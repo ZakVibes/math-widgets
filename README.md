@@ -14,5 +14,6 @@ Each folder is one self-contained page: open its index.html in a browser.
 | schrodinger-sandbox | Schrödinger Sandbox (1D) |
 | schrodinger-sandbox-2d | Schrödinger Sandbox 2D |
 | kaleidoscope | Kaleidoscope |
+| bifurcation-mandelbrot | Bifurcation ↔ Mandelbrot |
 
 Goal: turn this folder into a website that showcases these widgets.

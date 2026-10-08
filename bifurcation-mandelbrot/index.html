@@ -1,0 +1,939 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bifurcation ↔ Mandelbrot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0c11; --panel:#0f1219; --card:#141822; --ink:#ebe6dc; --muted:#9a9db0; --line:rgba(235,230,220,.12);
+  --chip:rgba(235,230,220,.05); --sel:rgba(235,230,220,.15); --accent:#f2b45a; --tagbg:rgba(15,18,25,.72);
+  --sans:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif; --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+:root[data-theme="light"]{
+  --bg:#efece4; --panel:#fbfaf6; --card:#ffffff; --ink:#1d1f27; --muted:#5d6070; --line:rgba(29,31,39,.14);
+  --chip:rgba(29,31,39,.04); --sel:rgba(29,31,39,.11); --accent:#b9741a; --tagbg:rgba(251,250,246,.8);
+  color-scheme:light;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:400 14px/1.45 var(--sans);-webkit-font-smoothing:antialiased}
+button{font:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1500px;margin:0 auto;padding:calc(env(safe-area-inset-top,0px) + 12px) 16px 32px}
+
+.top{display:flex;align-items:center;gap:6px 14px;flex-wrap:wrap}
+.back{color:var(--muted);text-decoration:none;font-size:13px;flex-basis:100%}
+.back:hover{color:var(--ink)}
+h1{font-size:20px;font-weight:600;margin:0;letter-spacing:-.01em;flex:1}
+.icon{appearance:none;border:1px solid var(--line);background:var(--chip);color:var(--ink);border-radius:10px;padding:6px 11px;cursor:pointer;font-size:13px}
+.icon:hover{background:var(--sel)}
+
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+.seg{display:inline-flex;padding:3px;border-radius:10px;background:var(--chip);border:1px solid var(--line)}
+.seg button{appearance:none;border:0;background:transparent;color:var(--muted);font-size:13px;font-weight:500;padding:6px 11px;border-radius:7px;cursor:pointer;white-space:nowrap}
+.seg button:hover{color:var(--ink)}
+.seg button[aria-pressed="true"]{background:var(--sel);color:var(--ink)}
+.btn{appearance:none;font-size:13px;font-weight:500;color:var(--ink);background:var(--chip);border:1px solid var(--line);border-radius:10px;padding:7px 12px;cursor:pointer;white-space:nowrap}
+.btn:hover{background:var(--sel)}
+.tog{display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;color:var(--ink);padding:0 4px}
+.tog input{appearance:none;-webkit-appearance:none;margin:0;width:32px;height:19px;border-radius:10px;background:var(--sel);border:1px solid var(--line);position:relative;flex:none;cursor:pointer;transition:background .2s}
+.tog input::after{content:"";position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:var(--muted);transition:transform .2s,background .2s}
+.tog input:checked{background:var(--accent);border-color:transparent}
+.tog input:checked::after{transform:translateX(13px);background:var(--panel)}
+.presets{display:flex;gap:6px;margin-top:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.presets::-webkit-scrollbar{display:none}
+.presets .btn{border-radius:999px;padding:6px 12px;font-size:12.5px}
+
+.layout{display:grid;gap:14px;margin-top:12px}
+@media (min-width:1000px){ .layout{grid-template-columns:minmax(0,1fr) 340px;align-items:start} }
+
+/* The two top panels and the axis share one width so their x-axes line up pixel for pixel */
+.stack{position:relative;touch-action:pan-y;user-select:none;-webkit-user-select:none;cursor:crosshair}
+.stack.tool-pan{cursor:grab}
+.panel{position:relative;background:var(--panel);border:1px solid var(--line);overflow:hidden}
+#mPanel{height:clamp(150px,31vh,400px);border-radius:12px 12px 0 0}
+#bPanel{height:clamp(170px,36vh,450px);border-top:0}
+#aPanel{height:30px;border-top:0;border-radius:0 0 12px 12px}
+.panel canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.tag{position:absolute;right:8px;top:7px;font-size:11.5px;color:var(--muted);background:var(--tagbg);padding:2px 8px;border-radius:6px;pointer-events:none}
+.tag i{font-family:var(--mono);font-style:normal;color:var(--ink)}
+.hint{color:var(--muted);font-size:12px;margin:7px 2px 0}
+
+.side{display:grid;gap:12px;align-content:start}
+@media (min-width:640px) and (max-width:999px){ .side{grid-template-columns:1fr 1fr} .side .why, .side #feigCard{grid-column:1 / -1} }
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.cardh{font-size:12px;color:var(--muted);margin:0 0 6px;font-weight:500}
+.status{display:flex;align-items:center;gap:9px;font-size:17px;font-weight:600;margin-bottom:8px}
+.sw{width:12px;height:12px;border-radius:50%;flex:none;background:var(--muted)}
+.readout dl{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;margin:0;font-family:var(--mono);font-size:13px}
+.readout dt{color:var(--muted)}
+.readout dd{margin:0;overflow-wrap:anywhere}
+.small{font-size:12px;color:var(--muted);margin:8px 0 0}
+.cob{position:relative;width:100%;max-width:320px;aspect-ratio:1 / 1;margin:0 auto 10px}
+.ts{position:relative;width:100%;height:96px}
+.cob canvas,.ts canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+
+#feigCard table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px}
+#feigCard th{font:500 11px var(--sans);color:var(--muted);text-align:left;padding:0 6px 4px 0}
+#feigCard td{padding:3px 6px 3px 0;border-top:1px solid var(--line)}
+#feigCard td button{appearance:none;border:0;background:none;color:inherit;font:inherit;padding:0;cursor:pointer;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
+#feigCard .delta{margin:8px 0 0;font-size:12.5px}
+
+.why summary{cursor:pointer;font-weight:600;list-style:none;display:flex;justify-content:space-between;align-items:center}
+.why summary::-webkit-details-marker{display:none}
+.why summary::after{content:"+";color:var(--muted);font-weight:400;font-size:18px;line-height:1}
+.why[open] summary::after{content:"−"}
+.why p{margin:10px 0 0;font-size:13.5px}
+.formula{font-family:var(--mono);font-size:14px;background:var(--chip);border:1px solid var(--line);border-radius:8px;padding:8px 10px;text-align:center}
+.err{display:none;color:#ef7a5a;font-size:13px;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="back" href="../index.html">← All widgets</a>
+    <h1>Bifurcation ↔ Mandelbrot</h1>
+    <button type="button" class="icon" id="themeBtn">Light</button>
+  </header>
+
+  <div class="toolbar">
+    <div class="seg" id="toolSeg" role="group" aria-label="Drag tool">
+      <button type="button" data-v="cursor" aria-pressed="true">Cursor</button>
+      <button type="button" data-v="box" aria-pressed="false">Box zoom</button>
+      <button type="button" data-v="pan" aria-pressed="false">Pan</button>
+    </div>
+    <button type="button" class="btn" id="zoomOut">Zoom out</button>
+    <button type="button" class="btn" id="reset">Reset</button>
+    <div class="seg" id="axisSeg" role="group" aria-label="Axis labels">
+      <button type="button" data-v="c" aria-pressed="true">c axis</button>
+      <button type="button" data-v="r" aria-pressed="false">r axis</button>
+    </div>
+    <label class="tog"><input type="checkbox" id="feigTog"><span>Feigenbaum</span></label>
+  </div>
+  <div class="presets" id="presets" role="group" aria-label="Fly to"></div>
+
+  <main class="layout">
+    <section>
+      <div class="stack" id="stack" tabindex="0" aria-label="Mandelbrot set above the bifurcation diagram, sharing one horizontal axis. Arrow keys move the cursor; plus and minus zoom.">
+        <div class="panel" id="mPanel"><canvas id="mCv"></canvas><canvas id="mOv"></canvas><span class="tag">Mandelbrot · <i>z → z² + c</i></span></div>
+        <div class="panel" id="bPanel"><canvas id="bCv"></canvas><canvas id="bOv"></canvas><span class="tag">Bifurcation · <i>x → r·x(1−x)</i></span></div>
+        <div class="panel" id="aPanel"><canvas id="aCv"></canvas></div>
+      </div>
+      <p class="hint" id="hint"></p>
+      <p class="err" id="err"></p>
+    </section>
+
+    <aside class="side">
+      <div class="card readout">
+        <div class="status"><span class="sw" id="sw"></span><span id="status">–</span></div>
+        <dl>
+          <dt>c</dt><dd id="cOut">–</dd>
+          <dt>r</dt><dd id="rOut">–</dd>
+          <dt>λ</dt><dd id="lOut">–</dd>
+        </dl>
+        <p class="small">λ is the Lyapunov exponent: below zero the orbit settles into a cycle, above zero it is chaotic.</p>
+      </div>
+      <div class="card">
+        <p class="cardh">Cobweb: each bounce is one step of the map</p>
+        <div class="cob"><canvas id="cobCv"></canvas></div>
+        <p class="cardh">Orbit x<sub>n</sub>, starting from x₀ = ½</p>
+        <div class="ts"><canvas id="tsCv"></canvas></div>
+      </div>
+      <div class="card" id="feigCard" hidden>
+        <p class="cardh">Period doublings (dashed lines)</p>
+        <table><thead><tr><th>Doubling</th><th>at c</th><th>gap ratio</th></tr></thead><tbody id="feigBody"></tbody></table>
+        <p class="delta">Each doubling comes sooner than the last. One gap divided by the next closes in on <b>δ ≈ 4.669</b>, Feigenbaum's constant. It is the same for almost any map with a single hump.</p>
+      </div>
+      <details class="card why">
+        <summary>Why are these the same?</summary>
+        <p>Both pictures come from the same game: start with a number, apply a rule, then apply the rule to the answer, over and over. What matters is where the numbers end up.</p>
+        <p>The bifurcation diagram uses the rule <b>x → r·x(1−x)</b>. The Mandelbrot set uses <b>z → z² + c</b>.</p>
+        <p>They look different, but they are the same rule written in different units, like Celsius and Fahrenheit. Translate with</p>
+        <p class="formula">c = r/2 − r²/4 &nbsp;·&nbsp; z = r(½ − x)</p>
+        <p>and one step of either rule is exactly one step of the other. So each r from 1 to 4 matches one c from −2 to ¼, the stretch of the real axis highlighted in the top panel.</p>
+        <p>Inside a Mandelbrot bulb the numbers settle into a repeating cycle, and the bulb's period is the number of branches in the diagram below it. That is why the branches split exactly where the axis passes from one bulb into the next, and why the period-3 window sits right under a tiny copy of the Mandelbrot set.</p>
+        <p>Matching colours mean matching periods in both panels.</p>
+      </details>
+    </aside>
+  </main>
+</div>
+
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const root = document.documentElement;
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const coarse = matchMedia('(pointer: coarse)').matches;
+
+/* ---------------- constants ---------------- */
+const C_LO = -2, C_HI = 0.25;                 // real segment of the Mandelbrot set (r = 4 … r = 1)
+const MIN_SPAN = 2e-12, MAX_SPAN = 4.5;
+const HOME = { cMin: -2.1, span: 2.5 };
+// Period-doubling points on the real axis (period 1→2, 2→4, 4→8, …) and their limit.
+// Checked by solving f^p(z) = z, (f^p)'(z) = −1 with Newton's method; the last one is from the literature.
+const FEIG = [-0.75, -1.25, -1.3680989393913, -1.3940461566008, -1.3996312388738, -1.4008287423709, -1.401085271257, -1.4011402183];
+const C_INF = -1.4011551890920506;
+const PRESETS = [
+  { label: 'Period 2', c: -1, view: [-1.34, -0.66] },
+  { label: 'Period 4', c: -1.3107026413368328, view: [-1.405, -1.215] },
+  { label: 'Onset of chaos', c: C_INF, view: [C_INF - 0.009, C_INF + 0.009] },
+  { label: 'Period-3 window', c: -1.7548776662466927, view: [-1.795, -1.738] },
+  { label: 'Bands merge', c: -1.5436890126920764, view: [-1.62, -1.47] },
+  { label: 'c = −2 (r = 4)', c: -2, view: [-2.06, -1.86] }
+];
+const rFromC = c => 1 + Math.sqrt(1 - 4 * c);
+const cFromR = r => r / 2 - r * r / 4;
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const minus = s => String(s).replace(/-/g, '−');
+
+/* ---------------- colours ---------------- */
+// Same period = same colour in both panels. Chaos uses the colour of the Mandelbrot boundary glow.
+const THEMES = {
+  dark: {
+    bg: [15, 18, 25], outside: [11, 13, 19], chaos: [239, 230, 210],
+    ext: [[0, [15, 18, 25]], [0.3, [24, 33, 66]], [0.58, [44, 88, 128]], [0.8, [104, 170, 178]], [1, [239, 230, 210]]],
+    per: { 1: [53, 198, 180], 2: [242, 180, 90], 4: [239, 122, 90], 8: [224, 85, 143], 16: [179, 91, 214], 32: [125, 108, 240], 64: [111, 140, 255], 3: [155, 211, 90], 5: [90, 176, 242], 6: [242, 211, 90], 7: [90, 242, 200] },
+    interiorMix: 0.28, cursor: '#ffffff', seg: 'rgba(255,255,255,.42)', text: 'rgba(235,230,220,.9)', mute: 'rgba(235,230,220,.5)',
+    grid: 'rgba(235,230,220,.09)', feig: 'rgba(242,180,90,.7)', band: 'rgba(242,180,90,.14)', bandEdge: 'rgba(242,180,90,.85)', halo: 'rgba(0,0,0,.6)'
+  },
+  light: {
+    bg: [251, 250, 246], outside: [242, 239, 232], chaos: [32, 35, 45],
+    ext: [[0, [251, 250, 246]], [0.3, [222, 227, 236]], [0.58, [150, 172, 204]], [0.8, [72, 100, 142]], [1, [32, 35, 45]]],
+    per: { 1: [22, 150, 135], 2: [200, 128, 20], 4: [214, 84, 52], 8: [196, 48, 110], 16: [140, 60, 180], 32: [90, 70, 200], 64: [60, 90, 220], 3: [90, 158, 36], 5: [36, 118, 200], 6: [186, 146, 18], 7: [18, 168, 138] },
+    interiorMix: 0.12, cursor: '#111318', seg: 'rgba(0,0,0,.4)', text: 'rgba(29,31,39,.9)', mute: 'rgba(29,31,39,.55)',
+    grid: 'rgba(29,31,39,.08)', feig: 'rgba(185,116,26,.8)', band: 'rgba(185,116,26,.12)', bandEdge: 'rgba(185,116,26,.9)', halo: 'rgba(255,255,255,.75)'
+  }
+};
+const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+const pack = c => ((255 << 24) | ((c[2] & 255) << 16) | ((c[1] & 255) << 8) | (c[0] & 255)) >>> 0;
+const css = c => `rgb(${c.map(Math.round).join(',')})`;
+function hsl(h, s, l) {
+  const f = n => { const k = (n + h / 30) % 12, a = s * Math.min(l, 1 - l); return 255 * (l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1))); };
+  return [f(0), f(8), f(4)];
+}
+let theme = 'dark', P = null;
+try { const t = localStorage.getItem('bifmand-theme'); if (t === 'light' || t === 'dark') theme = t; } catch (e) {}
+function buildPalette() {
+  const T = THEMES[theme], lut = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) {
+    const t = i / 255; let k = 1;
+    while (k < T.ext.length - 1 && T.ext[k][0] < t) k++;
+    const [t0, c0] = T.ext[k - 1], [t1, c1] = T.ext[k];
+    lut[i] = pack(mix(c0, c1, (t - t0) / (t1 - t0)).map(Math.round));
+  }
+  P = { T, lut, cache: new Map(), bg: pack(T.bg), outside: pack(T.outside), unknown: pack(mix(T.chaos, T.bg, 0.55).map(Math.round)), chaosCss: css(T.chaos) };
+}
+function periodEntry(p) {
+  let e = P.cache.get(p);
+  if (e) return e;
+  const T = P.T;
+  let rgb = T.per[p];
+  if (!rgb) rgb = (p & (p - 1)) === 0 ? T.per[64] : hsl((p * 137.508) % 360, 0.62, theme === 'dark' ? 0.64 : 0.42);
+  e = { rgb, css: css(rgb), interior: pack(mix(rgb, T.bg, T.interiorMix).map(Math.round)) };
+  P.cache.set(p, e);
+  return e;
+}
+
+/* ---------------- worker code (also usable on the main thread as a fallback) ---------------- */
+const CORE = `
+function minPeriod(x, y, cr, ci, p) {
+  let a = x, b = y;
+  for (let k = 1; k <= p; k++) {
+    const t = a * a - b * b + cr; b = 2 * a * b + ci; a = t;
+    if (Math.abs(a - x) < 1e-9 && Math.abs(b - y) < 1e-9) return k;
+  }
+  return p;
+}
+// Smooth escape count (>= 0), minus the period of an attracting cycle (< 0), or -1000 if undecided.
+function mpoint(cr, ci, maxIter) {
+  const q = (cr - 0.25) * (cr - 0.25) + ci * ci;
+  if (q * (q + (cr - 0.25)) <= 0.25 * ci * ci) return -1;          // main cardioid
+  if ((cr + 1) * (cr + 1) + ci * ci <= 0.0625) return -2;          // period-2 bulb
+  let x = 0, y = 0, x2 = 0, y2 = 0, sx = 0, sy = 0, sn = 0, lim = 8;
+  for (let n = 1; n <= maxIter; n++) {
+    y = 2 * x * y + ci; x = x2 - y2 + cr; x2 = x * x; y2 = y * y;
+    if (x2 + y2 > 65536) return Math.max(0, n + 1 - Math.log2(0.5 * Math.log(x2 + y2)));
+    if (Math.abs(x - sx) < 1e-13 && Math.abs(y - sy) < 1e-13) return -minPeriod(x, y, cr, ci, n - sn);
+    if (n - sn === lim) { sx = x; sy = y; sn = n; lim *= 2; }
+  }
+  // Near the edge of a bulb the orbit converges slowly, so confirm the cycle mathematically instead.
+  const p = findPeriod(x, y, cr, ci, 512, 1e-4);
+  return p ? -p : -1000;
+}
+// The period of the attracting cycle that z is heading for, or 0 if there is none.
+// A rough near-return suggests a length p; Newton's method then pins down the exact cycle for each
+// divisor q of p, and the first one whose multiplier is below 1 in size is the attractor.
+// This stays correct where convergence is too slow for a plain "did it come back?" test.
+function attractingPeriod(zr, zi, cr, ci, p) {
+  for (let q = 1; q <= p; q++) {
+    if (p % q) continue;
+    let ur = zr, ui = zi;
+    for (let it = 0; it < 40; it++) {
+      let vr = ur, vi = ui, dr = 1, di = 0;
+      for (let k = 0; k < q; k++) {
+        const t = 2 * (dr * vr - di * vi); di = 2 * (dr * vi + di * vr); dr = t;
+        const s = vr * vr - vi * vi + cr; vi = 2 * vr * vi + ci; vr = s;
+      }
+      const gr = vr - ur, gi = vi - ui, hr = dr - 1, hi = di, den = hr * hr + hi * hi;
+      if (!(den > 1e-300)) break;
+      const sr = (gr * hr + gi * hi) / den, si = (gi * hr - gr * hi) / den;
+      ur -= sr; ui -= si;
+      if (Math.abs(sr) + Math.abs(si) < 1e-13 * (1 + Math.abs(ur) + Math.abs(ui))) {
+        if (dr * dr + di * di < 1 - 1e-9) return q;   // strictly attracting; |multiplier| = 1 is a bifurcation point
+        break;
+      }
+    }
+  }
+  return 0;
+}
+function findPeriod(zr, zi, cr, ci, maxP, tol) {
+  let a = zr, b = zi, tries = 0;
+  for (let k = 1; k <= maxP && tries < 3; k++) {
+    const t = a * a - b * b + cr; b = 2 * a * b + ci; a = t;
+    if (Math.abs(a - zr) < tol && Math.abs(b - zi) < tol) {
+      tries++;
+      const q = attractingPeriod(zr, zi, cr, ci, k);
+      if (q) return q;
+    }
+  }
+  return 0;
+}
+function handle(d) {
+  if (d.kind === 'm') {
+    const { b, cols, row0, row1, H, cMin, px, maxIter } = d, rows = row1 - row0, half = H / 2;
+    const out = new Float32Array(cols * rows);
+    for (let j = 0; j < rows; j++) {
+      const ci = (half - ((row0 + j) * b + b / 2)) * px;
+      for (let i = 0; i < cols; i++) out[j * cols + i] = mpoint(cMin + (i * b + b / 2) * px, ci, maxIter);
+    }
+    return { msg: { kind: 'm', gen: d.gen, b, cols, row0, row1, out }, transfer: [out.buffer] };
+  }
+  // Bifurcation columns: iterate from the critical point, skip a transient, histogram the rest.
+  const { i0, i1, H, cMin, dc, sub, T, N } = d, cols = i1 - i0;
+  const dens = new Float32Array(cols * H), per = new Int16Array(cols), cnt = new Uint32Array(H);
+  const norm = 1 / Math.log1p(N * sub);
+  for (let i = 0; i < cols; i++) {
+    cnt.fill(0);
+    let any = false, p = 0;
+    for (let k = 0; k < sub; k++) {
+      const c = cMin + (i0 + i + (k + 0.5) / sub) * dc;
+      if (c > 0.25 || c < -2) continue;
+      const r = 1 + Math.sqrt(1 - 4 * c), ir = 1 / r;
+      let z = 0;
+      for (let n = 0; n < T; n++) z = z * z + c;
+      if (!any) p = findPeriod(z, 0, c, 0, 256, 1e-3);
+      any = true;
+      for (let n = 0; n < N; n++) {
+        z = z * z + c;
+        let row = ((0.5 + z * ir) * H) | 0;      // x = 1/2 − z/r, drawn with x = 1 at the top
+        if (row < 0) row = 0; else if (row >= H) row = H - 1;
+        cnt[row]++;
+      }
+    }
+    per[i] = any ? p : -2;
+    if (any) { const o = i * H; for (let y = 0; y < H; y++) if (cnt[y]) dens[o + y] = Math.log1p(cnt[y]) * norm; }
+  }
+  return { msg: { kind: 'b', gen: d.gen, pass: d.pass, i0, i1, dens, per }, transfer: [dens.buffer, per.buffer] };
+}
+`;
+const { handle: fbHandle, findPeriod } = new Function(CORE + '\nreturn { handle, findPeriod };')();
+let pool = [];
+try {
+  const url = URL.createObjectURL(new Blob([CORE + '\nself.onmessage = e => { const r = handle(e.data); self.postMessage(r.msg, r.transfer); };'], { type: 'text/javascript' }));
+  const n = Math.max(2, Math.min(6, (navigator.hardwareConcurrency || 4) - 1));
+  for (let i = 0; i < n; i++) {
+    const w = new Worker(url);
+    w.busy = false;
+    w.onmessage = e => { w.busy = false; onResult(e.data); pump(); };
+    w.onerror = ev => { ev.preventDefault(); dropWorkers(); };
+    pool.push(w);
+  }
+} catch (e) { pool = []; }
+function dropWorkers() {
+  if (!pool.length) return;
+  pool.forEach(w => w.terminate());
+  pool = [];
+  startRender();
+}
+
+/* ---------------- task queue ---------------- */
+const gen = { m: 0, b: 0 };
+let queue = [], fbBusy = false;
+function nextTask() {
+  while (queue.length) { const t = queue.shift(); if (t.gen === gen[t.kind]) return t; }
+  return null;
+}
+function pump() {
+  if (!pool.length) {
+    if (fbBusy) return;
+    const t = nextTask();
+    if (!t) return;
+    fbBusy = true;
+    setTimeout(() => { const r = fbHandle(t); fbBusy = false; onResult(r.msg); pump(); }, 0);
+    return;
+  }
+  for (const w of pool) {
+    if (w.busy) continue;
+    const t = nextTask();
+    if (!t) return;
+    w.busy = true;
+    w.postMessage(t);
+  }
+}
+
+/* ---------------- canvases and layout ---------------- */
+const stack = $('#stack');
+const mCv = $('#mCv'), mOv = $('#mOv'), bCv = $('#bCv'), bOv = $('#bOv'), aCv = $('#aCv'), cobCv = $('#cobCv'), tsCv = $('#tsCv');
+const mCtx = mCv.getContext('2d'), mOx = mOv.getContext('2d'), bCtx = bCv.getContext('2d'), bOx = bOv.getContext('2d');
+const aCtx = aCv.getContext('2d'), cobCtx = cobCv.getContext('2d'), tsCtx = tsCv.getContext('2d');
+let dpr = 1, Wc = 1, Wd = 2, mH = 2, bH = 2, aH = 2;
+
+function layout() {
+  dpr = Math.min(2, window.devicePixelRatio || 1);
+  const r = mCv.getBoundingClientRect();
+  Wc = Math.max(1, r.width);
+  Wd = Math.max(2, Math.round(Wc * dpr));
+  mH = Math.max(3, Math.round(r.height * dpr)) | 1;   // odd height, so the middle pixel row is exactly the real axis
+  bH = Math.max(2, Math.round(bCv.getBoundingClientRect().height * dpr));
+  aH = Math.max(2, Math.round(aCv.getBoundingClientRect().height * dpr));
+  for (const [cv, h] of [[mCv, mH], [mOv, mH], [bCv, bH], [bOv, bH], [aCv, aH]]) { cv.width = Wd; cv.height = h; }
+  for (const cv of [cobCv, tsCv]) {
+    const q = cv.getBoundingClientRect();
+    cv.width = Math.max(2, Math.round(q.width * dpr)); cv.height = Math.max(2, Math.round(q.height * dpr));
+  }
+  shown = null;
+}
+
+/* ---------------- view state ---------------- */
+let view = { ...HOME }, shown = null, cursor = -1, tool = 'cursor', axis = 'c', feigOn = false;
+let analysis = null, band = null;
+const X = c => (c - view.cMin) / view.span * Wd;          // c → device x
+const cAtCss = x => view.cMin + x / Wc * view.span;      // css x → c
+
+function setView(v) {
+  const span = clamp(v.span, MIN_SPAN, MAX_SPAN);
+  const mid = clamp(v.cMin + v.span / 2, -2.8, 1);
+  view = { cMin: mid - span / 2, span };
+  needReproject = true;
+  scheduleRender();
+  queueFrame(true);
+}
+
+/* Stretch whatever is on screen to the new view right away, so zooming feels instant */
+const tmp = document.createElement('canvas'), tmpCtx = tmp.getContext('2d');
+function reprojectOne(cv, ctx, from, to, vertical) {
+  if (tmp.width !== cv.width || tmp.height !== cv.height) { tmp.width = cv.width; tmp.height = cv.height; }
+  tmpCtx.clearRect(0, 0, tmp.width, tmp.height);
+  tmpCtx.drawImage(cv, 0, 0);
+  const s = from.span / to.span, tx = (from.cMin - to.cMin) / to.span * cv.width;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = css(P.T.bg);
+  ctx.fillRect(0, 0, cv.width, cv.height);
+  if (vertical) ctx.setTransform(s, 0, 0, s, tx, cv.height / 2 * (1 - s));
+  else ctx.setTransform(s, 0, 0, 1, tx, 0);
+  ctx.imageSmoothingEnabled = s < 8;
+  ctx.drawImage(tmp, 0, 0);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+}
+let needReproject = false;
+function reproject() {
+  needReproject = false;
+  if (shown && (shown.cMin !== view.cMin || shown.span !== view.span)) {
+    reprojectOne(mCv, mCtx, shown, view, true);
+    reprojectOne(bCv, bCtx, shown, view, false);
+    // anything still rendering was for the old view
+    gen.m++; gen.b++; mJob = null; bJob = null;
+  }
+  shown = { ...view };
+}
+
+/* ---------------- rendering jobs ---------------- */
+let mJob = null, bJob = null, renderTimer = 0, lastStart = 0;
+function scheduleRender() {
+  clearTimeout(renderTimer);
+  renderTimer = setTimeout(startRender, performance.now() - lastStart > 260 ? 0 : 80);
+}
+function escapeMu(cr, ci, maxIter) {
+  let x = 0, y = 0;
+  for (let n = 1; n <= maxIter; n++) {
+    const t = x * x - y * y + cr; y = 2 * x * y + ci; x = t;
+    const m = x * x + y * y;
+    if (m > 65536) return Math.max(0, n + 1 - Math.log2(0.5 * Math.log(m)));
+  }
+  return Infinity;
+}
+function estimateMuMin(maxIter) {
+  const px = view.span / Wd, top = mH / 2 * px;
+  let mn = Infinity;
+  for (let i = 0; i <= 16; i++) mn = Math.min(mn, escapeMu(view.cMin + view.span * i / 16, top, maxIter));
+  for (let j = 0; j <= 4; j++) {
+    mn = Math.min(mn, escapeMu(view.cMin, top * j / 4, maxIter), escapeMu(view.cMin + view.span, top * j / 4, maxIter));
+  }
+  return isFinite(mn) ? mn : 0;
+}
+function startRender() {
+  clearTimeout(renderTimer);
+  if (needReproject) reproject();
+  if (!shown) shown = { ...view };
+  lastStart = performance.now();
+  const gm = ++gen.m, gb = ++gen.b;
+  queue = [];
+  const zoom = HOME.span / view.span;
+  const maxIter = Math.round(Math.min(25000, 400 + 240 * Math.max(0, Math.log2(zoom))));
+  const px = view.span / Wd, half = Math.ceil(mH / 2);
+  mJob = { g: gm, img: mCtx.createImageData(Wd, mH), level: new Uint8Array(half).fill(255), muMin: estimateMuMin(maxIter), denom: 4 + 0.6 * Math.log2(maxIter) };
+  bJob = { g: gb, img: bCtx.createImageData(Wd, bH), level: new Uint8Array(Wd) };
+  const T = Math.round(Math.min(40000, 1000 * Math.sqrt(Math.max(1, zoom))));   // longer transient when zoomed in near bifurcations
+  const nT = Math.max(1, pool.length);
+  const chunk = Math.max(16, Math.ceil(Wd / (nT * 3)));
+  const pushB = (pass, sub, t, n) => {
+    for (let i0 = 0; i0 < Wd; i0 += chunk) queue.push({ kind: 'b', gen: gb, pass, i0, i1: Math.min(Wd, i0 + chunk), H: bH, cMin: view.cMin, dc: px, sub, T: t, N: n });
+  };
+  const pushM = b => {
+    const cols = Math.ceil(Wd / b), rows = Math.ceil(half / b), step = Math.max(1, Math.ceil(rows / (nT * (b === 1 ? 5 : 2))));
+    for (let r0 = 0; r0 < rows; r0 += step) queue.push({ kind: 'm', gen: gm, b, cols, row0: r0, row1: Math.min(rows, r0 + step), H: mH, cMin: view.cMin, px, maxIter });
+  };
+  // coarse first, then refined
+  pushB(1, 1, Math.min(T, 1500), 300);
+  pushM(8);
+  pushB(2, 2, T, coarse ? 900 : 1600);
+  pushM(3);
+  pushM(1);
+  pump();
+  writeHash();
+}
+function onResult(d) { if (d.kind === 'm') onM(d); else onB(d); }
+
+function onM(d) {
+  const J = mJob;
+  if (!J || d.gen !== J.g) return;
+  const { out, b, cols, row0, row1 } = d, W = Wd, H = mH, half = Math.ceil(H / 2);
+  const y0 = row0 * b, y1 = Math.min(half, row1 * b);
+  if (y1 <= y0) return;
+  const px32 = new Uint32Array(J.img.data.buffer), colors = new Uint32Array(out.length), lut = P.lut;
+  for (let k = 0; k < out.length; k++) {
+    const v = out[k];
+    if (v >= 0) { let t = Math.log2(1 + Math.max(0, v - J.muMin)) / J.denom; if (t > 1) t = 1; colors[k] = lut[(t * 255) | 0]; }
+    else if (v === -1000) colors[k] = P.unknown;
+    else colors[k] = periodEntry(-v).interior;
+  }
+  for (let y = y0; y < y1; y++) {
+    if (b > J.level[y]) continue;
+    J.level[y] = b;
+    const ro = (((y / b) | 0) - row0) * cols, o1 = y * W, o2 = (H - 1 - y) * W;   // the set is symmetric about the real axis
+    for (let x = 0; x < W; x++) { const col = colors[ro + ((x / b) | 0)]; px32[o1 + x] = col; px32[o2 + x] = col; }
+  }
+  mCtx.putImageData(J.img, 0, 0, 0, y0, W, y1 - y0);
+  mCtx.putImageData(J.img, 0, 0, 0, H - y1, W, y1 - y0);
+}
+
+function onB(d) {
+  const J = bJob;
+  if (!J || d.gen !== J.g) return;
+  const { i0, i1, dens, per, pass } = d, W = Wd, H = bH;
+  const px32 = new Uint32Array(J.img.data.buffer), bg = P.T.bg, chaos = P.T.chaos;
+  for (let i = i0; i < i1; i++) {
+    if (pass < J.level[i]) continue;
+    J.level[i] = pass;
+    const k = i - i0, p = per[k];
+    if (p === -2) { for (let y = 0; y < H; y++) px32[y * W + i] = P.outside; continue; }
+    const periodic = p > 0, col = periodic ? periodEntry(p).rgb : chaos, base = k * H;
+    const r0 = bg[0], g0 = bg[1], b0 = bg[2], dr = col[0] - r0, dg = col[1] - g0, db = col[2] - b0;
+    for (let y = 0; y < H; y++) {
+      const v = dens[base + y];
+      if (v === 0) { px32[y * W + i] = P.bg; continue; }
+      // log density: settled cycles are crisp, chaotic bands are soft
+      const t = periodic ? Math.min(1, v * 1.2) : Math.min(1, 1.15 * Math.pow(v, 0.8));
+      px32[y * W + i] = 0xff000000 | ((b0 + db * t) << 16) | ((g0 + dg * t) << 8) | (r0 + dr * t);
+    }
+  }
+  bCtx.putImageData(J.img, 0, 0, i0, 0, i1 - i0, H);
+}
+
+/* ---------------- analysis of the cursor's orbit ---------------- */
+function analyze(c) {
+  const a = { c, r: NaN, p: 0, lyap: NaN, esc: false, z: 0, cycle: null };
+  if (c > C_HI) { a.esc = true; return a; }
+  a.r = rFromC(c);
+  if (c < C_LO) { a.esc = true; return a; }
+  let z = 0;
+  for (let n = 0; n < 20000; n++) z = z * z + c;
+  a.z = z;
+  a.p = findPeriod(z, 0, c, 0, 1024, 1e-3);
+  // λ = average of ln|f'| along the orbit, with f'(z) = 2z, which equals r(1 − 2x).
+  let s = 0, w = z;
+  if (a.p) {
+    // exactly, over one turn of the cycle (−∞ when the cycle passes through the critical point)
+    for (let k = 0; k < a.p; k++) { s += Math.log(Math.abs(2 * w)); w = w * w + c; }
+    a.lyap = s / a.p;
+  } else {
+    // over a typical orbit: nudge off the critical orbit, which can land exactly on an unstable point (c = −2 does)
+    w = z - Math.sign(z || 1) * 1e-9 * (1 + Math.abs(z));   // nudge inward, so c = −2 cannot escape past z = 2
+    const M = 20000;
+    for (let k = 0; k < M; k++) { s += Math.log(Math.abs(2 * w) || 1e-300); w = w * w + c; }
+    a.lyap = s / M;
+  }
+  if (a.p) { a.cycle = []; w = z; for (let k = 0; k < Math.min(a.p, 64); k++) { a.cycle.push(0.5 - w / a.r); w = w * w + c; } }
+  return a;
+}
+function orbitColor(a) {
+  if (a.esc) return P.T.mute;
+  return a.p ? periodEntry(a.p).css : P.chaosCss;
+}
+function digits() { return clamp(Math.ceil(-Math.log10(view.span / Wc)) + 1, 3, 15); }
+function fmt(v, d) { return minus(v.toFixed(d)); }
+
+/* ---------------- drawing: overlays, axis, readout, cobweb ---------------- */
+let frameQueued = false, sideDirty = false;
+function queueFrame(side) { if (side) sideDirty = true; if (!frameQueued) { frameQueued = true; requestAnimationFrame(frame); } }
+function frame() {
+  frameQueued = false;
+  if (needReproject) reproject();
+  if (sideDirty) { sideDirty = false; analysis = analyze(cursor); drawReadout(); drawCobweb(); drawSeries(); }
+  drawOverlays();
+  drawAxis();
+}
+function vline(ctx, x, H, color, w, dash) {
+  ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = w; if (dash) ctx.setLineDash(dash);
+  ctx.beginPath(); ctx.moveTo(Math.round(x) + 0.5, 0); ctx.lineTo(Math.round(x) + 0.5, H); ctx.stroke(); ctx.restore();
+}
+const MONO = '"IBM Plex Mono", ui-monospace, Menlo, monospace', SANS = '"IBM Plex Sans", system-ui, sans-serif';
+function label(ctx, text, x, y, align, color) {
+  ctx.font = `500 ${11 * dpr}px ${MONO}`;
+  ctx.textAlign = align; ctx.textBaseline = 'middle';
+  ctx.lineWidth = 3 * dpr; ctx.strokeStyle = P.T.halo; ctx.lineJoin = 'round';
+  ctx.strokeText(text, x, y); ctx.fillStyle = color; ctx.fillText(text, x, y);
+}
+function drawOverlays() {
+  const T = P.T;
+  for (const [ctx, H] of [[mOx, mH], [bOx, bH]]) {
+    ctx.clearRect(0, 0, Wd, H);
+    if (band) {
+      const x0 = Math.min(band.x0, band.x1) * dpr, x1 = Math.max(band.x0, band.x1) * dpr;
+      ctx.fillStyle = T.band; ctx.fillRect(x0, 0, x1 - x0, H);
+      vline(ctx, x0, H, T.bandEdge, dpr); vline(ctx, x1, H, T.bandEdge, dpr);
+    }
+    if (feigOn) for (const c of FEIG.concat([C_INF])) { const x = X(c); if (x > -2 && x < Wd + 2) vline(ctx, x, H, T.feig, dpr, [4 * dpr, 4 * dpr]); }
+  }
+  // the real segment [−2, ¼] that the logistic map lives on
+  const ya = mH / 2, xa = X(C_LO), xb = X(C_HI);   // centre of the middle row
+  if (xb > 0 && xa < Wd) {
+    mOx.save(); mOx.strokeStyle = T.seg; mOx.lineWidth = 1.5 * dpr;
+    mOx.beginPath(); mOx.moveTo(Math.max(-2, xa), ya); mOx.lineTo(Math.min(Wd + 2, xb), ya); mOx.stroke();
+    mOx.fillStyle = T.seg;
+    for (const x of [xa, xb]) if (x >= 0 && x <= Wd) { mOx.beginPath(); mOx.arc(x, ya, 2.5 * dpr, 0, Math.PI * 2); mOx.fill(); }
+    mOx.restore();
+  }
+  // y labels for x on the bifurcation panel
+  for (const [v, t] of [[1, 'x = 1'], [0.5, '½'], [0, '0']]) label(bOx, t, 6 * dpr, clamp((1 - v) * bH, 9 * dpr, bH - 9 * dpr), 'left', T.mute);
+  if (feigOn) {
+    let last = -1e9;
+    FEIG.forEach((c, i) => { const x = X(c); if (x > 8 * dpr && x < Wd - 8 * dpr && Math.abs(x - last) > 22 * dpr) { label(bOx, String(2 ** (i + 1)), x, 40 * dpr, 'center', T.feig); last = x; } });
+    const xi = X(C_INF);
+    if (xi > 8 * dpr && xi < Wd - 8 * dpr) label(bOx, '∞', xi, 54 * dpr, 'center', T.feig);
+  }
+  // shared cursor
+  const xc = X(cursor);
+  if (xc >= -1 && xc <= Wd + 1) {
+    for (const [ctx, H] of [[mOx, mH], [bOx, bH]]) {
+      vline(ctx, xc, H, T.halo, 3 * dpr);
+      vline(ctx, xc, H, T.cursor, 1.25 * dpr);
+    }
+    mOx.fillStyle = T.cursor; mOx.beginPath(); mOx.arc(xc, mH / 2, 3.5 * dpr, 0, Math.PI * 2); mOx.fill();
+    if (analysis && analysis.cycle) {
+      bOx.fillStyle = T.cursor;
+      for (const x of analysis.cycle) { bOx.beginPath(); bOx.arc(xc, (1 - x) * bH, 3 * dpr, 0, Math.PI * 2); bOx.fill(); }
+    }
+  }
+}
+function niceStep(range, n) {
+  const raw = range / Math.max(1, n), mag = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / mag;
+  return (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10) * mag;
+}
+function tickDigits(step) { return Math.max(0, -Math.floor(Math.log10(step) + 1e-9)); }
+function drawAxis() {
+  const ctx = aCtx, T = P.T;
+  ctx.clearRect(0, 0, Wd, aH);
+  ctx.font = `${11 * dpr}px ${MONO}`;
+  ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+  const cMax = view.cMin + view.span, y = aH * 0.58;
+  const ticks = [];
+  if (axis === 'c') {
+    let step = niceStep(view.span, Wc / 110), d = tickDigits(step);
+    step = niceStep(view.span, Wc / ((d + 4) * 7.5 + 26)); d = tickDigits(step);
+    for (let v = Math.ceil(view.cMin / step) * step; v <= cMax; v += step) ticks.push([X(v), fmt(Math.abs(v) < step / 1e6 ? 0 : v, d)]);
+  } else {
+    const lo = Math.max(view.cMin, C_LO), hi = Math.min(cMax, C_HI);
+    if (hi > lo) {
+      const rLo = rFromC(hi), rHi = rFromC(lo);
+      let step = niceStep(rHi - rLo, Wc / 110), d = tickDigits(step);
+      step = niceStep(rHi - rLo, Wc / ((d + 3) * 7.5 + 26)); d = tickDigits(step);
+      for (let v = Math.ceil(rLo / step) * step; v <= rHi + step * 1e-9; v += step) ticks.push([X(cFromR(v)), v.toFixed(d)]);
+    }
+  }
+  let last = -1e9;
+  ctx.fillStyle = T.text; ctx.strokeStyle = T.mute; ctx.lineWidth = dpr;
+  for (const [x, t] of ticks) {
+    const w = ctx.measureText(t).width;
+    if (x - w / 2 < last + 10 * dpr || x < w / 2 + 2 || x > Wd - w / 2 - 20 * dpr) continue;
+    ctx.beginPath(); ctx.moveTo(Math.round(x) + 0.5, 0); ctx.lineTo(Math.round(x) + 0.5, 5 * dpr); ctx.stroke();
+    ctx.fillText(t, x, y);
+    last = x + w / 2;
+  }
+  ctx.textAlign = 'right'; ctx.fillStyle = T.mute;
+  ctx.font = `italic 600 ${12 * dpr}px ${SANS}`;
+  ctx.fillText(axis, Wd - 7 * dpr, y);
+}
+function drawReadout() {
+  const a = analysis, d = digits();
+  $('#cOut').textContent = fmt(a.c, d);
+  $('#rOut').textContent = isNaN(a.r) ? 'no real r' : fmt(a.r, d);
+  let s;
+  if (a.esc) s = 'Escapes to ∞';
+  else if (a.p) s = 'Period ' + a.p;
+  else if (a.lyap > 1e-3) s = 'Chaotic';
+  else s = 'Borderline (λ ≈ 0)';
+  $('#status').textContent = s;
+  $('#sw').style.background = a.esc ? 'transparent' : orbitColor(a);
+  $('#sw').style.border = a.esc ? '1px solid var(--muted)' : '0';
+  $('#lOut').textContent = a.esc ? '–' : a.lyap === -Infinity ? '−∞ (superstable)' : fmt(a.lyap, 4);
+}
+function plotFrame(ctx, W, H, pad) {
+  const T = P.T;
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = T.grid; ctx.lineWidth = dpr;
+  ctx.strokeRect(pad.l + 0.5, pad.t + 0.5, W - pad.l - pad.r, H - pad.t - pad.b);
+}
+function drawCobweb() {
+  const ctx = cobCtx, W = cobCv.width, H = cobCv.height, a = analysis, T = P.T;
+  const pad = { l: 20 * dpr, r: 8 * dpr, t: 8 * dpr, b: 20 * dpr };
+  const sx = v => pad.l + v * (W - pad.l - pad.r), sy = v => H - pad.b - v * (H - pad.t - pad.b);
+  plotFrame(ctx, W, H, pad);
+  label(ctx, '0', pad.l - 9 * dpr, H - pad.b + 9 * dpr, 'center', T.mute);
+  label(ctx, '1', sx(1), H - pad.b + 10 * dpr, 'center', T.mute);
+  label(ctx, '1', pad.l - 9 * dpr, sy(1), 'center', T.mute);
+  label(ctx, 'xₙ', sx(0.5), H - pad.b + 10 * dpr, 'center', T.mute);
+  ctx.strokeStyle = T.grid; ctx.lineWidth = dpr;
+  ctx.beginPath(); ctx.moveTo(sx(0), sy(0)); ctx.lineTo(sx(1), sy(1)); ctx.stroke();
+  if (isNaN(a.r)) { label(ctx, 'no real r here', W / 2, H / 2, 'center', T.text); return; }
+  const r = a.r, col = orbitColor(a), f = x => r * x * (1 - x);
+  ctx.save();
+  ctx.beginPath(); ctx.rect(pad.l, pad.t, W - pad.l - pad.r, H - pad.t - pad.b); ctx.clip();
+  ctx.strokeStyle = col; ctx.lineWidth = 1.6 * dpr; ctx.globalAlpha = 0.9;
+  ctx.beginPath();
+  for (let i = 0; i <= 120; i++) { const x = i / 120; i ? ctx.lineTo(sx(x), sy(f(x))) : ctx.moveTo(sx(x), sy(f(x))); }
+  ctx.stroke();
+  const web = (x, steps, alpha, width) => {
+    ctx.globalAlpha = alpha; ctx.lineWidth = width; ctx.beginPath(); ctx.moveTo(sx(x), sy(x));
+    for (let k = 0; k < steps; k++) {
+      const y = f(x);
+      if (!isFinite(y) || y < -1 || y > 2) break;
+      ctx.lineTo(sx(x), sy(y)); ctx.lineTo(sx(y), sy(y)); x = y;
+    }
+    ctx.stroke();
+  };
+  ctx.strokeStyle = T.mute; web(0.5, 30, 0.7, dpr);
+  if (!a.esc) { ctx.strokeStyle = col; web(0.5 - a.z / r, a.p ? Math.min(a.p * 2, 200) : 160, a.p ? 1 : 0.55, 1.4 * dpr); }
+  ctx.restore();
+  if (a.esc) label(ctx, 'the orbit escapes', W / 2, pad.t + 14 * dpr, 'center', T.text);
+}
+function drawSeries() {
+  const ctx = tsCtx, W = tsCv.width, H = tsCv.height, a = analysis, T = P.T;
+  const pad = { l: 20 * dpr, r: 6 * dpr, t: 6 * dpr, b: 8 * dpr }, N = 80;
+  const sx = n => pad.l + n / N * (W - pad.l - pad.r), sy = v => H - pad.b - v * (H - pad.t - pad.b);
+  plotFrame(ctx, W, H, pad);
+  label(ctx, '1', pad.l - 9 * dpr, sy(1), 'center', T.mute);
+  label(ctx, '0', pad.l - 9 * dpr, sy(0), 'center', T.mute);
+  if (isNaN(a.r)) return;
+  const col = orbitColor(a);
+  ctx.save(); ctx.beginPath(); ctx.rect(pad.l, pad.t, W - pad.l - pad.r, H - pad.t - pad.b); ctx.clip();
+  ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = dpr; ctx.globalAlpha = 0.55;
+  let x = 0.5; const pts = [];
+  for (let n = 0; n <= N; n++) { pts.push(x); x = a.r * x * (1 - x); if (!isFinite(x) || Math.abs(x) > 4) break; }
+  ctx.beginPath(); pts.forEach((v, n) => n ? ctx.lineTo(sx(n), sy(v)) : ctx.moveTo(sx(n), sy(v))); ctx.stroke();
+  ctx.globalAlpha = 1;
+  pts.forEach((v, n) => { ctx.beginPath(); ctx.arc(sx(n), sy(v), 1.7 * dpr, 0, Math.PI * 2); ctx.fill(); });
+  ctx.restore();
+}
+
+/* ---------------- interaction ---------------- */
+function setCursor(c) { cursor = c; queueFrame(true); }
+function zoomAbout(cAnchor, factor) {
+  const span = clamp(view.span * factor, MIN_SPAN, MAX_SPAN);
+  const f = (cAnchor - view.cMin) / view.span;
+  setView({ cMin: cAnchor - f * span, span });
+}
+const pts = new Map();
+let drag = null;
+const localX = e => e.clientX - mCv.getBoundingClientRect().left;
+stack.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  cancelFly();
+  try { stack.setPointerCapture(e.pointerId); } catch (err) {}
+  const x = localX(e);
+  pts.set(e.pointerId, { x, y: e.clientY });
+  if (pts.size === 2) {
+    const [p, q] = [...pts.values()], mid = (p.x + q.x) / 2;
+    if (drag && drag.mode === 'cursor') setCursor(drag.prev);   // the first finger of a pinch shouldn't move the cursor
+    band = null;
+    drag = { mode: 'pinch', anchor: cAtCss(mid), dist: Math.max(20, Math.hypot(p.x - q.x, p.y - q.y)), span: view.span };
+    return;
+  }
+  if (pts.size > 2) return;
+  const mode = e.shiftKey ? 'box' : tool;
+  if (mode === 'cursor') { drag = { mode, prev: cursor }; setCursor(cAtCss(x)); }
+  else if (mode === 'box') { drag = { mode }; band = { x0: x, x1: x }; queueFrame(); }
+  else { drag = { mode: 'pan', x0: x, view0: { ...view } }; stack.style.cursor = 'grabbing'; }
+});
+stack.addEventListener('pointermove', e => {
+  const p = pts.get(e.pointerId);
+  if (!p || !drag) return;
+  p.x = localX(e); p.y = e.clientY;
+  if (drag.mode === 'pinch' && pts.size >= 2) {
+    const [a, b] = [...pts.values()], mid = (a.x + b.x) / 2, dist = Math.max(20, Math.hypot(a.x - b.x, a.y - b.y));
+    const span = clamp(drag.span * drag.dist / dist, MIN_SPAN, MAX_SPAN);
+    setView({ cMin: drag.anchor - mid / Wc * span, span });
+  } else if (drag.mode === 'cursor') setCursor(cAtCss(p.x));
+  else if (drag.mode === 'box') { band.x1 = p.x; queueFrame(); }
+  else if (drag.mode === 'pan') setView({ cMin: drag.view0.cMin - (p.x - drag.x0) / Wc * drag.view0.span, span: drag.view0.span });
+});
+function endPointer(e) {
+  if (!pts.has(e.pointerId)) return;
+  pts.delete(e.pointerId);
+  if (!drag) return;
+  if (drag.mode === 'box' && band && e.type === 'pointerup') {
+    const a = Math.min(band.x0, band.x1), b = Math.max(band.x0, band.x1);
+    band = null;
+    if (b - a > 6) setView({ cMin: cAtCss(a), span: (b - a) / Wc * view.span });
+    queueFrame();
+  }
+  if (drag.mode === 'pan') stack.style.cursor = '';
+  band = null;
+  if (pts.size === 0 || drag.mode === 'pinch') drag = null;
+  writeHash();
+  queueFrame();
+}
+stack.addEventListener('pointerup', endPointer);
+stack.addEventListener('pointercancel', endPointer);
+stack.addEventListener('wheel', e => {
+  e.preventDefault();
+  cancelFly();
+  const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1;
+  const dx = e.deltaX * unit, dy = e.deltaY * unit;
+  if (Math.abs(dx) > Math.abs(dy)) setView({ cMin: view.cMin + dx / Wc * view.span, span: view.span });
+  else zoomAbout(cAtCss(localX(e)), Math.exp(dy * 0.0015));
+}, { passive: false });
+stack.addEventListener('keydown', e => {
+  const px = view.span / Wc;
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { setCursor(cursor + (e.key === 'ArrowLeft' ? -1 : 1) * px * (e.shiftKey ? 10 : 1)); e.preventDefault(); }
+  else if (e.key === '+' || e.key === '=') { zoomAbout(cursor, 0.5); e.preventDefault(); }
+  else if (e.key === '-' || e.key === '_') { zoomAbout(cursor, 2); e.preventDefault(); }
+});
+
+/* fly-to animation: the target slides to the centre while the zoom changes smoothly */
+let flyRaf = 0;
+function cancelFly() { cancelAnimationFrame(flyRaf); flyRaf = 0; }
+function flyTo(v1, c1) {
+  cancelFly();
+  setCursor(c1);
+  if (reduced) { setView(v1); return; }
+  const v0 = { ...view }, t0 = performance.now(), D = 950;
+  const ls0 = Math.log(v0.span), ls1 = Math.log(v1.span), m1 = v1.cMin + v1.span / 2;
+  const u = (m1 - (v0.cMin + v0.span / 2)) / v0.span;
+  const step = now => {
+    const t = Math.min(1, (now - t0) / D), e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    const s = Math.exp(ls0 + (ls1 - ls0) * e), m = m1 - s * u * (1 - e);
+    setView({ cMin: m - s / 2, span: s });
+    flyRaf = t < 1 ? requestAnimationFrame(step) : 0;
+  };
+  flyRaf = requestAnimationFrame(step);
+}
+
+/* ---------------- controls ---------------- */
+function bindSeg(id, set) {
+  const seg = $(id);
+  seg.addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    seg.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    set(b.dataset.v);
+  });
+}
+bindSeg('#toolSeg', v => { tool = v; stack.classList.toggle('tool-pan', v === 'pan'); });
+bindSeg('#axisSeg', v => { axis = v; queueFrame(); });
+$('#zoomOut').addEventListener('click', () => { cancelFly(); zoomAbout(view.cMin + view.span / 2, 2); });
+$('#reset').addEventListener('click', () => flyTo({ ...HOME }, -1));
+$('#feigTog').addEventListener('change', e => { feigOn = e.target.checked; $('#feigCard').hidden = !feigOn; queueFrame(); });
+const presetBox = $('#presets');
+PRESETS.forEach(p => {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'btn'; b.textContent = p.label;
+  b.addEventListener('click', () => flyTo({ cMin: p.view[0], span: p.view[1] - p.view[0] }, p.c));
+  presetBox.appendChild(b);
+});
+(function buildFeigTable() {
+  const body = $('#feigBody');
+  FEIG.forEach((c, i) => {
+    const tr = document.createElement('tr');
+    const gapPrev = i > 0 ? FEIG[i - 1] - c : 0, gapNext = i + 1 < FEIG.length ? c - FEIG[i + 1] : 0;
+    const ratio = gapPrev && gapNext ? (gapPrev / gapNext).toFixed(4) : '';
+    tr.innerHTML = `<td>${2 ** i}→${2 ** (i + 1)}</td><td><button type="button">${minus(c.toFixed(i < 2 ? 2 : 7))}</button></td><td>${ratio}</td>`;
+    const w = Math.max(gapPrev, 1e-6) * 2.4;
+    tr.querySelector('button').addEventListener('click', () => flyTo({ cMin: c - w * 0.6, span: w }, c));
+    body.appendChild(tr);
+  });
+})();
+function applyTheme() {
+  root.dataset.theme = theme;
+  $('#themeBtn').textContent = theme === 'dark' ? 'Light' : 'Dark';
+  $('#themeBtn').setAttribute('aria-label', theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme');
+  buildPalette();
+}
+$('#themeBtn').addEventListener('click', () => {
+  theme = theme === 'dark' ? 'light' : 'dark';
+  try { localStorage.setItem('bifmand-theme', theme); } catch (e) {}
+  applyTheme();
+  startRender();
+  queueFrame(true);
+});
+$('#hint').textContent = coarse
+  ? 'Drag sideways to move the cursor · pinch to zoom both panels · swipe up or down to scroll'
+  : 'Drag to move the cursor · scroll to zoom · Shift-drag to box-zoom · arrow keys nudge the cursor';
+
+/* shareable link: #c=…&x=…&s=… */
+function writeHash() {
+  try { history.replaceState(null, '', `#c=${cursor.toPrecision(16)}&x=${view.cMin.toPrecision(16)}&s=${view.span.toPrecision(8)}`); } catch (e) {}
+}
+function readHash() {
+  const h = new URLSearchParams(location.hash.slice(1));
+  const c = parseFloat(h.get('c')), x = parseFloat(h.get('x')), s = parseFloat(h.get('s'));
+  if (isFinite(c)) cursor = c;
+  if (isFinite(x) && isFinite(s) && s > 0) view = { cMin: x, span: clamp(s, MIN_SPAN, MAX_SPAN) };
+}
+
+/* ---------------- start ---------------- */
+applyTheme();
+readHash();
+layout();
+startRender();
+queueFrame(true);
+let resizeTimer = 0;
+new ResizeObserver(() => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    const r = mCv.getBoundingClientRect();
+    if (Math.round(r.width * dpr) === Wd && (Math.max(3, Math.round(r.height * dpr)) | 1) === mH && Math.round(bCv.getBoundingClientRect().height * dpr) === bH
+        && Math.round(cobCv.getBoundingClientRect().width * dpr) === cobCv.width) return;
+    layout(); startRender(); queueFrame(true);
+  }, 120);
+}).observe(document.body);
+})();
+</script>
+</body>
+</html>
