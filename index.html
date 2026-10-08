@@ -23,6 +23,7 @@
       --chaos: #d0662a;
       --quantum: #1f9a7a;
       --symmetry: #a87a22;
+      --waves: #c2417e;
     }
     /* Dark mode: used automatically when the visitor's computer is set to dark. */
     @media (prefers-color-scheme: dark) {
@@ -37,6 +38,7 @@
         --chaos: #ef9058;
         --quantum: #4fc9a6;
         --symmetry: #d6a74e;
+        --waves: #f07aa8;
       }
     }
 
@@ -87,6 +89,7 @@
     .chaos    { --accent: var(--chaos); }
     .quantum  { --accent: var(--quantum); }
     .symmetry { --accent: var(--symmetry); }
+    .waves    { --accent: var(--waves); }
 
     /* The grid of cards: as many columns as fit, each at least 280px wide */
     .grid {
@@ -138,7 +141,7 @@
   <main>
     <header>
       <h1>Zak's Math Widgets</h1>
-      <p class="intro">Interactive explorations of fractals, symmetry, gravity, chaos and quantum mechanics. Pick one and start playing; everything runs right in your browser.</p>
+      <p class="intro">Interactive explorations of fractals, symmetry, gravity, chaos, quantum mechanics and waves. Pick one and start playing; everything runs right in your browser.</p>
     </header>
 
     <section class="fractals">
@@ -216,6 +219,17 @@
         <a class="card" href="schrodinger-sandbox-2d/index.html">
           <h3>Schrödinger Sandbox 2D</h3>
           <p>Wave packets in a plane: scattering, tunneling and interference in two dimensions.</p>
+          <span class="open">Open →</span>
+        </a>
+      </div>
+    </section>
+
+    <section class="waves">
+      <h2>Waves &amp; signals</h2>
+      <div class="grid">
+        <a class="card" href="fourier-studio/index.html">
+          <h3>Fourier Studio</h3>
+          <p>Draw any loop and watch spinning circles rebuild it, then split chords, beats and your own voice into their frequencies.</p>
           <span class="open">Open →</span>
         </a>
       </div>
