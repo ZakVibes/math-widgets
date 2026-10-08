@@ -599,7 +599,7 @@ function drawMom() {
   c.imageSmoothingEnabled = true; c.clearRect(0, 0, W, H); c.drawImage(offK, 0, 0, W, H);
   const k2x = k => (k + (MK + 0.5) * DK) / ((2 * MK + 1) * DK) * W, k2y = k => (1 - (k + (MK + 0.5) * DK) / ((2 * MK + 1) * DK)) * H;
   c.strokeStyle = C.grid; c.lineWidth = 1; c.beginPath(); c.moveTo(k2x(0), 0); c.lineTo(k2x(0), H); c.moveTo(0, k2y(0)); c.lineTo(W, k2y(0)); c.stroke();
-  if (obs.norm > 1e-4) { c.strokeStyle = C.ink; c.lineWidth = 1.5; c.beginPath(); c.arc(k2x(obs.px), k2y(obs.py), 4, 0, Math.PI * 2); c.stroke(); }
+  if (obs.norm >= 1e-3) { c.strokeStyle = C.ink; c.lineWidth = 1.5; c.beginPath(); c.arc(k2x(obs.px), k2y(obs.py), 4, 0, Math.PI * 2); c.stroke(); }
   c.font = "11px " + C.mono; c.fillStyle = C.muted; c.textAlign = "left"; c.textBaseline = "top"; c.fillText("|φ(k)|²", 6, 5);
   c.textBaseline = "alphabetic"; c.textAlign = "right"; c.fillText(`kₓ ±${KVIEW}`, W - 5, H - 5);
 }
@@ -644,7 +644,7 @@ function drawLadder() {
     });
   }
   // <E>
-  if (obs.norm > 1e-4) {
+  if (obs.norm >= 1e-3) {
     const y = e2y(obs.E);
     c.fillStyle = C.ink; c.textAlign = "right"; c.textBaseline = "top";
     if (y < LP.t) { if (!hov) c.fillText(`⟨E⟩ ${obs.E.toFixed(2)} ↑`, W - 6, 5); }
@@ -668,8 +668,9 @@ function loop() {
   if (frame++ % 90 === 0) readTokens();
   measure();
   drawField(); drawMom(); drawLadder();
-  R.t.textContent = S.t.toFixed(2); R.x.textContent = `${obs.x.toFixed(2)}, ${obs.y.toFixed(2)}`; R.p.textContent = `${obs.px.toFixed(2)}, ${obs.py.toFixed(2)}`;
-  R.e.textContent = obs.E.toFixed(3); R.n.textContent = obs.norm.toFixed(3);
+  const live = obs.norm >= 1e-3;
+  R.t.textContent = S.t.toFixed(2); R.x.textContent = live ? `${obs.x.toFixed(2)}, ${obs.y.toFixed(2)}` : "—"; R.p.textContent = live ? `${obs.px.toFixed(2)}, ${obs.py.toFixed(2)}` : "—";
+  R.e.textContent = live ? obs.E.toFixed(3) : "—"; R.n.textContent = obs.norm.toFixed(3);
   requestAnimationFrame(loop);
 }
 
@@ -729,8 +730,8 @@ cvL.addEventListener("pointerdown", e => {
   S.shift = e.shiftKey; install(eigen([m]), wantAdd()); resetScaleK = true;
   if (e.pointerType === "touch") hoverLevel = -1;
 });
-addEventListener("keydown", e => { if (e.key === "Shift") S.shift = true; if (e.code === "Space" && e.target === document.body) { e.preventDefault(); togglePlay(); } });
-addEventListener("keyup", e => { if (e.key === "Shift") S.shift = false; });
+addEventListener("keydown", e => { if (e.key === "Shift") S.shift = true; if (e.code === "Space" && (e.target === document.body || e.target.closest?.("button"))) { e.preventDefault(); if (!e.repeat) togglePlay(); } });
+addEventListener("keyup", e => { if (e.key === "Shift") S.shift = false; if (e.code === "Space" && e.target.closest?.("button")) e.preventDefault(); });
 
 // ---------- controls ----------
 const SMIN = 0.3, SMAX = 5;
