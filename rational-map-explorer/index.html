@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rational map explorer: z^n + c/z^m</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#f1f4f3;--fg:#141a19;--muted:#5a6866;--line:rgba(20,26,25,.18);--card:#fff;--acc:#0f8a7a;--gut:0px}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1514;--fg:#e6eeec;--muted:#93a6a2;--line:rgba(230,238,236,.2);--card:#192120;--acc:#4fd1b8}}
+:root[data-theme="dark"]{--bg:#0f1514;--fg:#e6eeec;--muted:#93a6a2;--line:rgba(230,238,236,.2);--card:#192120;--acc:#4fd1b8}
+html{scroll-padding-top:env(safe-area-inset-top,0px);-webkit-text-size-adjust:100%;text-size-adjust:100%}
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:16px}
+.wrap{max-width:1100px;margin:0 auto}
+h1{font-size:20px;font-weight:500;margin:0 0 4px}
+.hint{margin:0 0 14px;color:var(--muted);font-size:13px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:14px}
+.cap{font-size:13px;color:var(--muted);margin:0 var(--gut) 6px;display:flex;justify-content:space-between;gap:8px}
+.view{position:relative;aspect-ratio:1;overflow:hidden;margin:0 var(--gut);border-radius:10px;border:1px solid var(--line);background:#0b0d0d;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;cursor:grab}
+.view canvas{position:absolute;left:0;top:0;width:100%;height:100%;transform-origin:0 0;display:block}
+#mk{position:absolute;width:44px;height:44px;transform:translate(-50%,-50%);cursor:pointer;touch-action:none}
+#mk::before{content:"";position:absolute;left:50%;top:50%;width:14px;height:14px;margin:-7px 0 0 -7px;border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 1.5px #000}
+.ctl{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:10px 18px;margin-top:16px}
+.row{display:flex;align-items:center;gap:10px}
+.row label{min-width:80px;font-size:14px;color:var(--muted)}
+.row input{flex:1;min-width:0;height:28px;accent-color:var(--acc)}
+.row output{min-width:54px;text-align:right;font-size:14px;font-variant-numeric:tabular-nums}
+.bar{display:flex;gap:8px 10px;align-items:center;flex-wrap:wrap;margin-top:14px}
+.bar label{font-size:14px;color:var(--muted)}
+select,button{font:inherit;font-size:14px;min-height:36px;padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg);cursor:pointer}
+input,select,button{touch-action:manipulation}
+button:disabled{opacity:.5;cursor:default}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.st{min-height:20px;margin-top:10px;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+/* Phones: side gutters leave room to scroll the page with a finger (the panels capture touch for pan and zoom),
+   16px form text stops iOS zooming into a menu on focus, and controls get finger-sized targets. */
+@media (max-width:600px){
+ :root{--gut:16px}
+ body{padding:12px}
+ .hint{font-size:12.5px}
+ .ctl{gap:2px 18px}
+ .row{min-height:44px}
+ .row input{height:36px}
+ select,button{font-size:16px;min-height:44px}
+}
+</style></head><body>
+<div class="wrap">
+<a href="../index.html" style="display:table;flex-basis:100%;margin-bottom:6px;font-size:13px;color:inherit;opacity:.7;text-decoration:none">← All widgets</a>
+<h1>Rational map explorer: z<sup>n</sup> + c / z<sup>m</sup></h1>
+<p class="hint">Left: the parameter plane (where the critical orbit stays bounded). Right: the dynamical plane for the c you pick. Tap the left panel or drag its marker to set c. On both panels, drag to pan and pinch or scroll to zoom; double-tap or double-click the right panel to reset it. Try n = 2, m = 3 and a small c. Set m = 0 for the ordinary z<sup>n</sup> + c (Mandelbrot and Julia sets). Both panels zoom far beyond normal precision (the zoom label shows "deep"); deep views usually need more iterations. Animate c moves the marker around the centre of the left view; Path sets the shape of the loop.</p>
+<div class="grid">
+<div><div class="cap"><span>Parameter plane (c)</span><span id="z0">x1.0</span></div>
+<div class="view" id="mv"><canvas id="mc"></canvas><div id="mk"></div></div></div>
+<div><div class="cap"><span>Dynamical plane (z)</span><span id="z1">x1.0</span></div>
+<div class="view" id="jv"><canvas id="jc"></canvas></div></div>
+</div>
+<div class="st" id="st">Starting...</div>
+<div class="ctl">
+<div class="row"><label for="n">Power n</label><input type="range" id="n" min="2" max="8" step="1" value="2"><output id="nv">2</output></div>
+<div class="row"><label for="m">Pole m</label><input type="range" id="m" min="0" max="8" step="1" value="2"><output id="mv2">2</output></div>
+<div class="row"><label for="it">Iterations</label><input type="range" id="it" min="50" max="3000" step="50" value="200"><output id="itv">200</output></div>
+<div class="row"><label for="cd">Color</label><input type="range" id="cd" min="0.02" max="0.5" step="0.01" value="0.12"><output id="cdv">0.12</output></div>
+<div class="row"><label for="lr">Re(c)</label><input type="range" id="lr" min="-2.5" max="2.5" step="0.001" value="0.06"><output id="lrv">0.060</output></div>
+<div class="row"><label for="li">Im(c)</label><input type="range" id="li" min="-2.5" max="2.5" step="0.001" value="0.02"><output id="liv">0.020</output></div>
+<div class="row"><label for="sp">Anim speed</label><input type="range" id="sp" min="0.1" max="4" step="0.1" value="1"><output id="spv">1.0</output></div>
+</div>
+<div class="bar">
+<label for="pt">Path</label>
+<select id="pt"><option value="0">Circle</option><option value="1" selected>Breathing</option><option value="2">Spiral</option><option value="3">Petals</option></select>
+<button id="an">Animate c</button><button id="rv">Reset view</button>
+</div>
+<div class="bar">
+<label for="pal">Palette</label>
+<select id="pal"><option value="0">Ember</option><option value="1">Ocean</option><option value="2">Mono</option></select>
+<label for="ssel">Smoothing</label>
+<select id="ssel"><option value="1" selected>Off</option><option value="2">2x2</option><option value="3">3x3</option></select>
+<label for="rs">Resolution</label>
+<select id="rs"><option value="480">480 px</option><option value="720" selected>720 px</option><option value="1000">1000 px</option></select>
+</div>
+<div class="bar" id="ex" hidden>
+<label for="es">Export size</label>
+<select id="es"><option value="2000">2000 px</option><option value="3000" selected>3000 px</option><option value="4000">4000 px</option></select>
+<button id="sl">Save left PNG</button><button id="sr">Save right PNG</button>
+</div>
+</div>
+<script>
+(function(){
+'use strict';
+var $=function(i){return document.getElementById(i)};
+
+/* ---------- settings ---------- */
+var S={n:2,m:2,it:200,cd:0.12,lr:0.06,li:0.02,pal:0,R:720,E:3000,ss:1,sp:1,path:1,reg:1};
+var PALS=[[[.5,.5,.5],[.5,.5,.5],[1,1,1],[0,.1,.2]],[[.25,.5,.6],[.25,.4,.4],[1,1,1],[.5,.6,.7]],[[.5,.5,.5],[.5,.5,.5],[1,1,1],[0,0,0]]];
+
+/* ---------- math kernel (these functions are also copied into the worker threads) ---------- */
+var N,M,KM,MAXIT,LN,PALI,CD,C=[0,0,0];
+function prep(){N=S.n;M=S.m;KM=N>M?N:M;MAXIT=S.it;LN=Math.log(N);PALI=S.pal;CD=S.cd}
+// Smooth (fractional) escape count; the bailout is |z| > 1e4.
+function smooth(n,r2){var mu=n+1-Math.log(0.5*Math.log(r2)/9.210340371976184)/LN;return mu>0.01?mu:0.01}
+// Iterate z -> z^N + c/z^M (c = lr + i li). Returns the smooth escape count, 0.5 for a hit on the pole,
+// or -1 for "never escapes" (cap reached, or a cycle found by Brent-style periodicity checking).
+function iter(zr,zi,lr,li){
+ var sr=zr,si=zi,per=8,cnt=0,n=0,r2,pr,pi,qr,qi,den,inv,a,b,t,k,z2r,z2i,z3r,z3i,z4r,z4i,e=1e-13;
+ if(M===0){                       // plain z^N + c
+  if(N===2){
+   for(;n<MAXIT;n++){
+    a=zr*zr;b=zi*zi;r2=a+b;
+    if(r2>1e8||r2!==r2)return smooth(n,r2);
+    zi=2*zr*zi+li;zr=a-b+lr;
+    if(zr-sr<e&&sr-zr<e&&zi-si<e&&si-zi<e)return -1;
+    if(++cnt===per){cnt=0;per*=2;sr=zr;si=zi}
+   }
+   return -1;
+  }
+  for(;n<MAXIT;n++){
+   r2=zr*zr+zi*zi;
+   if(r2>1e8||r2!==r2)return smooth(n,r2);
+   pr=zr;pi=zi;for(k=1;k<N;k++){t=pr*zr-pi*zi;pi=pr*zi+pi*zr;pr=t}
+   zr=pr+lr;zi=pi+li;
+   if(zr-sr<e&&sr-zr<e&&zi-si<e&&si-zi<e)return -1;
+   if(++cnt===per){cnt=0;per*=2;sr=zr;si=zi}
+  }
+  return -1;
+ }
+ if(N===2&&M===2){                // z^2 + c/z^2: z^N and z^M are the same power
+  for(;n<MAXIT;n++){
+   a=zr*zr;b=zi*zi;r2=a+b;
+   if(r2>1e8||r2!==r2)return smooth(n,r2);
+   pr=a-b;pi=2*zr*zi;den=pr*pr+pi*pi;
+   if(den===0)return 0.5;
+   inv=1/den;
+   zr=pr+(lr*pr+li*pi)*inv;zi=pi+(li*pr-lr*pi)*inv;
+   if(zr-sr<e&&sr-zr<e&&zi-si<e&&si-zi<e)return -1;
+   if(++cnt===per){cnt=0;per*=2;sr=zr;si=zi}
+  }
+  return -1;
+ }
+ if(KM<=4){                       // small powers: build z^2..z^4 once per step
+  for(;n<MAXIT;n++){
+   r2=zr*zr+zi*zi;
+   if(r2>1e8||r2!==r2)return smooth(n,r2);
+   z2r=zr*zr-zi*zi;z2i=2*zr*zi;
+   if(KM>=3){z3r=z2r*zr-z2i*zi;z3i=z2r*zi+z2i*zr}
+   if(KM>=4){z4r=z2r*z2r-z2i*z2i;z4i=2*z2r*z2i}
+   switch(N){case 2:pr=z2r;pi=z2i;break;case 3:pr=z3r;pi=z3i;break;default:pr=z4r;pi=z4i}
+   switch(M){case 1:qr=zr;qi=zi;break;case 2:qr=z2r;qi=z2i;break;case 3:qr=z3r;qi=z3i;break;default:qr=z4r;qi=z4i}
+   den=qr*qr+qi*qi;
+   if(den===0)return 0.5;
+   inv=1/den;
+   zr=pr+(lr*qr+li*qi)*inv;zi=pi+(li*qr-lr*qi)*inv;
+   if(zr-sr<e&&sr-zr<e&&zi-si<e&&si-zi<e)return -1;
+   if(++cnt===per){cnt=0;per*=2;sr=zr;si=zi}
+  }
+  return -1;
+ }
+ for(;n<MAXIT;n++){               // general powers
+  r2=zr*zr+zi*zi;
+  if(r2>1e8||r2!==r2)return smooth(n,r2);
+  pr=zr;pi=zi;for(k=1;k<N;k++){t=pr*zr-pi*zi;pi=pr*zi+pi*zr;pr=t}
+  if(N===M){qr=pr;qi=pi}else{qr=zr;qi=zi;for(k=1;k<M;k++){t=qr*zr-qi*zi;qi=qr*zi+qi*zr;qr=t}}
+  den=qr*qr+qi*qi;
+  if(den===0)return 0.5;
+  inv=1/den;
+  zr=pr+(lr*qr+li*qi)*inv;zi=pi+(li*qr-lr*qi)*inv;
+  if(zr-sr<e&&sr-zr<e&&zi-si<e&&si-zi<e)return -1;
+  if(++cnt===per){cnt=0;per*=2;sr=zr;si=zi}
+ }
+ return -1;
+}
+// kind 0: parameter plane (x,y is c; start from a critical point). kind 1: dynamical plane (x,y is z).
+function pix(kind,x,y,lr,li){
+ if(kind===0){
+  if(M===0){
+   if(N===2){var q1=(x-.25)*(x-.25)+y*y;if(q1*(q1+x-.25)<.25*y*y||(x+1)*(x+1)+y*y<.0625)return -1}
+   return iter(0,0,x,y);
+  }
+  var r=Math.sqrt(x*x+y*y);
+  if(r===0)return -1;
+  var rho=Math.pow(r*M/N,1/(N+M)),th=Math.atan2(y,x)/(N+M);
+  return iter(rho*Math.cos(th),rho*Math.sin(th),x,y);
+ }
+ return iter(x,y,lr,li);
+}
+
+/* ---------- deep zoom (perturbation) kernel, also copied into the workers ----------
+   One reference orbit Z_k is computed with big integers; each pixel follows only its small offset
+   delta_k = z_k - Z_k in ordinary doubles. f(z) = z^n + c/z^m is split into pieces that can be
+   evaluated without cancellation, and when a pixel's orbit drifts nearer the start of the reference
+   than the current reference point, it is re-based onto Z_0 (stored differences Z_k - Z_0 keep that exact). */
+var RF,DF,RL,RN,RM,ZP,ZM,BN,BM,RCR,RCI,ROX,ROY,RSO,RT1r,RT1i,RT2r,RT2i,RP1,RP2,G0,G1;
+function buildRef(o){
+ var n=o.n,m=o.m,L=o.rl,rf=o.rf,zp=new Float64Array(L*(n-1)*2),zm=new Float64Array(L*2),bn=[1],bm=[1],k,j,pr,pi,t,x,y,d,qr,qi,o2;
+ for(j=1;j<=n;j++)bn[j]=bn[j-1]*(n-j+1)/j;
+ for(j=1;j<=m;j++)bm[j]=bm[j-1]*(m-j+1)/j;
+ for(k=0;k<L;k++){
+  x=rf[2*k];y=rf[2*k+1];pr=x;pi=y;
+  for(j=1;j<n;j++){o2=(k*(n-1)+j-1)*2;zp[o2]=pr;zp[o2+1]=pi;t=pr*x-pi*y;pi=pr*y+pi*x;pr=t}
+  if(m>0){qr=x;qi=y;for(j=1;j<m;j++){t=qr*x-qi*y;qi=qr*y+qi*x;qr=t}d=qr*qr+qi*qi;zm[2*k]=qr/d;zm[2*k+1]=-qi/d}
+ }
+ return{RF:rf,DF:o.df,RL:L,RN:n,RM:m,ZP:zp,ZM:zm,BN:bn,BM:bm,RCR:o.cr,RCI:o.ci,ROX:o.ox,ROY:o.oy,RSO:o.so,RT1r:o.t1r,RT1i:o.t1i,RT2r:o.t2r,RT2i:o.t2i,RP1:o.p1,RP2:o.p2};
+}
+function loadRef(o){RF=o.RF;DF=o.DF;RL=o.RL;RN=o.RN;RM=o.RM;ZP=o.ZP;ZM=o.ZM;BN=o.BN;BM=o.BM;RCR=o.RCR;RCI=o.RCI;ROX=o.ROX;ROY=o.ROY;
+ RSO=o.RSO;RT1r=o.RT1r;RT1i=o.RT1i;RT2r=o.RT2r;RT2i=o.RT2i;RP1=o.RP1;RP2=o.RP2}
+// (1+eps)^p - 1 without cancellation, for complex eps: expm1(p*log(1+eps)). Result in G0 + i G1.
+function gpow(er,ei,p){
+ var x=0.5*Math.log1p(2*er+er*er+ei*ei)*p,y=Math.atan2(ei,1+er)*p,em=Math.expm1(x),hs=Math.sin(y/2);
+ G0=em*Math.cos(y)-2*hs*hs;G1=(em+1)*Math.sin(y);
+}
+// (dr,di) is the pixel's offset from the view centre. Same return convention as iter().
+function dpix(kind,dr,di){
+ var n=RN,m=RM,N1=n-1,last=RL-1,a,b,dcr=0,dci=0,k=0,it,e=1e-13,per=8,cnt=0,
+  Zr,Zi,zr,zi,r2,sr,si,a2,b2,t1r,t1i,pr,pi,t,q,o,zq,zw,ur,ui,dn,Pr,Pi,qr,qi,Wr,Wi,wd,Qr,Qi,Mr,Mi,Dr,Di,zmr,zmi,xr,xi;
+ if(kind===0){
+  dcr=dr-ROX;dci=di-ROY;
+  if(m===0){a=0;b=0}
+  else{
+   // The parameter-plane orbit starts at a critical point t with t^(n+m) = m c/n. Two steps later
+   // z2 = A t^(n^2) + B t^(n+m-nm) exactly, so the reference starts at Z2 and each pixel's offset there
+   // comes from (1+eps)^p - 1 with eps = dc/c0: no cancellation, even when c is close to 0.
+   dn=RCR*RCR+RCI*RCI;var er=(dcr*RCR+dci*RCI)/dn,ei=(dci*RCR-dcr*RCI)/dn;
+   gpow(er,ei,RP1);a=RT1r*G0-RT1i*G1;b=RT1r*G1+RT1i*G0;
+   if(RP2!==0){gpow(er,ei,RP2);a+=RT2r*G0-RT2i*G1;b+=RT2r*G1+RT2i*G0}
+  }
+ }else{a=dr-ROX;b=di-ROY}
+ zr=RF[0]+a;zi=RF[1]+b;r2=zr*zr+zi*zi;
+ if(r2>1e8||r2!==r2)return smooth(RSO,r2);
+ sr=zr;si=zi;
+ for(it=RSO;it<MAXIT;it++){
+  Zr=RF[2*k];Zi=RF[2*k+1];
+  // (Z+d)^n - Z^n. Powers of a tiny d are dropped before they reach the denormal range, where
+  // floating point becomes very slow (interior pixels converge onto the reference, so d shrinks steadily).
+  if(n===2){
+   if(a<1e-140&&a>-1e-140&&b<1e-140&&b>-1e-140){t1r=2*(Zr*a-Zi*b);t1i=2*(Zr*b+Zi*a)}
+   else{t1r=2*(Zr*a-Zi*b)+a*a-b*b;t1i=2*(Zr*b+Zi*a)+2*a*b}
+  }
+  else{
+   t1r=0;t1i=0;pr=a;pi=b;
+   for(q=1;q<n;q++){o=(k*N1+(n-q-1))*2;zq=ZP[o];zw=ZP[o+1];t1r+=BN[q]*(zq*pr-zw*pi);t1i+=BN[q]*(zq*pi+zw*pr);
+    if(pr<1e-140&&pr>-1e-140&&pi<1e-140&&pi>-1e-140){pr=0;pi=0;break}
+    t=pr*a-pi*b;pi=pr*b+pi*a;pr=t}
+   t1r+=pr;t1i+=pi;
+  }
+  if(m===0){a2=t1r+dcr;b2=t1i+dci}
+  else{
+   Mr=ZM[2*k];Mi=ZM[2*k+1];                                               // Z^-m
+   dn=Zr*Zr+Zi*Zi;ur=(a*Zr+b*Zi)/dn;ui=(b*Zr-a*Zi)/dn;                    // u = d/Z
+   if((ur<0?-ur:ur)+(ui<0?-ui:ui)<0.5){                 // z^-m - Z^-m = Z^-m * (-P/(1+P)), P = (1+u)^m - 1 as a polynomial
+    Pr=0;Pi=0;qr=ur;qi=ui;
+    for(q=1;q<=m;q++){Pr+=BM[q]*qr;Pi+=BM[q]*qi;if(qr<1e-140&&qr>-1e-140&&qi<1e-140&&qi>-1e-140)break;t=qr*ur-qi*ui;qi=qr*ui+qi*ur;qr=t}
+    Wr=1+Pr;Wi=Pi;wd=Wr*Wr+Wi*Wi;
+    Qr=-(Pr*Wr+Pi*Wi)/wd;Qi=-(Pi*Wr-Pr*Wi)/wd;
+    Dr=Mr*Qr-Mi*Qi;Di=Mr*Qi+Mi*Qr;zmr=Mr+Dr;zmi=Mi+Di;
+   }else{                                // far from the reference point: no cancellation, compute directly
+    zr=Zr+a;zi=Zi+b;qr=zr;qi=zi;
+    for(q=1;q<m;q++){t=qr*zr-qi*zi;qi=qr*zi+qi*zr;qr=t}
+    wd=qr*qr+qi*qi;
+    if(wd===0)return 0.5;
+    zmr=qr/wd;zmi=-qi/wd;Dr=zmr-Mr;Di=zmi-Mi;
+   }
+   a2=t1r+RCR*Dr-RCI*Di+dcr*zmr-dci*zmi;                                  // + c0(z^-m - Z^-m) + dc*z^-m
+   b2=t1i+RCR*Di+RCI*Dr+dcr*zmi+dci*zmr;
+  }
+  k++;
+  zr=RF[2*k]+a2;zi=RF[2*k+1]+b2;r2=zr*zr+zi*zi;
+  if(r2>1e8||r2!==r2)return smooth(it+1,r2);
+  if(zr-sr<e&&sr-zr<e&&zi-si<e&&si-zi<e)return -1;
+  if(++cnt===per){cnt=0;per*=2;sr=zr;si=zi}
+  xr=DF[2*k]+a2;xi=DF[2*k+1]+b2;                                          // z - Z_0, exact
+  if(k>=last||(xr<0?-xr:xr)+(xi<0?-xi:xi)<(a2<0?-a2:a2)+(b2<0?-b2:b2)){a=xr;b=xi;k=0}else{a=a2;b=b2}
+  if(a<1e-280&&a>-1e-280&&b<1e-280&&b>-1e-280){a=0;b=0}
+ }
+ return -1;
+}
+function sample(kind,x,y,lr,li,dp){return dp?dpix(kind,x,y):pix(kind,x,y,lr,li)}
+function col(mu){
+ if(mu<0){C[0]=11;C[1]=13;C[2]=13;return}
+ var P=PALS[PALI],t=mu*CD;
+ for(var k=0;k<3;k++){var v=(P[0][k]+P[1][k]*Math.cos(6.28318*(P[2][k]*t+P[3][k])))*255;C[k]=v<0?0:v>255?255:v}
+}
+// One output pixel of size d centred on (x,y), averaged over ss x ss samples when smoothing is on.
+function aa(kind,x,y,lr,li,d,ss,dp){
+ if(!(ss>1)){col(sample(kind,x,y,lr,li,dp));return}
+ var a,b,r=0,g=0,bl=0,s0=-0.5*d+0.5*d/ss,st=d/ss,k=ss*ss;
+ for(a=0;a<ss;a++)for(b=0;b<ss;b++){col(sample(kind,x+s0+a*st,y+s0+b*st,lr,li,dp));r+=C[0];g+=C[1];bl+=C[2]}
+ C[0]=r/k;C[1]=g/k;C[2]=bl/k;
+}
+
+
+/* ---------- big-number view centres and reference orbits (main thread only) ---------- */
+var PB=1100,MINH=1e-150,RFID=0;     // centres are BigInts scaled by 2^PB
+function isDeep(V){return V.h<1e-9}
+function bd(v,W){                             // BigInt scaled by 2^W -> double
+ var neg=v<0n;if(neg)v=-v;if(v===0n)return 0;
+ var bl=v.toString(16).length*4,sh=bl>64?bl-64:0,x=Number(v>>BigInt(sh))*Math.pow(2,sh-W);
+ return neg?-x:x;
+}
+function d2b(x,W){                            // double -> BigInt scaled by 2^W (exact)
+ if(!x)return 0n;
+ var e=Math.floor(Math.log2(Math.abs(x)))-52,mm=Math.round(x/Math.pow(2,e)),k=W+e;
+ return k>=0?BigInt(mm)<<BigInt(k):BigInt(mm)>>BigInt(-k);
+}
+function mkV(BX,BY,h){return{BX:BX,BY:BY,cx:bd(BX,PB),cy:bd(BY,PB),h:h}}
+// Reference orbit for a deep view: kind 0 starts from the critical point of f for c0 (found by Newton's
+// method in big integers), kind 1 starts from z0 with the current c. If the view centre sits on the
+// singular point (c = 0 or z = 0), the reference is nudged half a view off it.
+function mkRef(kind,V,n,m,it,lr,li){
+ var h=V.h,W=Math.min(PB,Math.ceil(-Math.log2(h))+128),Wn=BigInt(W),sh=BigInt(PB-W);
+ var cx=V.BX>>sh,cy=V.BY>>sh,ox=0,oy=0;
+ if(m>0&&Math.abs(V.cx)+Math.abs(V.cy)<4*h){ox=0.5*h;oy=0.3*h;cx+=d2b(ox,W);cy+=d2b(oy,W)}
+ function mul(ar,ai,br,bi){return[(ar*br-ai*bi)>>Wn,(ar*bi+ai*br)>>Wn]}
+ function pw(r,i,k){var pr=r,pi=i,t;for(var j=1;j<k;j++){t=mul(pr,pi,r,i);pr=t[0];pi=t[1]}return[pr,pi]}
+ function dv(ar,ai,br,bi){var d=br*br+bi*bi;if(d===0n)return null;return[((ar*br+ai*bi)<<Wn)/d,((ai*br-ar*bi)<<Wn)/d]}
+ var Cr,Ci,Zr,Zi,s,t,q,p,so=0,p1=0,p2=0,t1r=0,t1i=0,t2r=0,t2i=0;
+ if(kind===0){
+  Cr=cx;Ci=cy;
+  if(m===0){Zr=0n;Zi=0n}
+  else{
+   var K=n+m,ar=Cr*BigInt(m)/BigInt(n),ai=Ci*BigInt(m)/BigInt(n);
+   var adr=bd(ar,W),adi=bd(ai,W),rho=Math.pow(Math.hypot(adr,adi),1/K),th=Math.atan2(adi,adr)/K;
+   Zr=d2b(rho*Math.cos(th),W);Zi=d2b(rho*Math.sin(th),W);
+   for(s=0;s<8;s++){                          // Newton for w^(n+m) = m c0 / n
+    var w1=pw(Zr,Zi,K-1),wk=mul(w1[0],w1[1],Zr,Zi);
+    q=dv(wk[0]-ar,wk[1]-ai,w1[0]*BigInt(K),w1[1]*BigInt(K));
+    if(!q)break;Zr-=q[0];Zi-=q[1];
+   }
+   // pixels join the reference at step 2 (see dpix): z2 = A t^(n^2) + B t^e with e = n+m-nm
+   var t0r=bd(Zr,W),t0i=bd(Zi,W),tm=Math.hypot(t0r,t0i),ta=Math.atan2(t0i,t0r),e=n+m-n*m;
+   var A=Math.pow(1+n/m,n),Bc=(n/m)*Math.pow(1+n/m,-m),m1=A*Math.pow(tm,n*n),m2=Bc*Math.pow(tm,e);
+   so=2;p1=n*n/K;p2=e/K;
+   t1r=m1*Math.cos(n*n*ta);t1i=m1*Math.sin(n*n*ta);t2r=m2*Math.cos(e*ta);t2i=m2*Math.sin(e*ta);
+   for(s=0;s<2;s++){p=pw(Zr,Zi,n);q=pw(Zr,Zi,m);t=dv(Cr,Ci,q[0],q[1]);if(!t)break;Zr=p[0]+t[0];Zi=p[1]+t[1]}
+  }
+ }else{Cr=d2b(lr,W);Ci=d2b(li,W);Zr=cx;Zi=cy}
+ var rf=new Float64Array(2*(it+2)),df=new Float64Array(2*(it+2)),k=0,Z0r=Zr,Z0i=Zi,zd,zid,mg;
+ for(;;){
+  zd=bd(Zr,W);zid=bd(Zi,W);
+  rf[2*k]=zd;rf[2*k+1]=zid;df[2*k]=bd(Zr-Z0r,W);df[2*k+1]=bd(Zi-Z0i,W);
+  mg=zd*zd+zid*zid;k++;
+  if(k+so>it||mg>1e16||(m>0&&Zr===0n&&Zi===0n))break;
+  p=pw(Zr,Zi,n);
+  if(m>0){q=pw(Zr,Zi,m);t=dv(Cr,Ci,q[0],q[1]);if(!t)break;Zr=p[0]+t[0];Zi=p[1]+t[1]}
+  else{Zr=p[0]+Cr;Zi=p[1]+Ci}
+ }
+ return{rf:rf.slice(0,2*k),df:df.slice(0,2*k),rl:k,n:n,m:m,cr:bd(Cr,W),ci:bd(Ci,W),ox:ox,oy:oy,so:so,p1:p1,p2:p2,t1r:t1r,t1i:t1i,t2r:t2r,t2i:t2i};
+}
+
+/* ---------- panels ---------- */
+var mv=$('mv'),jv=$('jv'),st=$('st');
+function panel(cv,box,kind,base,sym,ti){
+ return{cv:cv,ctx:cv.getContext('2d'),box:box,kind:kind,B:base,V:mkV(0n,0n,base),sym:sym,ti:ti,refKey:'',ref:null,raw:null,rid:0,sent:-1,
+  id:0,dv:null,img:null,busy:false,full:false,job:null,fl:false,t:0,t2:0};
+}
+var P0=panel($('mc'),mv,0,0.5,function(v){return v.BY===0n?1:0},0);                                     // parameter plane
+var P1=panel($('jc'),jv,1,1.8,function(v){return v.BX===0n&&v.BY===0n&&(S.n+S.m)%2===0?2:0},1);          // dynamical plane
+var X=panel(document.createElement('canvas'),null,0,1,null,2);                                             // off-screen export
+var FS=4,AN={on:false},DL=null;
+S.CBr=d2b(S.lr,PB);S.CBi=d2b(S.li,PB);         // c as BigInt too, so the marker stays exact when deep
+function setBases(){
+ if(S.m===0){var hm=Math.max(1.3,Math.pow(2,1/(S.n-1))*1.1);P0.B=hm;P1.B=hm}else{P0.B=0.5;P1.B=1.8}
+}
+function status(){
+ st.textContent=(X.busy||X.enc)?(X.msg||'Exporting...'):(P0.busy||P1.busy)?'Rendering...':(POOL?POOL.n+' threads':'single thread');
+}
+
+/* ---------- rendering ---------- */
+var chn=new MessageChannel(),tq=[];
+chn.port1.onmessage=function(){var f=tq.shift();if(f)f()};
+function later(f){tq.push(f);chn.port2.postMessage(0)}
+
+function mirror(data,R,row,sym){         // sym 1: mirror across the horizontal axis; 2: point reflection
+ var ro=row*R*4,mo=(R-1-row)*R*4;
+ if(sym===1){data.copyWithin(mo,ro,ro+R*4)}
+ else{for(var x=0;x<R;x++){var a=ro+x*4,d=mo+(R-1-x)*4;data[d]=data[a];data[d+1]=data[a+1];data[d+2]=data[a+2];data[d+3]=255}}
+}
+// Pass A: a quick blocky preview on the main thread. Pass B: full detail, row by row,
+// on the worker pool if it is running, otherwise in 12 ms slices on the main thread.
+function render(p,fast){
+ prep();
+ if(fast&&MAXIT>400)MAXIT=400;
+ var id=++p.id,R=p.cv.width,v=p.V,cx=v.cx,cy=v.cy,h=v.h,kind=p.kind,lr=S.lr,li=S.li,ss=S.ss,deep=isDeep(v),rref=null;
+ if(deep){                                    // pixels become offsets from the centre; reuse the reference if nothing changed
+  var key=[kind,v.BX,v.BY,h,S.n,S.m,MAXIT,kind?lr:0,kind?li:0].join('|');
+  if(p.refKey!==key){p.raw=mkRef(kind,v,S.n,S.m,MAXIT,lr,li);p.ref=buildRef(p.raw);p.refKey=key;p.rid=++RFID}
+  rref=p.ref;loadRef(rref);cx=0;cy=0;
+ }
+ var cap=[N,M,KM,MAXIT,LN,PALI,CD];
+ if(!p.img||p.img.width!==R)p.img=p.ctx.createImageData(R,R);   // reuse the buffer: no garbage per frame
+ var img=p.img,data=img.data,s0=p.noA?R:(fast?FS:deep?16:8),t0=performance.now(),x,y,xx,yy,o,wy;
+ p.busy=true;p.full=false;status();
+ for(y=0;y<R;y+=s0){
+  wy=cy+(1-2*(y+s0/2)/R)*h;
+  for(x=0;x<R;x+=s0){
+   col(sample(kind,cx+(2*(x+s0/2)/R-1)*h,wy,lr,li,deep));
+   for(yy=y;yy<y+s0&&yy<R;yy++)for(xx=x;xx<x+s0&&xx<R;xx++){o=(yy*R+xx)*4;data[o]=C[0];data[o+1]=C[1];data[o+2]=C[2];data[o+3]=255}
+  }
+ }
+ p.ctx.putImageData(img,0,0);
+ p.dv={cx:v.cx,cy:v.cy,h:h,BX:v.BX,BY:v.BY};tf();
+ if(fast){
+  var ft=performance.now()-t0;                 // keep live previews responsive on slow devices
+  if(ft>70&&FS<8)FS++;else if(ft<25&&FS>2)FS--;
+  p.busy=false;status();return;
+ }
+ var sym=p.sym?p.sym(v):0,rows=sym?R>>1:R,row=0;
+ if(POOL){
+  if(deep&&p.sent!==p.rid){var rw=p.raw,rid=p.rid;var msg=Object.assign({ref:1,id:rid},rw);POOL.ws.forEach(function(w){w.postMessage(msg)});p.sent=rid}
+  p.job={id:id,ti:p.ti,kind:kind,deep:deep?1:0,rid:p.rid,R:R,cx:cx,cy:cy,h:h,rows:rows,next:0,done:0,dl:1e9,dh:0,img:img,data:data,sym:sym,
+   n:S.n,m:S.m,it:S.it,pal:S.pal,cd:S.cd,lr:lr,li:li,ss:ss};
+  lastRes=performance.now();pump();return;
+ }
+ function band(){
+  if(id!==p.id)return;
+  var t1=performance.now(),r0=row,wy2,ro,x2,o2;
+  N=cap[0];M=cap[1];KM=cap[2];MAXIT=cap[3];LN=cap[4];PALI=cap[5];CD=cap[6];   // another render may have changed these
+  if(deep)loadRef(rref);
+  while(row<rows&&performance.now()-t1<12){
+   wy2=cy+(1-2*(row+.5)/R)*h;ro=row*R*4;
+   for(x2=0;x2<R;x2++){
+    aa(kind,cx+(2*(x2+.5)/R-1)*h,wy2,lr,li,2*h/R,ss,deep);
+    o2=ro+x2*4;data[o2]=C[0];data[o2+1]=C[1];data[o2+2]=C[2];data[o2+3]=255;
+   }
+   if(sym)mirror(data,R,row,sym);
+   row++;
+  }
+  if(sym)p.ctx.putImageData(img,0,0);else p.ctx.putImageData(img,0,0,0,r0,R,row-r0);
+  if(p.onprog)p.onprog(row/rows);
+  if(row<rows)later(band);else{p.busy=false;p.full=true;status();if(p.onfin)p.onfin()}
+ }
+ later(band);
+}
+// While a gesture is in progress, stretch the last finished image with a CSS transform.
+function tfo(p){
+ var dv=p.dv,V=p.V;if(!dv)return;
+ var W=p.box.clientWidth,s=dv.h/V.h;
+ var dx=bd(dv.BX-V.BX,PB),dy=bd(dv.BY-V.BY,PB);
+ var tx=((dx-dv.h)/(2*V.h)+.5)*W,ty=((V.h-dy-dv.h)/(2*V.h))*W;
+ p.cv.style.transform='translate('+tx+'px,'+ty+'px) scale('+s+')';
+}
+function tf(){tfo(P0);tfo(P1)}
+
+/* ---------- worker pool ---------- */
+function wmain(){
+ var refs={},rk=[];
+ self.onmessage=function(e){
+  var m=e.data;
+  if(m.ping){self.postMessage({ping:1});return}
+  if(m.ref){refs[m.id]=buildRef(m);rk.push(m.id);if(rk.length>6)delete refs[rk.shift()];return}
+  N=m.n;M=m.m;KM=N>M?N:M;MAXIT=m.it;LN=Math.log(N);PALI=m.pal;CD=m.cd;
+  if(m.deep){if(!refs[m.rid])return;loadRef(refs[m.rid])}
+  var R=m.R,cx=m.cx,cy=m.cy,h=m.h,buf=new Uint8ClampedArray(R*(m.r1-m.r0)*4),x,r,wy,o;
+  for(r=m.r0;r<m.r1;r++){
+   wy=cy+(1-2*(r+.5)/R)*h;
+   for(x=0;x<R;x++){
+    aa(m.q,cx+(2*(x+.5)/R-1)*h,wy,m.lr,m.li,2*h/R,m.ss,m.deep);
+    o=((r-m.r0)*R+x)*4;buf[o]=C[0];buf[o+1]=C[1];buf[o+2]=C[2];buf[o+3]=255;
+   }
+  }
+  self.postMessage({id:m.id,t:m.k,r0:m.r0,r1:m.r1,buf:buf},[buf.buffer]);
+ };
+}
+var WSRC='var N,M,KM,MAXIT,LN,PALI,CD,RF,DF,RL,RN,RM,ZP,ZM,BN,BM,RCR,RCI,ROX,ROY,RSO,RT1r,RT1i,RT2r,RT2i,RP1,RP2,G0,G1,C=[0,0,0],PALS='+JSON.stringify(PALS)+';\n'+
+ [smooth,iter,pix,buildRef,loadRef,gpow,dpix,sample,col,aa].map(function(f){return f.toString()}).join('\n')+'\n('+wmain.toString()+')();';
+var POOL=null,pend=null,rr=0,lastRes=0;
+function kill(p){if(p)p.ws.forEach(function(w){w.terminate()})}
+// Workers only take over after they answer a ping; otherwise the page keeps rendering on the main thread.
+function initPool(){
+ var ws=[];
+ try{
+  var n=Math.min(8,Math.max(2,(navigator.hardwareConcurrency||4)-1));
+  var url=URL.createObjectURL(new Blob([WSRC],{type:'text/javascript'}));
+  for(var i=0;i<n;i++){var w=new Worker(url);w.busy=false;w.onmessage=onRes;w.onerror=fail;ws.push(w);w.postMessage({ping:1})}
+  pend={ws:ws,n:n};
+  setTimeout(function(){if(pend&&!POOL){kill(pend);pend=null;status()}},3000);
+  setInterval(function(){if(POOL&&(P0.busy||P1.busy||X.busy)&&performance.now()-lastRes>5000)fail()},2000);
+ }catch(err){kill({ws:ws});pend=null;POOL=null}
+}
+function rerender(){render(P0,false);render(P1,false);if(X.busy)render(X,false)}
+function fail(){
+ var p=POOL||pend;if(!p)return;
+ var was=!!POOL;kill(p);POOL=null;pend=null;
+ if(was)rerender();else status();
+}
+function nextJob(){                      // round-robin between the two panels and an export
+ var a=[P0,P1,X];
+ for(var k=0;k<3;k++){var t=a[(rr+k)%3],j=t.job;if(j&&j.id===t.id&&j.next<j.rows){rr=(rr+k+1)%3;return j}}
+ return null;
+}
+function pump(){
+ if(!POOL)return;
+ for(var i=0;i<POOL.ws.length;i++){
+  var w=POOL.ws[i];if(w.busy)continue;
+  var j=nextJob();if(!j)return;
+  var r0=j.next,r1=Math.min(j.rows,r0+4);j.next=r1;w.busy=true;
+  w.postMessage({id:j.id,k:j.ti,q:j.kind,R:j.R,cx:j.cx,cy:j.cy,h:j.h,r0:r0,r1:r1,n:j.n,m:j.m,it:j.it,pal:j.pal,cd:j.cd,lr:j.lr,li:j.li,ss:j.ss,deep:j.deep,rid:j.rid});
+ }
+}
+function flush(p){
+ p.fl=false;var j=p.job;
+ if(!j||j.id!==p.id||j.dl>=j.dh)return;
+ p.ctx.putImageData(j.img,0,0,0,j.dl,j.R,j.dh-j.dl);
+ if(j.sym)p.ctx.putImageData(j.img,0,0,0,j.R-j.dh,j.R,j.dh-j.dl);
+ j.dl=1e9;j.dh=0;
+}
+function onRes(e){
+ var m=e.data;
+ if(m.ping){if(pend&&!POOL){POOL=pend;pend=null;lastRes=performance.now();rerender()}return}
+ var p=[P0,P1,X][m.t],j=p.job;
+ lastRes=performance.now();
+ e.target.busy=false;
+ if(j&&j.id===m.id&&m.id===p.id){
+  j.data.set(m.buf,m.r0*j.R*4);
+  if(j.sym)for(var r=m.r0;r<m.r1;r++)mirror(j.data,j.R,r,j.sym);
+  if(m.r0<j.dl)j.dl=m.r0;
+  if(m.r1>j.dh)j.dh=m.r1;
+  j.done+=m.r1-m.r0;
+  if(p.onprog)p.onprog(j.done/j.rows);
+  if(j.done>=j.rows){p.busy=false;p.full=true;status();flush(p);if(p.onfin)p.onfin()}
+  else if(!p.fl){p.fl=true;requestAnimationFrame(function(){flush(p)})}
+ }
+ pump();
+}
+
+/* ---------- labels and c ---------- */
+function zoomText(id,p){var z=p.B/p.V.h;$(id).textContent='x'+(z<100?z.toFixed(1):z.toExponential(1).replace('e+','e'))+(isDeep(p.V)?' (deep)':'')}
+function marker(){
+ var V=P0.V;
+ $('mk').style.left=((bd(S.CBr-V.BX,PB)/V.h+1)/2*100)+'%';$('mk').style.top=((1-bd(S.CBi-V.BY,PB)/V.h)/2*100)+'%';
+ zoomText('z0',P0);zoomText('z1',P1);
+}
+function labels(){
+ $('nv').textContent=S.n;$('mv2').textContent=S.m;$('itv').textContent=S.it;$('cdv').textContent=S.cd.toFixed(2);
+ $('lrv').textContent=S.lr.toFixed(3);$('liv').textContent=S.li.toFixed(3);$('spv').textContent=S.sp.toFixed(1);
+ marker();
+}
+function setSize(){P0.cv.width=P0.cv.height=P1.cv.width=P1.cv.height=S.R}
+function home(p){p.V=mkV(0n,0n,p.B);p.cv.style.transform='none';p.dv=null}
+function all(reset){
+ if(reset){home(P0);home(P1)}
+ labels();render(P0,false);render(P1,false);
+}
+function resetP(p){home(p);marker();render(p,false)}
+var qf=false;
+function cChanged(){                     // live low-cost preview now, full detail once c settles
+ labels();
+ if(!qf){qf=true;requestAnimationFrame(function(){qf=false;render(P1,true)})}
+ clearTimeout(P1.t2);P1.t2=setTimeout(function(){render(P1,false)},250);
+}
+function clampC(v){return Math.max(-2.5,Math.min(2.5,v))}
+function setC(a,b,br,bi){
+ stopAnim();
+ S.lr=clampC(a);S.li=clampC(b);
+ S.CBr=(br!==undefined&&S.lr===a)?br:d2b(S.lr,PB);S.CBi=(bi!==undefined&&S.li===b)?bi:d2b(S.li,PB);
+ $('lr').value=S.lr;$('li').value=S.li;cChanged();
+}
+function pickC(e){
+ var r=mv.getBoundingClientRect(),V=P0.V;
+ var br=V.BX+d2b((2*(e.clientX-r.left)/r.width-1)*V.h,PB),bi=V.BY+d2b((1-2*(e.clientY-r.top)/r.height)*V.h,PB);
+ setC(bd(br,PB),bd(bi,PB),br,bi);
+}
+
+/* ---------- gestures ---------- */
+function zoomV(V,u0,v0,u1,v1,f,hmax){    // zoom by f about screen point (u0,v0), which ends up at (u1,v1)
+ var nh=Math.max(MINH,Math.min(hmax,V.h*f));
+ return mkV(V.BX+d2b((2*u0-1)*V.h-(2*u1-1)*nh,PB),V.BY+d2b((1-2*v0)*V.h-(1-2*v1)*nh,PB),nh);
+}
+// One finger or the mouse pans, two fingers pinch, the wheel zooms. A tap calls onTap if given;
+// otherwise a double tap or double click resets the panel. On the left panel, dragging the marker moves c.
+function attach(p,onTap,mk){
+ var box=p.box,pts=new Map(),drag=-1,multi=false,lastTap=0;
+ function apply(){tfo(p);marker();clearTimeout(p.t);p.t=setTimeout(function(){render(p,false)},150)}
+ box.addEventListener('pointerdown',function(e){
+  box.setPointerCapture(e.pointerId);
+  if(mk&&e.target===mk&&pts.size===0){drag=e.pointerId;return}
+  pts.set(e.pointerId,{x:e.clientX,y:e.clientY,sx:e.clientX,sy:e.clientY,mv:false});
+  if(pts.size>1)multi=true;
+  box.style.cursor='grabbing';
+ });
+ box.addEventListener('pointermove',function(e){
+  if(e.pointerId===drag){onTap(e);return}
+  var q=pts.get(e.pointerId);if(!q)return;
+  var r=box.getBoundingClientRect(),old=[],nw=[],V=p.V;
+  pts.forEach(function(s){old.push({x:s.x,y:s.y})});
+  q.x=e.clientX;q.y=e.clientY;
+  if(Math.hypot(q.x-q.sx,q.y-q.sy)>6)q.mv=true;
+  pts.forEach(function(s){nw.push(s)});
+  if(nw.length===1){
+   if(!q.mv)return;
+   p.V=mkV(V.BX+d2b(-(nw[0].x-old[0].x)/r.width*2*V.h,PB),V.BY+d2b((nw[0].y-old[0].y)/r.height*2*V.h,PB),V.h);
+  }else{
+   var a0=old[0],b0=old[1],a1=nw[0],b1=nw[1];
+   var d0=Math.hypot(b0.x-a0.x,b0.y-a0.y)||1,d1=Math.hypot(b1.x-a1.x,b1.y-a1.y)||1;
+   p.V=zoomV(V,((a0.x+b0.x)/2-r.left)/r.width,((a0.y+b0.y)/2-r.top)/r.height,((a1.x+b1.x)/2-r.left)/r.width,((a1.y+b1.y)/2-r.top)/r.height,d0/d1,p.B*3);
+  }
+  apply();
+ });
+ function up(e){
+  if(e.pointerId===drag){drag=-1;return}
+  var q=pts.get(e.pointerId);pts.delete(e.pointerId);
+  if(q&&!q.mv&&!multi&&e.type==='pointerup'){
+   if(onTap)onTap(e);
+   else{var now=performance.now();if(now-lastTap<350){lastTap=0;resetP(p)}else lastTap=now}
+  }
+  if(!pts.size){multi=false;box.style.cursor='grab'}
+ }
+ box.addEventListener('pointerup',up);box.addEventListener('pointercancel',up);
+ box.addEventListener('wheel',function(e){
+  e.preventDefault();
+  var r=box.getBoundingClientRect(),u=(e.clientX-r.left)/r.width,v=(e.clientY-r.top)/r.height;
+  p.V=zoomV(p.V,u,v,u,v,Math.exp(e.deltaY*(e.ctrlKey?0.01:0.002)),p.B*3);apply();
+ },{passive:false});
+}
+attach(P0,pickC,$('mk'));
+attach(P1,null,null);
+
+/* ---------- animation of c ---------- */
+function pathF(t){
+ switch(S.path){
+  case 1:return 1+0.5*Math.sin(3*t);     // breathing
+  case 2:return 1+0.85*Math.sin(t/4);    // spiral out and back
+  case 3:return Math.cos(2.5*t);         // petals through the centre
+  default:return 1;                      // circle
+ }
+}
+function stopAnim(){
+ if(!AN.on)return;
+ AN.on=false;$('an').textContent='Animate c';
+ clearTimeout(P1.t2);P1.t2=setTimeout(function(){render(P1,false)},100);
+}
+function animTick(now){
+ if(!AN.on)return;
+ var dt=Math.min(100,now-AN.last);AN.last=now;
+ AN.ang+=dt/1000*(Math.PI*2/20)*S.sp;
+ var rad=AN.rad*pathF(AN.ang-AN.a0);
+ var br=AN.bx+d2b(rad*Math.cos(AN.ang),PB),bi=AN.by+d2b(rad*Math.sin(AN.ang),PB);
+ S.lr=clampC(bd(br,PB));S.li=clampC(bd(bi,PB));
+ S.CBr=S.lr===bd(br,PB)?br:d2b(S.lr,PB);S.CBi=S.li===bd(bi,PB)?bi:d2b(S.li,PB);
+ $('lr').value=S.lr;$('li').value=S.li;labels();
+ render(P1,true);
+ clearTimeout(P1.t2);P1.t2=setTimeout(function(){render(P1,false)},250);
+ requestAnimationFrame(animTick);
+}
+function animStart(){
+ var V=P0.V,dx=bd(S.CBr-V.BX,PB),dy=bd(S.CBi-V.BY,PB),r=Math.hypot(dx,dy);
+ if(r<0.02*V.h){r=0.35*V.h;dx=r;dy=0}
+ var a0=Math.atan2(dy,dx);
+ AN={on:true,cx:V.cx,cy:V.cy,bx:V.BX,by:V.BY,rad:r,ang:a0,a0:a0,last:performance.now()};
+ $('an').textContent='Pause';
+ requestAnimationFrame(animTick);
+}
+
+/* ---------- controls ---------- */
+function onIn(id,f){$(id).addEventListener('input',function(e){f(e.target.value)})}
+function onCh(id,f){$(id).addEventListener('change',function(e){f(e.target.value)})}
+onIn('n',function(v){S.n=parseInt(v,10);setBases();stopAnim();all(true)});
+onIn('m',function(v){
+ S.m=parseInt(v,10);
+ var reg=S.m===0?0:1;                   // m = 0 and m >= 1 need very different c, so jump to a good one
+ if(reg!==S.reg){S.reg=reg;S.lr=reg?0.06:-0.4;S.li=reg?0.02:0.6;S.CBr=d2b(S.lr,PB);S.CBi=d2b(S.li,PB);$('lr').value=S.lr;$('li').value=S.li}
+ setBases();stopAnim();all(true);
+});
+onIn('it',function(v){S.it=parseInt(v,10);all(false)});
+onIn('cd',function(v){S.cd=parseFloat(v);all(false)});
+onIn('lr',function(v){stopAnim();S.lr=parseFloat(v);S.CBr=d2b(S.lr,PB);cChanged()});
+onIn('li',function(v){stopAnim();S.li=parseFloat(v);S.CBi=d2b(S.li,PB);cChanged()});
+onIn('sp',function(v){S.sp=parseFloat(v);$('spv').textContent=S.sp.toFixed(1)});
+onCh('pt',function(v){S.path=parseInt(v,10)});
+onCh('pal',function(v){S.pal=parseInt(v,10);all(false)});
+onCh('ssel',function(v){S.ss=parseInt(v,10);all(false)});
+onCh('rs',function(v){S.R=parseInt(v,10);setSize();all(false)});
+onCh('es',function(v){S.E=parseInt(v,10)});
+$('an').addEventListener('click',function(){if(AN.on)stopAnim();else animStart()});
+$('rv').addEventListener('click',function(){resetP(P0);resetP(P1)});
+window.addEventListener('resize',tf);
+document.addEventListener('visibilitychange',function(){if(document.hidden)stopAnim()});   // save battery
+
+/* ---------- PNG export ---------- */
+function showMsg(t){st.textContent=t;setTimeout(status,2500)}
+function exportPng(src){
+ if(!DL||X.busy||X.enc)return;
+ var N2=S.E,c=document.createElement('canvas'),ctx;
+ var name=(src===P1?'dynamical':'parameter')+'_n'+S.n+'_m'+S.m+'_c'+S.lr.toFixed(3)+(S.li<0?'':'+')+S.li.toFixed(3)+'i_'+N2+'px.png';
+ c.width=c.height=N2;ctx=c.getContext('2d');
+ if(!ctx){showMsg('That size is too large for this device. Try a smaller export size.');return}
+ X.cv=c;X.ctx=ctx;X.img=null;X.kind=src.kind;X.V=mkV(src.V.BX,src.V.BY,src.V.h);X.refKey='';X.sym=src.sym;X.noA=true;
+ $('sl').disabled=$('sr').disabled=true;
+ function done(msg){
+  X.cv=document.createElement('canvas');X.ctx=null;X.img=null;X.job=null;X.onprog=X.onfin=null;X.enc=false;X.msg='';
+  $('sl').disabled=$('sr').disabled=false;if(msg)showMsg(msg);else status();
+ }
+ X.onprog=function(f){X.msg='Exporting '+Math.round(f*100)+'%';status()};
+ X.onfin=function(){
+  X.onprog=X.onfin=null;X.enc=true;X.msg='Encoding PNG...';status();
+  c.toBlob(function(b){
+   if(!b){done('Could not create the image. Try a smaller export size.');return}
+   DL.save({filename:name,data:b}).then(function(){done('Saved.')},function(err){done(err&&err.code==='declined'?'':'Save failed: '+((err&&err.code)||'error'))});
+  },'image/png');
+ };
+ render(X,false);
+}
+$('sl').addEventListener('click',function(){exportPng(P0)});
+$('sr').addEventListener('click',function(){exportPng(P1)});
+try{if(window.claude&&window.claude.use)window.claude.use('downloads').then(function(d){if(d){DL=d;$('ex').hidden=false}},function(){})}catch(err){}
+
+initPool();setBases();setSize();all(true);
+})();
+</script></body></html>

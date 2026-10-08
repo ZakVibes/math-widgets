@@ -1,0 +1,844 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Gravity Well 3D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: full-bleed perspective view of deep space with a slim instrument panel to the right (stacked below on phones). Single deliberate dark look. */
+:root{
+  --void:#080b13;
+  --panel:#0f131e;
+  --raise:#182033;
+  --line:#242c42;
+  --fg:#e8ebf4;
+  --muted:#8790a9;
+  --star:#f3c76a;
+  --fixed:#74d2e2;
+  --repel:#e783b6;
+  --display:"Bricolage Grotesque", "Figtree", system-ui, sans-serif;
+  --body:"Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--void);color:var(--fg);font-family:var(--body);font-size:14px;overflow:hidden}
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 320px}
+.stage{position:relative;min-width:0;min-height:0;overflow:hidden;background:var(--void)}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:crosshair}
+.stage[data-tool="orbit"] canvas{cursor:grab}
+.stage[data-tool="erase"] canvas{cursor:cell}
+
+.float{position:absolute;display:flex;gap:2px;padding:4px;background:color-mix(in srgb,var(--panel) 86%,transparent);border:1px solid var(--line);border-radius:10px;backdrop-filter:blur(6px)}
+.toolbar{top:12px;left:12px}
+.transport{top:12px;right:12px}
+.float button{display:flex;align-items:center;gap:6px;padding:7px 10px;border:0;background:transparent;color:var(--muted);font:500 12.5px/1 var(--body);border-radius:7px;cursor:pointer}
+.float button:hover{color:var(--fg)}
+.float button[aria-pressed="true"]{background:var(--raise);color:var(--fg)}
+.float button[aria-pressed="true"] svg{color:var(--star)}
+.float button[data-tool="fixed"][aria-pressed="true"] svg{color:var(--fixed)}
+.float svg{width:16px;height:16px;flex:none}
+button:focus-visible,input:focus-visible{outline:2px solid var(--star);outline-offset:2px}
+
+.hud{position:absolute;left:12px;bottom:12px;font:400 11.5px/1.5 var(--mono);color:var(--muted);font-variant-numeric:tabular-nums;pointer-events:none;display:flex;flex-direction:column;gap:2px}
+.hud b{color:var(--fg);font-weight:500}
+.hint{position:absolute;right:12px;bottom:12px;font-size:12px;color:var(--muted);pointer-events:none;text-align:right;line-height:1.5}
+
+.panel{overflow-y:auto;background:var(--panel);border-left:1px solid var(--line);padding:20px 18px 28px;display:flex;flex-direction:column;gap:22px}
+.panel header h1{font:700 22px/1.1 var(--display);letter-spacing:-.01em;margin:0}
+.panel header h1 sup{font:500 11px var(--mono);color:var(--star);margin-left:4px;vertical-align:6px}
+.panel header p{margin:6px 0 0;color:var(--muted);font-size:13px;line-height:1.45}
+section{display:flex;flex-direction:column;gap:12px}
+h2{margin:0;font:600 11px/1 var(--body);text-transform:uppercase;letter-spacing:.12em;color:var(--muted);display:flex;align-items:center;gap:10px}
+h2::after{content:"";flex:1;height:1px;background:var(--line)}
+.row{display:flex;flex-direction:column;gap:6px}
+.row label,.lab{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;gap:8px}
+.val{font:500 12px var(--mono);color:var(--fg);font-variant-numeric:tabular-nums}
+.massread{display:flex;align-items:baseline;gap:8px}
+.massread .big{font:500 26px/1 var(--mono);font-variant-numeric:tabular-nums}
+.massread .unit{color:var(--muted);font-size:12px}
+.swatch{width:14px;height:14px;border-radius:50%;flex:none;align-self:center;box-shadow:0 0 10px var(--sw,transparent)}
+input[type=range]{width:100%;accent-color:var(--star);margin:0}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:transparent;color:var(--fg);font:500 12px var(--body);padding:5px 9px;border-radius:999px;cursor:pointer}
+.chip span{font-family:var(--mono);color:var(--muted);margin-left:4px;font-size:11px}
+.chip:hover{border-color:var(--muted)}
+.chip[aria-pressed="true"]{border-color:var(--star);background:color-mix(in srgb,var(--star) 12%,transparent)}
+.note{margin:0;font-size:12.5px;line-height:1.5;color:var(--muted)}
+.note b{color:var(--fg);font-weight:500}
+
+.switch{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px;cursor:pointer}
+.switch input{appearance:none;-webkit-appearance:none;width:32px;height:18px;border-radius:9px;background:var(--line);position:relative;cursor:pointer;flex:none;margin:0;transition:background .15s}
+.switch input::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--muted);transition:transform .15s,background .15s}
+.switch input:checked{background:color-mix(in srgb,var(--star) 45%,var(--line))}
+.switch input:checked::after{transform:translateX(14px);background:var(--fg)}
+
+.seg{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:8px;padding:3px;gap:3px}
+.seg button{border:0;background:transparent;color:var(--muted);font:500 12.5px var(--body);padding:6px;border-radius:5px;cursor:pointer}
+.seg button[aria-pressed="true"][data-sign="1"]{background:color-mix(in srgb,var(--fixed) 18%,transparent);color:var(--fixed)}
+.seg button[aria-pressed="true"][data-sign="-1"]{background:color-mix(in srgb,var(--repel) 18%,transparent);color:var(--repel)}
+.scenes{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.scenes button,.btn{border:1px solid var(--line);background:var(--raise);color:var(--fg);font:500 12.5px var(--body);padding:8px 10px;border-radius:8px;cursor:pointer;text-align:left}
+.scenes button:hover,.btn:hover{border-color:var(--muted)}
+.btn.wide{text-align:center}
+
+@media (max-width:760px){
+  .app{grid-template-columns:1fr;grid-template-rows:58% 42%}
+  .panel{border-left:0;border-top:1px solid var(--line);padding:16px 16px 28px}
+  .hint{display:none}
+}
+@media (max-width:480px){ .toolbar button span,.transport button span{display:none} .float button{padding:8px} }
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="app">
+  <div class="stage" id="stage" data-tool="body">
+    <canvas id="cv" aria-label="3D gravity simulation. Click the grid to add bodies."></canvas>
+    <div class="float toolbar" role="toolbar" aria-label="Tools">
+      <button data-tool="body" aria-pressed="true" title="Add body (1)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="3.2" fill="currentColor" stroke="none"/><path d="M8 1v2.2M8 12.8V15M1 8h2.2M12.8 8H15"/></svg><span>Body</span></button>
+      <button data-tool="fixed" aria-pressed="false" title="Place fixed source (2)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="5"/><path d="M8 1v14M1 8h14"/></svg><span>Fixed</span></button>
+      <button data-tool="erase" aria-pressed="false" title="Erase (3)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M4.5 11.5l7-7"/></svg><span>Erase</span></button>
+      <button data-tool="orbit" aria-pressed="false" title="Rotate view (4)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><ellipse cx="8" cy="8" rx="6.5" ry="3"/><path d="M12.6 3.6l1.4 1.8-2.2.4"/><circle cx="8" cy="8" r="1.4" fill="currentColor" stroke="none"/></svg><span>Rotate</span></button>
+    </div>
+    <div class="float transport">
+      <button id="play" title="Pause (Space)"><svg id="playIcon" viewBox="0 0 16 16" fill="currentColor"><rect x="3.5" y="2.5" width="3" height="11" rx=".6"/><rect x="9.5" y="2.5" width="3" height="11" rx=".6"/></svg><span id="playLabel">Pause</span></button>
+      <button id="clear" title="Remove everything"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9.5h6.6L12 4"/></svg><span>Clear</span></button>
+    </div>
+    <div class="hud">
+      <div id="stats">t <b>0</b></div>
+      <div id="gridLabel"></div>
+    </div>
+    <div class="hint">Click the grid to place · drag to throw<br>Right-drag to rotate · Shift-drag to pan · scroll to zoom</div>
+  </div>
+
+  <aside class="panel">
+    <header>
+      <a href="../index.html" style="display:table;flex-basis:100%;margin-bottom:6px;font-size:13px;color:inherit;opacity:.7;text-decoration:none">← All widgets</a>
+      <h1>Gravity Well<sup>3D</sup></h1>
+      <p>Newtonian N-body sandbox in three dimensions, G = 1. New bodies land on the grid, which you can raise or lower.</p>
+    </header>
+
+    <section>
+      <h2>New body</h2>
+      <div class="massread"><span class="swatch" id="swatch"></span><span class="big" id="massVal">300</span><span class="unit">mass units</span></div>
+      <input type="range" id="mass" min="0" max="5" step="0.01" value="2.477" aria-label="Mass (log scale)">
+      <div class="chips" id="chips">
+        <button class="chip" data-m="1">Dust<span>1</span></button>
+        <button class="chip" data-m="30">Moon<span>30</span></button>
+        <button class="chip" data-m="300">Planet<span>300</span></button>
+        <button class="chip" data-m="3000">Giant<span>3k</span></button>
+        <button class="chip" data-m="30000">Star<span>30k</span></button>
+      </div>
+      <div class="row"><label for="height">Grid height <span class="val" id="heightVal">0</span></label><input type="range" id="height" min="-500" max="500" step="5" value="0"></div>
+      <div class="row"><label for="tilt">Launch tilt <span class="val" id="tiltVal">0°</span></label><input type="range" id="tilt" min="-75" max="75" step="1" value="0"></div>
+      <label class="switch">Click places it in orbit<input type="checkbox" id="orbit" checked></label>
+      <p class="note">A click sets up a circular orbit around whatever pulls hardest there. <b>Drag</b> across the grid to throw it instead. Tilt lifts the orbit or throw out of the grid's plane.</p>
+    </section>
+
+    <section>
+      <h2>Static fields</h2>
+      <div class="row"><label for="gs">Uniform field <span class="val" id="gsVal">off</span></label><input type="range" id="gs" min="0" max="0.3" step="0.002" value="0"></div>
+      <div class="row"><label for="gaz">Field heading <span class="val" id="gazVal">0°</span></label><input type="range" id="gaz" min="0" max="359" step="1" value="0"></div>
+      <div class="row"><label for="gel">Field elevation <span class="val" id="gelVal">−90° (down)</span></label><input type="range" id="gel" min="-90" max="90" step="1" value="-90"></div>
+      <div class="row">
+        <span class="lab">Fixed sources</span>
+        <div class="seg" id="sign"><button data-sign="1" aria-pressed="true">Attract</button><button data-sign="-1" aria-pressed="false">Repel</button></div>
+      </div>
+      <p class="note">The <b>Fixed</b> tool pins a source on the grid. It uses the mass above, never moves, and swallows anything that hits it.</p>
+      <button class="btn wide" id="useFixed">Use the Fixed tool</button>
+      <label class="switch">Field arrows on the grid<input type="checkbox" id="field"></label>
+    </section>
+
+    <section>
+      <h2>Simulation</h2>
+      <div class="row"><label for="speed">Speed <span class="val" id="speedVal">12 steps/frame</span></label><input type="range" id="speed" min="1" max="40" step="1" value="12"></div>
+      <div class="row"><label for="eps">Softening <span class="val" id="epsVal">5</span></label><input type="range" id="eps" min="0.5" max="30" step="0.5" value="5"></div>
+      <div class="row"><label for="trail">Trail length <span class="val" id="trailVal">150</span></label><input type="range" id="trail" min="0" max="500" step="10" value="150"></div>
+      <label class="switch">Merge on collision<input type="checkbox" id="merge" checked></label>
+    </section>
+
+    <section>
+      <h2>View</h2>
+      <label class="switch">Slowly rotate the view<input type="checkbox" id="spin"></label>
+      <label class="switch">Drop lines to the grid<input type="checkbox" id="drops" checked></label>
+      <label class="switch">Show grid<input type="checkbox" id="grid" checked></label>
+      <label class="switch">Follow centre of mass<input type="checkbox" id="follow"></label>
+    </section>
+
+    <section>
+      <h2>Scenes</h2>
+      <div class="scenes">
+        <button data-scene="system">Star system</button>
+        <button data-scene="binary">Binary + tilted ring</button>
+        <button data-scene="cluster">Star cluster</button>
+        <button data-scene="galaxies">Galaxy collision</button>
+        <button data-scene="eight">Figure-eight</button>
+        <button data-scene="pinball">Gravity pinball</button>
+        <button data-scene="empty">Empty space</button>
+      </div>
+      <button class="btn wide" id="dust">Add a dust ring (100)</button>
+    </section>
+  </aside>
+</div>
+
+<script>
+(() => {
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+const stage = document.getElementById('stage');
+const $ = id => document.getElementById(id);
+const css = getComputedStyle(document.documentElement);
+const tok = n => css.getPropertyValue(n).trim();
+const C = { void: tok('--void'), fixed: tok('--fixed'), repel: tok('--repel'), star: tok('--star') };
+
+let W = 0, H = 0, DPR = 1, bg = [];
+function resize() {
+  const r = stage.getBoundingClientRect();
+  W = r.width; H = r.height; DPR = Math.min(2, window.devicePixelRatio || 1);
+  cv.width = Math.max(1, Math.round(W * DPR)); cv.height = Math.max(1, Math.round(H * DPR));
+  // background stars on a sphere so they turn with the camera
+  if (!bg.length) for (let i = 0; i < 700; i++) {
+    const u = Math.random()*2 - 1, t = Math.random()*Math.PI*2, s = Math.sqrt(1 - u*u);
+    bg.push({ x: s*Math.cos(t), y: u, z: s*Math.sin(t), a: 0.08 + Math.random()*0.4, s: Math.random() < 0.1 ? 1.6 : 1 });
+  }
+}
+resize();
+new ResizeObserver(resize).observe(stage);
+
+// ---------- state ----------
+const S = {
+  dt: 0.02, substeps: 12, eps: 5, merge: true, trailLen: 150, follow: false, showField: false,
+  gStrength: 0, gAz: 0, gEl: -90, gx: 0, gy: 0, gz: 0,
+  tool: 'body', mass: 300, sign: 1, autoOrbit: true, planeH: 0, tilt: 0,
+  spin: false, drops: true, grid: true, paused: false, t: 0, e0: null, eNow: 0
+};
+const cam = { tx: 0, ty: 0, tz: 0, yaw: 0.6, pitch: 0.45, dist: 1500, fov: 50 * Math.PI / 180 };
+let bodies = [];
+
+const radiusOf = m => Math.max(1.6, 1.1 * Math.cbrt(Math.abs(m)));
+const STOPS = [[0,[143,163,201]],[1.5,[124,198,180]],[2.6,[214,190,140]],[3.5,[239,154,90]],[4.3,[255,224,160]],[5,[255,250,240]]];
+function tintArr(m) {
+  const l = Math.log10(Math.max(1, Math.abs(m)));
+  for (let i = 1; i < STOPS.length; i++) {
+    if (l <= STOPS[i][0] || i === STOPS.length - 1) {
+      const [a, ca] = STOPS[i-1], [b, cb] = STOPS[i];
+      const t = Math.min(1, Math.max(0, (l - a) / (b - a)));
+      return ca.map((c, k) => Math.round(c + (cb[k] - c) * t));
+    }
+  }
+}
+const tint = m => tintArr(m).join(',');
+function paint(b) {
+  const c = tintArr(b.m); b.rgb = c.join(',');
+  b.hi = c.map(v => Math.round(v + (255 - v) * 0.55)).join(',');
+  b.lo = c.map(v => Math.round(v * 0.28)).join(',');
+}
+function addBody(o) {
+  const b = { x: o.x, y: o.y, z: o.z, vx: o.vx || 0, vy: o.vy || 0, vz: o.vz || 0, ax: 0, ay: 0, az: 0, m: o.m, fixed: !!o.fixed, trail: [], dead: false };
+  b.r = radiusOf(b.m); paint(b);
+  bodies.push(b); changed(); return b;
+}
+function changed() { S.e0 = null; }
+function updateG() {
+  const az = S.gAz * Math.PI/180, el = S.gEl * Math.PI/180;
+  S.gx = S.gStrength * Math.cos(el) * Math.cos(az);
+  S.gy = S.gStrength * Math.sin(el);
+  S.gz = S.gStrength * Math.cos(el) * Math.sin(az);
+  changed();
+}
+
+// ---------- vectors ----------
+const cross = (a, b) => [a[1]*b[2] - a[2]*b[1], a[2]*b[0] - a[0]*b[2], a[0]*b[1] - a[1]*b[0]];
+const norm = a => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0]/l, a[1]/l, a[2]/l]; };
+const dot = (a, b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+
+// ---------- physics ----------
+function accel() {
+  const b = bodies, n = b.length, e2 = S.eps * S.eps, hits = [];
+  for (const o of b) { o.ax = o.fixed ? 0 : S.gx; o.ay = o.fixed ? 0 : S.gy; o.az = o.fixed ? 0 : S.gz; }
+  for (let i = 0; i < n; i++) {
+    const p = b[i];
+    for (let j = i + 1; j < n; j++) {
+      const q = b[j];
+      if (p.fixed && q.fixed) continue;
+      const dx = q.x - p.x, dy = q.y - p.y, dz = q.z - p.z, r2 = dx*dx + dy*dy + dz*dz, d2 = r2 + e2;
+      const inv = 1 / (d2 * Math.sqrt(d2));
+      if (!p.fixed) { const f = inv * q.m; p.ax += dx*f; p.ay += dy*f; p.az += dz*f; }
+      if (!q.fixed) { const f = inv * p.m; q.ax -= dx*f; q.ay -= dy*f; q.az -= dz*f; }
+      if (S.merge) { const rr = p.r + q.r; if (r2 < rr*rr) hits.push(i, j); }
+    }
+  }
+  return hits;
+}
+function resolve(hits) {
+  let any = false;
+  for (let k = 0; k < hits.length; k += 2) {
+    const p = bodies[hits[k]], q = bodies[hits[k+1]];
+    if (p.dead || q.dead) continue;
+    if (p.fixed || q.fixed) { (p.fixed ? q : p).dead = true; any = true; continue; }
+    const M = p.m + q.m, h = p.m >= q.m ? p : q, l = h === p ? q : p;
+    h.x = (p.x*p.m + q.x*q.m)/M; h.y = (p.y*p.m + q.y*q.m)/M; h.z = (p.z*p.m + q.z*q.m)/M;
+    h.vx = (p.vx*p.m + q.vx*q.m)/M; h.vy = (p.vy*p.m + q.vy*q.m)/M; h.vz = (p.vz*p.m + q.vz*q.m)/M;
+    h.m = M; h.r = radiusOf(M); paint(h); l.dead = true; any = true;
+  }
+  if (any) { bodies = bodies.filter(b => !b.dead); changed(); }
+  return any;
+}
+function step() {
+  const dt = S.dt, h = dt/2;
+  for (const o of bodies) if (!o.fixed) { o.vx += o.ax*h; o.vy += o.ay*h; o.vz += o.az*h; o.x += o.vx*dt; o.y += o.vy*dt; o.z += o.vz*dt; }
+  const hits = accel();
+  if (hits.length && resolve(hits)) accel();
+  for (const o of bodies) if (!o.fixed) { o.vx += o.ax*h; o.vy += o.ay*h; o.vz += o.az*h; }
+  S.t += dt;
+}
+function energy() {
+  let E = 0; const e2 = S.eps*S.eps, n = bodies.length;
+  for (let i = 0; i < n; i++) {
+    const p = bodies[i];
+    if (!p.fixed) E += 0.5*p.m*(p.vx*p.vx + p.vy*p.vy + p.vz*p.vz) - p.m*(S.gx*p.x + S.gy*p.y + S.gz*p.z);
+    for (let j = i + 1; j < n; j++) {
+      const q = bodies[j]; if (p.fixed && q.fixed) continue;
+      const dx = q.x - p.x, dy = q.y - p.y, dz = q.z - p.z;
+      E -= p.m*q.m / Math.sqrt(dx*dx + dy*dy + dz*dz + e2);
+    }
+  }
+  return E;
+}
+function fieldAt(x, y, z, out, r) {
+  let ax = S.gx, ay = S.gy, az = S.gz, hit = false; const e2 = S.eps*S.eps;
+  for (const b of bodies) {
+    const dx = b.x - x, dy = b.y - y, dz = b.z - z, r2 = dx*dx + dy*dy + dz*dz, d2 = r2 + e2;
+    const f = b.m / (d2 * Math.sqrt(d2)); ax += dx*f; ay += dy*f; az += dz*f;
+    if (r && r2 < (b.r + r)**2) hit = true;
+  }
+  out[0] = ax; out[1] = ay; out[2] = az; return hit;
+}
+function predict(p, v, m) {
+  let [x, y, z] = p, [vx, vy, vz] = v;
+  const pts = [x, y, z], h = S.dt*5, a = [0, 0, 0], r = radiusOf(m);
+  fieldAt(x, y, z, a, 0);
+  for (let i = 0; i < 600; i++) {
+    vx += a[0]*h/2; vy += a[1]*h/2; vz += a[2]*h/2;
+    x += vx*h; y += vy*h; z += vz*h;
+    const hit = fieldAt(x, y, z, a, r);
+    vx += a[0]*h/2; vy += a[1]*h/2; vz += a[2]*h/2;
+    if (i % 2 || hit) pts.push(x, y, z);
+    if (hit) break;
+  }
+  return pts;
+}
+// rotate v upward out of the horizontal by the tilt angle, keeping speed
+function applyTilt(v, axis) {
+  const i = S.tilt * Math.PI/180; if (!i) return v;
+  const k = axis || norm(cross(norm(v), [0, 1, 0]));
+  // Rodrigues rotation of v about k
+  const c = Math.cos(i), s = Math.sin(i), kv = cross(k, v), kd = dot(k, v);
+  return [0,1,2].map(n => v[n]*c + kv[n]*s + k[n]*kd*(1 - c));
+}
+function orbitVelocity(x, y, z, m) {
+  let best = null, pull = 0;
+  for (const b of bodies) {
+    if (b.m <= 0) continue;
+    const d2 = (b.x - x)**2 + (b.y - y)**2 + (b.z - z)**2;
+    const p = b.m / (d2 + S.eps*S.eps);
+    if (p > pull) { pull = p; best = b; }
+  }
+  if (!best) return [0, 0, 0];
+  const rad = [x - best.x, y - best.y, z - best.z], d = Math.hypot(...rad) || 1, rh = norm(rad);
+  let t = cross([0, 1, 0], rh);
+  if (Math.hypot(...t) < 0.1) t = cross([1, 0, 0], rh);
+  t = norm(t);
+  const M = best.m + (best.fixed ? 0 : m);
+  const v = Math.sqrt(M * d * d / Math.pow(d*d + S.eps*S.eps, 1.5));
+  const tv = applyTilt([t[0]*v, t[1]*v, t[2]*v], rh);
+  return [best.vx + tv[0], best.vy + tv[1], best.vz + tv[2]];
+}
+function com() {
+  let M = 0, x = 0, y = 0, z = 0;
+  for (const b of bodies) if (!b.fixed && b.m > 0) { M += b.m; x += b.x*b.m; y += b.y*b.m; z += b.z*b.m; }
+  return M ? { x: x/M, y: y/M, z: z/M } : null;
+}
+function cull() {
+  const lim = 30000 + 20 * cam.dist, n = bodies.length;
+  bodies = bodies.filter(b => b.fixed || Math.abs(b.x - cam.tx) < lim && Math.abs(b.y - cam.ty) < lim && Math.abs(b.z - cam.tz) < lim);
+  if (bodies.length !== n) changed();
+}
+
+// ---------- camera ----------
+let E = [0,0,0], F = [0,0,-1], R = [1,0,0], U = [0,1,0], focal = 1;
+const NEAR = 2;
+function basis() {
+  const cp = Math.cos(cam.pitch);
+  const off = [cp*Math.sin(cam.yaw), Math.sin(cam.pitch), cp*Math.cos(cam.yaw)];
+  E = [cam.tx + off[0]*cam.dist, cam.ty + off[1]*cam.dist, cam.tz + off[2]*cam.dist];
+  F = [-off[0], -off[1], -off[2]];
+  R = norm(cross(F, [0, 1, 0])); U = cross(R, F);
+  focal = H / (2 * Math.tan(cam.fov/2));
+}
+const P = [0, 0, 0, 0];
+function proj(x, y, z, o = P) {
+  const dx = x - E[0], dy = y - E[1], dz = z - E[2];
+  const cz = dx*F[0] + dy*F[1] + dz*F[2];
+  if (cz < NEAR) return false;
+  const s = focal / cz;
+  o[0] = W/2 + (dx*R[0] + dy*R[1] + dz*R[2]) * s;
+  o[1] = H/2 - (dx*U[0] + dy*U[1] + dz*U[2]) * s;
+  o[2] = cz; o[3] = s; return true;
+}
+function planeHit(sx, sy) {
+  const a = (sx - W/2) / focal, b = -(sy - H/2) / focal;
+  const d = [F[0] + R[0]*a + U[0]*b, F[1] + R[1]*a + U[1]*b, F[2] + R[2]*a + U[2]*b];
+  if (Math.abs(d[1]) < 1e-6) return null;
+  const t = (S.planeH - E[1]) / d[1];
+  if (t <= 0 || t > cam.dist * 30) return null;
+  return [E[0] + d[0]*t, S.planeH, E[2] + d[2]*t];
+}
+function fit(Rad, pitch = 0.45) {
+  cam.tx = cam.ty = cam.tz = 0; cam.pitch = pitch;
+  cam.dist = Rad / Math.tan(cam.fov/2) * 1.15 * Math.max(1, H / Math.max(W, 1));
+}
+function panBy(dx, dy) {
+  const k = cam.dist / focal;
+  cam.tx += -R[0]*dx*k + U[0]*dy*k; cam.ty += -R[1]*dx*k + U[1]*dy*k; cam.tz += -R[2]*dx*k + U[2]*dy*k;
+}
+
+// ---------- input ----------
+const ptrs = new Map();
+let gesture = null, hover = null, shiftDown = false;
+function local(e) { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+function midDist() { const [a, b] = [...ptrs.values()]; return { x: (a.x + b.x)/2, y: (a.y + b.y)/2, d: Math.hypot(a.x - b.x, a.y - b.y) || 1 }; }
+
+cv.addEventListener('pointerdown', e => {
+  const p = local(e);
+  cv.setPointerCapture(e.pointerId);
+  ptrs.set(e.pointerId, p);
+  if (ptrs.size === 2) { const m = midDist(); gesture = { type: 'pinch', d0: m.d, dist0: cam.dist, mx: m.x, my: m.y }; return; }
+  if (ptrs.size > 2) return;
+  if ((e.button === 0 && (e.shiftKey || shiftDown)) || e.button === 1) gesture = { type: 'pan', id: e.pointerId, lx: p.x, ly: p.y };
+  else if (e.button === 2 || S.tool === 'orbit') gesture = { type: 'orbit', id: e.pointerId, lx: p.x, ly: p.y };
+  else if (S.tool === 'erase') { gesture = { type: 'erase', id: e.pointerId }; eraseAt(p.x, p.y); }
+  else { const w = planeHit(p.x, p.y); if (w) gesture = { type: 'place', id: e.pointerId, sx: p.x, sy: p.y, w, cx: p.x, cy: p.y }; }
+});
+cv.addEventListener('pointermove', e => {
+  const p = local(e);
+  hover = e.pointerType === 'mouse' ? p : null;
+  if (ptrs.has(e.pointerId)) ptrs.set(e.pointerId, p);
+  if (!gesture) return;
+  if (gesture.type === 'pinch' && ptrs.size >= 2) {
+    const m = midDist();
+    cam.dist = Math.min(40000, Math.max(30, gesture.dist0 * gesture.d0 / m.d));
+    panBy(m.x - gesture.mx, m.y - gesture.my); gesture.mx = m.x; gesture.my = m.y;
+  } else if (e.pointerId !== gesture.id) return;
+  else if (gesture.type === 'orbit') {
+    cam.yaw -= (p.x - gesture.lx) * 0.006;
+    cam.pitch = Math.max(-1.5, Math.min(1.5, cam.pitch + (p.y - gesture.ly) * 0.006));
+    gesture.lx = p.x; gesture.ly = p.y;
+  } else if (gesture.type === 'pan') { panBy(p.x - gesture.lx, p.y - gesture.ly); gesture.lx = p.x; gesture.ly = p.y; }
+  else if (gesture.type === 'erase') eraseAt(p.x, p.y);
+  else if (gesture.type === 'place') { gesture.cx = p.x; gesture.cy = p.y; }
+});
+function endPointer(e) {
+  ptrs.delete(e.pointerId);
+  if (!gesture) return;
+  if (gesture.type === 'pinch') { if (ptrs.size < 2) gesture = null; return; }
+  if (e.pointerId !== gesture.id) return;
+  if (gesture.type === 'place' && e.type === 'pointerup') commitPlace(gesture);
+  gesture = null;
+}
+cv.addEventListener('pointerup', endPointer);
+cv.addEventListener('pointercancel', endPointer);
+cv.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') hover = null; });
+cv.addEventListener('contextmenu', e => e.preventDefault());
+cv.addEventListener('wheel', e => {
+  e.preventDefault();
+  cam.dist = Math.min(40000, Math.max(30, cam.dist * Math.exp(e.deltaY * (e.deltaMode ? 0.05 : 0.0015))));
+}, { passive: false });
+
+function launchFor(g) {
+  const dragged = Math.hypot(g.cx - g.sx, g.cy - g.sy) > 6;
+  if (dragged) {
+    const end = planeHit(g.cx, g.cy);
+    if (end) {
+      const v = [(end[0] - g.w[0]) * 0.05, 0, (end[2] - g.w[2]) * 0.05];
+      return applyTilt(v);
+    }
+  }
+  return S.autoOrbit ? orbitVelocity(g.w[0], g.w[1], g.w[2], S.mass) : [0, 0, 0];
+}
+function commitPlace(g) {
+  const [x, y, z] = g.w;
+  if (S.tool === 'fixed') { addBody({ x, y, z, m: S.mass * S.sign, fixed: true }); return; }
+  const [vx, vy, vz] = launchFor(g);
+  addBody({ x, y, z, vx, vy, vz, m: S.mass });
+}
+function eraseAt(sx, sy) {
+  let best = -1, bd = Infinity; const o = [0,0,0,0];
+  bodies.forEach((b, i) => {
+    if (!proj(b.x, b.y, b.z, o)) return;
+    const d = Math.hypot(o[0] - sx, o[1] - sy);
+    if (d < Math.max(14, b.r*o[3] + 6) && d < bd) { bd = d; best = i; }
+  });
+  if (best >= 0) { bodies.splice(best, 1); changed(); }
+}
+
+// ---------- drawing ----------
+function arrow2(x1, y1, x2, y2, head) {
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+  const a = Math.atan2(y2 - y1, x2 - x1);
+  ctx.moveTo(x2, y2); ctx.lineTo(x2 - head*Math.cos(a - 0.45), y2 - head*Math.sin(a - 0.45));
+  ctx.moveTo(x2, y2); ctx.lineTo(x2 - head*Math.cos(a + 0.45), y2 - head*Math.sin(a + 0.45));
+  ctx.stroke();
+}
+function niceStep(w) { const p = Math.pow(10, Math.floor(Math.log10(w))), f = w/p; return (f >= 5 ? 5 : f >= 2 ? 2 : 1) * p; }
+function line3(a, b, segs) {
+  // draw a 3D segment, clipped against the near plane by subdivision
+  const o = [0,0,0,0]; let pen = false;
+  ctx.beginPath();
+  for (let i = 0; i <= segs; i++) {
+    const t = i/segs;
+    if (proj(a[0] + (b[0]-a[0])*t, a[1] + (b[1]-a[1])*t, a[2] + (b[2]-a[2])*t, o)) { pen ? ctx.lineTo(o[0], o[1]) : ctx.moveTo(o[0], o[1]); pen = true; }
+    else pen = false;
+  }
+  ctx.stroke();
+}
+let gridStep = 100;
+function drawGrid() {
+  gridStep = niceStep(cam.dist / 7);
+  const N = 10, y = S.planeH;
+  const cx = Math.round(cam.tx / gridStep) * gridStep, cz = Math.round(cam.tz / gridStep) * gridStep;
+  ctx.lineWidth = 1;
+  for (let i = -N; i <= N; i++) {
+    const fade = 1 - Math.abs(i)/(N + 1);
+    ctx.strokeStyle = `rgba(120,140,190,${(i === 0 ? 0.28 : 0.13) * fade})`;
+    line3([cx + i*gridStep, y, cz - N*gridStep], [cx + i*gridStep, y, cz + N*gridStep], 24);
+    line3([cx - N*gridStep, y, cz + i*gridStep], [cx + N*gridStep, y, cz + i*gridStep], 24);
+  }
+}
+function drawField() {
+  const N = 7, y = S.planeH, sp = gridStep * 1.5, a = [0,0,0], o1 = [0,0,0,0], o2 = [0,0,0,0];
+  const cx = Math.round(cam.tx / gridStep) * gridStep, cz = Math.round(cam.tz / gridStep) * gridStep;
+  ctx.lineWidth = 1.1;
+  for (let i = -N; i <= N; i++) for (let j = -N; j <= N; j++) {
+    const x = cx + i*sp, z = cz + j*sp;
+    fieldAt(x, y, z, a, 0);
+    const mag = Math.hypot(a[0], a[1], a[2]); if (mag < 1e-7) continue;
+    const k = Math.min(1, Math.log10(1 + mag*200) / 2.5), L = sp * 0.45 * Math.max(0.15, k);
+    if (!proj(x, y, z, o1) || !proj(x + a[0]/mag*L, y + a[1]/mag*L, z + a[2]/mag*L, o2)) continue;
+    ctx.strokeStyle = `rgba(150,170,215,${0.15 + 0.5*k})`;
+    arrow2(o1[0], o1[1], o2[0], o2[1], 3.5);
+  }
+}
+function drawPath(pts, alpha) {
+  if (pts.length < 6) return;
+  const o = [0,0,0,0]; let pen = false;
+  ctx.setLineDash([2, 5]); ctx.lineWidth = 1.2; ctx.strokeStyle = `rgba(232,235,244,${alpha})`;
+  ctx.beginPath();
+  for (let i = 0; i < pts.length; i += 3) {
+    if (proj(pts[i], pts[i+1], pts[i+2], o)) { pen ? ctx.lineTo(o[0], o[1]) : ctx.moveTo(o[0], o[1]); pen = true; } else pen = false;
+  }
+  ctx.stroke(); ctx.setLineDash([]);
+}
+const fogOf = depth => Math.max(0.3, Math.min(1, 1.35 - depth / (cam.dist * 2.2)));
+function draw() {
+  basis();
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = C.void; ctx.fillRect(0, 0, W, H);
+  // sky: directions only, so it rotates but never moves
+  ctx.fillStyle = '#c8d2eb';
+  for (const s of bg) {
+    const cz = s.x*F[0] + s.y*F[1] + s.z*F[2]; if (cz < 0.05) continue;
+    const sx = W/2 + (s.x*R[0] + s.y*R[1] + s.z*R[2]) * focal / cz, sy = H/2 - (s.x*U[0] + s.y*U[1] + s.z*U[2]) * focal / cz;
+    if (sx < 0 || sy < 0 || sx > W || sy > H) continue;
+    ctx.globalAlpha = s.a; ctx.fillRect(sx, sy, s.s, s.s);
+  }
+  ctx.globalAlpha = 1;
+  if (S.grid) drawGrid(); else gridStep = niceStep(cam.dist / 7);
+  if (S.showField) drawField();
+
+  const o = [0,0,0,0], o2 = [0,0,0,0];
+  // trails
+  ctx.lineWidth = 1.1;
+  for (const b of bodies) {
+    const t = b.trail, n = t.length / 3; if (n < 2) continue;
+    const segs = 4, per = Math.ceil(n / segs);
+    for (let s = 0; s < segs; s++) {
+      const i0 = s*per, i1 = Math.min(n - 1, (s+1)*per); if (i1 <= i0) continue;
+      ctx.strokeStyle = `rgba(${b.rgb},${0.06 + 0.42*(s+1)/segs})`;
+      ctx.beginPath(); let pen = false;
+      for (let i = i0; i <= i1; i++) {
+        if (proj(t[i*3], t[i*3+1], t[i*3+2], o)) { pen ? ctx.lineTo(o[0], o[1]) : ctx.moveTo(o[0], o[1]); pen = true; } else pen = false;
+      }
+      ctx.stroke();
+    }
+  }
+  // depth-sorted bodies
+  const list = [];
+  for (const b of bodies) {
+    if (!proj(b.x, b.y, b.z, o)) continue;
+    if (o[0] < -300 || o[1] < -300 || o[0] > W + 300 || o[1] > H + 300) continue;
+    list.push({ b, sx: o[0], sy: o[1], d: o[2], s: o[3] });
+  }
+  list.sort((p, q) => q.d - p.d);
+  // drop lines first so bodies sit on top of them
+  if (S.drops) {
+    ctx.lineWidth = 1;
+    for (const it of list) {
+      const b = it.b; if (!proj(b.x, S.planeH, b.z, o2)) continue;
+      const below = b.y < S.planeH;
+      ctx.strokeStyle = `rgba(${b.fixed ? '116,210,226' : b.rgb},${below ? 0.12 : 0.22})`;
+      ctx.setLineDash(below ? [2, 3] : []);
+      ctx.beginPath(); ctx.moveTo(it.sx, it.sy); ctx.lineTo(o2[0], o2[1]); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = `rgba(${b.rgb},0.35)`;
+      ctx.beginPath(); ctx.ellipse(o2[0], o2[1], 2.2, 2.2 * Math.max(0.25, Math.abs(Math.sin(cam.pitch))), 0, 0, 7); ctx.fill();
+    }
+  }
+  for (const it of list) {
+    const b = it.b, sx = it.sx, sy = it.sy, fog = fogOf(it.d);
+    ctx.globalAlpha = fog;
+    if (b.fixed) {
+      const Rr = Math.max(5, b.r * it.s), col = b.m > 0 ? C.fixed : C.repel;
+      ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 1.5;
+      if (b.m < 0) ctx.setLineDash([3, 3]);
+      ctx.beginPath(); ctx.arc(sx, sy, Rr, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+      ctx.globalAlpha = fog * 0.25; ctx.beginPath(); ctx.arc(sx, sy, Rr*2.2, 0, 7); ctx.stroke(); ctx.globalAlpha = fog;
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(sx - Rr - 5, sy); ctx.lineTo(sx + Rr + 5, sy); ctx.moveTo(sx, sy - Rr - 5); ctx.lineTo(sx, sy + Rr + 5); ctx.stroke();
+      ctx.beginPath(); ctx.arc(sx, sy, 2, 0, 7); ctx.fill();
+      ctx.globalAlpha = 1; continue;
+    }
+    const Rr = Math.max(1.2, b.r * it.s);
+    if (b.m >= 2000) {
+      const g = ctx.createRadialGradient(sx, sy, Rr*0.6, sx, sy, Rr*3.4);
+      g.addColorStop(0, `rgba(${b.rgb},0.32)`); g.addColorStop(1, `rgba(${b.rgb},0)`);
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sx, sy, Rr*3.4, 0, 7); ctx.fill();
+      ctx.fillStyle = `rgb(${b.hi})`;
+    } else if (Rr > 3) {
+      const g = ctx.createRadialGradient(sx - Rr*0.35, sy - Rr*0.4, Rr*0.1, sx, sy, Rr);
+      g.addColorStop(0, `rgb(${b.hi})`); g.addColorStop(0.55, `rgb(${b.rgb})`); g.addColorStop(1, `rgb(${b.lo})`);
+      ctx.fillStyle = g;
+    } else ctx.fillStyle = `rgb(${b.rgb})`;
+    ctx.beginPath(); ctx.arc(sx, sy, Rr, 0, 7); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  // placement preview
+  const ghostCol = S.tool === 'fixed' ? (S.sign > 0 ? C.fixed : C.repel) : `rgb(${tint(S.mass)})`;
+  const ghost = (w, alpha) => {
+    if (!proj(w[0], w[1], w[2], o)) return;
+    ctx.globalAlpha = alpha; ctx.fillStyle = ghostCol;
+    ctx.beginPath(); ctx.arc(o[0], o[1], Math.max(2, radiusOf(S.mass) * o[3]), 0, 7); ctx.fill();
+    ctx.globalAlpha = 1;
+  };
+  if (gesture && gesture.type === 'place') {
+    const g = gesture;
+    ghost(g.w, 0.6);
+    if (S.tool === 'body') {
+      const v = launchFor(g);
+      drawPath(predict(g.w, v, S.mass), 0.6);
+      if (Math.hypot(g.cx - g.sx, g.cy - g.sy) > 6) {
+        const k = 20, e = [g.w[0] + v[0]*k, g.w[1] + v[1]*k, g.w[2] + v[2]*k];
+        if (proj(g.w[0], g.w[1], g.w[2], o) && proj(e[0], e[1], e[2], o2)) { ctx.strokeStyle = C.star; ctx.lineWidth = 1.6; arrow2(o[0], o[1], o2[0], o2[1], 8); }
+      }
+    }
+  } else if (hover && !gesture && (S.tool === 'body' || S.tool === 'fixed')) {
+    const w = planeHit(hover.x, hover.y);
+    if (w) {
+      ghost(w, 0.35);
+      if (S.tool === 'body' && S.autoOrbit && bodies.length) drawPath(predict(w, orbitVelocity(w[0], w[1], w[2], S.mass), S.mass), 0.28);
+    }
+  }
+}
+
+// ---------- HUD ----------
+function fmt(m) { const a = Math.abs(m); return a < 10 ? (+a.toFixed(1)).toString() : Math.round(a).toLocaleString('en-US'); }
+function hud() {
+  const moving = bodies.filter(b => !b.fixed).length, fixed = bodies.length - moving;
+  let drift = '—';
+  if (S.e0 !== null && Math.abs(S.e0) > 1e-9) { const d = (S.eNow - S.e0) / Math.abs(S.e0) * 100; drift = (d >= 0 ? '+' : '') + d.toFixed(Math.abs(d) < 0.1 ? 3 : 2) + '%'; }
+  $('stats').innerHTML = `t <b>${S.t.toFixed(1)}</b> · <b>${moving}</b> bodies${fixed ? ` · <b>${fixed}</b> fixed` : ''} · ΔE <b>${drift}</b>`;
+  $('gridLabel').innerHTML = `grid square <b>${gridStep.toLocaleString('en-US')} u</b> at height <b>${S.planeH}</b>`;
+}
+
+// ---------- loop ----------
+let frameN = 0;
+function frame() {
+  if (!S.paused && bodies.length) {
+    accel();
+    for (let i = 0; i < S.substeps; i++) step();
+    cull();
+    for (const b of bodies) {
+      if (b.fixed) continue;
+      b.trail.push(b.x, b.y, b.z);
+      const over = b.trail.length - 3*S.trailLen; if (over > 0) b.trail.splice(0, over);
+    }
+  }
+  if (S.spin && !gesture) cam.yaw += 0.0025;
+  if (S.follow) { const c = com(); if (c) { cam.tx += (c.x - cam.tx)*0.2; cam.ty += (c.y - cam.ty)*0.2; cam.tz += (c.z - cam.tz)*0.2; } }
+  if (frameN % 10 === 0) { S.eNow = energy(); if (S.e0 === null) S.e0 = S.eNow; }
+  draw();
+  if (frameN % 5 === 0) hud();
+  frameN++;
+  requestAnimationFrame(frame);
+}
+
+// ---------- scenes ----------
+// circular orbits in a disk with the given normal, around centre c
+function disk(c, n, r0, r1, m, normal = [0, 1, 0], thick = 0) {
+  const nn = norm(normal);
+  let e1 = cross(nn, [1, 0, 0]); if (Math.hypot(...e1) < 0.1) e1 = cross(nn, [0, 0, 1]);
+  e1 = norm(e1); const e2 = cross(nn, e1);
+  for (let i = 0; i < n; i++) {
+    const r = r0 + (r1 - r0) * Math.sqrt(Math.random()), th = Math.random()*Math.PI*2, h = (Math.random() - 0.5) * thick;
+    const v = Math.sqrt(c.m / r), cs = Math.cos(th), sn = Math.sin(th);
+    addBody({
+      x: c.x + r*(cs*e1[0] + sn*e2[0]) + h*nn[0], y: c.y + r*(cs*e1[1] + sn*e2[1]) + h*nn[1], z: c.z + r*(cs*e1[2] + sn*e2[2]) + h*nn[2],
+      vx: (c.vx||0) + v*(-sn*e1[0] + cs*e2[0]), vy: (c.vy||0) + v*(-sn*e1[1] + cs*e2[1]), vz: (c.vz||0) + v*(-sn*e1[2] + cs*e2[2]), m
+    });
+  }
+}
+const tilted = (deg, az = 0) => { const i = deg*Math.PI/180, a = az*Math.PI/180; return [Math.sin(i)*Math.cos(a), Math.cos(i), Math.sin(i)*Math.sin(a)]; };
+function zeroMomentum() {
+  let px = 0, py = 0, pz = 0, M = 0;
+  for (const b of bodies) if (!b.fixed) { px += b.m*b.vx; py += b.m*b.vy; pz += b.m*b.vz; M += b.m; }
+  if (M) for (const b of bodies) if (!b.fixed) { b.vx -= px/M; b.vy -= py/M; b.vz -= pz/M; }
+}
+const gauss = () => Math.sqrt(-2*Math.log(1 - Math.random())) * Math.cos(2*Math.PI*Math.random());
+function scene(name) {
+  bodies = []; S.t = 0; changed();
+  const set = o => { Object.assign(S, o); updateG(); syncUI(); };
+  const base = { gStrength: 0, showField: false, eps: 5, planeH: 0 };
+  if (name === 'system') {
+    set(base);
+    const star = addBody({ x: 0, y: 0, z: 0, m: 30000 });
+    for (const [r, m, inc] of [[150, 20, 7], [240, 80, -3], [360, 400, 4], [560, 1500, -6]]) {
+      const before = bodies.length;
+      disk({ ...star, m: star.m + m }, 1, r, r, m, tilted(inc, Math.random()*360));
+      const p = bodies[before];
+      if (m === 1500) disk({ x: p.x, y: p.y, z: p.z, vx: p.vx, vy: p.vy, vz: p.vz, m }, 1, 36, 36, 6, tilted(25));
+    }
+    disk(star, 110, 440, 480, 0.5, [0, 1, 0], 14);
+    zeroMomentum(); fit(640, 0.4);
+  } else if (name === 'binary') {
+    set(base);
+    const v = Math.sqrt(12000 * 80 / (160*160));
+    addBody({ x: -80, y: 0, z: 0, vx: 0, vy: 0, vz: v, m: 12000 });
+    addBody({ x: 80, y: 0, z: 0, vx: 0, vy: 0, vz: -v, m: 12000 });
+    disk({ x: 0, y: 0, z: 0, m: 24000 }, 180, 300, 460, 0.5, tilted(40, 30));
+    fit(520, 0.35);
+  } else if (name === 'cluster') {
+    set({ ...base, eps: 8 });
+    const N = 260, Rc = 300; let M = 0;
+    for (let i = 0; i < N; i++) {
+      const m = Math.pow(10, 0.7 + Math.random() * 1.6);
+      const u = Math.random()*2 - 1, t = Math.random()*Math.PI*2, s = Math.sqrt(1 - u*u), r = Rc * Math.cbrt(Math.random());
+      addBody({ x: r*s*Math.cos(t), y: r*u, z: r*s*Math.sin(t), m }); M += m;
+    }
+    const sigma = Math.sqrt(3 * M / (5 * Rc) / 3) * 0.9;
+    for (const b of bodies) { b.vx = gauss()*sigma; b.vy = gauss()*sigma; b.vz = gauss()*sigma; }
+    zeroMomentum(); fit(420, 0.3);
+  } else if (name === 'galaxies') {
+    set(base);
+    const a = addBody({ x: -330, y: -60, z: -120, vx: 1.7, vy: 0.1, vz: 0.3, m: 15000 });
+    const b = addBody({ x: 330, y: 60, z: 120, vx: -1.7, vy: -0.1, vz: -0.3, m: 15000 });
+    disk(a, 180, 40, 160, 0.5, tilted(25, 0));
+    disk(b, 180, 40, 160, 0.5, tilted(-70, 60));
+    fit(560, 0.5);
+  } else if (name === 'eight') {
+    set({ ...base, eps: 1 });
+    const L = 180, m = 2000, vs = Math.sqrt(m / L);
+    const x1 = 0.97000436*L, z1 = -0.24308753*L, v3x = -0.93240737*vs, v3z = -0.86473146*vs;
+    addBody({ x: -x1, y: 0, z: -z1, vx: -v3x/2, vy: 0, vz: -v3z/2, m });
+    addBody({ x: x1, y: 0, z: z1, vx: -v3x/2, vy: 0, vz: -v3z/2, m });
+    addBody({ x: 0, y: 0, z: 0, vx: v3x, vy: 0, vz: v3z, m });
+    fit(260, 0.7);
+  } else if (name === 'pinball') {
+    set({ ...base, gStrength: 0.06, gAz: 0, gEl: -90, showField: true, merge: true, planeH: -350 });
+    for (const y of [-40, -200]) for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+      const off = y === -200 ? 75 : 0;
+      addBody({ x: i*150 + off, y, z: j*150 + off, m: (y === -200 && (i + j) % 2 === 0) ? -2500 : 2500, fixed: true });
+    }
+    for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) addBody({ x: -210 + i*60, y: 260 + Math.random()*30, z: -210 + j*60, m: 1 });
+    fit(420, 0.3); cam.ty = -60;
+  } else if (name === 'empty') {
+    fit(500);
+  }
+  syncUI();
+}
+
+// ---------- UI ----------
+function setTool(t) {
+  S.tool = t; stage.dataset.tool = t;
+  document.querySelectorAll('.toolbar button').forEach(b => b.setAttribute('aria-pressed', b.dataset.tool === t));
+}
+function setMass(m) {
+  S.mass = m; $('mass').value = Math.log10(m);
+  $('massVal').textContent = fmt(m);
+  const rgb = tint(m); $('swatch').style.background = `rgb(${rgb})`; $('swatch').style.setProperty('--sw', m >= 2000 ? `rgba(${rgb},.6)` : 'transparent');
+  document.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', Math.abs(+c.dataset.m - m) / m < 0.02));
+}
+function syncUI() {
+  $('gs').value = S.gStrength; $('gsVal').textContent = S.gStrength ? S.gStrength.toFixed(3) : 'off';
+  $('gaz').value = S.gAz; $('gazVal').textContent = S.gAz + '°';
+  $('gel').value = S.gEl; $('gelVal').textContent = (S.gEl < 0 ? '−' : '') + Math.abs(S.gEl) + '°' + (S.gEl === -90 ? ' (down)' : S.gEl === 90 ? ' (up)' : '');
+  $('height').value = S.planeH; $('heightVal').textContent = S.planeH;
+  $('tilt').value = S.tilt; $('tiltVal').textContent = S.tilt + '°';
+  $('field').checked = S.showField; $('merge').checked = S.merge; $('follow').checked = S.follow; $('orbit').checked = S.autoOrbit;
+  $('spin').checked = S.spin; $('drops').checked = S.drops; $('grid').checked = S.grid;
+  $('speed').value = S.substeps; $('speedVal').textContent = S.substeps + ' steps/frame';
+  $('eps').value = S.eps; $('epsVal').textContent = S.eps;
+  $('trail').value = S.trailLen; $('trailVal').textContent = S.trailLen || 'off';
+  document.querySelectorAll('#sign button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.sign === S.sign));
+  $('playLabel').textContent = S.paused ? 'Play' : 'Pause';
+  $('playIcon').innerHTML = S.paused ? '<path d="M4 2.5v11l9.5-5.5z"/>' : '<rect x="3.5" y="2.5" width="3" height="11" rx=".6"/><rect x="9.5" y="2.5" width="3" height="11" rx=".6"/>';
+}
+function togglePause() { S.paused = !S.paused; syncUI(); }
+
+document.querySelectorAll('.toolbar button').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
+$('play').addEventListener('click', togglePause);
+$('clear').addEventListener('click', () => { bodies = []; S.t = 0; changed(); });
+$('mass').addEventListener('input', e => {
+  const v = Math.pow(10, +e.target.value), p = Math.pow(10, Math.floor(Math.log10(v)) - 1);
+  setMass(v < 10 ? Math.round(v*10)/10 : Math.round(v / p) * p);
+});
+document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => setMass(+c.dataset.m)));
+$('orbit').addEventListener('change', e => S.autoOrbit = e.target.checked);
+$('height').addEventListener('input', e => { S.planeH = +e.target.value; syncUI(); });
+$('tilt').addEventListener('input', e => { S.tilt = +e.target.value; syncUI(); });
+$('gs').addEventListener('input', e => { S.gStrength = +e.target.value; updateG(); syncUI(); });
+$('gaz').addEventListener('input', e => { S.gAz = +e.target.value; updateG(); syncUI(); });
+$('gel').addEventListener('input', e => { S.gEl = +e.target.value; updateG(); syncUI(); });
+document.querySelectorAll('#sign button').forEach(b => b.addEventListener('click', () => { S.sign = +b.dataset.sign; syncUI(); setTool('fixed'); }));
+$('useFixed').addEventListener('click', () => setTool('fixed'));
+$('field').addEventListener('change', e => S.showField = e.target.checked);
+$('speed').addEventListener('input', e => { S.substeps = +e.target.value; syncUI(); });
+$('eps').addEventListener('input', e => { S.eps = +e.target.value; changed(); syncUI(); });
+$('trail').addEventListener('input', e => { S.trailLen = +e.target.value; syncUI(); });
+$('merge').addEventListener('change', e => S.merge = e.target.checked);
+$('follow').addEventListener('change', e => S.follow = e.target.checked);
+$('spin').addEventListener('change', e => S.spin = e.target.checked);
+$('drops').addEventListener('change', e => S.drops = e.target.checked);
+$('grid').addEventListener('change', e => S.grid = e.target.checked);
+document.querySelectorAll('[data-scene]').forEach(b => b.addEventListener('click', () => scene(b.dataset.scene)));
+$('dust').addEventListener('click', () => {
+  let c = null; for (const b of bodies) if (b.m > 0 && (!c || b.m > c.m)) c = b;
+  if (!c) {
+    for (let i = 0; i < 100; i++) addBody({ x: cam.tx + (Math.random()-.5)*cam.dist*0.6, y: S.planeH + (Math.random()-.5)*cam.dist*0.2, z: cam.tz + (Math.random()-.5)*cam.dist*0.6, m: 0.5 });
+    return;
+  }
+  const r0 = c.r*2 + 20;
+  disk(c, 100, r0, Math.max(r0 + 60, cam.dist * 0.3), 0.5, tilted(S.tilt, 0));
+});
+window.addEventListener('keydown', e => {
+  if (e.key === 'Shift') shiftDown = true;
+  if (e.target.matches('input[type=checkbox],button') && e.code === 'Space') return;
+  if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) togglePause(); }
+  else if (e.key >= '1' && e.key <= '4') setTool(['body','fixed','erase','orbit'][+e.key - 1]);
+  else if (e.key === 'f') { S.showField = !S.showField; syncUI(); }
+});
+window.addEventListener('keyup', e => { if (e.key === 'Shift') shiftDown = false; });
+
+setMass(300); syncUI(); basis(); scene('system');
+requestAnimationFrame(frame);
+})();
+</script>
+
+</body></html>

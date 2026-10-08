@@ -1,0 +1,1166 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Mandelbrot Descent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,400;1,500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one fullscreen canvas; a quiet caption top-left and a floating control pill bottom-centre that fade when idle. Single dark world by design. */
+:root{
+  --ink:#07080c;
+  --glass:rgba(12,13,19,.62);
+  --line:rgba(236,226,206,.16);
+  --bone:#ece2ce;
+  --mute:rgba(236,226,206,.58);
+  --gilt:#d6ad6a;
+  --display:"Cormorant Garamond","Iowan Old Style","Palatino Linotype",Georgia,serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0;background:var(--ink);color:var(--bone);overflow:hidden}
+:root{padding:0!important}
+body{font:13px/1.4 var(--mono);-webkit-font-smoothing:antialiased;touch-action:manipulation}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block;background:var(--ink)}
+body.idle{cursor:none}
+.fade{transition:opacity .9s ease;}
+body.idle .fade{opacity:0;pointer-events:none}
+body.idle #bar{backdrop-filter:none;-webkit-backdrop-filter:none}
+#cap{position:fixed;left:max(20px,env(safe-area-inset-left));top:calc(16px + env(safe-area-inset-top,0px));pointer-events:none;text-shadow:0 1px 12px rgba(0,0,0,.55)}
+#cap .name{font:italic 500 clamp(20px,2.3vw,30px)/1.1 var(--display);letter-spacing:.01em;transition:opacity .9s ease}
+#cap .depth{margin-top:6px;font:400 11px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--mute);font-variant-numeric:tabular-nums}
+#cap .depth b{font-weight:500;color:var(--bone);letter-spacing:.04em}
+#cap sup{font-size:.78em;vertical-align:.45em;letter-spacing:.02em}
+#bar{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);display:flex;align-items:center;gap:2px;padding:5px;border-radius:999px;background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(14px) saturate(1.2);-webkit-backdrop-filter:blur(14px) saturate(1.2);box-shadow:0 10px 40px rgba(0,0,0,.35)}
+#bar button{all:unset;box-sizing:border-box;height:36px;min-width:36px;padding:0 10px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;gap:7px;color:var(--bone);cursor:pointer;font:500 11px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;transition:background .2s}
+#bar button:hover{background:rgba(236,226,206,.09)}
+#bar button:focus-visible{outline:1px solid var(--gilt);outline-offset:1px}
+#bar svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+#bar .sep{width:1px;height:18px;background:var(--line);margin:0 4px}
+#speed{min-width:48px;font-variant-numeric:tabular-nums}
+#panel{position:fixed;left:50%;bottom:calc(76px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:min(360px,calc(100vw - 32px));box-sizing:border-box;padding:18px 18px 16px;border-radius:16px;background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(18px) saturate(1.2);-webkit-backdrop-filter:blur(18px) saturate(1.2);box-shadow:0 20px 60px rgba(0,0,0,.45);display:grid;gap:14px}
+#panel h2{margin:0;font:italic 500 22px/1 var(--display)}
+#panel .row{display:grid;gap:7px}
+#panel .lab{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--mute)}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{all:unset;cursor:pointer;padding:7px 11px;border-radius:999px;border:1px solid var(--line);font:500 11px/1 var(--mono);letter-spacing:.04em;color:var(--bone);font-variant-numeric:tabular-nums}
+.seg button[aria-pressed="true"]{background:var(--bone);color:var(--ink);border-color:var(--bone)}
+.seg button:focus-visible{outline:1px solid var(--gilt);outline-offset:2px}
+#panel .note{font-size:11px;color:var(--mute);line-height:1.5}
+#go,#save{all:unset;cursor:pointer;text-align:center;padding:11px 14px;border-radius:999px;background:var(--gilt);color:#17120a;font:500 11px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase}
+#go:focus-visible,#save:focus-visible{outline:2px solid var(--bone);outline-offset:2px}
+#go[disabled]{opacity:.45;cursor:default}
+#prog{height:3px;border-radius:2px;background:var(--line);overflow:hidden}
+#prog i{display:block;height:100%;width:0;background:var(--gilt);transition:width .15s linear}
+#result{display:grid;gap:10px}
+#result img{width:100%;border-radius:8px;display:block;image-rendering:auto}
+.acts{display:flex;gap:8px;align-items:center;justify-content:space-between}
+#close{all:unset;cursor:pointer;position:absolute;right:14px;top:14px;color:var(--mute);font-size:18px;line-height:1;padding:2px 6px}
+#veil{position:fixed;inset:0;display:grid;place-items:center;pointer-events:none;transition:opacity 1.2s ease}
+#veil span{font:italic 400 20px var(--display);color:var(--mute);letter-spacing:.04em}
+#err{position:fixed;inset:0;display:grid;place-items:center;padding:24px;text-align:center;font:italic 20px/1.5 var(--display)}
+@media (max-width:520px){#bar button .t{display:none}#cap .name{font-size:20px}}
+@media (prefers-reduced-motion:reduce){.fade{transition:none}}
+</style>
+
+<canvas id="c" aria-label="Animated deep zoom into the Mandelbrot set"></canvas>
+<div id="veil"><span>Descending…</span></div>
+<a href="../index.html" class="fade" style="position:fixed;top:calc(12px + env(safe-area-inset-top,0px));right:max(16px,env(safe-area-inset-right));z-index:5;padding:6px 12px;border-radius:999px;background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);color:var(--bone);font-size:12px;text-decoration:none">← All widgets</a>
+<div id="cap" class="fade"><div class="name" id="locname"></div><div class="depth" id="depth"></div></div>
+<div id="bar" class="fade" role="toolbar" aria-label="Zoom controls">
+  <button id="pause" title="Pause (Space)" aria-label="Pause"><svg viewBox="0 0 16 16" id="pauseIcon"><path d="M5.5 3.5v9M10.5 3.5v9"/></svg></button>
+  <button id="slower" title="Slower (←)" aria-label="Slower"><svg viewBox="0 0 16 16"><path d="M4 8h8"/></svg></button>
+  <button id="speed" title="Zoom speed" aria-live="polite">1×</button>
+  <button id="faster" title="Faster (→)" aria-label="Faster"><svg viewBox="0 0 16 16"><path d="M4 8h8M8 4v8"/></svg></button>
+  <span class="sep"></span>
+  <button id="next" title="Next location (N)"><svg viewBox="0 0 16 16"><path d="M3.5 3.5l5 4.5-5 4.5M9.5 3.5l5 4.5-5 4.5" transform="translate(-1 0)"/></svg><span class="t">Next</span></button>
+  <button id="exp" title="Export GIF (E)"><svg viewBox="0 0 16 16"><path d="M8 2.5v8M4.5 7l3.5 3.5L11.5 7M3 13.5h10"/></svg><span class="t">GIF</span></button>
+</div>
+<div id="panel" hidden role="dialog" aria-label="Export animated GIF">
+  <button id="close" aria-label="Close">×</button>
+  <h2>Export this descent</h2>
+  <div class="row"><div class="lab">Length</div><div class="seg" id="optLen">
+    <button data-v="3">3 s</button><button data-v="5" aria-pressed="true">5 s</button><button data-v="10">10 s</button><button data-v="20">20 s</button></div></div>
+  <div class="row"><div class="lab">Size</div><div class="seg" id="optSize">
+    <button data-v="270" aria-pressed="true">270p</button><button data-v="360">360p</button><button data-v="480">480p</button><button data-v="sq">Square</button></div></div>
+  <div class="row"><div class="lab">Quality</div><div class="seg" id="optQ">
+    <button data-v="compact">Compact</button><button data-v="std" aria-pressed="true">Standard</button><button data-v="fine">Fine</button></div></div>
+  <div class="note" id="estimate"></div>
+  <button id="go">Render GIF</button>
+  <div class="row" id="progRow" hidden><div class="lab" id="progLab">Rendering</div><div id="prog"><i></i></div></div>
+  <div id="result" hidden><img id="gifimg" alt="Exported zoom GIF preview"><div class="acts"><span class="note" id="gifinfo"></span><button id="save">Save GIF</button></div></div>
+</div>
+<div id="err" hidden></div>
+
+<script>
+"use strict";
+// ---------- curated palettes (cyclic; interpolated in OKLab) ----------
+const PALETTES = {
+  tidewater: { stops: ['#0a1a2e', '#1d4e5f', '#5f9e96', '#d9e4cf', '#e7c27d', '#b0633a', '#4a2130'], ink: '#071019', void: '#05070c' },
+  nocturne:  { stops: ['#0e0b1f', '#33204d', '#7a4a7e', '#d08a8a', '#f2d4b0', '#9fb7b4', '#2c4a5a'], ink: '#0b0814', void: '#06050b' },
+  celadon:   { stops: ['#0f2421', '#2c5a4c', '#7fae94', '#e8eedc', '#cfae73', '#7a4a2e', '#2a2420'], ink: '#0a1412', void: '#060a09' },
+  ember:     { stops: ['#140b0a', '#4b1913', '#a3402a', '#e48d4c', '#f6dfb5', '#8fa3a8', '#2b3440'], ink: '#0d0707', void: '#080505' },
+  glacier:   { stops: ['#081a2c', '#1b4467', '#4f86b0', '#a9cfe0', '#f1f0e8', '#c4a982', '#43405a'], ink: '#06111c', void: '#04080e' },
+  lacquer:   { stops: ['#120607', '#5a1218', '#b23a2f', '#e8b779', '#f3ead6', '#2f5a57', '#0e2224'], ink: '#0c0405', void: '#070304' },
+  moss:      { stops: ['#0d140c', '#2f4a25', '#7f9a4f', '#e3dfb6', '#c58f5a', '#6b3a3a', '#231a24'], ink: '#090d08', void: '#050704' },
+};
+// ---------- curated deep targets: minibrot nuclei (exact to ~70 digits) ----------
+const LOCATIONS = [
+  { id: 'a', name: 'Seahorse Valley', re: '-0.7440514043185802740309131205206212412160496240398593932148288751860110', im: '0.1157382806164059423391465349296550392478612456653133743498323123687525', p: 19359, size: 4.912238135612426e-31, ang: 0.287320904617907, r0: 0.005, pal: ['tidewater', 'nocturne'], phase: 0.1, cycles: 0.9, seed: 11 },
+  { id: 'b', name: 'Elephant Valley', re: '0.2860195351845307742957248207874635845001149621892448731062983135174734', im: '0.0115339645163373596789759629212513767580901604809316063860429653914588', p: 2036, size: 6.456689474458968e-36, ang: 1.1319676488473127, r0: 3.7e-6, pal: ['ember', 'glacier'], phase: 0.3, cycles: 0.9, seed: 12 },
+  { id: 'c', name: 'Triple Spiral Valley', re: '-0.0862270094580491238528419922865814491904839553095442226838806154042686', im: '0.6502794878939344198516310860983795254951075162327781826110291632507618', p: 13500, size: 2.629946317256072e-36, ang: -1.885144746357273, r0: 6e-5, pal: ['nocturne', 'celadon'], phase: 0.2, cycles: 0.9, seed: 13 },
+  { id: 'd', name: 'Northern Filaments', re: '-0.1634693675675649572523931919536802282060221847309384452100713495597245', im: '1.0310841382896437726204685348056207021772521630482183730665148487557773', p: 3240, size: 3.1285118362893547e-35, ang: 0.21556032616453136, r0: 0.015, pal: ['glacier', 'lacquer'], phase: 0.6, cycles: 0.9, seed: 14 },
+  { id: 'e', name: 'Scepter Valley', re: '-1.2519690623074106181899438925628800437164297992975882111127608453326893', im: '0.0168329188467551814835924535638643440455506729748311663486302974787709', p: 27648, size: 3.2553572750785795e-32, ang: -0.33597069223290377, r0: 2.3e-4, pal: ['moss', 'tidewater'], phase: 0.45, cycles: 0.9, seed: 15 },
+  { id: 'f', name: 'West of the Third Bulb', re: '-0.5659599378224782284060622987821052872096173792441192585397404157280093', im: '0.6390524748684324089954691893967276226784664158183979694225990583436822', p: 3863, size: 9.957224777545256e-36, ang: 0.6622724524079262, r0: 0.015, pal: ['lacquer', 'celadon'], phase: 0.75, cycles: 0.9, seed: 16 },
+];
+
+// ---------- GLSL ----------
+const VS = `#version 300 es
+void main(){ vec2 p = vec2(float((gl_VertexID<<1)&2), float(gl_VertexID&2)); gl_Position = vec4(p*2.0-1.0, 0.0, 1.0); }`;
+
+// Perturbation renderer. All deltas are stored rescaled by uS (the frame's half-height in the
+// complex plane), so float32 never underflows even at 1e-35. Reference = exact periodic orbit
+// of a minibrot nucleus (wraps at uP). Bilinear approximation (BLA) skips runs of iterations.
+const FS_FRACTAL = (probe) => `#version 300 es
+precision highp float; precision highp int; precision highp sampler2D;
+uniform sampler2D uRef, uBlaAB, uBlaR, uPal;
+uniform int uP, uLevels, uMaxIter, uMaxSteps;
+uniform int uLOff[24]; uniform int uLCnt[24];
+uniform float uS;
+uniform vec2 uW, uRot, uExt, uC, uTex, uOrg, uJit;
+uniform vec2 uLight;
+uniform float uBrent;
+uniform float uPhase, uBetaP, uTexel, uSeed;
+uniform sampler2D uMap; uniform vec2 uMapR;
+uniform vec3 uInkA, uInkB, uVoid;
+uniform sampler2D uPrev; uniform int uPrevOn; uniform vec4 uPrevA, uPrevB; uniform ivec2 uPrevSize;
+out vec4 o;
+vec2 cmul(vec2 a, vec2 b){ return vec2(a.x*b.x - a.y*b.y, a.x*b.y + a.y*b.x); }
+vec2 refZ(int m){ return texelFetch(uRef, ivec2(m & 2047, m >> 11), 0).xy; }
+float nrm1(vec2 v){ vec2 a = abs(v); return max(a.x,a.y) + 0.4*min(a.x,a.y); }
+float hash(vec2 p){ p = fract(p*vec2(443.897, 441.423) + uSeed); p += dot(p, p.yx + 19.19); return fract((p.x + p.y)*p.x); }
+vec3 toS(vec3 c){ return mix(c*12.92, 1.055*pow(c, vec3(1.0/2.4)) - 0.055, step(0.0031308, c)); }
+vec3 toL(vec3 c){ return mix(c/12.92, pow((c+0.055)/1.055, vec3(2.4)), step(0.04045, c)); }
+void main(){
+  vec2 f = ((gl_FragCoord.xy - uOrg + uJit) / uTex) * 2.0 - 1.0;
+  vec2 dc = uW + cmul(uRot, f * uExt);
+${probe ? '' : `  // Interior inheritance: membership depends only on c, so if the previous (coarser) keyframe found a
+  // whole 5x5 neighbourhood around this point interior, it is interior here too. Alpha stores
+  // 1 = exterior, k/8 = interior inherited k times. Points are re-verified after 4 inheritances.
+  if (uPrevOn == 1) {
+    vec2 q = cmul(vec2(uPrevA.y, -uPrevA.z), dc * uPrevA.x - uPrevB.xy) / uPrevB.zw;
+    ivec2 ti = ivec2(floor((q * 0.5 + 0.5) * vec2(uPrevSize)));
+    if (all(greaterThanEqual(ti, ivec2(2))) && all(lessThan(ti, uPrevSize - 2))) {
+      float g = 0.0;
+      for (int y = -2; y <= 2 && g < 0.45; y++) for (int x = -2; x <= 2; x++) { g = max(g, texelFetch(uPrev, ti + ivec2(x, y), 0).a); if (g > 0.45) break; }
+      if (g < 0.45) {
+        vec3 sv = toS(uVoid) + (hash(gl_FragCoord.xy) + hash(gl_FragCoord.yx + 7.0) - 1.0) / 255.0;
+        o = vec4(toL(clamp(sv, 0.0, 1.0)), g + 0.125); return;
+      }
+    }
+  }`}
+  vec2 d = vec2(0.0), dd = vec2(0.0), z = vec2(0.0);
+  int m = 0, n = 0, steps = 0; bool esc = false;
+  vec2 zs = vec2(1e30), ds = vec2(0.0); int ms = -1, chk = 8; bool settled = false;
+  // uMaxSteps bounds the real work per pixel (BLA skips count once), so no single pixel can run long
+  // enough to trip the GPU driver's watchdog; pixels that hit it are drawn as interior.
+  while (n < uMaxIter && steps < uMaxSteps) {
+    steps++;
+    if (m > 0) {
+      int mm = m - 1; int l = (mm == 0) ? uLevels : min(uLevels, int(log2(float(mm & -mm)) + 0.5));
+      float dn = nrm1(d);
+      bool did = false;
+      for (; l >= 1; --l) {
+        int j = (m - 1) >> l;
+        if (j >= uLCnt[l]) continue;
+        int idx = uLOff[l] + j;
+        ivec2 tc = ivec2(idx & 2047, idx >> 11);
+        if (dn < texelFetch(uBlaR, tc, 0).x) {
+          vec4 ab = texelFetch(uBlaAB, tc, 0);
+          d = cmul(ab.xy, d) + cmul(ab.zw, dc);
+          dd = cmul(ab.xy, dd) + ab.zw * uS;
+          int k = 1 << l; m += k; n += k; did = true; break;
+        }
+      }
+      if (did) { if (m >= uP) m -= uP; continue; }
+    }
+    vec2 Z = refZ(m);
+    vec2 sd = uS * d;
+    dd = 2.0 * cmul(Z + sd, dd) + vec2(uS, 0.0);
+    d = cmul(2.0 * Z + sd, d) + dc;
+    m++; n++; if (m == uP) m = 0;
+    sd = uS * d;
+    z = refZ(m) + sd;
+    float zz = dot(z, z);
+    if (zz > 4.0) { esc = true; break; }
+    // periodicity check: an orbit that returns to a saved point has settled on an attracting cycle
+    if (m == ms) { if (nrm1(d - ds) < uBrent * nrm1(d)) { settled = true; break; } }
+    else { if (nrm1(z - zs) < uBrent * nrm1(z) + 4e-7 * (nrm1(z - sd) + nrm1(sd)) && dot(sd, sd) > 1e-6 * zz) { settled = true; break; } }
+    if (n >= chk) { zs = z; ds = d; ms = m; chk = n + n; }
+    if (zz < dot(sd, sd)) { d = z / uS; m = 0; }
+  }
+  float nu = -1.0, dpx = 0.0; vec2 nr = vec2(0.0);
+  if (esc) {
+    vec2 c = uC + uS * dc;
+    for (int k = 0; k < 40; k++) { if (dot(z,z) > 1e8) break; dd = 2.0*cmul(z, dd) + vec2(uS, 0.0); z = cmul(z, z) + c; n++; }
+    float lz = 0.5*log(dot(z, z));
+    nu = max(float(n) + 1.0 - log2(lz), 1.0);
+    float ld = length(dd);
+    dpx = length(z) * lz / max(ld, 1e-30) / uTexel;
+    nr = normalize(cmul(z, vec2(dd.x, -dd.y)) + 1e-30);
+  }
+${probe ? `  o = vec4(settled ? -2.0 : nu, dpx, float(steps), 1.0);
+}` : `  vec3 col;
+  if (!esc) col = uVoid;
+  else {
+    // one global, depth-aware mapping from iteration count to palette position: every keyframe agrees
+    float x = clamp((log(nu) - uMapR.x) / (uMapR.y - uMapR.x), 0.0, 1.0) * 1023.0;
+    int xi = min(int(x), 1022);
+    float t = mix(texelFetch(uMap, ivec2(xi, 0), 0).x, texelFetch(uMap, ivec2(xi + 1, 0), 0).x, x - float(xi)) + uPhase;
+    float beta = 0.5 - 0.5 * cos(6.2831853 * t / uBetaP);
+    vec3 a = textureLod(uPal, vec2(t, 0.25), 0.0).rgb;
+    vec3 b = textureLod(uPal, vec2(t, 0.75), 0.0).rgb;
+    col = mix(a, b, beta);
+    vec3 uInk = mix(uInkA, uInkB, beta);
+    float lit = dot(nr, uLight);
+    col *= 0.86 + 0.24 * lit;
+    float edge = exp(-dpx * 2.2);
+    col = mix(col, uInk, 0.5 * edge);
+  }
+  vec3 s = toS(max(col, 0.0)) + (hash(gl_FragCoord.xy) + hash(gl_FragCoord.yx + 7.0) - 1.0) / 255.0;
+  o = vec4(toL(clamp(s, 0.0, 1.0)), settled ? 0.0 : 1.0);
+}`}`;
+
+// Composites up to five keyframes (deepest first) into the screen.
+const FS_DISPLAY = `#version 300 es
+precision highp float;
+uniform sampler2D uK0, uK1, uK2, uK3, uK4;
+uniform vec4 uKA[5]; uniform vec4 uKB[5]; uniform vec2 uKS[5]; uniform float uBand[5];
+uniform vec2 uWv, uRotV, uView, uRes;
+uniform vec3 uVoid;
+uniform float uAlpha, uSeed, uVig;
+uniform vec3 uGrade;
+out vec4 o;
+vec2 cmul(vec2 a, vec2 b){ return vec2(a.x*b.x - a.y*b.y, a.x*b.y + a.y*b.x); }
+float hash(vec2 p){ p = fract(p*vec2(443.897, 441.423) + uSeed); p += dot(p, p.yx + 19.19); return fract((p.x + p.y)*p.x); }
+vec3 toS(vec3 c){ return mix(c*12.92, 1.055*pow(c, vec3(1.0/2.4)) - 0.055, step(0.0031308, c)); }
+void main(){
+  vec2 sc = (gl_FragCoord.xy / uRes) * 2.0 - 1.0;
+  vec2 p = uWv + cmul(uRotV, sc * uView);
+  vec3 col = vec3(0.0); float acc = 0.0;
+  // keyframe coordinates and their screen-space gradients first (uniform control flow), then sample
+  // only the slots that actually contribute: usually one or two of the five
+#define FCOORD(i) (cmul(vec2(uKA[i].y, -uKA[i].z), uKA[i].x * p - uKB[i].xy) / uKB[i].zw)
+  vec2 f0 = FCOORD(0), f1 = FCOORD(1), f2 = FCOORD(2), f3 = FCOORD(3), f4 = FCOORD(4);
+  vec2 gx0 = dFdx(f0), gy0 = dFdy(f0), gx1 = dFdx(f1), gy1 = dFdy(f1), gx2 = dFdx(f2), gy2 = dFdy(f2), gx3 = dFdx(f3), gy3 = dFdy(f3), gx4 = dFdx(f4), gy4 = dFdy(f4);
+#define SLOT(i, T, f, gx, gy) if (acc < 0.996 && uKA[i].w > 0.0) { float e = 1.0 - max(abs(f.x), abs(f.y)); float w = uKA[i].w * smoothstep(0.0, uBand[i], e); if (w > 0.0) { vec3 c = textureGrad(T, (f * 0.5 + 0.5) * uKS[i], gx * 0.5 * uKS[i], gy * 0.5 * uKS[i]).rgb; col += (1.0 - acc) * w * c; acc += (1.0 - acc) * w; } }
+  SLOT(0, uK0, f0, gx0, gy0) SLOT(1, uK1, f1, gx1, gy1) SLOT(2, uK2, f2, gx2, gy2) SLOT(3, uK3, f3, gx3, gy3) SLOT(4, uK4, f4, gx4, gy4)
+  col += (1.0 - acc) * uVoid;
+  col *= uGrade;
+  float r2 = dot(sc * uView, sc * uView) / dot(uView, uView);
+  col *= 1.0 - uVig * r2 * r2;
+  vec3 s = toS(max(col, 0.0)) + (hash(gl_FragCoord.xy) + hash(gl_FragCoord.yx + 3.1) - 1.0) / 255.0;
+  o = vec4(s, uAlpha);
+}`;
+
+// Box-filter downsample (linear light) of a supersampled sRGB texture, output sRGB bytes.
+const FS_DOWN = `#version 300 es
+precision highp float;
+uniform sampler2D uSrc; uniform int uSS; uniform float uVig; uniform vec2 uRes;
+out vec4 o;
+vec3 toS(vec3 c){ return mix(c*12.92, 1.055*pow(c, vec3(1.0/2.4)) - 0.055, step(0.0031308, c)); }
+void main(){
+  ivec2 b = ivec2(gl_FragCoord.xy) * uSS;
+  vec3 a = vec3(0.0);
+  for (int y = 0; y < 4; y++) for (int x = 0; x < 4; x++) if (x < uSS && y < uSS) a += texelFetch(uSrc, b + ivec2(x, y), 0).rgb;
+  a /= float(uSS * uSS);
+  vec2 sc = (gl_FragCoord.xy / uRes) * 2.0 - 1.0; vec2 v = sc * vec2(uRes.x / uRes.y, 1.0);
+  float r2 = dot(v, v) / (1.0 + (uRes.x/uRes.y)*(uRes.x/uRes.y));
+  a *= 1.0 - uVig * r2 * r2;
+  o = vec4(toS(a), 1.0);
+}`;
+
+// ---------- math helpers ----------
+const TAU = Math.PI * 2;
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const smoothstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+const FB = 400n, FBN = 400;
+function parseFixed(str) {
+  str = str.trim(); let neg = false;
+  if (str[0] === '-' || str[0] === '+') { neg = str[0] === '-'; str = str.slice(1); }
+  const [ip, fp = ''] = str.split('.');
+  const v = (BigInt(ip + fp) << FB) / (10n ** BigInt(fp.length));
+  return neg ? -v : v;
+}
+const big2num = (b) => Number(b >> 300n) / 2 ** (FBN - 300);
+// Exact periodic reference orbit of the nucleus, Z_0..Z_{p-1} (Z_p = 0).
+function periodicOrbit(re, im, p) {
+  const cr = parseFixed(re), ci = parseFixed(im);
+  const Z = new Float64Array(2 * p);
+  let zr = 0n, zi = 0n;
+  for (let n = 1; n < p; n++) {
+    const t = ((zr * zr - zi * zi) >> FB) + cr;
+    zi = ((zr * zi) >> (FB - 1n)) + ci; zr = t;
+    Z[2 * n] = big2num(zr); Z[2 * n + 1] = big2num(zi);
+  }
+  return { Z, C: [big2num(cr), big2num(ci)] };
+}
+// Bilinear approximation (BLA) for skipping iterations. Coefficients A, B depend only on the reference
+// orbit; validity radii R depend on the frame scale s and are rebuilt cheaply per frame.
+const BLA_EPS = 2 ** -22;
+function blaStatic(Z, p) {
+  const n0 = p - 1;
+  let A = new Float64Array(2 * Math.max(n0, 0)), B = new Float64Array(2 * Math.max(n0, 0));
+  for (let j = 0; j < n0; j++) { A[2 * j] = 2 * Z[2 * (j + 1)]; A[2 * j + 1] = 2 * Z[2 * (j + 1) + 1]; B[2 * j] = 1; }
+  const absZ = new Float64Array(Math.max(n0, 0)); for (let j = 0; j < n0; j++) absZ[j] = Math.hypot(Z[2 * (j + 1)], Z[2 * (j + 1) + 1]);
+  const lv = [{ cnt: n0, A, B }]; const offs = new Int32Array(24), cnts = new Int32Array(24); let total = 0;
+  for (let l = 1; l < 24; l++) {
+    const cnt = Math.floor(n0 / (1 << l)); if (cnt < 1) break;
+    const A2 = new Float64Array(2 * cnt), B2 = new Float64Array(2 * cnt);
+    for (let j = 0; j < cnt; j++) {
+      const x = 2 * j, y = 2 * j + 1, axr = A[2 * x], axi = A[2 * x + 1], ayr = A[2 * y], ayi = A[2 * y + 1], bxr = B[2 * x], bxi = B[2 * x + 1];
+      A2[2 * j] = ayr * axr - ayi * axi; A2[2 * j + 1] = ayr * axi + ayi * axr;
+      B2[2 * j] = ayr * bxr - ayi * bxi + B[2 * y]; B2[2 * j + 1] = ayr * bxi + ayi * bxr + B[2 * y + 1];
+    }
+    offs[l] = total; cnts[l] = cnt; total += cnt; lv.push({ cnt, A: A2, B: B2 }); A = A2; B = B2;
+  }
+  const L = lv.length - 1, W = 2048, H = Math.max(1, Math.ceil(total / W)), ab = new Float32Array(W * H * 4);
+  const mags = lv.map(v => { const a = new Float64Array(v.cnt), b = new Float64Array(v.cnt); for (let j = 0; j < v.cnt; j++) { a[j] = Math.hypot(v.A[2 * j], v.A[2 * j + 1]); b[j] = Math.hypot(v.B[2 * j], v.B[2 * j + 1]); } return { a, b }; });
+  for (let l = 1; l <= L; l++) for (let j = 0; j < lv[l].cnt; j++) { const k = 4 * (offs[l] + j); ab[k] = lv[l].A[2 * j]; ab[k + 1] = lv[l].A[2 * j + 1]; ab[k + 2] = lv[l].B[2 * j]; ab[k + 3] = lv[l].B[2 * j + 1]; }
+  return { L, W, H, ab, lo: offs, lc: cnts, absZ, mags, n0 };
+}
+const blaScratch = [new Float64Array(0), new Float64Array(0)];
+function blaRadii(st, s, dcMax, out) {
+  if (blaScratch[0].length < st.n0) { blaScratch[0] = new Float64Array(st.n0); blaScratch[1] = new Float64Array(st.n0); }
+  let R = blaScratch[0], R2b = blaScratch[1]; for (let j = 0; j < st.n0; j++) R[j] = BLA_EPS * st.absZ[j] / s;
+  for (let l = 1; l <= st.L; l++) {
+    const cnt = st.lc[l], m = st.mags[l - 1], R2 = R2b, o = st.lo[l], big = st.mags[l];
+    for (let j = 0; j < cnt; j++) {
+      const x = 2 * j, y = x + 1;
+      let r = Math.min(R[x], Math.max(0, (R[y] - m.b[x] * dcMax) / m.a[x]));
+      if (!(big.a[j] < 1e30) || !(big.b[j] < 1e30)) r = 0;
+      R2[j] = r; out[o + j] = Math.min(r, 3e38);
+    }
+    R2b = R; R = R2;
+  }
+  return out;
+}
+// ---------- palettes (OKLab interpolation, cyclic Catmull-Rom) ----------
+const srgb2lin = (c) => c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+const lin2srgb = (c) => c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055;
+function hex2lin(h) { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(v => srgb2lin(v / 255)); }
+function lin2ok([r, g, b]) {
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b), m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b), s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  return [0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s, 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s, 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s];
+}
+function ok2lin([L, a, b]) {
+  const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3, m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3, s = (L - 0.0894841775 * a - 1.2914855480 * b) ** 3;
+  return [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s, -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s, -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s];
+}
+function paletteRow(stops, N) {
+  const P = stops.map(h => lin2ok(hex2lin(h))), K = P.length, out = [];
+  for (let i = 0; i < N; i++) {
+    const t = i / N * K, k = Math.floor(t), f = t - k;
+    const p0 = P[(k - 1 + K) % K], p1 = P[k % K], p2 = P[(k + 1) % K], p3 = P[(k + 2) % K];
+    const f2 = f * f, f3 = f2 * f;
+    const c = [0, 1, 2].map(q => 0.5 * (2 * p1[q] + (-p0[q] + p2[q]) * f + (2 * p0[q] - 5 * p1[q] + 4 * p2[q] - p3[q]) * f2 + (-p0[q] + 3 * p1[q] - 3 * p2[q] + p3[q]) * f3));
+    out.push(ok2lin(c).map(v => clamp(v, 0, 1)));
+  }
+  return out;
+}
+
+// ---------- reference-orbit worker (arbitrary precision, BigInt fixed point) ----------
+// Computes the exact periodic orbit of a target nucleus off the main thread.
+const WORKER_SRC = `
+function parse(str, FB) {
+  str = str.trim(); let neg = false;
+  if (str[0] === '-' || str[0] === '+') { neg = str[0] === '-'; str = str.slice(1); }
+  const [ip, fp = ''] = str.split('.');
+  const v = (BigInt(ip + fp) << BigInt(FB)) / (10n ** BigInt(fp.length));
+  return neg ? -v : v;
+}
+function toNum(b, FB) { const sh = Math.max(0, FB - 120); return Number(b >> BigInt(sh)) / 2 ** (FB - sh); }
+function orbit(cr, ci, q, FB) {
+  const F = BigInt(FB), F1 = BigInt(FB - 1), Z = new Float64Array(2 * q); let zr = 0n, zi = 0n;
+  for (let n = 1; n < q; n++) { const t = ((zr * zr - zi * zi) >> F) + cr; zi = ((zr * zi) >> F1) + ci; zr = t; Z[2 * n] = toNum(zr, FB); Z[2 * n + 1] = toNum(zi, FB); }
+  return Z;
+}
+onmessage = (e) => {
+  const d = e.data;
+  try {
+    if (d.type === 'target') {
+      const FB = d.FB; const cr = parse(d.re, FB), ci = parse(d.im, FB);
+      postMessage({ id: d.id, q: d.P, Z: orbit(cr, ci, d.P, FB), C: [toNum(cr, FB), toNum(ci, FB)], off: [0, 0] });
+      return;
+    }
+    postMessage({ id: d.id, q: 0 });
+  } catch (err) { postMessage({ id: d.id, q: 0, err: String(err) }); }
+};`;
+let refWorker = null;
+try { refWorker = new Worker(URL.createObjectURL(new Blob([WORKER_SRC], { type: 'text/javascript' }))); } catch (_) { refWorker = null; }
+const refWaiters = new Map(); let refSeq = 0;
+if (refWorker) { refWorker.onmessage = (e) => { const cb = refWaiters.get(e.data.id); refWaiters.delete(e.data.id); if (cb) cb(e.data); }; refWorker.onerror = () => { refWorker = null; for (const [, cb] of refWaiters) cb(null); refWaiters.clear(); }; }
+function workerCall(msg) {
+  const local = () => { const { Z, C } = periodicOrbit(msg.re, msg.im, msg.P); return { q: msg.P, Z, C, off: [0, 0] }; };
+  if (!refWorker) return new Promise(res => setTimeout(() => res(local()), 0));
+  return new Promise(res => { const id = ++refSeq; refWaiters.set(id, (r) => res(r || local())); refWorker.postMessage({ ...msg, id }); });
+}
+
+const $ = (id) => document.getElementById(id);
+// ---------- WebGL setup ----------
+const canvas = document.getElementById('c');
+const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, depth: false, stencil: false, premultipliedAlpha: false, powerPreference: 'high-performance', preserveDrawingBuffer: false });
+function fail(msg) { const e = document.getElementById('err'); e.textContent = msg; e.hidden = false; document.getElementById('veil').style.opacity = 0; throw new Error(msg); }
+if (!gl) fail('WebGL 2 is unavailable right now. If this page worked before, the browser has probably switched WebGL off after a graphics-driver reset; quitting and reopening the browser turns it back on.');
+// If the GPU drops the context (driver reset, or a phone reclaiming memory in the background), remember
+// where the descent was and reload as soon as the page can have a context again; it resumes there.
+let ctxLost = false;
+function saveResume() { try { if (S.cur) sessionStorage.setItem('md-resume', JSON.stringify({ id: S.cur.loc.id, u: S.cur.u, t: Date.now() })); } catch (_) {} }
+function reloadSoon() { if (ctxLost && document.visibilityState === 'visible') setTimeout(() => location.reload(), 600); }
+canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); ctxLost = true; saveResume(); const el = document.getElementById('err'); el.textContent = 'The graphics driver reset. Picking the descent back up…'; el.hidden = false; reloadSoon(); });
+canvas.addEventListener('webglcontextrestored', () => location.reload());
+document.addEventListener('visibilitychange', reloadSoon);
+if (!gl.getExtension('EXT_color_buffer_float')) fail('This visualizer needs float render targets (EXT_color_buffer_float), which this GPU does not offer.');
+const MAXTEX = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+
+function compile(type, src) { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { console.error(src); fail('Shader error: ' + gl.getShaderInfoLog(s)); } return s; }
+function program(fs) {
+  const p = gl.createProgram(); gl.attachShader(p, compile(gl.VERTEX_SHADER, VS)); gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) fail('Link error: ' + gl.getProgramInfoLog(p));
+  const u = {}; const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+  for (let i = 0; i < n; i++) { const info = gl.getActiveUniform(p, i); const nm = info.name.replace(/\[0\]$/, ''); u[nm] = gl.getUniformLocation(p, info.name); }
+  return { p, u };
+}
+const PROG_KEY = program(FS_FRACTAL(false)), PROG_PROBE = program(FS_FRACTAL(true)), PROG_DISP = program(FS_DISPLAY), PROG_DOWN = program(FS_DOWN);
+
+function tex2D(w, h, ifmt, fmt, type, data, filter = gl.NEAREST, wrap = gl.CLAMP_TO_EDGE) {
+  const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texImage2D(gl.TEXTURE_2D, 0, ifmt, w, h, 0, fmt, type, data);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  return t;
+}
+const DUMMY = tex2D(1, 1, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4));
+gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+
+class BlaSet { // validity radii for one frame scale (coefficients live with the reference)
+  constructor() { this.r = null; this.key = ''; this.buf = null; }
+  load(R, s, dcMax, key) {
+    if (this.key === key) return; this.key = key; const st = R.bla;
+    if (!this.buf || this.buf.length !== st.W * st.H) { this.buf = new Float32Array(st.W * st.H); if (this.r) gl.deleteTexture(this.r); this.r = tex2D(st.W, st.H, gl.R32F, gl.RED, gl.FLOAT, null); this.rW = st.W; this.rH = st.H; }
+    blaRadii(st, s, dcMax, this.buf);
+    gl.bindTexture(gl.TEXTURE_2D, this.r); gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, st.W, st.H, gl.RED, gl.FLOAT, this.buf);
+  }
+}
+
+// Keyframe textures: a fixed ring of equally sized, mipmapped sRGB textures, allocated once (behind the
+// start-up veil) and recycled forever. A keyframe rendered at lower resolution just uses the lower-left
+// part of its slot, so changing resolution never allocates or frees GPU memory mid-zoom.
+const MOBILE = matchMedia('(pointer: coarse)').matches || Math.min(screen.width, screen.height) < 700;
+let RING_N = MOBILE ? 8 : 9;
+const ring = { W: 0, H: 0, gen: 0, free: [], count: 0 };
+function ringNeed() {
+  let th = Q * MARGIN * S.keyH, tw = th * S.aspect;
+  const capW = Math.min(MAXTEX, 4096), capArea = MOBILE ? 2.2e6 : 6.5e6;
+  const sc = Math.min(1, capW / tw, capW / th, Math.sqrt(capArea / (tw * th)));
+  return [Math.round(tw * sc / 16) * 16, Math.round(th * sc / 16) * 16];
+}
+function ensureRing() {
+  const [w, h] = ringNeed();
+  if (ring.W && w <= ring.W && h <= ring.H && w * h > 0.55 * ring.W * ring.H) return;  // fits (URL-bar wiggles don't reallocate)
+  ring.gen++; ring.W = Math.min(MAXTEX, Math.round(w * 1.12 / 16) * 16); ring.H = Math.min(MAXTEX, Math.round(h * 1.12 / 16) * 16);
+  for (const t of ring.free) gl.deleteTexture(t); ring.free = []; ring.count = 0;
+  for (let i = 0; i < RING_N; i++) {
+    const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texStorage2D(gl.TEXTURE_2D, Math.floor(Math.log2(Math.max(ring.W, ring.H))) + 1, gl.SRGB8_ALPHA8, ring.W, ring.H);
+    if (i >= 4 && gl.getError() === gl.OUT_OF_MEMORY) { gl.deleteTexture(t); RING_N = i; break; }
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    t._gen = ring.gen; t._W = ring.W; t._H = ring.H; ring.free.push(t); ring.count++;
+  }
+}
+function getKeyTex() { return ring.free.pop() || null; }
+function releaseKeyTex(t) { if (t._gen === ring.gen) ring.free.push(t); else gl.deleteTexture(t); }
+
+// ---------- journeys ----------
+const MARGIN = 1.06;           // keyframe overscan
+const Q = MOBILE ? 1.5 : 1.7;  // keyframe texels per screen pixel at the keyframe's own depth
+const QMIN = MOBILE ? 0.25 : 0.3;              // lowest adaptive resolution factor
+const BASE_RATE = 0.62;        // doublings of magnification per second at 1x
+let seedRand = (s) => () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+
+class Journey {
+  constructor(loc, aspect) {
+    this.loc = loc; this.P = loc.p; this.aspect = aspect;
+    this.target = null; this.refIds = 0;
+    workerCall({ type: 'target', re: loc.re, im: loc.im, P: loc.p, FB: 420 }).then(r => { this.target = this.makeRef(r); });
+    const pal = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, pal);
+    const N = 1024, rowA = paletteRow(PALETTES[loc.pal[0]].stops, N), rowB = paletteRow(PALETTES[loc.pal[1]].stops, N), px = new Uint8Array(N * 2 * 4);
+    [rowA, rowB].forEach((row, r) => row.forEach((c, i) => { const o = (r * N + i) * 4; px[o] = Math.round(lin2srgb(c[0]) * 255); px[o + 1] = Math.round(lin2srgb(c[1]) * 255); px[o + 2] = Math.round(lin2srgb(c[2]) * 255); px[o + 3] = 255; }));
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.SRGB8_ALPHA8, N, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    this.palTex = pal;
+    const pa = PALETTES[loc.pal[0]], pb = PALETTES[loc.pal[1]];
+    this.inkA = hex2lin(pa.ink); this.inkB = hex2lin(pb.ink); this.voidA = hex2lin(pa.void); this.voidB = hex2lin(pb.void);
+    // camera path, all parametrised by depth u (doublings from the start)
+    const sig = loc.size, portrait = aspect < 1;
+    this.thEnd = loc.ang + (portrait ? -Math.PI / 2 : 0) + (loc.turn || 0);
+    const hw = 1.235 * 1.2, hh = 1.12 * 1.2;
+    this.rEnd = sig * (portrait ? Math.max(hw, hh / aspect) : Math.max(hh, hw / aspect));
+    this.r0 = loc.r0; this.Uend = Math.log2(this.r0 / this.rEnd);
+    this.cOff = [sig * Math.cos(loc.ang) * -0.765, sig * Math.sin(loc.ang) * -0.765];
+    const rnd = seedRand(loc.seed || 7); this.ph = [0, 1, 2, 3].map(() => rnd() * TAU);
+    this.omega = (loc.spin ?? 0.011);
+    this.u = 0; this.t = 0;
+    this.keys = [];
+    for (let j = 0; j < this.Uend - 0.4; j++) this.keys.push({ u: j, state: 0 });
+    this.keys.push({ u: this.Uend, state: 0 });
+    this.probes = []; this.probeNext = 0;
+    this.blaKey = new BlaSet(); this.blaProbe = new BlaSet();
+  }
+  makeRef(r) {
+    const W = 2048, H = Math.ceil(r.q / W), buf = new Float32Array(W * H * 2); buf.set(r.Z);
+    const bla = blaStatic(r.Z, r.q);
+    return { id: ++this.refIds, q: r.q, Z: r.Z, C: r.C, off: r.off, bla, tex: tex2D(W, H, gl.RG32F, gl.RG, gl.FLOAT, buf), abTex: tex2D(bla.W, bla.H, gl.RGBA32F, gl.RGBA, gl.FLOAT, bla.ab) };
+  }
+  ref() { return this.target; } // the exact target nucleus: pixels shadow its orbit longest, so BLA skips most
+  r(u) { return this.r0 * 2 ** -u; }
+  theta(u) { return this.thEnd + this.omega * (u - this.Uend); }
+  w(u) {
+    const A = 0.1 * (1 - smoothstep(this.Uend - 14, this.Uend - 4, u)) * smoothstep(-2, 3, u), p = this.ph;
+    const k = 2 ** u / this.r0;
+    return [A * (Math.sin(0.12 * u + p[0]) + 0.6 * Math.sin(0.27 * u + p[1])) + this.cOff[0] * k,
+            A * (Math.cos(0.10 * u + p[2]) + 0.6 * Math.sin(0.21 * u + p[3])) + this.cOff[1] * k];
+  }
+  colorAt(u) { // iteration budget as a smooth function of depth (colour mapping is global)
+    if (!this.mapTex) return null;
+    const j = clamp(Math.floor(u), 0, this.probes.length - 2), a = this.probes[j], b = this.probes[j + 1];
+    return { maxIter: Math.max(a.maxIter, b.maxIter) };
+  }
+  buildMap() { // palette position T(log nu): slope follows each depth's spread, so every depth gets ~1 cycle
+    const pts = []; let mx = -1e9;
+    for (const p of this.probes) if (p.done && p.mu > mx + 1e-3) { mx = p.mu; pts.push([p.mu, Math.exp(-p.ls) * (this.loc.cycles || 0.9)]); }
+    if (!pts.length) pts.push([3, 0.5]);
+    const L0 = Math.max(0, pts[0][0] - 2.5 / pts[0][1] - 1), L1 = pts[pts.length - 1][0] + 2.5 / pts[pts.length - 1][1] + 2;
+    const N = 1024, T = new Float32Array(N), dx = (L1 - L0) / (N - 1);
+    const g = (x) => { if (x <= pts[0][0]) return pts[0][1]; for (let i = 1; i < pts.length; i++) if (x <= pts[i][0]) { const f = (x - pts[i - 1][0]) / (pts[i][0] - pts[i - 1][0]); return Math.exp(Math.log(pts[i - 1][1]) * (1 - f) + Math.log(pts[i][1]) * f); } return pts[pts.length - 1][1]; };
+    let acc = 0; for (let i = 0; i < N; i++) { T[i] = acc; acc += g(L0 + (i + 0.5) * dx) * dx; }
+    this.mapTex = tex2D(N, 1, gl.R32F, gl.RED, gl.FLOAT, T); this.mapR = [L0, L1];
+  }
+  dispose() { this.disposed = true; if (this.mapTex) gl.deleteTexture(this.mapTex); gl.deleteTexture(this.palTex); if (this.target) { gl.deleteTexture(this.target.tex); gl.deleteTexture(this.target.abTex); } for (const k of this.keys) if (k.tex) { releaseKeyTex(k.tex); k.tex = null; } }
+}
+
+// frame parameters for rendering the fractal at depth u
+function frameParams(J, u, ext, ref) {
+  const s = J.r(u), wv = J.w(u), th = J.theta(u);
+  ref = ref || J.ref(u); if (!ref) return null;
+  const w = wv;
+  return { s, w, wv, ref, rot: [Math.cos(th), Math.sin(th)], ext, dcMax: Math.hypot(w[0], w[1]) + Math.hypot(ext[0], ext[1]) * 1.02 };
+}
+function bindFractal(prog, J, fp, col, bla, texW, texH, org = [0, 0], jit = [0, 0], prev = null) {
+  const R = fp.ref; bla.load(R, fp.s, fp.dcMax, J.loc.id + R.id + ':' + fp.s + ':' + fp.dcMax.toFixed(3));
+  const u = prog.u; gl.useProgram(prog.p);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, R.tex); gl.uniform1i(u.uRef, 0);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, R.abTex); gl.uniform1i(u.uBlaAB, 1);
+  gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, bla.r); gl.uniform1i(u.uBlaR, 2);
+  if (u.uPal) { gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, J.palTex); gl.uniform1i(u.uPal, 3); }
+  gl.uniform1i(u.uP, R.q); gl.uniform1i(u.uLevels, R.bla.L); gl.uniform1iv(u.uLOff, R.bla.lo); gl.uniform1iv(u.uLCnt, R.bla.lc);
+  gl.uniform1i(u.uMaxIter, col.maxIter); gl.uniform1i(u.uMaxSteps, MAX_STEPS); gl.uniform1f(u.uBrent, 2e-6);
+  gl.uniform1f(u.uS, fp.s); gl.uniform2f(u.uW, fp.w[0], fp.w[1]); gl.uniform2f(u.uRot, fp.rot[0], fp.rot[1]); gl.uniform2f(u.uExt, fp.ext[0], fp.ext[1]);
+  gl.uniform2f(u.uC, R.C[0], R.C[1]); gl.uniform2f(u.uTex, texW, texH); gl.uniform2f(u.uOrg, org[0], org[1]); gl.uniform2f(u.uJit, jit[0], jit[1]);
+  gl.uniform1f(u.uTexel, 2 * fp.ext[1] / texH);
+  if (u.uPrevOn) {
+    gl.activeTexture(gl.TEXTURE5); gl.bindTexture(gl.TEXTURE_2D, prev ? prev.tex : DUMMY); gl.uniform1i(u.uPrev, 5);
+    gl.uniform1i(u.uPrevOn, prev ? 1 : 0);
+    if (prev) { const th = J.theta(prev.u); gl.uniform4f(u.uPrevA, fp.s / prev.fp.s, Math.cos(th), Math.sin(th), 0); gl.uniform4f(u.uPrevB, prev.fp.wv[0], prev.fp.wv[1], prev.fp.ext[0], prev.fp.ext[1]); gl.uniform2i(u.uPrevSize, prev.tw, prev.th); }
+  }
+  if (u.uMap) {
+    const la = 0.62 + 0.15 * Math.sin(J.ph[1]);
+    gl.uniform2f(u.uLight, Math.cos(la * TAU), Math.sin(la * TAU));
+    gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, J.mapTex); gl.uniform1i(u.uMap, 4); gl.uniform2f(u.uMapR, J.mapR[0], J.mapR[1]);
+    gl.uniform1f(u.uPhase, J.loc.phase || 0); gl.uniform1f(u.uBetaP, J.loc.betaP || 7);
+    gl.uniform3fv(u.uInkA, J.inkA); gl.uniform3fv(u.uInkB, J.inkB); gl.uniform3fv(u.uVoid, J.voidA); gl.uniform1f(u.uSeed, Math.random());
+  }
+}
+
+// ---------- scheduler: budgeted GPU work between display frames ----------
+const fboKey = gl.createFramebuffer(), fboProbe = gl.createFramebuffer();
+const PROBE_W = 80, PROBE_H = 48;
+const probeTex = tex2D(PROBE_W, PROBE_H, gl.RGBA32F, gl.RGBA, gl.FLOAT, null);
+gl.bindFramebuffer(gl.FRAMEBUFFER, fboProbe); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, probeTex, 0);
+gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+const S = { work: 2e7, vcap: 99, vcapT: 99, kTime: 0, quality: 0.8, keyH: 1, job: null, refresh: 16.7, dts: [], paused: false, speedIdx: 3, vs: 0, cur: null, next: null, fade: 0, hold: 0, advance: false, exporting: false, aspect: 1, devW: 1, devH: 1 };
+const SPEEDS = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4];
+
+const PROBE_CAP = MOBILE ? 400000 : 1500000;
+const MAX_STEPS = MOBILE ? 24000 : 60000;   // per-pixel loop cap (watchdog safety)
+const pboPool = [];
+function probeCount(J) { return Math.ceil(J.Uend) + 2; }
+// Probes: tiny renders at every integer depth, independent of each other, read back asynchronously.
+// Their statistics set the iteration budget per depth and the global colour mapping.
+function probeSteps(J, j) { for (let k = j - 1; k >= 0; k--) { const p = J.probes[k]; if (p && p.steps) return Math.max(400, p.steps * 1.5); } return 4000; }
+// Draws part of the probe for the next depth; returns the work spent. Rows are spread over frames.
+function stepProbe(J, budget) {
+  let pj = J.probeJob;
+  if (!pj) { const j = J.probeNext || 0, fp = frameParams(J, j, [J.aspect * MARGIN, MARGIN]); if (!fp) return 0; pj = J.probeJob = { j, fp, row: 0, steps: probeSteps(J, j) }; J.probeNext = j + 1; J.probes[j] = { j, state: 0 }; }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fboProbe);
+  bindFractal(PROG_PROBE, J, pj.fp, { maxIter: PROBE_CAP }, J.blaProbe, PROBE_W, PROBE_H);
+  gl.viewport(0, 0, PROBE_W, PROBE_H); gl.enable(gl.SCISSOR_TEST);
+  let spent = 0;
+  pj.col = pj.col || 0;
+  while (pj.row < PROBE_H && (spent === 0 || spent < budget)) {
+    if (pj.col > 0 || budget - spent < PROBE_W * pj.steps) {   // part of a row (keeps every piece small)
+      const n = clamp(Math.floor((budget - spent) / pj.steps), 16, PROBE_W - pj.col);
+      gl.scissor(pj.col, pj.row, n, 1); gl.drawArrays(gl.TRIANGLES, 0, 3); spent += n * pj.steps;
+      pj.col += n; if (pj.col >= PROBE_W) { pj.col = 0; pj.row++; }
+    } else {
+      const rows = clamp(Math.floor((budget - spent) / (PROBE_W * pj.steps)), 1, PROBE_H - pj.row);
+      gl.scissor(0, pj.row, PROBE_W, rows); gl.drawArrays(gl.TRIANGLES, 0, 3); pj.row += rows; spent += rows * PROBE_W * pj.steps;
+    }
+  }
+  gl.disable(gl.SCISSOR_TEST);
+  if (pj.row >= PROBE_H) {
+    let pbo = pboPool.pop(); if (!pbo) { pbo = gl.createBuffer(); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbo); gl.bufferData(gl.PIXEL_PACK_BUFFER, PROBE_W * PROBE_H * 16, gl.STREAM_READ); }
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbo); gl.readPixels(0, 0, PROBE_W, PROBE_H, gl.RGBA, gl.FLOAT, 0); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    J.probes[pj.j] = { j: pj.j, state: 1, pbo, fence: gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0) };
+    J.probeJob = null;
+  }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  return spent;
+}
+function collectProbes(J) {
+  for (const pr of J.probes) if (pr && pr.state === 1) {
+    const st = gl.clientWaitSync(pr.fence, 0, 0);
+    if (st !== gl.ALREADY_SIGNALED && st !== gl.CONDITION_SATISFIED) continue;
+    gl.deleteSync(pr.fence); const data = new Float32Array(PROBE_W * PROBE_H * 4);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pr.pbo); gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, data); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    pboPool.push(pr.pbo); pr.pbo = null; rawStats(J, pr, data);
+  }
+}
+function rawStats(J, pr, data) {
+  const L = []; let nuHi = 0, capHit = 0, st = 0; const n = data.length / 4;
+  for (let i = 0; i < data.length; i += 4) { st += data[i + 2]; if (data[i] > 0) { L.push(Math.log(data[i])); nuHi = Math.max(nuHi, data[i]); } else if (data[i] === -1) capHit++; }
+  pr.capFrac = capHit / n; pr.steps = st / n; pr.ok = L.length >= 20; pr.state = 2;
+  if (pr.ok) {
+    L.sort((a, b) => a - b); const q = (x) => L[Math.min(L.length - 1, Math.floor(x * L.length))];
+    pr.rmu = q(0.5); pr.rls = Math.log(Math.max(q(0.95) - q(0.05), 0.04));
+    pr.rmax = Math.round(clamp(Math.exp(q(0.998)) * 2.5 + 2 * J.P, 1500, PROBE_CAP));
+    if (pr.capFrac > 0.004) pr.rmax = PROBE_CAP;
+  }
+}
+function finalizeProbes(J) {
+  let prev = null;
+  for (const pr of J.probes) {
+    if (!pr.ok) Object.assign(pr, prev ? { mu: prev.mu, ls: prev.ls, maxIter: prev.maxIter } : { mu: 3, ls: 0, maxIter: 4000 });
+    else if (!prev) Object.assign(pr, { mu: pr.rmu, ls: pr.rls, maxIter: pr.rmax });
+    else Object.assign(pr, { mu: prev.mu + (pr.rmu - prev.mu) * 0.5, ls: prev.ls + (pr.rls - prev.ls) * 0.5, maxIter: Math.max(pr.rmax, Math.round(prev.maxIter * 0.85)) });
+    pr.done = true; prev = pr;
+  }
+}
+function startKey(J, K) {
+  const col = J.colorAt(K.u); if (!col) return null;
+  const q = K.still ? 1 : Math.max(QMIN, Math.round(S.quality * 10) / 10);
+  ensureRing();
+  const [fw, fh] = ringNeed();
+  const th = Math.min(ring.H, Math.max(48, Math.round(fh * q / 16) * 16)), tw = Math.min(ring.W, Math.max(64, Math.round(fw * q / 16) * 16));
+  const fp = frameParams(J, K.u, [tw / th * MARGIN, MARGIN]);
+  if (!fp) return null;
+  const tex = getKeyTex(); if (!tex) return null;
+  K.state = 1; K.tex = tex; K.fp = fp; K.tw = tw; K.th = th; K.qual = Math.min(1, th / fh);
+  const tiles = [];
+  const j = clamp(Math.floor(K.u), 0, J.probes.length - 1), pa = J.probes[j], pb = J.probes[Math.min(j + 1, J.probes.length - 1)];
+  const steps = Math.max(300, Math.max(pa.steps || 3000, pb.steps || 3000) * 1.3);
+  let prev = null; for (const P of J.keys) if (P.state === 2 && P.tex && P.u < K.u - 0.2 && P.fp) prev = P;
+  if (prev) prev.pin = (prev.pin || 0) + 1;
+  return { kind: 'key', J, K, fp, col, w: tw, h: th, tiles, steps, prev, ty: 0, tx: 0, t0: performance.now() };
+}
+function drawTile(job, x, y, w, h) {
+  gl.viewport(0, 0, job.w, job.h); gl.enable(gl.SCISSOR_TEST); gl.scissor(x, y, w, h);
+  gl.drawArrays(gl.TRIANGLES, 0, 3); gl.disable(gl.SCISSOR_TEST);
+}
+function pickJob() {
+  const C = S.cur; if (!C) return null;
+  const order = [C]; if (S.next) { const l = leadOf(C); if (l > 1.6 || S.advance) order.unshift(S.next); else order.push(S.next); }
+  for (const K of C.keys) if (K.still && K.state === 0) { const job = startKey(C, K); if (job) return job; }
+  for (const J of order) {
+    const look = J === C ? (MOBILE ? 2.4 : 3.2) : 1.2;
+    for (const K of J.keys) {
+      if (K.state !== 0) continue;
+      if (K.u < J.u - 1.01 && !K.still) { K.state = 3; continue; }
+      if (K.u > J.u + look && !K.still) break;
+      const job = startKey(J, K); if (job) return job;
+      break;
+    }
+  }
+  return null;
+}
+function probesDone(J) {
+  if (J.mapTex) return true;
+  if ((J.probeNext || 0) < probeCount(J) || J.probes.some(p => p.state !== 2)) return false;
+  finalizeProbes(J); J.buildMap(); return true;
+}
+function pumpProbes(J, budget) {
+  collectProbes(J);
+  let spent = 0;
+  while (spent < budget && ((J.probeNext || 0) < probeCount(J) || J.probeJob)) { const s = stepProbe(J, budget - spent); if (!s) break; spent += s; }
+  probesDone(J); return spent;
+}
+// GPU work is issued in small, cost-estimated pieces (pixels × expected iteration steps), and a new
+// batch is only issued once the previous one has finished, so the display never queues behind it.
+function pump(budget) {
+  // charting the next location must never starve the keyframes of the zoom on screen: when the current
+  // zoom is close to running out of rendered keyframes, it gets the frame's budget first
+  let spent = 0;
+  if (S.cur && !probesDone(S.cur)) return pumpProbes(S.cur, S.cur.shown ? budget * 0.5 : budget) + (S.cur.shown ? pumpKeys(budget * 0.5) : 0);
+  if (S.next && !probesDone(S.next)) {
+    const urgent = S.cur && S.cur.shown && leadOf(S.cur) < 1.2;
+    if (urgent) { spent += pumpKeys(budget * 0.75); spent += pumpProbes(S.next, Math.max(0, budget - spent)); }
+    else { spent += pumpProbes(S.next, budget * (S.advance ? 0.6 : 0.3)); spent += pumpKeys(budget - spent); }
+    return spent;
+  }
+  if (S.cur) collectProbes(S.cur);
+  return pumpKeys(budget);
+}
+function pumpKeys(budget) {
+  let spent = 0;
+  if (budget <= 0) return 0;
+  let guard = 0;
+  while (spent < budget && guard++ < 64) {
+    if (!S.job) { S.job = pickJob(); if (!S.job) break; }
+    const job = S.job;
+    if (!job.K.tex || job.J.disposed) { if (job.prev) job.prev.pin--; S.job = null; continue; }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fboKey); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, job.K.tex, 0);
+    bindFractal(PROG_KEY, job.J, job.fp, job.col, job.J.blaKey, job.w, job.h, undefined, undefined, job.prev && job.prev.tex && !window.NOINH ? job.prev : null);
+    const tile = clamp(Math.floor(Math.sqrt(Math.max(budget - spent, budget * 0.25) / job.steps)), 16, 256);
+    while (spent < budget && job.ty < job.h) {
+      if (job.tx === 0) job.rowH = Math.min(tile, job.h - job.ty); // a row keeps one height even if the budget changes
+      const w = Math.min(tile, job.w - job.tx), h = job.rowH;
+      drawTile(job, job.tx, job.ty, w, h); spent += w * h * job.steps;
+      job.tx += w; if (job.tx >= job.w) { job.tx = 0; job.ty += job.rowH; }
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    if (job.ty >= job.h) {
+      const mipCost = job.w * job.h * 40;   // building the mip chain is real GPU work too
+      if (spent > 0 && spent + mipCost > budget) break;
+      gl.bindTexture(gl.TEXTURE_2D, job.K.tex); gl.generateMipmap(gl.TEXTURE_2D); spent += mipCost;
+      job.K.state = 2; job.K.readyAt = performance.now(); S.job = null; if (job.prev) job.prev.pin--; if (window.LOGKEY) console.log('KEY', job.K.u, Math.round(performance.now() - job.t0));
+      if (job.K.u < job.J.u - 1.5 && !job.K.still) { releaseKeyTex(job.K.tex); job.K.tex = null; job.K.state = 3; }
+      if (!job.K.still && job.J === S.cur && S.cur.shown && !S.paused) adaptPace((performance.now() - job.t0) / 1000);
+    }
+  }
+  return spent;
+}
+// Keep keyframe production at ~70% of the zoom's pace: resolution adapts first; if it is already at
+// its floor, the zoom speed itself is capped (smoothly) so the motion stays steady instead of stalling.
+function adaptPace(el) {
+  const v = BASE_RATE * SPEEDS[S.speedIdx];
+  S.kTime = S.kTime ? S.kTime * 0.5 + el * 0.5 : el;
+  S.quality = clamp(S.quality * clamp(Math.sqrt(0.7 / (v * S.kTime)), 0.85, 1.1), QMIN, 1);
+  S.vcapT = S.quality <= QMIN + 1e-6 ? Math.max(0.08, 0.8 / S.kTime) : 99;
+}
+function coverIndex(J) { let c = -1; const now = performance.now(); for (let i = 0; i < J.keys.length; i++) { const K = J.keys[i]; if (K.u <= J.u + 1e-9 && K.state === 2 && (!K.still || now - K.readyAt > 700)) c = i; } return c; }
+function leadOf(J) {
+  let c = coverIndex(J); if (c < 0) return 0;
+  let last = J.keys[c];
+  for (let i = c + 1; i < J.keys.length; i++) { if (J.keys[i].state === 2) last = J.keys[i]; else if (!J.keys[i].still) break; }
+  if (last.u >= J.Uend - 1e-9) return 99;
+  return last.u + clamp(Math.log2(Q * (last.qual || 1)), 0.35, 0.9) - J.u;   // how far we can zoom before the newest keyframe would be magnified
+}
+
+// ---------- GPU pacing ----------
+const tq = gl.getExtension('EXT_disjoint_timer_query_webgl2');
+const WORK_MIN = 1e6, WORK_MAX = 3e9;
+// rate: work units per GPU ms (timer queries); dispMs: GPU cost of drawing the screen; ceil: the work
+// level at which frames last dropped (used when no timer is available, so we stop re-overshooting)
+const gp = { pending: [], rate: 0, dispMs: 0, inflight: [], ceil: Infinity };
+function timed(kind, work, fn) {
+  const q = tq && gp.pending.length < 12 ? gl.createQuery() : null;
+  if (q) gl.beginQuery(tq.TIME_ELAPSED_EXT, q);
+  const r = fn();
+  if (q) { gl.endQuery(tq.TIME_ELAPSED_EXT); gp.pending.push({ q, kind, work: kind === 'work' ? r : 0 }); }
+  return r;
+}
+function gpuSchedule(dt) {
+  while (gp.inflight.length) { const st = gl.clientWaitSync(gp.inflight[0], 0, 0); if (st !== gl.ALREADY_SIGNALED && st !== gl.CONDITION_SATISFIED) break; gl.deleteSync(gp.inflight.shift()); }
+  if (tq && gp.pending.length && gl.getQueryParameter(gp.pending[0].q, gl.QUERY_RESULT_AVAILABLE)) {
+    const disjoint = gl.getParameter(tq.GPU_DISJOINT_EXT);
+    gp.pending = gp.pending.filter(q => {
+      if (!gl.getQueryParameter(q.q, gl.QUERY_RESULT_AVAILABLE)) return true;
+      const ms = gl.getQueryParameter(q.q, gl.QUERY_RESULT) / 1e6; gl.deleteQuery(q.q);
+      if (disjoint) return false;
+      if (q.kind === 'disp') gp.dispMs = gp.dispMs ? gp.dispMs * 0.9 + ms * 0.1 : ms;
+      else if (ms > 0.2 && q.work > 0) { const r = q.work / ms; gp.rate = gp.rate ? gp.rate * 0.85 + r * 0.15 : r; }
+      return false;
+    });
+  }
+  const shown = S.cur && S.cur.shown;
+  if (gp.rate > 0) {
+    // leave room for drawing the screen plus a safety margin; the rest of the frame goes to rendering ahead
+    const sliceMs = shown ? clamp(S.refresh * 0.72 - gp.dispMs - 2, 1, S.refresh * 0.5) : 30;
+    S.work = clamp(gp.rate * sliceMs, WORK_MIN, WORK_MAX);
+  } else if (frameCount > 5) {
+    if (shown && dt * 1000 > S.refresh * 1.5) { gp.ceil = S.work; S.work = Math.max(WORK_MIN, S.work * 0.7); }
+    else { S.work = Math.min(WORK_MAX, S.work * (shown ? 1.03 : 1.15), shown ? gp.ceil * 0.85 : Infinity); gp.ceil *= 1.002; }
+  }
+  if (gp.inflight.length >= 2) return;                              // never queue far ahead of the display
+  const spent = timed('work', 0, () => pump(S.work));
+  if (spent > 0) { gp.inflight.push(gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0)); gl.flush(); }
+}
+
+// ---------- display ----------
+const DJ = { slots: [], KA: new Float32Array(20), KB: new Float32Array(20), KS: new Float32Array(10), band: new Float32Array(5), names: ['uK0', 'uK1', 'uK2', 'uK3', 'uK4'] };
+function drawJourney(J, alpha) {
+  const P = PROG_DISP, u = P.u; gl.useProgram(P.p);
+  const cI = coverIndex(J), slots = DJ.slots; slots.length = 0;
+  if (cI >= 0) {
+    slots.push(J.keys[cI]);
+    for (let i = cI + 1; i < J.keys.length && slots.length < 5; i++) { const K = J.keys[i]; if (K.state === 2 && K.u <= J.u + 3.5) slots.push(K); }
+  } else { for (const K of J.keys) if (K.state === 2) { slots.push(K); break; } }
+  slots.reverse(); // deepest first
+  const KA = DJ.KA, KB = DJ.KB, KS = DJ.KS, band = DJ.band; KA.fill(0); band.fill(0.001);
+  for (let i = 0; i < 5; i++) {
+    gl.activeTexture(gl.TEXTURE0 + i); const K = slots[i];
+    gl.bindTexture(gl.TEXTURE_2D, K ? K.tex : DUMMY); gl.uniform1i(u[DJ.names[i]], i);
+    if (!K) { KS[2 * i] = KS[2 * i + 1] = 1; continue; }
+    const th = J.theta(K.u), o = 4 * i;
+    KA[o] = 2 ** (K.u - J.u); KA[o + 1] = Math.cos(th); KA[o + 2] = Math.sin(th); KA[o + 3] = K.still ? smoothstep(0, 650, performance.now() - K.readyAt) : 1;
+    KB[o] = K.fp.wv[0]; KB[o + 1] = K.fp.wv[1]; KB[o + 2] = K.fp.ext[0]; KB[o + 3] = K.fp.ext[1];
+    KS[2 * i] = K.tw / K.tex._W; KS[2 * i + 1] = K.th / K.tex._H;
+    band[i] = i === slots.length - 1 ? 0.002 : 0.22;
+  }
+  gl.uniform4fv(u.uKA, KA); gl.uniform4fv(u.uKB, KB); gl.uniform2fv(u.uKS, KS); gl.uniform1fv(u.uBand, band);
+  const w = J.w(J.u), th = J.theta(J.u);
+  gl.uniform2f(u.uWv, w[0], w[1]); gl.uniform2f(u.uRotV, Math.cos(th), Math.sin(th)); gl.uniform2f(u.uView, S.aspect, 1);
+  gl.uniform2f(u.uRes, canvas.width, canvas.height);
+  gl.uniform3fv(u.uVoid, J.voidA); gl.uniform1f(u.uAlpha, alpha); gl.uniform1f(u.uSeed, (performance.now() % 1000) / 1000); gl.uniform1f(u.uVig, 0.16);
+  const tt = performance.now() / 1000; gl.uniform3f(u.uGrade, 1 + 0.035 * Math.sin(tt * TAU / 53), 1 + 0.015 * Math.sin(tt * TAU / 71 + 1), 1 - 0.035 * Math.sin(tt * TAU / 53));
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  // free keyframes that are now shallower than the covering one
+  if (cI > 0) for (let i = 0; i < cI; i++) { const K = J.keys[i]; if (K.tex && K.state !== 1 && !K.pin) { releaseKeyTex(K.tex); K.tex = null; K.state = 3; } else if (K.state === 0) K.state = 3; }
+  return slots.length;
+}
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = Math.max(2, Math.round(canvas.clientWidth * dpr)), h = Math.max(2, Math.round(canvas.clientHeight * dpr));
+  if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+  S.devW = w; S.devH = h; S.aspect = w / h; S.keyH = Math.min(h, canvas.clientHeight * (MOBILE ? 1.1 : 1.5));
+}
+
+// ---------- offline rendering (used by GIF export) ----------
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+async function gpuWait() { const f = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0); gl.flush(); for (;;) { const st = gl.clientWaitSync(f, 0, 0); if (st === gl.ALREADY_SIGNALED || st === gl.CONDITION_SATISFIED) break; await sleep(1); } gl.deleteSync(f); }
+async function ensureProbes(J) { while (!J.target) await sleep(5); while (!probesDone(J)) { pumpProbes(J, 3e7); await gpuWait(); } }
+
+const offBla = new BlaSet();
+let offTex = null, offFbo = gl.createFramebuffer(), outTex = null, outFbo = gl.createFramebuffer();
+// Render the view at depth u to W×H sRGB bytes (top row first), supersampled ss×ss.
+async function renderFrame(J, u, W, H, ss, vig = 0.16) {
+  const col = J.colorAt(u), fp = frameParams(J, u, [W / H, 1]);
+  const tw = W * ss, th = H * ss;
+  if (!offTex || offTex._w !== tw || offTex._h !== th) {
+    if (offTex) gl.deleteTexture(offTex);
+    offTex = tex2D(tw, th, gl.SRGB8_ALPHA8, gl.RGBA, gl.UNSIGNED_BYTE, null); offTex._w = tw; offTex._h = th;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, offFbo); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, offTex, 0);
+    if (outTex) gl.deleteTexture(outTex);
+    outTex = tex2D(W, H, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, outFbo); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, outTex, 0);
+  }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, offFbo);
+  bindFractal(PROG_KEY, J, fp, col, offBla, tw, th);
+  gl.viewport(0, 0, tw, th); gl.enable(gl.SCISSOR_TEST);
+  // small pieces with a wait after each, so no single GPU submission runs long enough to trip the driver watchdog
+  const j = clamp(Math.floor(u), 0, J.probes.length - 1), steps = Math.max(300, (J.probes[j].steps || 3000) * 1.5);
+  const T = clamp(Math.floor(Math.sqrt(3e7 / steps)), 32, 256);
+  for (let y = 0; y < th; y += T) for (let x = 0; x < tw; x += T) {
+    gl.scissor(x, y, T, T); gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.disable(gl.SCISSOR_TEST); await gpuWait(); gl.bindFramebuffer(gl.FRAMEBUFFER, offFbo); bindFractal(PROG_KEY, J, fp, col, offBla, tw, th); gl.viewport(0, 0, tw, th); gl.enable(gl.SCISSOR_TEST);
+  }
+  gl.disable(gl.SCISSOR_TEST);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, outFbo); gl.viewport(0, 0, W, H);
+  gl.useProgram(PROG_DOWN.p); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, offTex);
+  gl.uniform1i(PROG_DOWN.u.uSrc, 0); gl.uniform1i(PROG_DOWN.u.uSS, ss); gl.uniform1f(PROG_DOWN.u.uVig, vig); gl.uniform2f(PROG_DOWN.u.uRes, W, H);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  await gpuWait();
+  const px = new Uint8Array(W * H * 4); gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  const out = new Uint8Array(W * H * 4), row = W * 4; // flip to top-down
+  for (let y = 0; y < H; y++) out.set(px.subarray((H - 1 - y) * row, (H - y) * row), y * row);
+  return out;
+}
+
+// ---------- GIF encoding ----------
+function buildPalette(samples, ncol) { // samples: array of RGBA Uint8Arrays
+  const cnt = new Float64Array(32768), sr = new Float64Array(32768), sg = new Float64Array(32768), sb = new Float64Array(32768);
+  for (const px of samples) for (let i = 0; i < px.length; i += 4) {
+    const r = px[i], g = px[i + 1], b = px[i + 2], k = ((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3);
+    cnt[k]++; sr[k] += r; sg[k] += g; sb[k] += b;
+  }
+  const bins = []; for (let k = 0; k < 32768; k++) if (cnt[k]) bins.push([sr[k] / cnt[k], sg[k] / cnt[k], sb[k] / cnt[k], cnt[k]]);
+  let boxes = [bins];
+  while (boxes.length < ncol) {
+    let bi = -1, best = 0, bc = 0;
+    boxes.forEach((bx, i) => {
+      if (bx.length < 2) return; let tot = 0; const mn = [255, 255, 255], mx = [0, 0, 0];
+      for (const b of bx) { tot += b[3]; for (let c = 0; c < 3; c++) { if (b[c] < mn[c]) mn[c] = b[c]; if (b[c] > mx[c]) mx[c] = b[c]; } }
+      const ext = [0, 1, 2].map(c => (mx[c] - mn[c]) * [1.0, 1.2, 0.9][c]); const e = Math.max(...ext);
+      const score = e * Math.sqrt(tot); if (score > best) { best = score; bi = i; bc = ext.indexOf(e); }
+    });
+    if (bi < 0) break;
+    const bx = boxes[bi].sort((a, b) => a[bc] - b[bc]); let tot = 0; for (const b of bx) tot += b[3];
+    let acc = 0, cut = 1; for (let i = 0; i < bx.length; i++) { acc += bx[i][3]; if (acc >= tot / 2) { cut = clamp(i + 1, 1, bx.length - 1); break; } }
+    boxes.splice(bi, 1, bx.slice(0, cut), bx.slice(cut));
+  }
+  let cents = boxes.map(bx => { let w = 0, r = 0, g = 0, b = 0; for (const q of bx) { w += q[3]; r += q[0] * q[3]; g += q[1] * q[3]; b += q[2] * q[3]; } return [r / w, g / w, b / w]; });
+  for (let it = 0; it < 5; it++) { // k-means refinement on the histogram bins
+    const acc = cents.map(() => [0, 0, 0, 0]);
+    for (const q of bins) { let bi = 0, bd = 1e18; for (let i = 0; i < cents.length; i++) { const c = cents[i], dr = q[0] - c[0], dg = q[1] - c[1], db = q[2] - c[2], d = 3 * dr * dr + 4 * dg * dg + 2 * db * db; if (d < bd) { bd = d; bi = i; } } const a = acc[bi]; a[0] += q[0] * q[3]; a[1] += q[1] * q[3]; a[2] += q[2] * q[3]; a[3] += q[3]; }
+    cents = cents.map((c, i) => acc[i][3] ? [acc[i][0] / acc[i][3], acc[i][1] / acc[i][3], acc[i][2] / acc[i][3]] : c);
+  }
+  while (cents.length < 256) cents.push([0, 0, 0]);
+  return cents.map(c => c.map(v => clamp(Math.round(v), 0, 255)));
+}
+function makeQuantizer(pal, ncol, ditherAmp) {
+  const lut = new Int16Array(262144).fill(-1);
+  const bayer = [0, 32, 8, 40, 2, 34, 10, 42, 48, 16, 56, 24, 50, 18, 58, 26, 12, 44, 4, 36, 14, 46, 6, 38, 60, 28, 52, 20, 62, 30, 54, 22, 3, 35, 11, 43, 1, 33, 9, 41, 51, 19, 59, 27, 49, 17, 57, 25, 15, 47, 7, 39, 13, 45, 5, 37, 63, 31, 55, 23, 61, 29, 53, 21].map(v => ((v + 0.5) / 64 - 0.5) * ditherAmp);
+  return (px, W, H) => {
+    const out = new Uint8Array(W * H);
+    for (let y = 0, i = 0; y < H; y++) for (let x = 0; x < W; x++, i++) {
+      const d = bayer[((y & 7) << 3) | (x & 7)];
+      const r = clamp(px[4 * i] + d, 0, 255) >> 2, g = clamp(px[4 * i + 1] + d, 0, 255) >> 2, b = clamp(px[4 * i + 2] + d, 0, 255) >> 2;
+      const k = (r << 12) | (g << 6) | b; let c = lut[k];
+      if (c < 0) { const R = r * 4 + 2, G = g * 4 + 2, B = b * 4 + 2; let bd = 1e18; for (let j = 0; j < ncol; j++) { const p = pal[j], dr = R - p[0], dg = G - p[1], db = B - p[2], dd = 3 * dr * dr + 4 * dg * dg + 2 * db * db; if (dd < bd) { bd = dd; c = j; } } lut[k] = c; }
+      out[i] = c;
+    }
+    return out;
+  };
+}
+class GifWriter {
+  constructor(W, H, pal) {
+    this.chunks = []; this.size = 0;
+    const h = [71, 73, 70, 56, 57, 97, W & 255, W >> 8, H & 255, H >> 8, 0xF7, 0, 0];
+    const ct = new Uint8Array(768); pal.forEach((c, i) => ct.set(c, 3 * i));
+    this.push(new Uint8Array(h)); this.push(ct);
+    this.push(new Uint8Array([0x21, 0xFF, 11, ...'NETSCAPE2.0'.split('').map(c => c.charCodeAt(0)), 3, 1, 0, 0, 0]));
+    this.W = W; this.H = H; this.gen = new Int32Array(4096 * 256); this.val = new Int16Array(4096 * 256); this.g = 0;
+  }
+  push(a) { this.chunks.push(a); this.size += a.length; }
+  frame(idx, delayCs) {
+    const { W, H } = this;
+    this.push(new Uint8Array([0x21, 0xF9, 4, 0x04, delayCs & 255, delayCs >> 8, 0, 0, 0x2C, 0, 0, 0, 0, W & 255, W >> 8, H & 255, H >> 8, 0]));
+    this.push(this.lzw(idx));
+  }
+  lzw(idx) {
+    const out = []; let cur = 0, nb = 0; const block = []; const minCode = 8, clear = 256, eoi = 257;
+    let size = 9, next = 258; const gen = this.gen, val = this.val;
+    const emit = (code) => { cur |= code << nb; nb += size; while (nb >= 8) { block.push(cur & 255); cur >>>= 8; nb -= 8; if (block.length === 255) { out.push(255, ...block); block.length = 0; } } };
+    let g = ++this.g; emit(clear);
+    let prefix = idx[0];
+    for (let i = 1; i < idx.length; i++) {
+      const k = idx[i], key = prefix * 256 + k;
+      if (gen[key] === g) { prefix = val[key]; continue; }
+      emit(prefix);
+      if (next < 4096) { gen[key] = g; val[key] = next++; if (next > (1 << size) && size < 12) size++; }
+      else { emit(clear); g = ++this.g; size = 9; next = 258; }
+      prefix = k;
+    }
+    emit(prefix); emit(eoi);
+    if (nb > 0) { block.push(cur & 255); if (block.length === 255) { out.push(255, ...block); block.length = 0; } }
+    if (block.length) out.push(block.length, ...block);
+    out.push(0);
+    return new Uint8Array([minCode, ...out]);
+  }
+  finish() { this.push(new Uint8Array([0x3B])); return new Blob(this.chunks, { type: 'image/gif' }); }
+}
+
+// ---------- export UI ----------
+const EXP = { len: 5, size: '270', q: 'std', blob: null, url: null, wasPaused: false, cancel: false };
+function segInit(id, key) { $(id).querySelectorAll('button').forEach(b => b.onclick = () => { $(id).querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); EXP[key] = b.dataset.v; estimate(); }); }
+function expDims() {
+  if (EXP.size === 'sq') return [400, 400];
+  const s = +EXP.size, a = clamp(S.aspect, 0.5625, 1.7778);
+  return a >= 1 ? [Math.round(s * a / 2) * 2, s] : [s, Math.round(s / a / 2) * 2];
+}
+const QUAL = { compact: { fps: 15, ncol: 64, amp: 10, bpp: 4.6 }, std: { fps: 20, ncol: 128, amp: 8, bpp: 5.6 }, fine: { fps: 25, ncol: 256, amp: 8, bpp: 6.6 } };
+function expFps() { return QUAL[EXP.q].fps; }
+function estimate() {
+  const [W, H] = expDims(), n = Math.round(EXP.len * expFps());
+  const mb = W * H * n * QUAL[EXP.q].bpp / 8 / 1048576;
+  $('estimate').textContent = `${W} × ${H} · ${Math.round(expFps())} fps · ${n} frames · roughly ${mb < 10 ? mb.toFixed(1) : Math.round(mb)} MB (dense detail costs more). Loops seamlessly with a soft dissolve.`;
+}
+function openPanel() { if (!$('panel').hidden) return; EXP.wasPaused = S.paused; if (!S.paused) togglePause(); $('panel').hidden = false; $('result').hidden = true; $('progRow').hidden = true; $('go').disabled = false; estimate(); poke(); }
+function closePanel() { if ($('panel').hidden) return; EXP.cancel = true; $('panel').hidden = true; if (!EXP.wasPaused && S.paused) togglePause(); }
+async function runExport() {
+  const J = S.cur; if (!J) return;
+  $('go').disabled = true; $('result').hidden = true; $('progRow').hidden = false; EXP.cancel = false;
+  const bar = $('prog').firstElementChild, lab = $('progLab');
+  const setP = (f, t) => { bar.style.width = (f * 100).toFixed(1) + '%'; lab.textContent = t; };
+  S.exporting = true;
+  try {
+    // wait for any in-flight keyframe tiles, then render offline
+    await gpuWait();
+    const [W, H] = expDims(), delay = Math.round(100 / expFps()), fps = 100 / delay;
+    const N = Math.round(EXP.len * fps), F = Math.round(Math.min(1.2, EXP.len * 0.25) * fps);
+    const ss = EXP.q === 'fine' ? 3 : 2;
+    let v = BASE_RATE * SPEEDS[S.speedIdx];
+    const span = (N + F) / fps;
+    let u0 = J.u;
+    if (u0 + v * span > J.Uend - 0.02) u0 = Math.max(0, J.Uend - 0.02 - v * span);
+    if (u0 + v * span > J.Uend) v = (J.Uend - u0) / span;
+    const uAt = (k) => u0 + v * k / fps;
+    setP(0, 'Preparing'); await ensureProbes(J);
+    // palette from a quick pre-pass
+    const samples = [];
+    for (let i = 0; i < 10; i++) { if (EXP.cancel) throw 'cancel'; samples.push(await renderFrame(J, uAt((N + F) * (i + 0.5) / 10), W >> 1, H >> 1, 1)); setP(0.04 * (i + 1) / 10, 'Choosing colours'); }
+    const { ncol, amp } = QUAL[EXP.q], pal = buildPalette(samples, ncol), quant = makeQuantizer(pal, ncol, amp);
+    const gif = new GifWriter(W, H, pal);
+    // frames past the loop point, kept to dissolve into the opening frames
+    const lin = new Float32Array(256).map((_, i) => srgb2lin(i / 255)), toS8 = new Uint8Array(4096).map((_, i) => Math.round(lin2srgb(i / 4095) * 255));
+    const tail = [];
+    for (let k = 0; k < F; k++) { if (EXP.cancel) throw 'cancel'; tail.push(await renderFrame(J, uAt(N + k), W, H, ss)); setP(0.04 + 0.9 * (k + 1) / (N + F), `Rendering frame ${k + 1} of ${N + F}`); }
+    for (let k = 0; k < N; k++) {
+      if (EXP.cancel) throw 'cancel';
+      let px = await renderFrame(J, uAt(k), W, H, ss);
+      if (k < F) { const a = (k + 0.5) / F, t = tail[k]; for (let i = 0; i < px.length; i++) if ((i & 3) !== 3) px[i] = toS8[Math.round((lin[px[i]] * a + lin[t[i]] * (1 - a)) * 4095)]; }
+      gif.frame(quant(px, W, H), delay);
+      setP(0.04 + 0.9 * (F + k + 1) / (N + F), `Rendering frame ${F + k + 1} of ${N + F}`);
+    }
+    setP(1, 'Finishing');
+    EXP.blob = gif.finish();
+    if (EXP.url) URL.revokeObjectURL(EXP.url); EXP.url = URL.createObjectURL(EXP.blob);
+    $('gifimg').src = EXP.url;
+    $('gifinfo').textContent = `${W}×${H} · ${N} frames · ${(EXP.blob.size / 1048576).toFixed(1)} MB`;
+    $('result').hidden = false; $('progRow').hidden = true;
+    const dl = await getDownloads(); $('save').hidden = !dl;
+    if (!dl) $('gifinfo').textContent += ' · right-click the preview to save';
+  } catch (e) { if (e !== 'cancel') { console.error(e); lab.textContent = 'Export failed: ' + (e.message || e); } else $('progRow').hidden = true; }
+  finally { S.exporting = false; $('go').disabled = false; }
+}
+let dlNs; async function getDownloads() { if (dlNs !== undefined) return dlNs; try { dlNs = (window.claude && window.claude.use) ? await window.claude.use('downloads') : null; } catch (_) { dlNs = null; } return dlNs; }
+segInit('optLen', 'len'); segInit('optSize', 'size'); segInit('optQ', 'q');
+EXP.len = 5; $('exp').onclick = () => $('panel').hidden ? openPanel() : closePanel(); $('close').onclick = closePanel; $('go').onclick = runExport;
+$('save').onclick = async () => {
+  const dl = await getDownloads(); if (!dl || !EXP.blob) return;
+  try { await dl.save({ filename: `mandelbrot-${S.cur.loc.id}-${Date.now() % 100000}.gif`, data: EXP.blob }); } catch (e) { if (e && e.code !== 'declined') $('gifinfo').textContent = 'Saving is unavailable here. Right-click the preview to save.'; }
+};
+
+// ---------- main loop & UI ----------
+
+let order = LOCATIONS.map((_, i) => i), orderPos = 0;
+(function shuffle() { const r = seedRand((Date.now() & 0xffff) + 1); for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; } })();
+const startHash = (location.hash || '').slice(1).split('-')[0];
+if (startHash) { const i = LOCATIONS.findIndex(l => l.id === startHash); if (i >= 0) { order.splice(order.indexOf(i), 1); order.unshift(i); } }
+function nextLoc() { const l = LOCATIONS[order[orderPos % order.length]]; orderPos++; return l; }
+function prepareNext() { if (!S.next) S.next = new Journey(nextLoc(), S.aspect); }
+function readyToShow(J) { if (J.shown) return true; const c = coverIndex(J); return (J.shown = c >= 0 && (c === J.keys.length - 1 || J.keys[c + 1].state === 2)); }
+
+let last = performance.now(), veilGone = false, frameCount = 0;
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.1, (now - last) / 1000); last = now; frameCount++;
+  S.dts[frameCount % 90] = dt * 1000;
+  if (frameCount % 30 === 0) { const sorted = S.dts.slice().sort((a, b) => a - b); S.refresh = clamp(sorted[Math.floor(sorted.length * 0.2)] || 16.7, 6, 34); }
+  if (S.exporting) return;
+  resize();
+  const C = S.cur;
+  if (S.resumeU != null && C && C.mapTex && !C.shown) { // start where a reset interrupted us
+    const u = S.resumeU; S.resumeU = null; C.u = u; for (const K of C.keys) if (K.u < Math.floor(u)) K.state = 3;
+  }
+  // speed: smoothed so pause/resume and speed changes never lurch
+  S.vcap += (Math.min(S.vcapT, 10) - S.vcap) * (1 - Math.exp(-dt / 4));
+  const vt = S.paused ? 0 : Math.min(BASE_RATE * SPEEDS[S.speedIdx], S.vcap);
+  S.vs += (vt - S.vs) * (1 - Math.exp(-dt / 0.55));
+  for (const J of [C, S.next]) {
+    if (!J) continue;
+    if (J === S.next && !(S.fade > 0)) continue;
+    if (!readyToShow(J)) continue;
+    J.t += S.paused ? 0 : dt;
+    const x = J.Uend - J.u, D = 4.5;
+    const easeOut = x >= D ? 1 : 1 - (1 - Math.max(0, x) / D) ** 2;
+    const easeIn = smoothstep(0, 5, J.t);
+    const lead = leadOf(J);
+    J.thr = (J.thr ?? 0) + (smoothstep(0.08, 0.75, lead) - (J.thr ?? 0)) * (1 - Math.exp(-dt / 0.35));
+    J.u = Math.min(J.Uend, J.u + S.vs * easeIn * easeOut * J.thr * dt);
+  }
+  // settled: re-render the exact view at full resolution if adaptive quality had lowered it
+  if (C && S.paused && S.vs < 0.002 && S.quality < 0.97 && !S.exporting && readyToShow(C) && !C.keys.some(K => K.still && Math.abs(K.u - C.u) < 1e-6)) {
+    const K = { u: C.u, state: 0, still: true }; const i = C.keys.findIndex(k => k.u > C.u); C.keys.splice(i < 0 ? C.keys.length : i, 0, K);
+  }
+  // journey end → hold, then dissolve into the next location
+  if (C && C.Uend - C.u < 7) prepareNext();
+  if (C && C.Uend - C.u < 0.03) { S.hold += dt; if (S.hold > 3.5) S.advance = true; }
+  if (S.advance && S.next && readyToShow(S.next) && S.fade === 0) { S.fade = 1e-6; swapName(S.next.loc.name); }
+  if (S.fade > 0) {
+    S.fade += dt / 3.2;
+    if (S.fade >= 1) { C.dispose(); S.cur = S.next; S.next = null; S.fade = 0; S.hold = 0; S.advance = false; }
+  }
+  // draw
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, canvas.width, canvas.height);
+  if (S.cur && readyToShow(S.cur)) {
+    gl.disable(gl.BLEND);
+    timed('disp', 0, () => drawJourney(S.cur, 1));
+    if (S.fade > 0) {
+      gl.enable(gl.BLEND); const a = smoothstep(0, 1, S.fade);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); drawJourney(S.next, a); gl.disable(gl.BLEND);
+    }
+    if (!veilGone) { veilGone = true; $('veil').style.opacity = 0; showName(); }
+  } else {
+    gl.clearColor(0.027, 0.031, 0.047, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+    if (S.cur && frameCount % 10 === 0) { const J = S.cur, pc = probeCount(J), k = J.keys.slice(0, 2).filter(x => x.state === 2).length;
+      const f = !J.target ? 0 : (J.probes.filter(p => p && p.state === 2).length / pc) * 0.8 + k * 0.1;
+      $('veil').firstElementChild.textContent = `Charting the descent · ${Math.round(f * 100)}%`; }
+  }
+  // GPU work: cost-estimated batches. With a GPU timer we size each batch to a fixed slice of GPU
+  // time; without one we adapt to frame pacing. A floor keeps progress going whatever happens.
+  try { gpuSchedule(dt); } catch (err) { console.error(err); if (S.job && S.job.prev) S.job.prev.pin--; S.job = null; }
+  if (frameCount % 120 === 0 && S.cur && S.cur.shown) saveResume();
+  if (frameCount % 6 === 0) updateHud();
+}
+
+function showName() { $('locname').textContent = S.cur.loc.name; }
+function swapName(n) { const el = $('locname'); el.style.opacity = 0; setTimeout(() => { el.textContent = n; el.style.opacity = 1; }, 900); }
+function updateHud() {
+  const J = S.cur; if (!J) return;
+  const mag = Math.log10(1.25 / (J.r(J.u) * Math.min(1, S.aspect)));
+  const h = (S.advance && S.next && !(S.fade > 0)) ? `Travelling to <b>${S.next.loc.name}</b>…` : `Magnification <b>10<sup>${mag.toFixed(1)}</sup></b>`;
+  if (h !== updateHud.last) { $('depth').innerHTML = h; updateHud.last = h; }
+}
+function setSpeed(i) { S.speedIdx = clamp(i, 0, SPEEDS.length - 1); $('speed').textContent = SPEEDS[S.speedIdx] + '×'; }
+function togglePause() {
+  S.paused = !S.paused;
+  $('pauseIcon').innerHTML = S.paused ? '<path d="M5 3.5l7 4.5-7 4.5z"/>' : '<path d="M5.5 3.5v9M10.5 3.5v9"/>';
+  $('pause').setAttribute('aria-label', S.paused ? 'Play' : 'Pause'); $('pause').title = S.paused ? 'Play (Space)' : 'Pause (Space)';
+}
+function goNext() { prepareNext(); S.advance = true; }
+$('pause').onclick = togglePause; $('slower').onclick = () => setSpeed(S.speedIdx - 1); $('faster').onclick = () => setSpeed(S.speedIdx + 1);
+$('speed').onclick = () => setSpeed(S.speedIdx === 3 ? 0 : 3); $('next').onclick = goNext;
+addEventListener('keydown', (e) => {
+  if (e.target.closest && e.target.closest('#panel') && e.key !== 'Escape') return;
+  if (e.key === ' ') { e.preventDefault(); togglePause(); }
+  else if (e.key === 'ArrowLeft') setSpeed(S.speedIdx - 1);
+  else if (e.key === 'ArrowRight') setSpeed(S.speedIdx + 1);
+  else if (e.key === 'n' || e.key === 'N') goNext();
+  else if (e.key === 'e' || e.key === 'E') openPanel();
+  else if (e.key === 'Escape') closePanel();
+  else if (e.key === 'f' || e.key === 'F') { try { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => {}); } catch (_) {} }
+  poke();
+});
+let idleT = 0;
+function poke() { document.body.classList.remove('idle'); clearTimeout(idleT); idleT = setTimeout(() => { if ($('panel').hidden && !$('bar').matches(':hover')) document.body.classList.add('idle'); else poke(); }, 2600); }
+['pointermove', 'pointerdown', 'touchstart', 'wheel'].forEach(ev => addEventListener(ev, poke, { passive: true }));
+canvas.addEventListener('dblclick', () => { try { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => {}); } catch (_) {} });
+try { navigator.wakeLock && navigator.wakeLock.request('screen').catch(() => {}); } catch (_) {}
+
+resize();
+let resume = null;
+try { resume = JSON.parse(sessionStorage.getItem('md-resume') || 'null'); sessionStorage.removeItem('md-resume'); } catch (_) {}
+if (resume && Date.now() - resume.t < 600000) { const i = LOCATIONS.findIndex(l => l.id === resume.id); if (i >= 0) { order.splice(order.indexOf(i), 1); order.unshift(i); orderPos = 0; } else resume = null; } else resume = null;
+S.cur = new Journey(nextLoc(), S.aspect);
+if (resume) { S.resumeU = Math.max(0, Math.min(resume.u, S.cur.Uend - 1)); S.quality = Math.min(S.quality, 0.55); }
+setSpeed(matchMedia('(prefers-reduced-motion: reduce)').matches ? 1 : 3); poke();
+if (!window.NO_TICK) requestAnimationFrame(frame);
+
+</script>
+
+</body></html>

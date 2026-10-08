@@ -1,0 +1,998 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Double Pendulum Flip Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: square chaos map is the hero; a compact instrument panel (pendulum + settings) sits beside it on desktop, below it with tabs on phones. */
+:root{
+  --bg:#eceef3; --surface:#ffffff; --ink:#141725; --muted:#5a6074; --line:#d4d8e2;
+  --accent:#9a6418; --accent-ink:#ffffff; --accent-soft:#f3e6cf;
+  --frame:#07080c; --pend-bg:#f5f6f9; --arm:#252a3b; --bob1:#9a6418; --bob2:#c0432b; --twin:#2f72ba;
+  --f-display:'Unbounded','Arial Black',system-ui,sans-serif;
+  --f-body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0b0d14; --surface:#141724; --ink:#e6e8f0; --muted:#9298ac; --line:#262a3b;
+  --accent:#e2a64b; --accent-ink:#1b1305; --accent-soft:#2c2416;
+  --frame:#000000; --pend-bg:#0f1220; --arm:#c8cddc; --bob1:#e2a64b; --bob2:#f07b5c; --twin:#6eb0ff; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0b0d14; --surface:#141724; --ink:#e6e8f0; --muted:#9298ac; --line:#262a3b;
+  --accent:#e2a64b; --accent-ink:#1b1305; --accent-soft:#2c2416;
+  --frame:#000000; --pend-bg:#0f1220; --arm:#c8cddc; --bob1:#e2a64b; --bob2:#f07b5c; --twin:#6eb0ff; color-scheme:dark}
+
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45;-webkit-tap-highlight-color:transparent}
+.app{max-width:1240px;margin:0 auto;padding-inline:16px;padding-block:12px 28px;display:flex;flex-direction:column;gap:12px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand h1{font-family:var(--f-display);font-weight:700;font-size:clamp(18px,4.6vw,26px);letter-spacing:-.01em;margin:0;line-height:1.1;text-wrap:balance}
+.brand p{margin:2px 0 0;color:var(--muted);font-size:13px}
+.runbtn{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:500 13px var(--f-mono);font-variant-numeric:tabular-nums;cursor:pointer}
+.runbtn svg{width:14px;height:14px;fill:currentColor}
+.runbtn .dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.runbtn[data-state="running"] .dot{background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+
+.layout{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;align-items:start}
+@media (min-width:900px){.layout{grid-template-columns:minmax(0,1fr) 370px}}
+.mapcol{display:flex;flex-direction:column;gap:8px;min-width:0;align-items:center}
+.mapwrap{position:relative;width:min(100%,calc(100vh - 150px));min-width:min(100%,300px);aspect-ratio:1;max-width:100%;background:var(--frame);border-radius:6px;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;cursor:crosshair}
+.stage{position:absolute;inset:0;transform-origin:0 0;will-change:transform}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.mapbtns{position:absolute;right:8px;bottom:12px;display:flex;flex-direction:column;gap:6px;z-index:2}
+.mapbtns button{width:42px;height:42px;border-radius:8px;border:1px solid rgba(255,255,255,.18);background:rgba(10,12,20,.72);color:#f1f2f6;display:grid;place-items:center;cursor:pointer;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.mapbtns button svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+.mapbtns button:focus-visible,.runbtn:focus-visible,.seg button:focus-visible,.btn:focus-visible,.tabs button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.axis{position:absolute;z-index:2;font:500 11px var(--f-mono);color:rgba(240,242,248,.8);pointer-events:none;text-shadow:0 1px 2px #000}
+.axis.x{left:8px;top:8px;background:rgba(10,12,20,.6);padding:2px 6px;border-radius:4px}
+.progress{position:absolute;left:0;right:0;bottom:0;height:3px;background:rgba(255,255,255,.08);z-index:2}
+.progress i{display:block;height:100%;width:100%;background:var(--accent);transform:scaleX(0);transform-origin:0 50%;transition:transform .15s linear}
+.under{width:min(100%,calc(100vh - 150px));min-width:min(100%,300px);max-width:100%;display:flex;flex-direction:column;gap:6px}
+.legend{display:grid;grid-template-columns:minmax(0,1fr);gap:4px}
+.ramp{height:10px;border-radius:3px}
+.ticks{position:relative;height:16px;font:400 11px var(--f-mono);color:var(--muted)}
+.ticks span{position:absolute;transform:translateX(-50%);white-space:nowrap}
+.ticks span:first-child{transform:none}
+.keys{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted);align-items:center}
+.keys b{font-weight:500;color:var(--ink)}
+.sw{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:6px;vertical-align:-1px;border:1px solid var(--line)}
+.viewinfo{font:400 12px var(--f-mono);color:var(--muted);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+
+.panel{display:flex;flex-direction:column;gap:12px;min-width:0}
+.modes{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);gap:6px}
+@media (max-width:420px){.modes{grid-template-columns:minmax(0,1fr)}}
+.tabs{display:grid;grid-template-columns:1fr 1fr;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:3px;gap:3px;position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
+.tabs button{min-height:40px;border:0;border-radius:7px;background:transparent;color:var(--muted);font:500 14px var(--f-body);cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accent-ink)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.card h2{font-family:var(--f-display);font-weight:500;font-size:13px;letter-spacing:.06em;text-transform:uppercase;margin:0;color:var(--muted)}
+.off{display:none}
+@media (min-width:900px){.tabs{display:none}.off{display:flex}}
+.pendbox{position:relative;width:100%;height:250px;border-radius:8px;background:var(--pend-bg);overflow:hidden}
+.pendbox canvas{width:100%;height:100%;display:block}
+.pendclock{position:absolute;left:10px;top:8px;font:500 12px var(--f-mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.readout{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px}
+.readout div{display:flex;flex-direction:column;min-width:0}
+.readout dt,.lbl{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.readout dd{white-space:pre-line;margin:0;font:500 15px var(--f-mono);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{min-height:40px;padding:0 14px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:500 14px var(--f-body);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent}
+.btn svg{width:14px;height:14px;fill:currentColor}
+.field{display:flex;flex-direction:column;gap:6px}
+.field .top2{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.field output{font:500 13px var(--f-mono);font-variant-numeric:tabular-nums}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--bg)}
+.seg button{min-height:38px;border:0;background:transparent;color:var(--ink);font:500 13px var(--f-body);cursor:pointer;border-left:1px solid var(--line)}
+.seg button:first-child{border-left:0}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.seg button:disabled{opacity:.4;cursor:not-allowed}
+select{min-height:40px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:500 14px var(--f-body);padding:0 10px;width:100%}
+input[type=range]{width:100%;accent-color:var(--accent);height:28px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.note{font-size:13px;color:var(--muted);margin:0;max-width:65ch}
+.note strong{color:var(--ink);font-weight:500}
+.warn{font-size:13px;color:var(--ink);background:var(--accent-soft);border-radius:8px;padding:8px 10px;margin:0}
+@media (prefers-reduced-motion:reduce){.progress i{transition:none}}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <a href="../index.html" style="display:table;flex-basis:100%;margin-bottom:6px;font-size:13px;color:inherit;opacity:.7;text-decoration:none">← All widgets</a>
+      <h1>Double Pendulum Flip Map</h1>
+      <p>Every pixel is a pendulum with its own start. Lay them out by starting angles or starting momenta, and color them by when they flip over the top or by how chaotic they are.</p>
+    </div>
+    <button class="runbtn" id="runbtn" data-state="running" aria-label="Pause or resume the map simulation">
+      <span class="dot"></span><span id="status">t = 0.0</span>
+    </button>
+  </header>
+
+  <main class="layout">
+    <section class="mapcol" aria-label="Flip-time map">
+      <div class="mapwrap" id="mapwrap">
+        <div class="stage" id="stage">
+          <canvas id="sim" width="400" height="400"></canvas>
+          <canvas id="overlay"></canvas>
+        </div>
+        <div class="axis x" id="axisLbl">θ₁ → · θ₂ ↑</div>
+        <div class="mapbtns">
+          <button id="zin" aria-label="Zoom in"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+          <button id="zout" aria-label="Zoom out"><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+          <button id="zreset" aria-label="Show full map"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+        </div>
+        <div class="progress"><i id="bar"></i></div>
+      </div>
+      <div class="under">
+        <div class="modes">
+        <div class="seg" id="segSpace" role="group" aria-label="Map axes"><button data-v="ang" aria-pressed="true">Angles</button><button data-v="mom" aria-pressed="false">Momenta</button></div>
+        <div class="seg" id="segMode" role="group" aria-label="Color the map by"><button data-v="flip" aria-pressed="true">Flip time</button><button data-v="lyap" aria-pressed="false">Chaos</button><button data-v="live" aria-pressed="false">Live angles</button></div>
+        </div>
+        <div class="legend">
+          <div class="ramp" id="ramp"></div>
+          <div class="ticks" id="ticks"></div>
+          <div class="keys" id="keysFlip">
+            <span><i class="sw" id="swForbid"></i><b>Can't flip</b> · too little energy</span>
+            <span><i class="sw" id="swWait"></i><b>No flip yet</b></span>
+            <span>time in √(l/g)</span>
+          </div>
+          <div class="keys" id="keysLyap" hidden>
+            <span><b>Lyapunov exponent λ</b>: how fast two nearly identical starts drift apart, per √(l/g). Dark is orderly, bright is chaotic.</span>
+          </div>
+          <div class="keys" id="keysLive" hidden>
+            <span><b>Hue</b> shows each pendulum's θ₁ right now, <b>brightness</b> its θ₂.</span>
+          </div>
+        </div>
+        <div class="viewinfo" id="viewinfo"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="tabs" role="tablist">
+        <button role="tab" id="tabP" aria-selected="true" data-tab="pend">Pendulum</button>
+        <button role="tab" id="tabS" aria-selected="false" data-tab="set">Settings</button>
+      </div>
+
+      <div class="card" id="pane-pend">
+        <h2>Selected pendulum</h2>
+        <div class="pendbox" id="pendbox"><canvas id="pend"></canvas><span class="pendclock" id="pclock">t = 0.0</span></div>
+        <dl class="readout">
+          <div><dt>Start <span style="text-transform:none">θ₁, θ₂</span></dt><dd id="rStart">–</dd></div>
+          <div><dt>First flip</dt><dd id="rFlip">–</dd></div>
+          <div><dt>Flips so far</dt><dd id="rCount">0</dd></div>
+          <div><dt>Twin gap</dt><dd id="rGap">–</dd></div>
+          <div><dt>Chaos <span style="text-transform:none">λ</span></dt><dd id="rLy">–</dd></div>
+          <div><dt>Behavior</dt><dd id="rKind">–</dd></div>
+        </dl>
+        <div class="row">
+          <button class="btn primary" id="pplay"><svg viewBox="0 0 24 24" id="pplayIcon"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg><span>Pause</span></button>
+          <button class="btn" id="prestart">Restart</button>
+          <button class="btn" id="ptwin" aria-pressed="true">Twin on</button>
+          <select id="pspeed" aria-label="Playback speed" style="width:auto">
+            <option value="0.25">¼× speed</option>
+            <option value="0.5">½× speed</option>
+            <option value="1" selected>1× (1 m arms)</option>
+            <option value="2">2× speed</option>
+          </select>
+        </div>
+        <p class="note">Tap the map to load a pendulum. Drag or pinch to zoom. The <strong>twin</strong> starts 0.001 rad away. Watch how soon the two drift apart in the bright regions.</p>
+      </div>
+
+      <div class="card off" id="pane-set">
+        <h2>Map settings</h2>
+        <div class="field">
+          <span class="lbl" id="sliceLbl">Starting momenta for every pendulum</span>
+          <div class="grid2">
+            <div class="field"><div class="top2"><label class="lbl" for="rngF1" id="lblF1" style="text-transform:none">p₁</label><output id="outF1">0</output></div><input type="range" id="rngF1"></div>
+            <div class="field"><div class="top2"><label class="lbl" for="rngF2" id="lblF2" style="text-transform:none">p₂</label><output id="outF2">0</output></div><input type="range" id="rngF2"></div>
+          </div>
+          <div class="row"><button class="btn" id="useSel">Use selected pendulum</button><button class="btn" id="zeroFix">Set to zero</button></div>
+        </div>
+        <div class="field"><span class="lbl">Palette</span>
+          <div class="seg" id="segPal"><button data-v="ember" aria-pressed="true">Ember</button><button data-v="glacier" aria-pressed="false">Glacier</button><button data-v="viridis" aria-pressed="false">Viridis</button></div>
+        </div>
+        <div class="grid2">
+          <label class="field"><span class="lbl">Resolution</span>
+            <select id="selRes"><option>200</option><option>300</option><option>400</option><option>600</option><option>800</option><option>1024</option></select>
+          </label>
+          <label class="field"><span class="lbl">Watch until t =</span>
+            <select id="selT"><option>30</option><option selected>100</option><option>300</option><option>1000</option></select>
+          </label>
+        </div>
+        <div class="field"><span class="lbl">Integrator step</span>
+          <div class="seg" id="segDt"><button data-v="0.025" aria-pressed="false">Fast</button><button data-v="0.01" aria-pressed="true">Balanced</button><button data-v="0.004" aria-pressed="false">Precise</button></div>
+        </div>
+        <div class="field"><div class="top2"><label class="lbl" for="rngM">Mass ratio m₂/m₁</label><output id="outM">1.00</output></div>
+          <input type="range" id="rngM" min="-1" max="1" step="0.01" value="0">
+        </div>
+        <div class="field"><div class="top2"><label class="lbl" for="rngL">Length ratio l₂/l₁</label><output id="outL">1.00</output></div>
+          <input type="range" id="rngL" min="-1" max="1" step="0.01" value="0">
+        </div>
+        <div class="row"><button class="btn primary" id="restart">Restart map</button><button class="btn" id="defaults">Reset settings</button></div>
+        <p class="warn" id="fallbackNote" hidden>This device can't run the GPU simulator, so the map is computed on the CPU at lower resolution. Chaos and Live angles are unavailable.</p>
+        <p class="note">The map is a 2D slice through all possible starts. <strong>Angles</strong>: each pixel is a pair of starting angles, with both momenta fixed above (zero means released from rest). <strong>Momenta</strong>: each pixel is a pair of starting kicks p₁, p₂ (in m·l·√(g·l)), with both angles fixed above (zero means hanging straight down). The map runs on your GPU and adjusts its pace to keep taps, pinches and scrolling smooth. Flip-time mode stops simulating pendulums once their color is final, so switching to Live angles restarts the run. On a phone, 300–400 px is a good balance.</p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+(()=>{
+'use strict';
+const $=id=>document.getElementById(id);
+const PI=Math.PI, TAU=2*PI;
+
+/* ---------- palettes ---------- */
+const PALS={
+  ember:['#fff3cc','#f6b241','#d6552a','#7f2148','#28123d'],
+  glacier:['#f1fbff','#8ad1f2','#3a7ad1','#2a2c74','#110e2c'],
+  viridis:['#fde725','#5ec962','#21918c','#3b528b','#440154']
+};
+const FORBID='#030305', WAIT='#1b1f2e', UNKNOWN='#0d0f17';
+const hex=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)/255);
+
+/* ---------- physics (shared with CPU worker) ---------- */
+function makeStepper(m2,l2){
+  const m1=1,l1=1,g=1,M=m1+m2;
+  const K=new Float64Array(16);
+  function f(t1,t2,w1,w2,k){
+    const d=t1-t2,sd=Math.sin(d),cd=Math.cos(d),den=2*m1+m2-m2*Math.cos(2*d);
+    K[k]=w1;K[k+1]=w2;
+    K[k+2]=(-g*(2*m1+m2)*Math.sin(t1)-m2*g*Math.sin(t1-2*t2)-2*sd*m2*(w2*w2*l2+w1*w1*l1*cd))/(l1*den);
+    K[k+3]=(2*sd*(w1*w1*l1*M+g*M*Math.cos(t1)+w2*w2*l2*m2*cd))/(l2*den);
+  }
+  return function(s,h){
+    const a=s[0],b=s[1],c=s[2],d=s[3];
+    f(a,b,c,d,0);
+    f(a+.5*h*K[0],b+.5*h*K[1],c+.5*h*K[2],d+.5*h*K[3],4);
+    f(a+.5*h*K[4],b+.5*h*K[5],c+.5*h*K[6],d+.5*h*K[7],8);
+    f(a+h*K[8],b+h*K[9],c+h*K[10],d+h*K[11],12);
+    for(let i=0;i<4;i++) s[i]+=h/6*(K[i]+2*K[4+i]+2*K[8+i]+K[12+i]);
+  };
+}
+/* A starting state in canonical coordinates (θ1, θ2, p1, p2), converted to angular velocities.
+   p = M ω with M = [[(m1+m2) l1², m2 l1 l2 cos(θ1−θ2)], [m2 l1 l2 cos(θ1−θ2), m2 l2²]] and m1 = l1 = 1. */
+function toState(t1,t2,p1,p2,m2,l2){
+  const c=Math.cos(t1-t2),a=1+m2,b=m2*l2*c,d=m2*l2*l2,det=a*d-b*b;
+  return [t1,t2,(d*p1-b*p2)/det,(a*p2-b*p1)/det];
+}
+// Energy rule: a pendulum can only go over the top if its total energy reaches the lowest "arm straight up" energy.
+function cannotFlip(s,m2,l2){
+  const [t1,t2,w1,w2]=s;
+  const KE=.5*((1+m2)*w1*w1+m2*l2*l2*w2*w2+2*m2*l2*w1*w2*Math.cos(t1-t2));
+  const V=-(1+m2)*Math.cos(t1)-m2*l2*Math.cos(t2);
+  return KE+V<Math.min(-(1+m2)+m2*l2,(1+m2)-m2*l2);
+}
+function flipTime(s0,m2,l2,dt,tmax,step){
+  if(cannotFlip(s0,m2,l2)) return -2;
+  const s=new Float64Array(s0);const n=Math.ceil(tmax/dt-1e-9);
+  for(let i=1;i<=n;i++){step(s,dt);if(Math.abs(s[0])>Math.PI||Math.abs(s[1])>Math.PI) return i*dt;}
+  return -1;
+}
+
+// Finite-time Lyapunov exponent by Benettin's method (same scheme as the GPU chaos map, in double precision).
+function ftle(s0,m2,l2,dt,tmax,step){
+  const D0=1e-3,s=new Float64Array(s0),w=new Float64Array(s0.map(v=>v+D0/2));
+  let sum=0;const n=Math.ceil(tmax/dt-1e-9);
+  for(let i=0;i<n;i++){step(s,dt);step(w,dt);let d=0;for(let k=0;k<4;k++){const g=w[k]-s[k];d+=g*g;}d=Math.sqrt(d);
+    if(d<1e-300){for(let k=0;k<4;k++)w[k]=s[k]+D0/2;continue;}
+    sum+=Math.log(d/D0);for(let k=0;k<4;k++)w[k]=s[k]+(w[k]-s[k])*D0/d;}
+  return sum/(n*dt);
+}
+
+/* ---------- state ---------- */
+const small=Math.min(screen.width,screen.height)<700;
+const DEF={res:small?300:600,tmax:100,dt:0.01,mv:0,lv:0,mode:'flip',pal:'ember',space:'ang',fix:{ang:[0,0],mom:[0,0]}};
+const PMAX=5;   // momentum view spans p ∈ [−5, 5] in units of m·l·√(g·l)
+const S={...DEF,fix:{ang:[0,0],mom:[0,0]},cx:0,cy:0,span:TAU,views:{},sel:{t1:110*PI/180,t2:150*PI/180,p1:0,p2:0}};
+const RANGE=()=>S.space==='mom'?PMAX:PI;           // half-width of the full view in the current space
+const MINSPAN_=()=>2*RANGE()*1.6e-5;
+const fixNow=()=>S.fix[S.space];
+const sliceKey=()=>`${S.space}|${fixNow().join(',')}`;
+// Starting state of a point (x, y) in the current view.
+const stateAt=(x,y)=>S.space==='mom'?toState(fixNow()[0],fixNow()[1],x,y,m2(),l2()):toState(x,y,fixNow()[0],fixNow()[1],m2(),l2());
+const selState=()=>toState(S.sel.t1,S.sel.t2,S.sel.p1,S.sel.p2,m2(),l2());
+// Where the selected pendulum sits in the current view, or null if it is not on this slice.
+function selCoords(){const f=fixNow(),e=1e-9,q=S.sel;
+  if(S.space==='mom') return Math.abs(q.t1-f[0])<e&&Math.abs(q.t2-f[1])<e?[q.p1,q.p2]:null;
+  return Math.abs(q.p1-f[0])<e&&Math.abs(q.p2-f[1])<e?[q.t1,q.t2]:null;}
+try{const saved=JSON.parse(localStorage.getItem('flipmap.prefs')||'{}');for(const k of ['res','tmax','dt','mv','lv','mode','pal','space']) if(k in saved) S[k]=saved[k];
+  if(saved.fix&&Array.isArray(saved.fix.ang)&&Array.isArray(saved.fix.mom)) S.fix={ang:saved.fix.ang.map(Number),mom:saved.fix.mom.map(Number)};
+  if(S.space!=='mom') S.space='ang'; if(S.space==='mom') S.span=2*PMAX;}catch(e){}
+function savePrefs(){try{localStorage.setItem('flipmap.prefs',JSON.stringify({res:S.res,tmax:S.tmax,dt:S.dt,mv:S.mv,lv:S.lv,mode:S.mode,pal:S.pal,space:S.space,fix:S.fix}))}catch(e){}}
+const m2=()=>Math.pow(10,S.mv*0.7), l2=()=>Math.pow(2,S.lv*2);
+const sim={t:0,running:true,done:false,dirty:true};
+
+/* ---------- GPU engine ---------- */
+/* Per pixel: state (θ1,θ2,ω1,ω2), info (R = flip time, G = summed log-stretch of the twin), twin state.
+   Chaos mode (Benettin's method): a twin starts LYD0 away in phase space; after every step the gap's growth
+   is logged and the twin is pulled back to distance LYD0 along the same direction. λ = Σ log(d/LYD0) / t. */
+const LYD0=1e-3, LYMAX=0.6;
+const VS=`#version 300 es
+layout(location=0) in vec2 p; void main(){gl_Position=vec4(p,0.,1.);}`;
+const FS_INIT=`#version 300 es
+precision highp float;
+uniform vec2 uC,uFix; uniform float uSpan,uRes,uM2,uL2; uniform int uSpace;
+layout(location=0) out vec4 st; layout(location=1) out vec4 inf; layout(location=2) out vec4 tw;
+void main(){
+  vec2 uv=gl_FragCoord.xy/uRes;
+  vec2 xy=uC+(uv-.5)*uSpan;
+  // Angles view: pixel = (θ1, θ2), momenta fixed. Momenta view: pixel = (p1, p2), angles fixed.
+  vec2 th=uSpace==1?uFix:xy, p=uSpace==1?xy:uFix;
+  float c=cos(th.x-th.y),A=1.+uM2,B=uM2*uL2*c,D=uM2*uL2*uL2,det=A*D-B*B;
+  vec2 w=vec2(D*p.x-B*p.y,A*p.y-B*p.x)/det;
+  st=vec4(th,w); tw=st+${LYD0}*vec4(.5);
+  float KE=.5*dot(w,p);
+  float V=-(1.+uM2)*cos(th.x)-uM2*uL2*cos(th.y);
+  float need=min(-(1.+uM2)+uM2*uL2,(1.+uM2)-uM2*uL2);
+  inf=vec4(KE+V<need?-2.:-1.,0.,0.,1.);
+}`;
+const FS_STEP=`#version 300 es
+precision highp float;
+uniform sampler2D uSt,uInf,uTw; uniform float uT,uDt,uM2,uL2; uniform int uN,uSkip,uLyap;
+layout(location=0) out vec4 st; layout(location=1) out vec4 inf; layout(location=2) out vec4 tw;
+const float PI=3.14159265, TAU=6.2831853, D0=${LYD0};
+vec4 F(vec4 s){
+  float m1=1.,l1=1.,m2=uM2,l2=uL2,M=m1+m2;
+  float d=s.x-s.y,sd=sin(d),cd=cos(d),den=2.*m1+m2-m2*cos(2.*d);
+  float a1=(-(2.*m1+m2)*sin(s.x)-m2*sin(s.x-2.*s.y)-2.*sd*m2*(s.w*s.w*l2+s.z*s.z*l1*cd))/(l1*den);
+  float a2=(2.*sd*(s.z*s.z*l1*M+M*cos(s.x)+s.w*s.w*l2*m2*cd))/(l2*den);
+  return vec4(s.z,s.w,a1,a2);
+}
+vec4 rk4(vec4 s,float h){vec4 k1=F(s),k2=F(s+.5*h*k1),k3=F(s+.5*h*k2),k4=F(s+h*k3);return s+h/6.*(k1+2.*k2+2.*k3+k4);}
+void main(){
+  ivec2 ij=ivec2(gl_FragCoord.xy);
+  vec4 s=texelFetch(uSt,ij,0), f=texelFetch(uInf,ij,0), w=texelFetch(uTw,ij,0);
+  float t=uT,h=uDt;
+  // In flip-time mode a pixel's color is final once it has flipped (or can never flip): stop integrating it.
+  if(uSkip==1&&f.x!=-1.){st=s;inf=f;tw=w;return;}
+  for(int i=0;i<uN;i++){
+    s=rk4(s,h); t+=h;
+    if(f.x==-1.&&(abs(s.x)>PI||abs(s.y)>PI)){f.x=t;if(uSkip==1)break;}
+    if(uLyap==1){
+      w=rk4(w,h);
+      vec4 g=w-s; float d=length(g);
+      if(d>1e-12){f.y+=log(d/D0); w=s+g*(D0/d);} else w=s+D0*vec4(.5);
+      // keep angles small so float32 keeps the twin's 1e-3 offset accurate (shift both by the same 2π)
+      vec2 k=TAU*floor((s.xy+PI)/TAU); s.xy-=k; w.xy-=k;
+    }
+  }
+  st=s; inf=f; tw=w;
+}`;
+/* Memory: snapshots of earlier views. Flip snapshots hold (flip time, horizon):
+   flip time >= 0 flipped then · -2 can never flip · -1 no flip up to horizon · -3 nothing known.
+   Chaos snapshots hold (λ, how long it was measured); -3 = nothing known. */
+const FS_COMMON=`
+uniform sampler2D uC0,uC1,uC2,uC3,uC4,uC5; uniform vec3 uCV[6]; uniform int uNC;
+uniform vec3 uSV; uniform float uSimRes,uT;
+vec2 fc(int i,vec2 q){
+  if(i==0) return texelFetch(uC0,ivec2(q*vec2(textureSize(uC0,0))),0).xy;
+  if(i==1) return texelFetch(uC1,ivec2(q*vec2(textureSize(uC1,0))),0).xy;
+  if(i==2) return texelFetch(uC2,ivec2(q*vec2(textureSize(uC2,0))),0).xy;
+  if(i==3) return texelFetch(uC3,ivec2(q*vec2(textureSize(uC3,0))),0).xy;
+  if(i==4) return texelFetch(uC4,ivec2(q*vec2(textureSize(uC4,0))),0).xy;
+  return texelFetch(uC5,ivec2(q*vec2(textureSize(uC5,0))),0).xy;
+}
+// Flip memory: finest snapshot that knows a definite answer wins; otherwise the best "no flip yet" record.
+vec2 lookup(vec2 th){
+  vec2 r=vec2(-3.,0.);
+  for(int i=0;i<6;i++){
+    if(i>=uNC) break;
+    vec3 v=uCV[i]; vec2 q=(th-v.xy)/v.z+.5;
+    if(q.x<0.||q.y<0.||q.x>=1.||q.y>=1.) continue;
+    vec2 d=fc(i,q);
+    if(d.x>=0.||(d.x<-1.5&&d.x>-2.5)) return d;
+    if(d.x>-1.5&&d.x<-.5&&r.x<-2.5) r=d;
+  }
+  return r;
+}
+// Chaos memory: finest snapshot with a measurement wins.
+vec2 lookupL(vec2 th){
+  for(int i=0;i<6;i++){
+    if(i>=uNC) break;
+    vec3 v=uCV[i]; vec2 q=(th-v.xy)/v.z+.5;
+    if(q.x<0.||q.y<0.||q.x>=1.||q.y>=1.) continue;
+    vec2 d=fc(i,q);
+    if(d.y>0.) return d;
+  }
+  return vec2(-3.,0.);
+}
+bool inSim(vec2 th,out ivec2 ij){
+  vec2 q=(th-uSV.xy)/uSV.z+.5; ij=ivec2(floor(q*uSimRes));
+  return q.x>=0.&&q.y>=0.&&q.x<1.&&q.y<1.;
+}`;
+const FS_DRAW=`#version 300 es
+precision highp float;
+uniform sampler2D uSt,uInf; uniform int uMode; uniform float uTmax,uOutRes; uniform vec3 uDV;
+uniform vec3 uPal[5]; uniform vec3 uForbid,uWait,uUnknown;
+${FS_COMMON}
+out vec4 o;
+vec3 palX(float x){x=clamp(x,0.,1.)*4.;int i=int(min(floor(x),3.));return mix(uPal[i],uPal[i+1],x-float(i));}
+vec3 pal(float f){return palX(log(max(f,1.))/log(uTmax));}
+vec3 lyc(float l){return palX(1.-pow(clamp(l/${LYMAX},0.,1.),.8));}   // bright = chaotic
+void main(){
+  vec2 th=uDV.xy+(gl_FragCoord.xy/uOutRes-.5)*uDV.z;
+  ivec2 ij; bool ins=inSim(th,ij);
+  vec3 c;
+  if(uMode==1){
+    if(ins){vec4 s=texelFetch(uSt,ij,0);c=(.55+.45*cos(s.x+vec3(0.,2.094,4.189)))*(.62+.38*cos(s.y));}
+    else c=uUnknown;
+  } else if(uMode==2){
+    vec2 d=lookupL(th);
+    if(ins&&!(d.y>uT)) c=uT>.5?lyc(texelFetch(uInf,ij,0).y/uT):uWait;   // memory stands in until this run has measured longer
+    else c=d.y>0.?lyc(d.x):uUnknown;
+  } else {
+    float f=ins?texelFetch(uInf,ij,0).x:-3.;
+    if(f>=0.) c=pal(f);
+    else if(f<-1.5&&f>-2.5) c=uForbid;
+    else{
+      vec2 d=lookup(th);
+      if(d.x>uTmax) d=vec2(-1.,uTmax);
+      if(ins) c=(d.x>=0.&&d.x>uT)?pal(d.x):uWait;      // memory may only fill in what this run hasn't settled
+      else c=d.x>=0.?pal(d.x):(d.x<-1.5&&d.x>-2.5)?uForbid:(d.x>-1.5?uWait:uUnknown);
+    }
+  }
+  o=vec4(c,1.);
+}`;
+const FS_RESOLVE=`#version 300 es
+precision highp float;
+uniform sampler2D uInf;
+${FS_COMMON}
+out vec4 o;
+void main(){
+  vec2 th=uSV.xy+(gl_FragCoord.xy/uSimRes-.5)*uSV.z;
+  float f=texelFetch(uInf,ivec2(gl_FragCoord.xy),0).x;
+  if(f>=0.||f<-1.5){o=vec4(f,0.,0.,0.);return;}
+  vec2 d=lookup(th);
+  if(d.x>=0.&&d.x>uT) o=vec4(d,0.,0.);
+  else if(d.x>-1.5&&d.x<-.5) o=vec4(-1.,max(uT,d.y),0.,0.);
+  else o=uT>0.?vec4(-1.,uT,0.,0.):vec4(-3.,0.,0.,0.);
+}`;
+const FS_RESOLVE_L=`#version 300 es
+precision highp float;
+uniform sampler2D uInf;
+${FS_COMMON}
+out vec4 o;
+void main(){
+  vec2 th=uSV.xy+(gl_FragCoord.xy/uSimRes-.5)*uSV.z;
+  vec2 d=lookupL(th);
+  if(d.y>uT) o=vec4(d,0.,0.);
+  else o=uT>0.?vec4(texelFetch(uInf,ivec2(gl_FragCoord.xy),0).y/uT,uT,0.,0.):vec4(-3.,0.,0.,0.);
+}`;
+
+function makeGPU(canvas){
+  const gl=canvas.getContext('webgl2',{antialias:false,depth:false,stencil:false,alpha:false,powerPreference:'high-performance',preserveDrawingBuffer:false});
+  if(!gl||!gl.getExtension('EXT_color_buffer_float')) return null;
+  function prog(fs){
+    const p=gl.createProgram();
+    for(const [type,src] of [[gl.VERTEX_SHADER,VS],[gl.FRAGMENT_SHADER,fs]]){
+      const sh=gl.createShader(type);gl.shaderSource(sh,src);gl.compileShader(sh);
+      if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS)){console.error(gl.getShaderInfoLog(sh));return null;}
+      gl.attachShader(p,sh);
+    }
+    gl.linkProgram(p);
+    if(!gl.getProgramParameter(p,gl.LINK_STATUS)){console.error(gl.getProgramInfoLog(p));return null;}
+    const U={};p.u=n=>U[n]??(U[n]=gl.getUniformLocation(p,n));
+    return p;
+  }
+  const PI_=prog(FS_INIT),PS=prog(FS_STEP),PD=prog(FS_DRAW),PR=prog(FS_RESOLVE),PRL=prog(FS_RESOLVE_L);
+  if(!PI_||!PS||!PD||!PR||!PRL) return null;
+  const vao=gl.createVertexArray();gl.bindVertexArray(vao);
+  const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
+  const dummy=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,dummy);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RG32F,1,1,0,gl.RG,gl.FLOAT,new Float32Array([-3,0]));
+  for(const k of [gl.TEXTURE_MIN_FILTER,gl.TEXTURE_MAG_FILTER]) gl.texParameteri(gl.TEXTURE_2D,k,gl.NEAREST);
+  // T[3*side + 0|1|2] = state, info, twin for the two ping-pong sides.
+  let res=0,T=[],FB=[],cur=0,SV={cx:0,cy:0,span:TAU},caches=[],seq=0,lyapRun=false,key='';
+  const MAXC={flip:5,lyap:4};
+  function tex(r,fmt){const t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);
+    if(fmt==='rg') gl.texImage2D(gl.TEXTURE_2D,0,gl.RG32F,r,r,0,gl.RG,gl.FLOAT,null);
+    else gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,r,r,0,gl.RGBA,gl.FLOAT,null);
+    for(const k of [gl.TEXTURE_MIN_FILTER,gl.TEXTURE_MAG_FILTER]) gl.texParameteri(gl.TEXTURE_2D,k,gl.NEAREST);
+    for(const k of [gl.TEXTURE_WRAP_S,gl.TEXTURE_WRAP_T]) gl.texParameteri(gl.TEXTURE_2D,k,gl.CLAMP_TO_EDGE);
+    return t;}
+  function alloc(r){
+    T.forEach(t=>gl.deleteTexture(t));FB.forEach(f=>gl.deleteFramebuffer(f));
+    res=r;T=[tex(r),tex(r,'rg'),tex(r),tex(r),tex(r,'rg'),tex(r)];FB=[];
+    for(let i=0;i<2;i++){
+      const fb=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,fb);
+      for(let k=0;k<3;k++) gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0+k,gl.TEXTURE_2D,T[3*i+k],0);
+      gl.drawBuffers([gl.COLOR_ATTACHMENT0,gl.COLOR_ATTACHMENT1,gl.COLOR_ATTACHMENT2]);
+      if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE){gl.bindFramebuffer(gl.FRAMEBUFFER,null);return false;}
+      FB.push(fb);
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER,null);canvas.width=canvas.height=r;cur=0;return true;
+  }
+  function bindMem(p,kind){
+    const order=caches.filter(c=>c.kind===kind&&c.key===key).sort((a,b)=>a.span-b.span||b.seq-a.seq);const cv=new Float32Array(18);
+    for(let i=0;i<6;i++){gl.activeTexture(gl.TEXTURE3+i);
+      gl.bindTexture(gl.TEXTURE_2D,order[i]?order[i].tex:dummy);gl.uniform1i(p.u('uC'+i),3+i);
+      if(order[i]){cv[3*i]=order[i].cx;cv[3*i+1]=order[i].cy;cv[3*i+2]=order[i].span;}}
+    gl.uniform3fv(p.u('uCV'),cv);gl.uniform1i(p.u('uNC'),Math.min(6,order.length));
+    gl.uniform3f(p.u('uSV'),SV.cx,SV.cy,SV.span);gl.uniform1f(p.u('uSimRes'),res);gl.uniform1f(p.u('uT'),sim.t);
+  }
+  function bindSrc(p){
+    for(const [k,n] of [[0,'uSt'],[1,'uInf'],[2,'uTw']]){gl.activeTexture(gl.TEXTURE0+k);gl.bindTexture(gl.TEXTURE_2D,T[3*cur+k]);gl.uniform1i(p.u(n),k);}
+  }
+  function snap(kind,prog){
+    const t=tex(res,'rg');
+    const fb=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,fb);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,t,0);
+    if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE){gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.deleteFramebuffer(fb);gl.deleteTexture(t);return;}
+    gl.viewport(0,0,res,res);gl.useProgram(prog);
+    gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,T[3*cur+1]);gl.uniform1i(prog.u('uInf'),1);
+    bindMem(prog,kind);gl.drawArrays(gl.TRIANGLES,0,3);
+    gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.deleteFramebuffer(fb);
+    // The new snapshot already contains everything an older one of this exact view knew, so drop that one now.
+    for(let i=caches.length-1;i>=0;i--){const c=caches[i];
+      if(c.kind===kind&&c.key===key&&c.cx===SV.cx&&c.cy===SV.cy&&c.span===SV.span){gl.deleteTexture(c.tex);caches.splice(i,1);}}
+    caches.push({kind,key,tex:t,cx:SV.cx,cy:SV.cy,span:SV.span,res,seq:++seq});
+    // Remember at most 3 slices; forget the one used longest ago.
+    const keys=[...new Set(caches.map(c=>c.key))];
+    if(keys.length>3){const last=k=>Math.max(...caches.filter(c=>c.key===k).map(c=>c.seq));
+      const old=keys.reduce((a,b)=>last(b)<last(a)?b:a);caches.filter(c=>c.key===old).forEach(c=>gl.deleteTexture(c.tex));caches=caches.filter(c=>c.key!==old);}
+    // Within a slice, keep the widest view (the overview) and the most recent others.
+    let mine;while((mine=caches.filter(c=>c.kind===kind&&c.key===key)).length>MAXC[kind]){
+      const widest=mine.reduce((a,b)=>b.span>a.span?b:a);
+      const victim=mine.filter(c=>c!==widest).reduce((a,b)=>b.seq<a.seq?b:a);
+      gl.deleteTexture(victim.tex);caches.splice(caches.indexOf(victim),1);}
+  }
+  return {
+    gl,
+    init(r){
+      if(r!==res&&!alloc(r)) return false;
+      SV={cx:S.cx,cy:S.cy,span:S.span};lyapRun=S.mode==='lyap';
+      gl.bindFramebuffer(gl.FRAMEBUFFER,FB[cur]);gl.viewport(0,0,res,res);gl.useProgram(PI_);
+      gl.uniform2f(PI_.u('uC'),S.cx,S.cy);gl.uniform1f(PI_.u('uSpan'),S.span);gl.uniform1f(PI_.u('uRes'),res);
+      gl.uniform1f(PI_.u('uM2'),m2());gl.uniform1f(PI_.u('uL2'),l2());
+      gl.uniform1i(PI_.u('uSpace'),S.space==='mom'?1:0);gl.uniform2f(PI_.u('uFix'),fixNow()[0],fixNow()[1]);key=sliceKey();
+      gl.drawArrays(gl.TRIANGLES,0,3);return true;
+    },
+    step(n,t){
+      gl.bindFramebuffer(gl.FRAMEBUFFER,FB[1-cur]);gl.viewport(0,0,res,res);gl.useProgram(PS);bindSrc(PS);
+      gl.uniform1f(PS.u('uT'),t);gl.uniform1f(PS.u('uDt'),S.dt);gl.uniform1i(PS.u('uN'),n);
+      gl.uniform1i(PS.u('uSkip'),S.mode==='flip'?1:0);gl.uniform1i(PS.u('uLyap'),lyapRun?1:0);
+      gl.uniform1f(PS.u('uM2'),m2());gl.uniform1f(PS.u('uL2'),l2());
+      gl.drawArrays(gl.TRIANGLES,0,3);cur=1-cur;
+    },
+    draw(dv){
+      dv=dv||SV;const mode=S.mode==='live'?1:S.mode==='lyap'?2:0;
+      gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,res,res);gl.useProgram(PD);bindSrc(PD);bindMem(PD,mode===2?'lyap':'flip');
+      gl.uniform3f(PD.u('uDV'),dv.cx,dv.cy,dv.span);gl.uniform1f(PD.u('uOutRes'),res);
+      gl.uniform1i(PD.u('uMode'),mode);gl.uniform1f(PD.u('uTmax'),S.tmax);
+      gl.uniform3fv(PD.u('uPal'),new Float32Array(PALS[S.pal].flatMap(hex)));
+      gl.uniform3fv(PD.u('uForbid'),hex(FORBID));gl.uniform3fv(PD.u('uWait'),hex(WAIT));gl.uniform3fv(PD.u('uUnknown'),hex(UNKNOWN));
+      gl.drawArrays(gl.TRIANGLES,0,3);
+    },
+    // Save what the current view knows (this run plus older memory) before moving to a new view.
+    snapshot(){
+      if(sim.t<=0||!res) return;
+      snap('flip',PR);
+      if(lyapRun) snap('lyap',PRL);
+    },
+    clearMemory(){caches.forEach(c=>gl.deleteTexture(c.tex));caches=[];},
+    get lyapRun(){return lyapRun;},
+    get memoryCount(){const k=sliceKey();return caches.filter(c=>c.key===k&&c.kind===(S.mode==='lyap'?'lyap':'flip')).length;},
+    get simView(){return SV;}
+  };
+}
+
+/* ---------- CPU fallback (web worker) ---------- */
+let cpu=null;
+function makeCPU(canvas){
+  const ctx=canvas.getContext('2d');
+  const src=`${makeStepper.toString()}\n${flipTime.toString()}\n${toState.toString()}\n${cannotFlip.toString()}\n
+  onmessage=e=>{const p=e.data;const step=makeStepper(p.m2,p.l2);const r=p.res;
+    const order=[];const seen=new Uint8Array(r);
+    for(let st=16;st>=1;st>>=1) for(let y=0;y<r;y+=st) if(!seen[y]){seen[y]=1;order.push([y,st]);}
+    for(const [y,st] of order){const row=new Float32Array(r);const b=p.cy-((y+.5)/r-.5)*p.span;
+      for(let x=0;x<r;x++){const a=p.cx+((x+.5)/r-.5)*p.span;const s0=p.mom?toState(p.f1,p.f2,a,b,p.m2,p.l2):toState(a,b,p.f1,p.f2,p.m2,p.l2);row[x]=flipTime(s0,p.m2,p.l2,p.dt,p.tmax,step);}
+      postMessage({y,st,row},[row.buffer]);}
+    postMessage({done:true});};`;
+  const url=URL.createObjectURL(new Blob([src],{type:'text/javascript'}));
+  let w=null,res=0,data=null,filled=null,rows=0,img=null;
+  function paintRow(y){const d=img.data;for(let x=0;x<res;x++){const c=colorOf(data[y*res+x]);const k=4*(y*res+x);d[k]=c[0];d[k+1]=c[1];d[k+2]=c[2];d[k+3]=255;}}
+  return {
+    init(r){
+      if(w) w.terminate();
+      res=r;canvas.width=canvas.height=r;data=new Float32Array(r*r).fill(-1);filled=new Uint8Array(r);rows=0;
+      img=ctx.createImageData(r,r);for(let y=0;y<r;y++) paintRow(y);ctx.putImageData(img,0,0);
+      w=new Worker(url);
+      w.onmessage=e=>{const m=e.data;
+        if(m.done){sim.done=true;sim.t=S.tmax;sim.dirty=true;return;}
+        rows++;filled[m.y]=2;
+        for(let yy=m.y;yy<Math.min(res,m.y+m.st);yy++){ if(yy!==m.y&&filled[yy]===2) continue; data.set(m.row,yy*res); paintRow(yy); if(yy!==m.y) filled[yy]=1; }
+        sim.t=S.tmax*rows/res;sim.dirty=true;};
+      w.postMessage({res:r,cx:S.cx,cy:S.cy,span:S.span,m2:m2(),l2:l2(),dt:S.dt,tmax:S.tmax,mom:S.space==='mom',f1:fixNow()[0],f2:fixNow()[1]});
+      return true;
+    },
+    draw(){ctx.putImageData(img,0,0);},
+    recolor(){for(let y=0;y<res;y++) paintRow(y);}
+  };
+}
+const palRGB=()=>PALS[S.pal].map(h=>hex(h).map(v=>v*255));
+let palCache=null;
+function colorOf(f){
+  if(f<-1.5) return hex(FORBID).map(v=>v*255);
+  if(f<0) return hex(WAIT).map(v=>v*255);
+  const P=palCache||(palCache=palRGB());
+  let x=Math.min(1,Math.max(0,Math.log(Math.max(f,1))/Math.log(S.tmax)))*4;const i=Math.min(3,Math.floor(x)),u=x-i;
+  return [0,1,2].map(k=>P[i][k]+(P[i+1][k]-P[i][k])*u);
+}
+
+/* ---------- engine setup ---------- */
+let simCanvas=$('sim');
+let gpu=makeGPU(simCanvas);
+if(!gpu){
+  const fresh=simCanvas.cloneNode();simCanvas.replaceWith(fresh);simCanvas=fresh;
+  cpu=makeCPU(simCanvas);S.mode='flip';$('fallbackNote').hidden=false;
+  document.querySelector('#segMode [data-v="live"]').disabled=true;document.querySelector('#segMode [data-v="lyap"]').disabled=true;
+  for(const o of $('selRes').options) if(+o.value>400) o.disabled=true;
+  if(S.res>300) S.res=300;
+}
+simCanvas.addEventListener('webglcontextlost',e=>{e.preventDefault();fences=[];gpu=null;});
+simCanvas.addEventListener('webglcontextrestored',()=>{gpu=makeGPU(simCanvas);restart();});
+
+const remember=()=>{if(gpu) gpu.snapshot();}, forget=()=>{if(gpu) gpu.clearMemory();};
+function restart(){
+  DV=null;
+  sim.t=0;sim.done=false;sim.dirty=true;sim.skipped=false;
+  if(gpu){ clearFences(); if(!gpu.init(S.res)){gpu=null;} }
+  if(!gpu&&cpu) cpu.init(Math.min(S.res,400));
+  drawOverlay();updateViewInfo();updateLegend();
+}
+
+/* ---------- main loop ---------- */
+/* GPU pacing: never queue new work until the GPU has finished the previous batch
+   (checked with a fence, without blocking). The work per frame grows while batches
+   finish within a frame and shrinks when they don't, so the page stays responsive at
+   any resolution or step size. */
+let fences=[],lastTs=0,budget=8,ri=0;const ring=new Array(60).fill(16.7);const MAXPASS=24;
+const gesturing=()=>G.pts.size>0||G.wheelTimer!==0||G.anim!==0;
+function clearFences(){if(gpu) fences.forEach(f=>gpu.gl.deleteSync(f));fences=[];}
+function frame(ts){
+  const fdt=lastTs?Math.min(ts-lastTs,100):16;lastTs=ts;
+  if(gpu&&sim.running&&!sim.done&&!gesturing()){
+    const gl=gpu.gl;
+    ring[ri++%60]=fdt;const base=Math.max(6,[...ring].sort((x,y)=>x-y)[6]);  // display cadence (30/60/120 Hz)
+    // Pacing. Old behaviour: work was added faster than the GPU could finish it, so a backlog built up and
+    // every tap or pinch waited behind it. Now (1) a fence on each batch caps the queue at 3 frames of work,
+    // (2) the work per frame grows gently while frames keep the display's pace and is cut fast when they don't,
+    // (3) work is split into small draws so the browser can paint between them.
+    while(fences.length&&gl.clientWaitSync(fences[0],0,0)!==gl.TIMEOUT_EXPIRED) gl.deleteSync(fences.shift());
+    if(fdt<base*1.3) budget=Math.min(budget*1.1+0.5,6000); else if(fdt>base*1.8) budget=Math.max(1,budget*(fdt>base*3?0.5:0.75));
+    if(fences.length>=3) budget=Math.max(1,budget*0.9);
+    else{
+      let left=Math.min(Math.floor(budget),Math.ceil((S.tmax-sim.t)/S.dt-1e-6));
+      const perDraw=Math.max(1,Math.min(MAXPASS,Math.floor(2.5e6/(S.res*S.res))),Math.ceil(left/48));  // small draws let the browser paint in between; at most ~48 per frame
+      if(left>0&&S.mode==='flip') sim.skipped=true;
+      while(left>0){const n=Math.min(perDraw,left);gpu.step(n,sim.t);sim.t+=n*S.dt;left-=n;}
+      if(sim.t>=S.tmax-1e-6){sim.t=S.tmax;sim.done=true;}
+      gpu.draw(DV);sim.dirty=false;updateStatus();
+      fences.push(gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE,0));gl.flush();
+    }
+  }
+  if(sim.dirty){ if(gpu) gpu.draw(DV); else if(cpu) cpu.draw(); sim.dirty=false; updateStatus(); }
+  pendTick(fdt);
+  requestAnimationFrame(frame);
+}
+let lastStatus='';
+function updateStatus(){
+  const st=sim.done?'done':sim.running?'running':'paused';
+  const txt=sim.done?`Done · t = ${S.tmax}`:`${sim.running?'':'Paused · '}t = ${sim.t.toFixed(1)} / ${S.tmax}`;
+  if(txt!==lastStatus){$('status').textContent=txt;lastStatus=txt;}
+  $('runbtn').dataset.state=st;
+  $('bar').style.transform=`scaleX(${Math.min(1,sim.t/S.tmax).toFixed(4)})`;
+}
+$('runbtn').onclick=()=>{
+  if(sim.done){remember();restart();return;}
+  if(cpu){return;}
+  sim.running=!sim.running;sim.dirty=true;
+};
+
+/* ---------- view, gestures ---------- */
+const mapwrap=$('mapwrap'),stage=$('stage');
+function setView(cx,cy,span){
+  const R=RANGE();span=Math.min(2*R,Math.max(MINSPAN_(),span));const h=span/2;
+  S.cx=Math.min(R-h,Math.max(-R+h,cx));S.cy=Math.min(R-h,Math.max(-R+h,cy));S.span=span;
+}
+const G={pts:new Map(),T:{x:0,y:0},s:1,base:null,moved:false,t0:0,wheelTimer:0,anim:0,target:null};
+let DV=null;   // view being shown while a gesture or zoom animation is in progress (null = the simulated view)
+function gestureView(){
+  const W=mapwrap.clientWidth||1,pc={x:(W/2-G.T.x)/G.s,y:(W/2-G.T.y)/G.s};
+  const R=RANGE(),span=Math.min(2*R,Math.max(MINSPAN_(),S.span/G.s)),h=span/2;
+  return {cx:Math.min(R-h,Math.max(-R+h,S.cx+(pc.x/W-.5)*S.span)),cy:Math.min(R-h,Math.max(-R+h,S.cy-(pc.y/W-.5)*S.span)),span};
+}
+// With the GPU, gestures redraw the map from memory at the new view (no stretched or empty edges).
+function applyT(){
+  if(gpu){DV=gestureView();sim.dirty=true;drawOverlay();}
+  else stage.style.transform=`translate(${G.T.x}px,${G.T.y}px) scale(${G.s})`;
+}
+function clampView(cx,cy,span){const R=RANGE(),h=Math.min(2*R,Math.max(MINSPAN_(),span))/2;
+  return {cx:Math.min(R-h,Math.max(-R+h,cx)),cy:Math.min(R-h,Math.max(-R+h,cy)),span:2*h};}
+function sameView(a,b){const e=1e-9*b.span;return Math.abs(a.cx-b.cx)<e&&Math.abs(a.cy-b.cy)<e&&Math.abs(a.span-b.span)<e;}
+function goTo(cx,cy,span){
+  G.target=null;const v=clampView(cx,cy,span);
+  // Landing on the view that is already running (zooming out at full size, a drag stopped by the edge):
+  // keep the run going instead of starting over.
+  if(sameView(v,S)){DV=null;sim.dirty=true;drawOverlay();return;}
+  remember();S.cx=v.cx;S.cy=v.cy;S.span=v.span;restart();
+}
+// Stop any zoom animation or unfinished gesture (used before switching views or slices).
+function cancelMotion(){
+  cancelAnimationFrame(G.anim);G.anim=0;clearTimeout(G.wheelTimer);G.wheelTimer=0;
+  G.pts.clear();G.T={x:0,y:0};G.s=1;G.moved=false;G.target=null;DV=null;
+  if(!gpu) stage.style.transform='';
+}
+function animateTo(cx,cy,span){
+  if(!gpu||matchMedia('(prefers-reduced-motion: reduce)').matches){goTo(cx,cy,span);return;}
+  ({cx,cy,span}=clampView(cx,cy,span));
+  // Start from whatever is on screen (a zoom still animating counts), so quick repeated taps chain smoothly.
+  const a=DV?{...DV}:{cx:S.cx,cy:S.cy,span:S.span},t0=performance.now(),dur=260;cancelAnimationFrame(G.anim);
+  G.target={cx,cy,span};
+  if(sameView(G.target,a)){G.anim=0;goTo(cx,cy,span);return;}
+  const tick=now=>{const u=Math.min(1,(now-t0)/dur),e=u<.5?2*u*u:1-2*(1-u)*(1-u);
+    const sp=Math.exp(Math.log(a.span)+(Math.log(span)-Math.log(a.span))*e);
+    // move the center so the zoom feels anchored, interpolating in log-span
+    const k=(a.span===span)?e:(a.span-sp)/(a.span-span);
+    DV={cx:a.cx+(cx-a.cx)*k,cy:a.cy+(cy-a.cy)*k,span:sp};sim.dirty=true;drawOverlay();
+    if(u<1) G.anim=requestAnimationFrame(tick); else {G.anim=0;goTo(cx,cy,span);}};
+  G.anim=requestAnimationFrame(tick);
+}
+const local=e=>{const r=mapwrap.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};};
+function rebase(){G.base={T:{...G.T},s:G.s,pts:[...G.pts.values()].map(p=>({...p}))};}
+function clampS(s){return Math.min(S.span/MINSPAN_(),Math.max(S.span/(2*RANGE())*0.999,s));}
+// A new gesture first lands any zoom that is still animating, so the two never fight.
+function settleAnim(){if(!G.anim) return;cancelAnimationFrame(G.anim);G.anim=0;const t=G.target;if(t) goTo(t.cx,t.cy,t.span);}
+mapwrap.addEventListener('pointerdown',e=>{
+  if(e.target.closest('.mapbtns')) return;
+  settleAnim();
+  mapwrap.setPointerCapture(e.pointerId);G.pts.set(e.pointerId,local(e));
+  if(G.pts.size===1){G.moved=false;G.t0=performance.now();}
+  rebase();
+});
+mapwrap.addEventListener('pointermove',e=>{
+  if(!G.pts.has(e.pointerId)) return;
+  G.pts.set(e.pointerId,local(e));const b=G.base,P=[...G.pts.values()];
+  if(P.length===1){
+    const dx=P[0].x-b.pts[0].x,dy=P[0].y-b.pts[0].y;
+    if(!G.moved&&Math.hypot(dx,dy)<7) return;
+    G.moved=true;G.T={x:b.T.x+dx,y:b.T.y+dy};
+  }else if(b.pts.length>=2){
+    const d0=Math.hypot(b.pts[0].x-b.pts[1].x,b.pts[0].y-b.pts[1].y)||1;
+    const d1=Math.hypot(P[0].x-P[1].x,P[0].y-P[1].y);
+    const m0={x:(b.pts[0].x+b.pts[1].x)/2,y:(b.pts[0].y+b.pts[1].y)/2},m1={x:(P[0].x+P[1].x)/2,y:(P[0].y+P[1].y)/2};
+    G.s=clampS(b.s*d1/d0);const c={x:(m0.x-b.T.x)/b.s,y:(m0.y-b.T.y)/b.s};
+    G.T={x:m1.x-c.x*G.s,y:m1.y-c.y*G.s};G.moved=true;
+  }
+  applyT();
+});
+function endPtr(e){
+  if(!G.pts.has(e.pointerId)) return;
+  const p=G.pts.get(e.pointerId);G.pts.delete(e.pointerId);
+  if(G.pts.size>0){rebase();return;}
+  if(!G.moved&&e.type==='pointerup'&&performance.now()-G.t0<600) selectAt(p);
+  else if(G.moved) commitT();
+}
+mapwrap.addEventListener('pointerup',endPtr);mapwrap.addEventListener('pointercancel',endPtr);
+mapwrap.addEventListener('wheel',e=>{
+  e.preventDefault();settleAnim();const m=local(e);const f=Math.exp(-e.deltaY*0.0018);
+  const c={x:(m.x-G.T.x)/G.s,y:(m.y-G.T.y)/G.s};G.s=clampS(G.s*f);G.T={x:m.x-c.x*G.s,y:m.y-c.y*G.s};applyT();
+  clearTimeout(G.wheelTimer);G.wheelTimer=setTimeout(()=>{G.wheelTimer=0;commitT();},240);
+},{passive:false});
+function commitT(){
+  if(G.s===1&&G.T.x===0&&G.T.y===0) return;
+  const v=gestureView();G.T={x:0,y:0};G.s=1;
+  if(!gpu) stage.style.transform='';
+  goTo(v.cx,v.cy,v.span);
+}
+function selectAt(p){
+  const W=mapwrap.clientWidth;
+  const x=S.cx+(p.x/W-.5)*S.span,y=S.cy-(p.y/W-.5)*S.span,f=fixNow();
+  S.sel=S.space==='mom'?{t1:f[0],t2:f[1],p1:x,p2:y}:{t1:x,t2:y,p1:f[0],p2:f[1]};
+  loadPendulum();drawOverlay();
+  if(window.matchMedia('(max-width: 899px)').matches) showTab('pend');
+}
+const zbase=()=>G.target||S;
+$('zin').onclick=()=>{const b=zbase();animateTo(b.cx,b.cy,b.span/2);};
+$('zout').onclick=()=>{const b=zbase();animateTo(b.cx,b.cy,b.span*2);};
+$('zreset').onclick=()=>animateTo(0,0,2*RANGE());
+
+const fmtP=(v,span)=>{const dig=Math.max(1,Math.min(6,Math.ceil(-Math.log10(span/400))));return (v<0?'−':'')+Math.abs(v).toFixed(dig);};
+const fmtDeg=(r,span)=>{const d=r*180/PI;const dig=Math.max(1,Math.min(5,Math.ceil(-Math.log10(span*180/PI/400))));return (d<0?'−':'')+Math.abs(d).toFixed(dig)+'°';};
+function updateViewInfo(){
+  const h=S.span/2;
+  const mom=S.space==='mom',fm=mom?fmtP:fmtDeg,[n1,n2]=mom?['p₁','p₂']:['θ₁','θ₂'],f=fixNow();
+  const fixTxt=mom?`at θ₁ ${fmtDeg(f[0],1)}, θ₂ ${fmtDeg(f[1],1)}`:(f[0]||f[1]?`at p₁ ${fmtP(f[0],1)}, p₂ ${fmtP(f[1],1)}`:'from rest');
+  $('axisLbl').textContent=`${n1} → · ${n2} ↑`;
+  $('viewinfo').textContent=`${n1} ${fm(S.cx-h,S.span)} … ${fm(S.cx+h,S.span)}   ${n2} ${fm(S.cy-h,S.span)} … ${fm(S.cy+h,S.span)}   ${fixTxt}   zoom ${(2*RANGE()/S.span).toLocaleString(undefined,{maximumFractionDigits:1})}×${gpu&&gpu.memoryCount?`   remembers ${gpu.memoryCount} view${gpu.memoryCount>1?'s':''}`:''}`;
+}
+
+/* ---------- overlay marker ---------- */
+const ov=$('overlay'),ovx=ov.getContext('2d');
+function drawOverlay(){
+  const W=mapwrap.clientWidth,dpr=Math.min(2,devicePixelRatio||1);
+  if(ov.width!==Math.round(W*dpr)){ov.width=ov.height=Math.round(W*dpr);}
+  ovx.setTransform(dpr,0,0,dpr,0,0);ovx.clearRect(0,0,W,W);
+  const sc=selCoords();if(!sc) return;
+  const v=DV||S;const x=((sc[0]-v.cx)/v.span+.5)*W,y=(.5-(sc[1]-v.cy)/v.span)*W;
+  if(x<-10||y<-10||x>W+10||y>W+10) return;
+  for(const [col,lw] of [['rgba(0,0,0,.75)',4],['#ffffff',1.6]]){
+    ovx.strokeStyle=col;ovx.lineWidth=lw;ovx.beginPath();ovx.arc(x,y,9,0,TAU);
+    ovx.moveTo(x-17,y);ovx.lineTo(x-12,y);ovx.moveTo(x+12,y);ovx.lineTo(x+17,y);
+    ovx.moveTo(x,y-17);ovx.lineTo(x,y-12);ovx.moveTo(x,y+12);ovx.lineTo(x,y+17);ovx.stroke();
+  }
+}
+new ResizeObserver(()=>drawOverlay()).observe(mapwrap);
+
+/* ---------- legend ---------- */
+function updateLegend(){
+  const P=PALS[S.pal],ly=S.mode==='lyap';
+  const stops=ly?[...P].reverse():P;
+  $('ramp').style.background=`linear-gradient(90deg,${stops.map((c,i)=>`${c} ${i*25}%`).join(',')})`;
+  $('swForbid').style.background=FORBID;$('swWait').style.background=WAIT;
+  $('keysFlip').hidden=S.mode!=='flip';$('keysLyap').hidden=!ly;$('keysLive').hidden=S.mode!=='live';
+  let tk;
+  if(ly) tk=[0,0.1,0.2,0.3,0.4,0.5,0.6].map(v=>[v,100*Math.pow(v/LYMAX,0.8),v===LYMAX?'0.6+':String(v)]);
+  else{const L=Math.log(S.tmax);tk=[1,3,10,30,100,300,1000].filter(t=>t<=S.tmax).map(t=>[t,100*Math.log(t)/L,String(t)]);}
+  $('ticks').innerHTML=tk.map(([,pct,lab],i)=>{const al=i===0?'left:0;transform:none':pct>96?'right:0;transform:none':`left:${pct}%`;return `<span style="${al}">${lab}</span>`;}).join('');
+  $('ramp').style.opacity=S.mode==='live'?.35:1;$('ticks').style.visibility=S.mode==='live'?'hidden':'visible';
+}
+
+/* ---------- pendulum viewer ---------- */
+const pc=$('pend'),px=pc.getContext('2d');let tok={},pendDirty=true;
+function readTokens(){const cs=getComputedStyle(document.documentElement);for(const k of ['pend-bg','arm','bob1','bob2','twin','muted']) tok[k]=cs.getPropertyValue('--'+k).trim();pendDirty=true;}
+readTokens();
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',readTokens);
+new MutationObserver(readTokens).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+new ResizeObserver(()=>{const r=pc.getBoundingClientRect(),d=Math.min(2,devicePixelRatio||1);pc.width=Math.round(r.width*d);pc.height=Math.round(r.height*d);pendDirty=true;}).observe(pc);
+
+const V={P:null,Q:null,t:0,play:true,twin:true,speed:1,trail:[],ttrail:[],flips:0,k:[0,0],step:null};
+const wrapK=th=>Math.floor((th+PI)/TAU);
+function loadPendulum(){
+  const s0=selState(),q=S.sel;
+  V.step=makeStepper(m2(),l2());V.P=new Float64Array(s0);V.Q=new Float64Array(s0);V.Q[0]+=1e-3;
+  V.t=0;V.trail=[];V.ttrail=[];V.flips=0;V.k=[wrapK(s0[0]),wrapK(s0[1])];
+  $('rStart').textContent=`${(q.t1*180/PI).toFixed(2)}°, ${(q.t2*180/PI).toFixed(2)}°`+(q.p1||q.p2?`\np ${q.p1.toFixed(3)}, ${q.p2.toFixed(3)}`:'');
+  probe(s0);pendDirty=true;
+  setText('rCount','0');setText('rGap','0.001 rad');
+}
+/* The selected point's exact flip time runs in a worker so a tap never stalls the page. */
+const probeW=(()=>{try{return new Worker(URL.createObjectURL(new Blob([`${makeStepper.toString()}\n${flipTime.toString()}\n${ftle.toString()}\n${cannotFlip.toString()}\n
+  onmessage=e=>{const p=e.data;const ft=flipTime(p.s0,p.m2,p.l2,p.dt,p.tmax,makeStepper(p.m2,p.l2));postMessage({id:p.id,ft});
+    postMessage({id:p.id,ly:ftle(p.s0,p.m2,p.l2,p.dt,p.tmax,makeStepper(p.m2,p.l2))});};`],{type:'text/javascript'})));}catch(e){return null;}})();
+let probeId=0;
+function showFlip(ft){setText('rFlip',ft===-2?"never (energy)":ft<0?`none by t = ${S.tmax}`:`t = ${ft.toFixed(2)}`);}
+function showLy(ly){
+  setText('rLy',ly.toFixed(3));
+  // A perfectly regular orbit still shows λ ≈ ln(t)/t after a finite time t, so the cutoff scales with the watch time.
+  const reg=1.2*Math.log(1+S.tmax)/S.tmax;
+  setText('rKind',ly<reg?'orderly':ly<0.25?'weakly chaotic':'chaotic');
+}
+function probe(s0){
+  const id=++probeId,msg={id,s0,m2:m2(),l2:l2(),dt:S.dt,tmax:S.tmax};
+  if(!probeW){const st=makeStepper(msg.m2,msg.l2);showFlip(flipTime(s0,msg.m2,msg.l2,msg.dt,msg.tmax,st));showLy(ftle(s0,msg.m2,msg.l2,msg.dt,Math.min(msg.tmax,100),st));return;}
+  setText('rFlip','computing…');setText('rLy','computing…');setText('rKind','–');probeW.postMessage(msg);
+}
+if(probeW) probeW.onmessage=e=>{if(e.data.id!==probeId) return; if('ft' in e.data) showFlip(e.data.ft); else showLy(e.data.ly);};
+const textCache={};
+function setText(id,v){v=String(v);if(textCache[id]!==v){textCache[id]=v;$(id).textContent=v;}}
+function pendTick(fdt){
+  if(!V.P) return;
+  if(V.play){
+    const adv=Math.min(fdt,50)/1000*Math.sqrt(9.81)*V.speed;const h=0.002;const n=Math.max(1,Math.round(adv/h));
+    for(let i=0;i<n;i++){V.step(V.P,h);if(V.twin) V.step(V.Q,h);
+      const k0=wrapK(V.P[0]),k1=wrapK(V.P[1]);if(k0!==V.k[0]||k1!==V.k[1]){V.flips+=Math.abs(k0-V.k[0])+Math.abs(k1-V.k[1]);V.k=[k0,k1];}}
+    V.t+=n*h;pendDirty=true;
+  }
+  if(pendDirty){drawPend();pendDirty=false;}
+}
+function arms(s,sc,cx,cy){const L2=l2();const x1=cx+Math.sin(s[0])*sc,y1=cy+Math.cos(s[0])*sc;return [x1,y1,x1+Math.sin(s[1])*sc*L2,y1+Math.cos(s[1])*sc*L2];}
+function drawPend(){
+  const w=pc.width,h=pc.height,d=Math.min(2,devicePixelRatio||1);if(!w) return;
+  px.setTransform(1,0,0,1,0,0);px.fillStyle=tok['pend-bg'];px.fillRect(0,0,w,h);
+  const cx=w/2,cy=h/2,sc=(Math.min(w,h)/2-14*d)/(1+l2());
+  const A=arms(V.P,sc,cx,cy);
+  if(V.play||!V.trail.length){V.trail.push([A[2],A[3]]);if(V.trail.length>260) V.trail.shift();}
+  // circle of reach
+  px.strokeStyle=tok.muted;px.globalAlpha=.25;px.lineWidth=1*d;px.setLineDash([3*d,5*d]);
+  px.beginPath();px.arc(cx,cy,sc*(1+l2()),0,TAU);px.stroke();px.setLineDash([]);px.globalAlpha=1;
+  // trail
+  const tr=V.trail;px.lineWidth=1.6*d;px.strokeStyle=tok.bob2;px.lineCap='round';
+  const GR=10,seg=Math.ceil(tr.length/GR);
+  for(let g=0;g*seg<tr.length-1;g++){const i0=g*seg,i1=Math.min(tr.length-1,i0+seg);
+    px.globalAlpha=((g+1)/GR)*.7;px.beginPath();px.moveTo(tr[i0][0],tr[i0][1]);for(let i=i0+1;i<=i1;i++) px.lineTo(tr[i][0],tr[i][1]);px.stroke();}
+  px.globalAlpha=1;
+  const bob=(x,y,r,c)=>{px.fillStyle=c;px.beginPath();px.arc(x,y,r,0,TAU);px.fill();};
+  const r1=7*d*Math.cbrt(1),r2=7*d*Math.cbrt(m2());
+  if(V.twin){const B=arms(V.Q,sc,cx,cy);px.globalAlpha=.75;px.strokeStyle=tok.twin;px.lineWidth=2*d;
+    px.beginPath();px.moveTo(cx,cy);px.lineTo(B[0],B[1]);px.lineTo(B[2],B[3]);px.stroke();bob(B[0],B[1],r1*.8,tok.twin);bob(B[2],B[3],r2*.8,tok.twin);px.globalAlpha=1;}
+  px.strokeStyle=tok.arm;px.lineWidth=3*d;px.lineJoin='round';
+  px.beginPath();px.moveTo(cx,cy);px.lineTo(A[0],A[1]);px.lineTo(A[2],A[3]);px.stroke();
+  bob(cx,cy,3*d,tok.arm);bob(A[0],A[1],r1,tok.bob1);bob(A[2],A[3],r2,tok.bob2);
+  setText('pclock',`t = ${V.t.toFixed(1)} √(l/g)`);
+  setText('rCount',V.flips);
+  if(V.twin){const g=Math.hypot(Math.atan2(Math.sin(V.P[0]-V.Q[0]),Math.cos(V.P[0]-V.Q[0])),Math.atan2(Math.sin(V.P[1]-V.Q[1]),Math.cos(V.P[1]-V.Q[1])));
+    setText('rGap',g<0.01?g.toExponential(1)+' rad':g.toFixed(2)+' rad');} else setText('rGap','off');
+}
+$('pplay').onclick=()=>{V.play=!V.play;$('pplay').querySelector('span').textContent=V.play?'Pause':'Play';
+  $('pplayIcon').innerHTML=V.play?'<path d="M7 5h4v14H7zM13 5h4v14h-4z"/>':'<path d="M7 4l13 8-13 8z"/>';};
+$('prestart').onclick=()=>loadPendulum();
+$('ptwin').onclick=()=>{V.twin=!V.twin;$('ptwin').setAttribute('aria-pressed',V.twin);$('ptwin').textContent=V.twin?'Twin on':'Twin off';
+  if(V.twin){V.Q=new Float64Array(V.P);V.Q[0]+=1e-3;}pendDirty=true;};
+$('pspeed').onchange=e=>V.speed=+e.target.value;
+
+/* ---------- tabs ---------- */
+function showTab(t){
+  $('tabP').setAttribute('aria-selected',t==='pend');$('tabS').setAttribute('aria-selected',t==='set');
+  $('pane-pend').classList.toggle('off',t!=='pend');$('pane-set').classList.toggle('off',t!=='set');
+}
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
+
+/* ---------- settings ---------- */
+function seg(id,key,onchange){
+  const el=$(id);
+  const sync=()=>el.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v)===String(S[key])));
+  el.querySelectorAll('button').forEach(b=>b.onclick=()=>{S[key]=key==='dt'?+b.dataset.v:b.dataset.v;sync();savePrefs();onchange();});
+  sync();return sync;
+}
+const syncs=[
+  seg('segMode','mode',()=>{
+    // Flip-time mode stops finished pendulums, and chaos needs its twins from the start: restart when the run can't show the new mode.
+    if(gpu&&S.mode!=='flip'&&(sim.skipped||(S.mode==='lyap'&&!gpu.lyapRun))){remember();restart();} else sim.dirty=true;
+    updateLegend();updateViewInfo();}),
+  seg('segPal','pal',()=>{palCache=null;if(cpu) cpu.recolor();sim.dirty=true;updateLegend();}),
+  seg('segDt','dt',()=>{forget();restart();loadPendulum();})
+];
+function syncInputs(){
+  $('selRes').value=String(S.res);$('selT').value=String(S.tmax);$('rngM').value=S.mv;$('rngL').value=S.lv;
+  $('outM').textContent=m2().toFixed(2);$('outL').textContent=l2().toFixed(2);syncs.forEach(f=>f());
+}
+$('selRes').onchange=e=>{S.res=+e.target.value;savePrefs();remember();restart();};
+$('selT').onchange=e=>{const nt=+e.target.value;const grow=nt>S.tmax&&gpu;S.tmax=nt;savePrefs();
+  if(grow&&sim.t>0){sim.done=false;sim.dirty=true;updateLegend();}else{remember();restart();}loadPendulum();};
+$('rngM').oninput=e=>{S.mv=+e.target.value;$('outM').textContent=m2().toFixed(2);};
+$('rngL').oninput=e=>{S.lv=+e.target.value;$('outL').textContent=l2().toFixed(2);};
+$('rngM').onchange=$('rngL').onchange=()=>{savePrefs();forget();restart();loadPendulum();};
+$('restart').onclick=()=>{sim.running=true;forget();restart();};
+$('defaults').onclick=()=>{Object.assign(S,DEF);if(cpu&&S.res>300)S.res=300;if(cpu)S.mode='flip';palCache=null;S.space='ang';S.fix={ang:[0,0],mom:[0,0]};S.views={};savePrefs();syncInputs();syncSlice();setView(0,0,TAU);forget();restart();loadPendulum();};
+
+/* ---------- slice: which space the map shows, and the two fixed coordinates ---------- */
+const mom=()=>S.space==='mom';
+function syncSlice(){
+  const f=fixNow(),M=mom();
+  $('sliceLbl').textContent=M?'Starting angles for every pendulum':'Starting momenta for every pendulum';
+  $('lblF1').textContent=M?'θ₁':'p₁';$('lblF2').textContent=M?'θ₂':'p₂';
+  for(const [i,id] of [[0,'rngF1'],[1,'rngF2']]){const r=$(id);
+    if(M){r.min=-180;r.max=180;r.step=0.5;r.value=f[i]*180/PI;} else {r.min=-PMAX;r.max=PMAX;r.step=0.05;r.value=f[i];}
+    $(id==='rngF1'?'outF1':'outF2').textContent=M?(f[i]*180/PI).toFixed(1)+'°':f[i].toFixed(2);}
+  $('segSpace').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===S.space));
+}
+function readSlider(i){const r=$(i?'rngF2':'rngF1');return mom()?(+r.value)*PI/180:+r.value;}
+for(const [i,id] of [[0,'rngF1'],[1,'rngF2']]){
+  $(id).oninput=()=>{const v=readSlider(i);$(i?'outF2':'outF1').textContent=mom()?(v*180/PI).toFixed(1)+'°':v.toFixed(2);};
+  $(id).onchange=()=>{cancelMotion();remember();S.fix[S.space][i]=readSlider(i);savePrefs();restart();};
+}
+function setFix(f){cancelMotion();remember();S.fix[S.space]=f;savePrefs();syncSlice();restart();}
+$('useSel').onclick=()=>setFix(mom()?[S.sel.t1,S.sel.t2]:[S.sel.p1,S.sel.p2]);
+$('zeroFix').onclick=()=>setFix([0,0]);
+function setSpace(sp){
+  if(sp===S.space) return;
+  cancelMotion();remember();S.views[S.space]={cx:S.cx,cy:S.cy,span:S.span};
+  S.space=sp;const v=S.views[sp]||{cx:0,cy:0,span:2*RANGE()};S.cx=v.cx;S.cy=v.cy;S.span=v.span;
+  savePrefs();syncSlice();restart();
+}
+$('segSpace').querySelectorAll('button').forEach(b=>b.onclick=()=>setSpace(b.dataset.v));
+
+/* ---------- boot ---------- */
+if(cpu&&S.mode!=='flip') S.mode='flip';
+syncInputs();syncSlice();restart();loadPendulum();
+document.addEventListener('visibilitychange',()=>{lastTs=0;});
+requestAnimationFrame(frame);
+})();
+</script>
+
+</body></html>

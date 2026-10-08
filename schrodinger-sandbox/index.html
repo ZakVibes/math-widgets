@@ -1,0 +1,762 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Schrödinger Sandbox</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@1,500&display=swap">
+<style>
+/* Layout: an instrument bench — wide plot on the left (position + momentum readouts), a narrow control rail on the right; stacks on phones. */
+:root{
+  --bg:#EDF0F5; --panel:#FFFFFF; --plot:#FAFBFD; --ink:#141A26; --muted:#5A6477; --line:#D5DBE5;
+  --accent:#2C57CF; --accent-soft:rgba(44,87,207,.14); --im:#B5307A;
+  --pot:#E1E6EF; --potline:#7A869F; --absorb:rgba(122,134,159,.12); --grid:rgba(20,26,38,.06);
+  --phase-l:48%; --phase-s:78%;
+  --f-sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  --f-math:"IBM Plex Serif",Georgia,"Times New Roman",serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0C111B; --panel:#131A27; --plot:#0F1521; --ink:#E3E8F1; --muted:#8C97AC; --line:#253046;
+  --accent:#7FA0FF; --accent-soft:rgba(127,160,255,.16); --im:#F07AB7;
+  --pot:#1B2435; --potline:#6F7D9A; --absorb:rgba(140,151,172,.10); --grid:rgba(227,232,241,.05);
+  --phase-l:60%; --phase-s:75%; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#0C111B; --panel:#131A27; --plot:#0F1521; --ink:#E3E8F1; --muted:#8C97AC; --line:#253046;
+  --accent:#7FA0FF; --accent-soft:rgba(127,160,255,.16); --im:#F07AB7;
+  --pot:#1B2435; --potline:#6F7D9A; --absorb:rgba(140,151,172,.10); --grid:rgba(227,232,241,.05);
+  --phase-l:60%; --phase-s:75%; color-scheme:dark }
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-sans);font-size:14px;line-height:1.45;margin:0;padding:20px 16px 32px}
+@media (min-width:700px){body{padding-inline:24px}}
+.wrap{max-width:1280px;margin:0 auto;display:grid;gap:16px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px}
+h1{font-size:22px;font-weight:600;margin:0;letter-spacing:-.01em;text-wrap:balance}
+h1 i{font-family:var(--f-math);font-weight:500}
+.sub{color:var(--muted);margin:0}
+.sub code{font-family:var(--f-mono);font-size:12.5px}
+.app{display:grid;gap:16px;grid-template-columns:minmax(0,1fr)}
+@media (min-width:980px){.app{grid-template-columns:minmax(0,1fr) 320px}}
+.bench{align-self:start;align-content:start;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;display:grid;gap:8px;min-width:0}
+.readout{display:flex;flex-wrap:wrap;gap:4px 18px;font-family:var(--f-mono);font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.readout b{color:var(--ink);font-weight:500}
+canvas{display:block;width:100%;border-radius:6px;background:var(--plot)}
+#main{height:clamp(280px,54vh,520px);touch-action:none;cursor:crosshair}
+#mom{height:104px;cursor:pointer;touch-action:none}
+.hint{font-size:13px;color:var(--muted);margin:0}
+.rail{display:grid;gap:14px;align-content:start;min-width:0}
+.group{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;display:grid;gap:10px}
+.group h2{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin:0}
+.seg{display:flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.seg button{flex:1;min-width:0;border:0;background:transparent;color:var(--ink);font:inherit;font-size:13px;padding:7px 4px;cursor:pointer;border-left:1px solid var(--line)}
+.seg button:first-child{border-left:0}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--panel);font-weight:500}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{border:1px solid var(--line);background:transparent;color:var(--ink);font:inherit;font-size:12.5px;padding:5px 9px;border-radius:999px;cursor:pointer}
+.chips button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--ink)}
+.chips button:hover{border-color:var(--accent)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.row{display:flex;align-items:center;gap:10px}
+.row label{flex:0 0 auto;font-size:13px}
+.row input[type=range]{flex:1;min-width:0;accent-color:var(--accent)}
+.val{font-family:var(--f-mono);font-size:12.5px;min-width:44px;text-align:right;font-variant-numeric:tabular-nums}
+.check{display:flex;gap:8px;align-items:center;font-size:13px;cursor:pointer}
+.check input{accent-color:var(--accent);margin:0}
+.btns{display:flex;gap:8px}
+.btn{flex:1;border:1px solid var(--line);background:transparent;color:var(--ink);font:inherit;font-size:13px;padding:7px 10px;border-radius:7px;cursor:pointer}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--panel);font-weight:500}
+.legend{display:flex;align-items:center;gap:8px;font-family:var(--f-mono);font-size:11.5px;color:var(--muted)}
+.legend .bar{flex:1;height:10px;border-radius:3px}
+.note{font-size:12.5px;color:var(--muted);margin:0}
+.note i{font-family:var(--f-math)}
+.topbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 14px}
+.tbtns{display:flex;gap:6px}
+.readout{flex:1;min-width:0}
+.tbtns .btn{flex:0 0 auto;padding:5px 12px;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.tbtns svg{display:block}
+.hint-m{display:none}
+.ctl{display:grid;gap:8px}
+.sym{font-family:var(--f-math);font-style:italic;font-size:15px !important;width:20px}
+input[type=number]{width:66px;flex:0 0 auto;font-family:var(--f-mono);font-size:12.5px;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:5px;padding:4px 6px;font-variant-numeric:tabular-nums}
+.tabs{display:none;gap:4px;border-bottom:1px solid var(--line)}
+.tabs button{flex:1;border:0;background:transparent;color:var(--muted);font:inherit;font-size:13.5px;font-weight:500;padding:10px 4px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button[aria-pressed="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+@media (max-width:979px){
+  body{padding-top:14px}
+  .sub{font-size:13px}
+  .tabs{display:flex}
+  .rail{gap:10px}
+  .group{display:none}
+  .group.active{display:grid}
+  .group h2{display:none}
+  #main{height:clamp(230px,44vh,420px)}
+  #mom{height:76px}
+  .seg button{min-height:40px}
+  .chips button{padding:8px 12px;font-size:13px}
+  .btn{min-height:38px}
+  .row{min-height:34px}
+  .bench .hint{display:none}
+  .hint-m{display:block}
+  #main{height:clamp(220px,38vh,400px)}
+  .readout{font-size:11.5px;gap:2px 12px}
+  .tbtns .btn span{display:none}
+  .tbtns .btn{min-width:42px;min-height:36px;padding:4px 10px}
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <a href="../index.html" style="display:table;flex-basis:100%;margin-bottom:6px;font-size:13px;color:inherit;opacity:.7;text-decoration:none">← All widgets</a>
+    <h1>Schrödinger Sandbox</h1>
+    <p class="sub">One particle on a line, <code>ħ = m = 1</code>, box of length 40. Press the plot to place a state; it evolves under <i style="font-family:var(--f-math)">i∂ψ/∂t = Hψ</i>.</p>
+  </header>
+
+  <div class="app">
+    <section class="bench" aria-label="Simulation">
+      <div class="topbar">
+        <div class="readout" id="readout">
+          <span>t <b id="r-t">0.00</b></span>
+          <span>⟨x⟩ <b id="r-x">0.00</b></span>
+          <span>⟨p⟩ <b id="r-p">0.00</b></span>
+          <span>⟨E⟩ <b id="r-e">0.00</b></span>
+          <span>∫|ψ|² <b id="r-n">1.000</b></span>
+        </div>
+        <div class="tbtns">
+          <button type="button" class="btn primary icon" id="play" aria-label="Pause" title="Pause (Space)"></button>
+          <button type="button" class="btn icon" id="restart" aria-label="Restart" title="Restart from the last state you made"><svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M4.5 10a5.5 5.5 0 1 0 1.8-4.1" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M5.6 2.6v3.7h3.7" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Restart</span></button>
+        </div>
+      </div>
+      <canvas id="main" aria-label="Wavefunction and potential. Press to create a state."></canvas>
+      <canvas id="mom" aria-label="Momentum distribution. Press to create a momentum state."></canvas>
+      <p class="hint" id="hint"></p>
+    </section>
+
+    <aside class="rail">
+      <nav class="tabs" id="tabs" aria-label="Control panels">
+        <button type="button" data-tab="g-create">Create</button>
+        <button type="button" data-tab="g-pot">Potential</button>
+        <button type="button" data-tab="g-show">View</button>
+        <button type="button" data-tab="g-ex">Examples</button>
+      </nav>
+
+      <div class="group" id="g-create">
+        <h2>Press the plot to…</h2>
+        <div class="seg" id="mode">
+          <button type="button" id="m-position" data-v="position">Position</button>
+          <button type="button" id="m-momentum" data-v="momentum">Momentum</button>
+          <button type="button" id="m-energy" data-v="energy">Energy</button>
+          <button type="button" id="m-bump" data-v="bump">V bump</button>
+        </div>
+        <div class="ctl" id="packetCtl">
+          <div class="row">
+            <label for="x0r" class="sym">x₀</label>
+            <input type="range" id="x0r" min="-19" max="19" step="0.1">
+            <input type="number" id="x0n" min="-19" max="19" step="0.1" aria-label="Packet center x₀">
+          </div>
+          <div class="row">
+            <label for="k0r" class="sym">k₀</label>
+            <input type="range" id="k0r" min="-20" max="20" step="0.05">
+            <input type="number" id="k0n" min="-20" max="20" step="0.05" aria-label="Packet momentum k₀">
+          </div>
+          <div class="row">
+            <label for="sigma" class="sym">σ</label>
+            <input type="range" id="sigma" min="0" max="100" step="0.5">
+            <input type="number" id="sigN" min="0.15" max="8" step="0.01" aria-label="Packet width σ">
+          </div>
+          <button type="button" class="btn primary" id="drop">Drop Gaussian packet</button>
+        </div>
+        <div class="ctl" id="bumpCtl">
+          <div class="row">
+            <label for="bw">Width</label>
+            <input type="range" id="bw" min="0.1" max="4" step="0.05" value="0.6">
+            <span class="val" id="bwVal">0.60</span>
+          </div>
+          <div class="btns">
+            <button type="button" class="btn" id="bumpUndo">Undo last</button>
+            <button type="button" class="btn" id="bumpClear">Clear bumps</button>
+          </div>
+        </div>
+        <p class="note hint-m" id="hint2"></p>
+        <label class="check" id="addRow"><input type="checkbox" id="add"> Add to current state (or hold Shift)</label>
+      </div>
+
+      <div class="group" id="g-pot">
+        <h2>Potential</h2>
+        <div class="chips" id="pots"></div>
+        <div class="row" id="paramRow">
+          <label for="param" id="paramLabel">Height</label>
+          <input type="range" id="param">
+          <span class="val" id="paramVal"></span>
+        </div>
+        <div class="seg" id="edges">
+          <button type="button" id="e-walls" data-v="walls">Hard edges</button>
+          <button type="button" id="e-absorb" data-v="absorb">Absorbing edges</button>
+        </div>
+        <p class="note" id="bumpNote"></p>
+      </div>
+
+      <div class="group" id="g-show">
+        <h2>View and time</h2>
+        <div class="seg" id="view">
+          <button type="button" id="v-phase" data-v="phase">ψ + phase</button>
+          <button type="button" id="v-reim" data-v="reim">Re, Im</button>
+          <button type="button" id="v-prob" data-v="prob">|ψ|²</button>
+        </div>
+        <div class="legend" id="legend"><span>−π</span><div class="bar" id="phaseBar"></div><span>π</span></div>
+        <p class="note" id="viewNote"></p>
+        <div class="row">
+          <label for="speed">Speed</label>
+          <input type="range" id="speed" min="1" max="60" step="1" value="12">
+          <span class="val" id="speedVal"></span>
+        </div>
+      </div>
+
+      <div class="group" id="g-ex">
+        <h2>Examples</h2>
+        <div class="chips" id="presets"></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+(() => {
+"use strict";
+// ---------- grid ----------
+const N = 1024, L = 40, XMIN = -20, DX = L / N, DT = 0.004, WALL = 300, KVIEW = 25, KMAX_DRAG = 20;
+const X = new Float64Array(N), K = new Float64Array(N), TK = new Float64Array(N);
+for (let i = 0; i < N; i++) X[i] = XMIN + (i + 0.5) * DX;
+for (let j = 0; j < N; j++) { K[j] = 2 * Math.PI / L * (j < N / 2 ? j : j - N); TK[j] = (1 - Math.cos(K[j] * DX)) / (DX * DX); }
+
+// ---------- FFT (radix-2, in place) ----------
+const BITS = Math.log2(N), rev = new Uint32Array(N), cosT = new Float64Array(N / 2), sinT = new Float64Array(N / 2);
+for (let i = 0; i < N; i++) { let r = 0; for (let b = 0; b < BITS; b++) r |= ((i >> b) & 1) << (BITS - 1 - b); rev[i] = r; }
+for (let i = 0; i < N / 2; i++) { cosT[i] = Math.cos(2 * Math.PI * i / N); sinT[i] = Math.sin(2 * Math.PI * i / N); }
+function fft(re, im, inv) {
+  for (let i = 0; i < N; i++) { const j = rev[i]; if (j > i) { let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; } }
+  for (let size = 2; size <= N; size <<= 1) {
+    const half = size >> 1, step = N / size;
+    for (let i = 0; i < N; i += size) for (let j = 0; j < half; j++) {
+      const wr = cosT[j * step], wi = inv ? sinT[j * step] : -sinT[j * step];
+      const a = i + j, b = a + half;
+      const tr = wr * re[b] - wi * im[b], ti = wr * im[b] + wi * re[b];
+      re[b] = re[a] - tr; im[b] = im[a] - ti; re[a] += tr; im[a] += ti;
+    }
+  }
+  if (inv) for (let i = 0; i < N; i++) { re[i] /= N; im[i] /= N; }
+}
+
+// ---------- potentials ----------
+const POTS = {
+  free:    { name: "Free", V: () => 0, view: () => [-0.5, 12], x0: 0 },
+  box:     { name: "Infinite well", param: { label: "Width", min: 4, max: 36, step: 0.5, def: 16 }, V: (x, p) => Math.abs(x) > p / 2 ? WALL : 0, view: () => [-0.5, 12], x0: 0 },
+  harmonic:{ name: "Harmonic", param: { label: "ω", min: 0.2, max: 2, step: 0.05, def: 0.6 }, V: (x, p) => Math.min(WALL, 0.5 * p * p * x * x), view: p => [-0.5, 10 * p + 2], x0: 0 },
+  finite:  { name: "Finite well", param: { label: "Depth", min: 1, max: 20, step: 0.5, def: 6 }, V: (x, p) => Math.abs(x) < 3 ? -p : 0, view: p => [-p - 0.5, 0.8 * p + 1], x0: 0 },
+  barrier: { name: "Barrier", param: { label: "Height", min: 0.5, max: 15, step: 0.25, def: 5 }, V: (x, p) => Math.abs(x) < 0.5 ? p : 0, view: p => [-0.5, 1.8 * p + 1], x0: -8 },
+  step:    { name: "Step", param: { label: "Height", min: 0.5, max: 15, step: 0.25, def: 4 }, V: (x, p) => x > 0 ? p : 0, view: p => [-0.5, 2 * p + 1], x0: -8 },
+  dwell:   { name: "Double well", param: { label: "Barrier", min: 0.5, max: 8, step: 0.1, def: 2.5 }, V: (x, p) => { const u = (x / 3) ** 2 - 1; return Math.min(WALL, p * u * u); }, view: p => [-0.3, 2.5 * p + 0.5], x0: -3 },
+  dbar:    { name: "Double barrier", param: { label: "Height", min: 1, max: 15, step: 0.25, def: 6 }, V: (x, p) => { const a = Math.abs(x); return a > 1.75 && a < 2.25 ? p : 0; }, view: p => [-0.5, 1.6 * p + 1], x0: -9 },
+  lattice: { name: "Lattice", param: { label: "Depth", min: 0.5, max: 10, step: 0.25, def: 3 }, V: (x, p) => p * (1 - Math.cos(2 * Math.PI * x / 2.5)) / 2, view: p => [-0.3, 2.5 * p + 1], x0: -6 },
+  linear:  { name: "Linear V", param: { label: "Slope", min: 0.1, max: 3, step: 0.05, def: 0.8 }, V: (x, p) => Math.min(WALL, p * Math.abs(x)), view: () => [-0.5, 12], x0: 0 },
+  coulomb: { name: "Soft Coulomb", param: { label: "Strength", min: 0.5, max: 5, step: 0.1, def: 2 }, V: (x, p) => -p / Math.sqrt(x * x + 1), view: p => [-p - 0.3, 0.8 * p + 0.5], x0: 0 },
+};
+
+// ---------- state ----------
+const S = {
+  pot: "barrier", params: {}, edges: "walls", mode: "position", view: "phase",
+  sigma: { position: 0.4, momentum: 5 }, pk: { x0: -8, k: 3 }, bumps: [], bw: 0.6, playing: true, speed: 12, t: 0, add: false, shift: false,
+};
+for (const k in POTS) if (POTS[k].param) S.params[k] = POTS[k].param.def;
+const pr = new Float64Array(N), pi = new Float64Array(N);
+let p0r = new Float64Array(N), p0i = new Float64Array(N);
+const Vtot = new Float64Array(N), vc = new Float64Array(N), vs = new Float64Array(N), tc = new Float64Array(N), ts = new Float64Array(N);
+const isWall = new Uint8Array(N);
+for (let j = 0; j < N; j++) { tc[j] = Math.cos(-TK[j] * DT); ts[j] = Math.sin(-TK[j] * DT); }
+let view = [0, 1];
+let levels = [], vecs = [], pops = [];
+
+function curParam() { return S.params[S.pot]; }
+
+function buildPotential() {
+  const P = POTS[S.pot], p = curParam();
+  for (let i = 0; i < N; i++) {
+    let v = P.V(X[i], p);
+    for (const b of S.bumps) { const u = (X[i] - b.x0) / b.w; v += b.A * Math.exp(-0.5 * u * u); }
+    v = Math.min(v, WALL);
+    if (S.edges === "walls" && Math.abs(X[i]) > 19.4) v = WALL;
+    Vtot[i] = v; isWall[i] = v >= WALL ? 1 : 0;
+    let g = 0;
+    if (S.edges === "absorb") { const a = Math.abs(X[i]) - 15; if (a > 0) g = 30 * (a / 5) ** 2; }
+    const amp = Math.exp(-g * DT / 2), ph = -v * DT / 2;
+    vc[i] = amp * Math.cos(ph); vs[i] = amp * Math.sin(ph);
+  }
+  view = P.view(p);
+  computeLevels();
+}
+
+// ---------- eigenstates of the finite-difference H (same kinetic term as the propagator) ----------
+function computeLevels() {
+  const e = -1 / (2 * DX * DX), e2 = e * e, d = new Float64Array(N);
+  let minV = Infinity;
+  for (let i = 0; i < N; i++) { d[i] = 1 / (DX * DX) + Vtot[i]; if (Vtot[i] < minV) minV = Vtot[i]; }
+  const count = l => { let c = 0, q = d[0] - l; if (q < 0) c++; for (let i = 1; i < N; i++) { q = d[i] - l - e2 / (q === 0 ? 1e-300 : q); if (q < 0) c++; } return c; };
+  const nLev = Math.min(count(view[1]), 80);
+  levels = []; vecs = [];
+  const cp = new Float64Array(N), dp = new Float64Array(N);
+  for (let n = 0; n < nLev; n++) {
+    let lo = minV - 1e-6, hi = view[1];
+    for (let it = 0; it < 56; it++) { const m = 0.5 * (lo + hi); if (count(m) > n) hi = m; else lo = m; }
+    const lam = 0.5 * (lo + hi) + 1e-11;
+    let x = new Float64Array(N);
+    for (let i = 0; i < N; i++) x[i] = 1 + 0.37 * Math.sin(i * 0.731 + n);
+    for (let it = 0; it < 4; it++) {
+      let m = d[0] - lam; if (Math.abs(m) < 1e-300) m = 1e-300;
+      cp[0] = e / m; dp[0] = x[0] / m;
+      for (let i = 1; i < N; i++) { m = d[i] - lam - e * cp[i - 1]; if (Math.abs(m) < 1e-300) m = 1e-300; cp[i] = e / m; dp[i] = (x[i] - e * dp[i - 1]) / m; }
+      x[N - 1] = dp[N - 1];
+      for (let i = N - 2; i >= 0; i--) x[i] = dp[i] - cp[i] * x[i + 1];
+      for (let m2 = 0; m2 < vecs.length; m2++) if (Math.abs(levels[m2] - lam) < 1e-3) {
+        let s = 0; const v = vecs[m2]; for (let i = 0; i < N; i++) s += v[i] * x[i];
+        for (let i = 0; i < N; i++) x[i] -= s * v[i];
+      }
+      let nn = 0; for (let i = 0; i < N; i++) nn += x[i] * x[i]; nn = Math.sqrt(nn) || 1;
+      for (let i = 0; i < N; i++) x[i] /= nn;
+    }
+    let mx = 0; for (let i = 0; i < N; i++) mx = Math.max(mx, Math.abs(x[i]));
+    for (let i = 0; i < N; i++) if (Math.abs(x[i]) > 0.1 * mx) { if (x[i] < 0) for (let k = 0; k < N; k++) x[k] = -x[k]; break; }
+    levels.push(lam); vecs.push(x);
+  }
+  levelPath = null;
+}
+
+// ---------- creating states ----------
+function normalize(re, im) {
+  let s = 0; for (let i = 0; i < N; i++) s += re[i] * re[i] + im[i] * im[i];
+  s = Math.sqrt(s * DX); if (s < 1e-12) return false;
+  for (let i = 0; i < N; i++) { re[i] /= s; im[i] /= s; }
+  return true;
+}
+function packet(x0, k, sg) {
+  const re = new Float64Array(N), im = new Float64Array(N);
+  for (let i = 0; i < N; i++) {
+    if (isWall[i]) continue;
+    const u = X[i] - x0, a = Math.exp(-u * u / (4 * sg * sg));
+    re[i] = a * Math.cos(k * X[i]); im[i] = a * Math.sin(k * X[i]);
+  }
+  return normalize(re, im) ? [re, im] : null;
+}
+function eigen(ns) {
+  const re = new Float64Array(N), im = new Float64Array(N);
+  for (const n of ns) { const v = vecs[n]; if (!v) continue; for (let i = 0; i < N; i++) re[i] += v[i]; }
+  return normalize(re, im) ? [re, im] : null;
+}
+function install(st, add) {
+  if (!st) return;
+  const [re, im] = st;
+  if (add) { for (let i = 0; i < N; i++) { pr[i] += re[i]; pi[i] += im[i]; } if (!normalize(pr, pi)) { pr.set(re); pi.set(im); } }
+  else { pr.set(re); pi.set(im); }
+  p0r = pr.slice(); p0i = pi.slice(); S.t = 0; resetScale = true;
+}
+const wantAdd = () => S.add || S.shift;
+
+// ---------- time step: split-operator ----------
+const wr = new Float64Array(N), wi = new Float64Array(N);
+function step() {
+  for (let i = 0; i < N; i++) { const a = pr[i], b = pi[i]; pr[i] = a * vc[i] - b * vs[i]; pi[i] = a * vs[i] + b * vc[i]; }
+  fft(pr, pi, false);
+  for (let j = 0; j < N; j++) { const a = pr[j], b = pi[j]; pr[j] = a * tc[j] - b * ts[j]; pi[j] = a * ts[j] + b * tc[j]; }
+  fft(pr, pi, true);
+  for (let i = 0; i < N; i++) { const a = pr[i], b = pi[i]; pr[i] = a * vc[i] - b * vs[i]; pi[i] = a * vs[i] + b * vc[i]; }
+}
+
+// ---------- observables ----------
+const obs = { norm: 1, x: 0, p: 0, E: 0 };
+const kOrder = []; for (let j = N / 2; j < N; j++) kOrder.push(j); for (let j = 0; j < N / 2; j++) kOrder.push(j);
+function measure() {
+  let n = 0, sx = 0, sv = 0;
+  for (let i = 0; i < N; i++) { const r = pr[i] * pr[i] + pi[i] * pi[i]; n += r; sx += r * X[i]; sv += r * (isWall[i] ? 0 : Vtot[i]); }
+  n *= DX; sx *= DX; sv *= DX;
+  wr.set(pr); wi.set(pi); fft(wr, wi, false);
+  let sk = 0, sp = 0, st = 0;
+  for (let j = 0; j < N; j++) { const r = wr[j] * wr[j] + wi[j] * wi[j]; sk += r; sp += r * K[j]; st += r * TK[j]; }
+  obs.norm = n; obs.x = n > 1e-9 ? sx / n : 0; obs.p = sk > 0 ? sp / sk : 0; obs.E = (sk > 0 ? st / sk : 0) + (n > 1e-9 ? sv / n : 0);
+  const sq = Math.sqrt(DX);
+  pops = vecs.map(v => { let a = 0, b = 0; for (let i = 0; i < N; i++) { a += v[i] * pr[i]; b += v[i] * pi[i]; } return (a * a + b * b) * DX; });
+}
+
+// ---------- drawing ----------
+const cvM = document.getElementById("main"), cvP = document.getElementById("mom");
+const ctxM = cvM.getContext("2d"), ctxP = cvP.getContext("2d");
+let WM = 0, HM = 0, WP = 0, HP = 0;
+const PAD = { l: 10, r: 48, t: 12, b: 24 };
+function fit() {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  for (const [cv, ctx, set] of [[cvM, ctxM, (w, h) => { WM = w; HM = h; }], [cvP, ctxP, (w, h) => { WP = w; HP = h; }]]) {
+    const r = cv.getBoundingClientRect();
+    cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); set(r.width, r.height);
+  }
+  levelPath = null;
+}
+new ResizeObserver(fit).observe(cvM);
+
+let C = {};
+function readTokens() {
+  const cs = getComputedStyle(document.documentElement), g = n => cs.getPropertyValue(n).trim();
+  C = { plot: g("--plot"), ink: g("--ink"), muted: g("--muted"), line: g("--line"), accent: g("--accent"), soft: g("--accent-soft"), im: g("--im"),
+        pot: g("--pot"), potline: g("--potline"), absorb: g("--absorb"), grid: g("--grid"), L: g("--phase-l"), Sa: g("--phase-s") };
+  phaseBar();
+}
+const hueOf = (re, im) => ((Math.atan2(im, re) * 180 / Math.PI) + 360) % 360;
+function phaseBar() {
+  const stops = []; for (let s = 0; s <= 12; s++) { const th = -180 + 30 * s; stops.push(`hsl(${(th + 360) % 360} ${C.Sa} ${C.L}) ${(s / 12 * 100).toFixed(1)}%`); }
+  document.getElementById("phaseBar").style.background = `linear-gradient(90deg, ${stops.join(",")})`;
+}
+
+const plotW = () => WM - PAD.l - PAD.r, plotH = () => HM - PAD.t - PAD.b;
+const xToPx = x => PAD.l + (x - XMIN) / L * plotW();
+const pxToX = px => XMIN + (px - PAD.l) / plotW() * L;
+const eToPy = E => PAD.t + (view[1] - E) / (view[1] - view[0]) * plotH();
+const pyToE = py => view[1] - (py - PAD.t) / plotH() * (view[1] - view[0]);
+function niceStep(r) { const m = Math.pow(10, Math.floor(Math.log10(r))), f = r / m; return (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10) * m; }
+
+let levelPath = null;
+function buildLevelPath() {
+  levelPath = levels.map(E => {
+    const p = new Path2D(), y = eToPy(E); let open = false;
+    for (let i = 0; i < N; i++) {
+      const ok = Vtot[i] < E;
+      if (ok && !open) { p.moveTo(xToPx(X[i] - DX / 2), y); open = true; }
+      if (!ok && open) { p.lineTo(xToPx(X[i] - DX / 2), y); open = false; }
+    }
+    if (open) p.lineTo(xToPx(X[N - 1] + DX / 2), y);
+    return p;
+  });
+}
+
+let ref = 1, refP = 1, resetScale = true, lastView = S.view;
+let drag = null, hoverLevel = -1;
+
+function drawMain() {
+  const c = ctxM, w = plotW(), h = plotH(), x0 = PAD.l, y0 = PAD.t, yB = y0 + h;
+  c.clearRect(0, 0, WM, HM);
+  c.fillStyle = C.plot; c.fillRect(0, 0, WM, HM);
+  c.save(); c.beginPath(); c.rect(x0, y0, w, h); c.clip();
+
+  // grid
+  c.strokeStyle = C.grid; c.lineWidth = 1;
+  for (let x = -20; x <= 20; x += 5) { const px = Math.round(xToPx(x)) + 0.5; c.beginPath(); c.moveTo(px, y0); c.lineTo(px, yB); c.stroke(); }
+  const es = niceStep((view[1] - view[0]) / 5);
+  for (let E = Math.ceil(view[0] / es) * es; E <= view[1]; E += es) { const py = Math.round(eToPy(E)) + 0.5; c.beginPath(); c.moveTo(x0, py); c.lineTo(x0 + w, py); c.stroke(); }
+
+  // absorber zones
+  if (S.edges === "absorb") { c.fillStyle = C.absorb; c.fillRect(xToPx(-20), y0, xToPx(-15) - xToPx(-20), h); c.fillRect(xToPx(15), y0, xToPx(20) - xToPx(15), h); }
+
+  // potential
+  c.beginPath(); c.moveTo(x0, yB + 2);
+  for (let i = 0; i < N; i++) c.lineTo(xToPx(X[i]), Math.max(y0 - 4, Math.min(yB + 2, eToPy(Vtot[i]))));
+  c.lineTo(x0 + w, yB + 2); c.closePath(); c.fillStyle = C.pot; c.fill();
+  c.beginPath();
+  for (let i = 0; i < N; i++) { const py = Math.max(y0 - 4, Math.min(yB + 2, eToPy(Vtot[i]))); i ? c.lineTo(xToPx(X[i]), py) : c.moveTo(xToPx(X[i]), py); }
+  c.strokeStyle = C.potline; c.lineWidth = 1.5; c.stroke();
+
+  // energy levels + populations
+  if (!levelPath) buildLevelPath();
+  const strong = S.mode === "energy";
+  c.lineWidth = 1;
+  levelPath.forEach((p, n) => { c.globalAlpha = n === hoverLevel ? 1 : strong ? 0.5 : 0.2; c.strokeStyle = n === hoverLevel ? C.accent : C.muted; c.stroke(p); });
+  c.globalAlpha = 1;
+  c.fillStyle = C.accent;
+  pops.forEach((q, n) => { if (q < 0.003) return; const y = eToPy(levels[n]); c.fillRect(x0 + w - q * 110, y - 1.5, q * 110, 3); });
+
+  // <E>
+  if (obs.norm > 1e-4) { const y = eToPy(obs.E); c.setLineDash([5, 4]); c.strokeStyle = C.ink; c.globalAlpha = 0.55; c.beginPath(); c.moveTo(x0, y); c.lineTo(x0 + w, y); c.stroke(); c.setLineDash([]); c.globalAlpha = 1; }
+
+  // wavefunction
+  let cur = 0;
+  if (S.view === "prob") { for (let i = 0; i < N; i++) cur = Math.max(cur, pr[i] * pr[i] + pi[i] * pi[i]); }
+  else { for (let i = 0; i < N; i++) cur = Math.max(cur, Math.hypot(pr[i], pi[i])); }
+  if (resetScale || lastView !== S.view) { ref = cur || 1; resetScale = false; lastView = S.view; }
+  else ref = cur > ref ? cur : ref + (cur - ref) * 0.03;
+  const r = Math.max(ref, 1e-6), cw = w / N + 0.7;
+  if (S.view === "phase") {
+    const sc = 0.82 * h / r;
+    for (let i = 0; i < N; i++) {
+      const a = Math.hypot(pr[i], pi[i]); if (a * sc < 0.3) continue;
+      c.fillStyle = `hsl(${hueOf(pr[i], pi[i]).toFixed(0)} ${C.Sa} ${C.L})`;
+      c.fillRect(xToPx(X[i] - DX / 2), yB - a * sc, cw, a * sc);
+    }
+    c.beginPath(); for (let i = 0; i < N; i++) { const py = yB - Math.hypot(pr[i], pi[i]) * sc; i ? c.lineTo(xToPx(X[i]), py) : c.moveTo(xToPx(X[i]), py); }
+    c.strokeStyle = C.ink; c.globalAlpha = 0.7; c.lineWidth = 1; c.stroke(); c.globalAlpha = 1;
+  } else if (S.view === "prob") {
+    const sc = 0.82 * h / r;
+    c.beginPath(); c.moveTo(x0, yB);
+    for (let i = 0; i < N; i++) c.lineTo(xToPx(X[i]), yB - (pr[i] * pr[i] + pi[i] * pi[i]) * sc);
+    c.lineTo(x0 + w, yB); c.closePath(); c.fillStyle = C.soft; c.fill();
+    c.beginPath(); for (let i = 0; i < N; i++) { const py = yB - (pr[i] * pr[i] + pi[i] * pi[i]) * sc; i ? c.lineTo(xToPx(X[i]), py) : c.moveTo(xToPx(X[i]), py); }
+    c.strokeStyle = C.accent; c.lineWidth = 1.6; c.stroke();
+  } else {
+    const ym = y0 + h * 0.5, sc = 0.44 * h / r;
+    c.strokeStyle = C.muted; c.globalAlpha = 0.5; c.lineWidth = 1; c.beginPath(); c.moveTo(x0, ym); c.lineTo(x0 + w, ym); c.stroke();
+    for (const sg of [1, -1]) { c.beginPath(); for (let i = 0; i < N; i++) { const py = ym - sg * Math.hypot(pr[i], pi[i]) * sc; i ? c.lineTo(xToPx(X[i]), py) : c.moveTo(xToPx(X[i]), py); } c.stroke(); }
+    c.globalAlpha = 1;
+    for (const [arr, col] of [[pi, C.im], [pr, C.accent]]) { c.beginPath(); for (let i = 0; i < N; i++) { const py = ym - arr[i] * sc; i ? c.lineTo(xToPx(X[i]), py) : c.moveTo(xToPx(X[i]), py); } c.strokeStyle = col; c.lineWidth = 1.5; c.stroke(); }
+  }
+
+  // hovered eigenstate preview
+  if (S.mode === "energy" && hoverLevel >= 0 && vecs[hoverLevel]) {
+    const v = vecs[hoverLevel], y = eToPy(levels[hoverLevel]); let m = 0; for (let i = 0; i < N; i++) m = Math.max(m, Math.abs(v[i]));
+    const sc = 0.11 * h / m; c.beginPath(); let on = false; for (let i = 0; i < N; i++) { if (Math.abs(v[i]) < 2e-3 * m) { on = false; continue; } const py = y - v[i] * sc; on ? c.lineTo(xToPx(X[i]), py) : c.moveTo(xToPx(X[i]), py); on = true; }
+    c.strokeStyle = C.accent; c.lineWidth = 1.8; c.stroke();
+  }
+
+  // packet preview (while dragging, or briefly after a slider change)
+  const showGhost = drag && !drag.bump ? { x0: drag.x0, k: drag.k } : (isPacketMode() && performance.now() < ghostUntil ? S.pk : null);
+  if (showGhost) {
+    const sg = packetSigma(), px0 = xToPx(showGhost.x0), sc = 0.6 * h;
+    c.setLineDash([4, 3]); c.strokeStyle = C.ink; c.lineWidth = 1.2; c.beginPath();
+    for (let i = 0; i < N; i++) { const u = X[i] - showGhost.x0, py = yB - Math.exp(-u * u / (4 * sg * sg)) * sc; i ? c.lineTo(xToPx(X[i]), py) : c.moveTo(xToPx(X[i]), py); }
+    c.stroke(); c.setLineDash([]);
+    const ya = yB - sc - 14, k = showGhost.k, pxk = xToPx(showGhost.x0 + k / 2);
+    c.strokeStyle = C.accent; c.fillStyle = C.accent; c.lineWidth = 2;
+    c.beginPath(); c.moveTo(px0, ya); c.lineTo(pxk, ya); c.stroke();
+    if (Math.abs(pxk - px0) > 4) { const d = Math.sign(pxk - px0); c.beginPath(); c.moveTo(pxk + d * 6, ya); c.lineTo(pxk - d * 2, ya - 5); c.lineTo(pxk - d * 2, ya + 5); c.closePath(); c.fill(); }
+    c.font = "500 12px " + getFont("--f-mono"); c.fillStyle = C.ink; c.textAlign = "center"; c.textBaseline = "alphabetic";
+    c.fillText(`x₀ = ${showGhost.x0.toFixed(1)}  k₀ = ${k.toFixed(2)}  σ = ${sg.toFixed(2)}`, Math.min(Math.max(px0, x0 + 120), x0 + w - 120), ya - 10);
+  }
+  // Gaussian bump preview
+  if (drag && drag.bump) {
+    c.setLineDash([5, 3]); c.strokeStyle = C.accent; c.lineWidth = 1.8; c.beginPath();
+    for (let i = 0; i < N; i++) { const u = (X[i] - drag.x0) / S.bw, v = Math.min(WALL, Vtot[i] + drag.A * Math.exp(-0.5 * u * u)); const py = Math.max(y0 - 4, Math.min(yB + 2, eToPy(v))); i ? c.lineTo(xToPx(X[i]), py) : c.moveTo(xToPx(X[i]), py); }
+    c.stroke(); c.setLineDash([]);
+    c.font = "500 12px " + getFont("--f-mono"); c.fillStyle = C.ink; c.textAlign = "center"; c.textBaseline = "alphabetic";
+    const px0 = xToPx(drag.x0), py0 = eToPy(drag.A);
+    c.fillText(`x₀ = ${drag.x0.toFixed(1)}  V₀ = ${drag.A.toFixed(2)}  w = ${S.bw.toFixed(2)}`, Math.min(Math.max(px0, x0 + 110), x0 + w - 110), Math.max(y0 + 16, Math.min(yB - 30, py0 - 12)));
+  }
+  c.restore();
+
+  // axes labels
+  c.font = "11px " + getFont("--f-mono"); c.fillStyle = C.muted;
+  c.textAlign = "center"; c.textBaseline = "top";
+  for (let x = -20; x <= 20; x += 5) c.fillText(String(x), Math.min(Math.max(xToPx(x), 10), WM - PAD.r - 8), yB + 6);
+  c.textAlign = "left"; c.textBaseline = "middle";
+  for (let E = Math.ceil(view[0] / es) * es; E <= view[1] + 1e-9; E += es) { const py = eToPy(E); if (py > y0 + 12) c.fillText(fmt(E), x0 + w + 6, py); }
+  c.textBaseline = "top"; c.fillText("E", x0 + w + 6, y0 - 4);
+  if (S.mode === "energy" && hoverLevel >= 0) {
+    c.textAlign = "left"; c.fillStyle = C.accent; c.font = "500 12px " + getFont("--f-mono");
+    c.fillText(`n = ${hoverLevel}   E = ${levels[hoverLevel].toFixed(3)}`, x0 + 8, y0 + 6);
+  }
+}
+const fontCache = {};
+function getFont(v) { return fontCache[v] || (fontCache[v] = getComputedStyle(document.documentElement).getPropertyValue(v).trim()); }
+const fmt = v => Math.abs(v) < 1e-9 ? "0" : (Math.abs(v) >= 10 || Number.isInteger(+v.toFixed(6)) ? (+v.toFixed(1)).toString() : v.toFixed(1));
+
+const PPAD = { l: 10, r: 48, t: 8, b: 20 };
+const kToPx = k => PPAD.l + (k + KVIEW) / (2 * KVIEW) * (WP - PPAD.l - PPAD.r);
+const pxToK = px => -KVIEW + (px - PPAD.l) / (WP - PPAD.l - PPAD.r) * 2 * KVIEW;
+function drawMom() {
+  const c = ctxP, h = HP - PPAD.t - PPAD.b, yB = PPAD.t + h;
+  c.clearRect(0, 0, WP, HP); c.fillStyle = C.plot; c.fillRect(0, 0, WP, HP);
+  c.strokeStyle = C.grid; c.lineWidth = 1;
+  for (let k = -20; k <= 20; k += 10) { const px = Math.round(kToPx(k)) + 0.5; c.beginPath(); c.moveTo(px, PPAD.t); c.lineTo(px, yB); c.stroke(); }
+  let cur = 0; for (const j of kOrder) if (Math.abs(K[j]) <= KVIEW) cur = Math.max(cur, wr[j] * wr[j] + wi[j] * wi[j]);
+  if (resetScaleP) { refP = cur || 1; resetScaleP = false; } else refP = cur > refP ? cur : refP + (cur - refP) * 0.03;
+  const sc = 0.9 * h / Math.max(refP, 1e-12);
+  c.beginPath(); let first = true;
+  for (const j of kOrder) { if (Math.abs(K[j]) > KVIEW) continue; const px = kToPx(K[j]), py = yB - (wr[j] * wr[j] + wi[j] * wi[j]) * sc; if (first) { c.moveTo(px, yB); first = false; } c.lineTo(px, py); }
+  c.lineTo(kToPx(KVIEW), yB); c.closePath(); c.fillStyle = C.soft; c.fill(); c.strokeStyle = C.accent; c.lineWidth = 1.3; c.stroke();
+  if (obs.norm > 1e-4) { const px = kToPx(Math.max(-KVIEW, Math.min(KVIEW, obs.p))); c.setLineDash([4, 3]); c.strokeStyle = C.ink; c.globalAlpha = 0.55; c.beginPath(); c.moveTo(px, PPAD.t); c.lineTo(px, yB); c.stroke(); c.setLineDash([]); c.globalAlpha = 1; }
+  c.font = "11px " + getFont("--f-mono"); c.fillStyle = C.muted; c.textAlign = "center"; c.textBaseline = "top";
+  for (let k = -20; k <= 20; k += 10) c.fillText(String(k), kToPx(k), yB + 5);
+  c.textAlign = "left"; c.fillText("k", WP - PPAD.r + 6, yB + 5);
+  c.textBaseline = "top"; c.fillText("|φ(k)|²", PPAD.l + 6, PPAD.t + 2);
+}
+let resetScaleP = true;
+
+// ---------- loop ----------
+const R = { t: rid("r-t"), x: rid("r-x"), p: rid("r-p"), e: rid("r-e"), n: rid("r-n") };
+function rid(id) { return document.getElementById(id); }
+let frame = 0;
+function loop() {
+  if (S.playing) { for (let s = 0; s < S.speed; s++) step(); S.t += S.speed * DT; }
+  if (frame++ % 90 === 0) readTokens();
+  measure();
+  if (WM > 0) { drawMain(); drawMom(); }
+  R.t.textContent = S.t.toFixed(2); R.x.textContent = obs.x.toFixed(2); R.p.textContent = obs.p.toFixed(2);
+  R.e.textContent = obs.E.toFixed(3); R.n.textContent = obs.norm.toFixed(3);
+  requestAnimationFrame(loop);
+}
+
+// ---------- pointer ----------
+let ghostUntil = 0;
+const isPacketMode = () => S.mode === "position" || S.mode === "momentum";
+const packetSigma = () => S.sigma[S.mode === "momentum" ? "momentum" : "position"];
+function local(e, cv) { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+function nearestLevel(E) { let b = -1, bd = Infinity; levels.forEach((l, n) => { const d = Math.abs(l - E); if (d < bd) { bd = d; b = n; } }); return b; }
+const clampX = x => Math.max(-19, Math.min(19, x));
+cvM.addEventListener("pointerdown", e => {
+  const [px, py] = local(e, cvM); S.shift = e.shiftKey;
+  if (S.mode === "energy") { const n = nearestLevel(pyToE(py)); if (n >= 0) { install(eigen([n]), wantAdd()); resetScaleP = true; } hoverLevel = n; return; }
+  cvM.setPointerCapture(e.pointerId);
+  if (S.mode === "bump") { drag = { bump: true, x0: clampX(pxToX(px)), A: pyToE(py) }; return; }
+  drag = { x0: clampX(pxToX(px)), px0: px, k: 0 };
+});
+cvM.addEventListener("pointermove", e => {
+  const [px, py] = local(e, cvM);
+  if (drag && drag.bump) { drag.x0 = clampX(pxToX(px)); drag.A = Math.max(view[0], Math.min(view[1], pyToE(py))); return; }
+  if (drag) { const dxw = pxToX(px) - pxToX(drag.px0); drag.k = Math.max(-KMAX_DRAG, Math.min(KMAX_DRAG, 2 * dxw)); return; }
+  hoverLevel = S.mode === "energy" && py >= PAD.t && py <= HM - PAD.b ? nearestLevel(pyToE(py)) : -1;
+});
+function endDrag(e, cancel) {
+  if (!drag) return;
+  const d = drag; drag = null;
+  if (cancel) return;
+  if (d.bump) { if (Math.abs(d.A) > 0.01) { S.bumps.push({ x0: d.x0, A: d.A, w: S.bw }); buildPotential(); syncBumps(); } return; }
+  S.shift = e.shiftKey || S.shift;
+  S.pk = { x0: d.x0, k: d.k }; syncPacketInputs();
+  dropPacket();
+}
+function dropPacket() { install(packet(S.pk.x0, S.pk.k, packetSigma()), wantAdd()); resetScaleP = true; }
+cvM.addEventListener("pointerup", e => endDrag(e, false));
+cvM.addEventListener("pointercancel", e => endDrag(e, true));
+cvM.addEventListener("pointerleave", () => { if (!drag) hoverLevel = -1; });
+cvP.addEventListener("pointerdown", e => {
+  const [px] = local(e, cvP), k = Math.max(-KMAX_DRAG, Math.min(KMAX_DRAG, pxToK(px)));
+  S.shift = e.shiftKey;
+  install(packet(POTS[S.pot].x0, k, Math.max(S.sigma.momentum, 3)), wantAdd()); resetScaleP = true;
+});
+addEventListener("keydown", e => { if (e.key === "Shift") S.shift = true; if (e.code === "Space" && e.target === document.body) { e.preventDefault(); togglePlay(); } });
+addEventListener("keyup", e => { if (e.key === "Shift") S.shift = false; });
+
+// ---------- controls ----------
+const $ = id => document.getElementById(id);
+function segBind(id, key, after) {
+  const el = $(id);
+  const sync = () => el.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === S[key])));
+  el.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; S[key] = b.dataset.v; sync(); after && after(); });
+  sync(); return sync;
+}
+const SIG_MIN = 0.15, SIG_MAX = 8;
+const sigToR = s => 100 * Math.log(s / SIG_MIN) / Math.log(SIG_MAX / SIG_MIN), rToSig = r => SIG_MIN * Math.pow(SIG_MAX / SIG_MIN, r / 100);
+const HINTS = {
+  position: "Press the plot to drop a narrow Gaussian packet (close to a position eigenstate); drag sideways to give it momentum. Or set x₀, k₀, σ exactly and tap Drop.",
+  momentum: "Press to place a wide Gaussian packet (close to a momentum eigenstate); drag sideways to set k. Or press the momentum strip below to pick k.",
+  energy: "Hover or press to load an eigenstate. Tick “Add” (or hold Shift) to stack levels into a superposition. Blue bars show |cₙ|².",
+  bump: "Press where the peak should go: left–right sets the center, up–down sets the height V₀ (below zero makes a dip). Drag to adjust before letting go.",
+};
+function syncPacketInputs() {
+  const sg = packetSigma();
+  $("x0r").value = S.pk.x0; $("x0n").value = S.pk.x0.toFixed(1);
+  $("k0r").value = S.pk.k; $("k0n").value = S.pk.k.toFixed(2);
+  $("sigma").value = sigToR(sg); $("sigN").value = sg.toFixed(2);
+}
+function syncMode() {
+  $("packetCtl").hidden = !isPacketMode();
+  $("bumpCtl").hidden = S.mode !== "bump";
+  $("addRow").hidden = S.mode === "bump";
+  if (isPacketMode()) syncPacketInputs();
+  $("hint").textContent = $("hint2").textContent = HINTS[S.mode];
+  cvM.style.cursor = S.mode === "energy" ? "pointer" : "crosshair";
+}
+segBind("mode", "mode", syncMode);
+const poke = () => { ghostUntil = performance.now() + 1800; };
+const num = (v, lo, hi, d) => { v = parseFloat(v); return Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d; };
+$("x0r").addEventListener("input", e => { S.pk.x0 = +e.target.value; $("x0n").value = S.pk.x0.toFixed(1); poke(); });
+$("x0n").addEventListener("change", e => { S.pk.x0 = num(e.target.value, -19, 19, S.pk.x0); syncPacketInputs(); poke(); });
+$("k0r").addEventListener("input", e => { S.pk.k = +e.target.value; $("k0n").value = S.pk.k.toFixed(2); poke(); });
+$("k0n").addEventListener("change", e => { S.pk.k = num(e.target.value, -20, 20, S.pk.k); syncPacketInputs(); poke(); });
+const setSig = v => { S.sigma[S.mode === "momentum" ? "momentum" : "position"] = v; };
+$("sigma").addEventListener("input", e => { const v = rToSig(+e.target.value); setSig(v); $("sigN").value = v.toFixed(2); poke(); });
+$("sigN").addEventListener("change", e => { setSig(num(e.target.value, SIG_MIN, SIG_MAX, packetSigma())); syncPacketInputs(); poke(); });
+$("drop").addEventListener("click", () => { S.shift = false; dropPacket(); });
+$("add").addEventListener("change", e => S.add = e.target.checked);
+
+$("bw").addEventListener("input", e => { S.bw = +e.target.value; $("bwVal").textContent = S.bw.toFixed(2); });
+function syncBumps() {
+  const n = S.bumps.length;
+  $("bumpUndo").disabled = $("bumpClear").disabled = n === 0;
+  $("bumpClear").textContent = n ? `Clear bumps (${n})` : "Clear bumps";
+  $("bumpNote").textContent = n ? `Plus ${n} Gaussian bump${n > 1 ? "s" : ""} added on top. Clear them under Create → V bump.` : "";
+  $("bumpNote").hidden = !n;
+}
+$("bumpUndo").addEventListener("click", () => { S.bumps.pop(); buildPotential(); syncBumps(); });
+$("bumpClear").addEventListener("click", () => { S.bumps = []; buildPotential(); syncBumps(); });
+
+const NOTES = {
+  phase: "Height is |ψ|, color is the phase arg ψ. A moving packet shows stripes of color; a stationary state holds one color that cycles in time.",
+  reim: "Re ψ in blue, Im ψ in pink, ±|ψ| as the faint envelope.",
+  prob: "Probability density |ψ|². The phase is invisible here.",
+};
+segBind("view", "view", () => { $("legend").hidden = S.view !== "phase"; $("viewNote").textContent = NOTES[S.view]; });
+$("legend").hidden = S.view !== "phase"; $("viewNote").textContent = NOTES[S.view];
+const syncEdges = segBind("edges", "edges", buildPotential);
+
+const potsEl = $("pots");
+for (const k in POTS) { const b = document.createElement("button"); b.type = "button"; b.dataset.v = k; b.id = "pot-" + k; b.textContent = POTS[k].name; potsEl.appendChild(b); }
+function syncPot() {
+  potsEl.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === S.pot)));
+  const P = POTS[S.pot]; $("paramRow").hidden = !P.param;
+  if (P.param) { const el = $("param"); el.min = P.param.min; el.max = P.param.max; el.step = P.param.step; el.value = curParam(); $("paramLabel").textContent = P.param.label; $("paramVal").textContent = (+curParam()).toFixed(2); }
+}
+potsEl.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; S.pot = b.dataset.v; syncPot(); buildPotential(); });
+let paramPending = false;
+$("param").addEventListener("input", e => {
+  S.params[S.pot] = +e.target.value; $("paramVal").textContent = (+e.target.value).toFixed(2);
+  if (!paramPending) { paramPending = true; requestAnimationFrame(() => { paramPending = false; buildPotential(); }); }
+});
+
+const ICON_PAUSE = '<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><rect x="4.5" y="3.5" width="3.6" height="13" rx="1" fill="currentColor"/><rect x="11.9" y="3.5" width="3.6" height="13" rx="1" fill="currentColor"/></svg><span>Pause</span>';
+const ICON_PLAY = '<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M5.5 3.6v12.8a.8.8 0 0 0 1.2.7l10-6.4a.8.8 0 0 0 0-1.4l-10-6.4a.8.8 0 0 0-1.2.7z" fill="currentColor"/></svg><span>Play</span>';
+function syncPlay() { const b = $("play"); b.innerHTML = S.playing ? ICON_PAUSE : ICON_PLAY; b.setAttribute("aria-label", S.playing ? "Pause" : "Play"); b.title = (S.playing ? "Pause" : "Play") + " (Space)"; }
+function togglePlay() { S.playing = !S.playing; syncPlay(); }
+syncPlay();
+$("play").addEventListener("click", togglePlay);
+$("restart").addEventListener("click", () => { pr.set(p0r); pi.set(p0i); S.t = 0; resetScale = resetScaleP = true; });
+$("speed").addEventListener("input", e => { S.speed = +e.target.value; $("speedVal").textContent = `${(S.speed * DT * 60).toFixed(1)}/s`; });
+$("speedVal").textContent = `${(S.speed * DT * 60).toFixed(1)}/s`;
+
+// tabs (phone and tablet widths)
+let tab = "g-create";
+try { tab = localStorage.getItem("ss-tab") || tab; } catch (e) {}
+function syncTabs() {
+  document.querySelectorAll("#tabs button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.tab === tab)));
+  document.querySelectorAll(".group").forEach(g => g.classList.toggle("active", g.id === tab));
+}
+$("tabs").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; tab = b.dataset.tab; syncTabs(); try { localStorage.setItem("ss-tab", tab); } catch (e) {} });
+
+const PRESETS = [
+  { name: "Tunneling", pot: "barrier", p: 5, speed: 12, pk: [-8, 3, 1.4] },
+  { name: "Coherent state", pot: "harmonic", p: 0.6, speed: 12, pk: [-6, 0, 1 / Math.sqrt(2 * 0.6)] },
+  { name: "Squeezed breathing", pot: "harmonic", p: 0.6, speed: 10, pk: [0, 0, 0.3] },
+  { name: "Two-level beat", pot: "dwell", p: 2.5, speed: 30, view: "prob", make: () => eigen([0, 1]) },
+  { name: "Box revival", pot: "box", p: 16, speed: 60, pk: [-3, 0, 0.35] },
+  { name: "Resonant tunneling", pot: "dbar", p: 6, speed: 14, pk: [-9, 1.9, 2.5] },
+  { name: "Plane wave on a step", pot: "step", p: 4, speed: 14, pk: [-10, 2.4, 3.5] },
+  { name: "Gaussian bump", pot: "free", speed: 12, pk: [-9, 3.2, 1.2], bumps: [{ x0: 0, A: 5, w: 0.8 }] },
+];
+const presetsEl = $("presets");
+PRESETS.forEach((p, i) => {
+  const b = document.createElement("button"); b.type = "button"; b.id = "preset-" + i; b.textContent = p.name;
+  b.addEventListener("click", () => loadPreset(p)); presetsEl.appendChild(b);
+});
+function loadPreset(p) {
+  S.pot = p.pot; if (p.p != null) S.params[p.pot] = p.p; S.edges = "walls"; S.bumps = (p.bumps || []).map(b => ({ ...b }));
+  syncEdges(); syncPot(); buildPotential(); syncBumps();
+  S.speed = p.speed; $("speed").value = p.speed; $("speedVal").textContent = `${(S.speed * DT * 60).toFixed(1)}/s`;
+  if (p.view) { S.view = p.view; $("view").querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === S.view))); $("legend").hidden = S.view !== "phase"; $("viewNote").textContent = NOTES[S.view]; }
+  if (p.pk) { S.pk = { x0: p.pk[0], k: p.pk[1] }; setSig(p.pk[2]); if (isPacketMode()) syncPacketInputs(); install(packet(p.pk[0], p.pk[1], p.pk[2]), false); }
+  else install(p.make(), false);
+  resetScaleP = true;
+  if (!S.playing) togglePlay();
+}
+
+// ---------- boot ----------
+readTokens(); fit(); syncPot(); syncMode(); syncTabs(); syncBumps(); buildPotential();
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", readTokens);
+new MutationObserver(readTokens).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+install(packet(-8, 3, 1.4), false);
+if (matchMedia("(prefers-reduced-motion: reduce)").matches) togglePlay();
+requestAnimationFrame(loop);
+})();
+</script>
+
+</body></html>

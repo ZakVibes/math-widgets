@@ -1,0 +1,865 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Schrödinger Sandbox 2D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@1,500&display=swap">
+<style>
+/* Layout: same instrument bench as the 1D sandbox — square field view with a momentum map and energy ladder beside it, control rail on the right; tabs on phones. */
+:root{
+  --bg:#EDF0F5; --panel:#FFFFFF; --plot:#FAFBFD; --ink:#141A26; --muted:#5A6477; --line:#D5DBE5;
+  --accent:#2C57CF; --accent-soft:rgba(44,87,207,.14); --im:#B5307A;
+  --pot-tint:#B4BED0; --wall:#5D6981; --grid:rgba(20,26,38,.07);
+  --phase-l:48%; --phase-s:78%;
+  --f-sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  --f-math:"IBM Plex Serif",Georgia,"Times New Roman",serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0C111B; --panel:#131A27; --plot:#0D121D; --ink:#E3E8F1; --muted:#8C97AC; --line:#253046;
+  --accent:#7FA0FF; --accent-soft:rgba(127,160,255,.16); --im:#F07AB7;
+  --pot-tint:#2C3854; --wall:#8995B0; --grid:rgba(227,232,241,.06);
+  --phase-l:60%; --phase-s:75%; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#0C111B; --panel:#131A27; --plot:#0D121D; --ink:#E3E8F1; --muted:#8C97AC; --line:#253046;
+  --accent:#7FA0FF; --accent-soft:rgba(127,160,255,.16); --im:#F07AB7;
+  --pot-tint:#2C3854; --wall:#8995B0; --grid:rgba(227,232,241,.06);
+  --phase-l:60%; --phase-s:75%; color-scheme:dark }
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-sans);font-size:14px;line-height:1.45;margin:0;padding:20px 16px 32px}
+@media (min-width:700px){body{padding-inline:24px}}
+.wrap{max-width:1360px;margin:0 auto;display:grid;gap:16px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px}
+h1{font-size:22px;font-weight:600;margin:0;letter-spacing:-.01em;text-wrap:balance}
+.sub{color:var(--muted);margin:0}
+.sub code{font-family:var(--f-mono);font-size:12.5px}
+.app{display:grid;gap:16px;grid-template-columns:minmax(0,1fr)}
+@media (min-width:1080px){.app{grid-template-columns:minmax(0,1fr) 320px}}
+.bench{align-self:start;align-content:start;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;display:grid;gap:10px;min-width:0}
+.topbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 14px}
+.readout{flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:4px 16px;font-family:var(--f-mono);font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.readout b{color:var(--ink);font-weight:500}
+.tbtns{display:flex;gap:6px}
+.stage{display:grid;gap:10px;grid-template-columns:minmax(0,1fr) 210px;align-items:stretch}
+.fieldbox{min-width:0;display:flex;justify-content:center}
+canvas{display:block;border-radius:6px;background:var(--plot)}
+#field{width:min(100%,74vh);aspect-ratio:1;max-width:100%;touch-action:none;cursor:crosshair}
+.side{display:flex;flex-direction:column;gap:10px;min-width:0}
+#mom{width:100%;aspect-ratio:1;max-width:100%;cursor:pointer;touch-action:none}
+#ladder{width:100%;flex:1 1 0;min-height:180px;cursor:pointer;touch-action:none}
+.hint{font-size:13px;color:var(--muted);margin:0}
+.rail{display:grid;gap:14px;align-content:start;min-width:0}
+.group{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;display:grid;gap:10px}
+.group h2{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin:0}
+.lbl{font-size:12px;color:var(--muted);margin:0 0 -4px}
+.seg{display:flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.seg button{flex:1;min-width:0;border:0;background:transparent;color:var(--ink);font:inherit;font-size:13px;padding:7px 4px;cursor:pointer;border-left:1px solid var(--line)}
+.seg button:first-child{border-left:0}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--panel);font-weight:500}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{border:1px solid var(--line);background:transparent;color:var(--ink);font:inherit;font-size:12.5px;padding:5px 9px;border-radius:999px;cursor:pointer}
+.chips button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.chips button:hover{border-color:var(--accent)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ctl{display:grid;gap:8px}
+.row{display:flex;align-items:center;gap:10px}
+.row label{flex:0 0 auto;font-size:13px}
+.row input[type=range]{flex:1;min-width:0;accent-color:var(--accent)}
+.sym{font-family:var(--f-math);font-style:italic;font-size:15px !important;width:22px}
+input[type=number]{width:66px;flex:0 0 auto;font-family:var(--f-mono);font-size:12.5px;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:5px;padding:4px 6px;font-variant-numeric:tabular-nums}
+.val{font-family:var(--f-mono);font-size:12.5px;min-width:44px;text-align:right;font-variant-numeric:tabular-nums}
+.check{display:flex;gap:8px;align-items:center;font-size:13px;cursor:pointer}
+.check input{accent-color:var(--accent);margin:0}
+.btns{display:flex;gap:8px}
+.btn{flex:1;border:1px solid var(--line);background:transparent;color:var(--ink);font:inherit;font-size:13px;padding:7px 10px;border-radius:7px;cursor:pointer}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--panel);font-weight:500}
+.tbtns .btn{flex:0 0 auto;padding:5px 12px;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.tbtns svg{display:block}
+.legend{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--muted)}
+.wheel{width:34px;height:34px;border-radius:50%;flex:0 0 auto}
+.note{font-size:12.5px;color:var(--muted);margin:0}
+.hint-m{display:none}
+.tabs{display:none;gap:4px;border-bottom:1px solid var(--line)}
+.tabs button{flex:1;border:0;background:transparent;color:var(--muted);font:inherit;font-size:13.5px;font-weight:500;padding:10px 4px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button[aria-pressed="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+@media (max-width:1079px){
+  .tabs{display:flex}
+  .rail{gap:10px}
+  .group{display:none}
+  .group.active{display:grid}
+  .group h2{display:none}
+}
+@media (max-width:760px){
+  body{padding-top:14px}
+  .sub{font-size:13px}
+  .stage{grid-template-columns:minmax(0,1fr)}
+  #field{width:100%}
+  .side{flex-direction:row;height:128px}
+  #mom{width:128px;height:128px;flex:0 0 auto}
+  #ladder{flex:1 1 0;min-width:0;height:128px;min-height:0}
+  .bench .hint{display:none}
+  .hint-m{display:block}
+  .readout{font-size:11.5px;gap:2px 12px}
+  .tbtns .btn span{display:none}
+  .tbtns .btn{min-width:42px;min-height:36px;padding:4px 10px}
+  .seg button{min-height:40px}
+  .chips button{padding:8px 12px;font-size:13px}
+  .btn{min-height:38px}
+  .row{min-height:34px}
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <a href="../index.html" style="display:table;flex-basis:100%;margin-bottom:6px;font-size:13px;color:inherit;opacity:.7;text-decoration:none">← All widgets</a>
+    <h1>Schrödinger Sandbox 2D</h1>
+    <p class="sub">One particle in a plane, <code>ħ = m = 1</code>, square box of side 20. Press the field to place a state.</p>
+  </header>
+
+  <div class="app">
+    <section class="bench" aria-label="Simulation">
+      <div class="topbar">
+        <div class="readout">
+          <span>t <b id="r-t">0.00</b></span>
+          <span>⟨x, y⟩ <b id="r-x">0, 0</b></span>
+          <span>⟨p⟩ <b id="r-p">0, 0</b></span>
+          <span>⟨E⟩ <b id="r-e">0</b></span>
+          <span>∫|ψ|² <b id="r-n">1.000</b></span>
+        </div>
+        <div class="tbtns">
+          <button type="button" class="btn primary" id="play" aria-label="Pause"></button>
+          <button type="button" class="btn" id="restart" aria-label="Restart" title="Restart from the last state you made"><svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M4.5 10a5.5 5.5 0 1 0 1.8-4.1" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M5.6 2.6v3.7h3.7" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Restart</span></button>
+        </div>
+      </div>
+      <div class="stage">
+        <div class="fieldbox"><canvas id="field" aria-label="Wavefunction in the plane. Press to create a state."></canvas></div>
+        <div class="side">
+          <canvas id="mom" aria-label="Momentum distribution. Press to create a momentum state."></canvas>
+          <canvas id="ladder" aria-label="Energy levels. Press a level to load that eigenstate."></canvas>
+        </div>
+      </div>
+      <p class="hint" id="hint"></p>
+    </section>
+
+    <aside class="rail">
+      <nav class="tabs" id="tabs" aria-label="Control panels">
+        <button type="button" data-tab="g-create">Create</button>
+        <button type="button" data-tab="g-pot">Potential</button>
+        <button type="button" data-tab="g-show">View</button>
+        <button type="button" data-tab="g-ex">Examples</button>
+      </nav>
+
+      <div class="group" id="g-create">
+        <h2>Press the field to…</h2>
+        <p class="lbl">Make a state</p>
+        <div class="seg tool">
+          <button type="button" id="t-position" data-v="position">Position</button>
+          <button type="button" id="t-momentum" data-v="momentum">Momentum</button>
+          <button type="button" id="t-energy" data-v="energy">Energy</button>
+        </div>
+        <p class="lbl">Edit the potential</p>
+        <div class="seg tool">
+          <button type="button" id="t-bump" data-v="bump">Gaussian bump</button>
+          <button type="button" id="t-wall" data-v="wall">Paint walls</button>
+        </div>
+
+        <div class="ctl" id="packetCtl">
+          <div class="row"><label for="x0r" class="sym">x₀</label><input type="range" id="x0r" min="-9.5" max="9.5" step="0.1"><input type="number" id="x0n" min="-9.5" max="9.5" step="0.1" aria-label="Center x₀"></div>
+          <div class="row"><label for="y0r" class="sym">y₀</label><input type="range" id="y0r" min="-9.5" max="9.5" step="0.1"><input type="number" id="y0n" min="-9.5" max="9.5" step="0.1" aria-label="Center y₀"></div>
+          <div class="row"><label for="kxr" class="sym">kₓ</label><input type="range" id="kxr" min="-10" max="10" step="0.05"><input type="number" id="kxn" min="-10" max="10" step="0.05" aria-label="Momentum kₓ"></div>
+          <div class="row"><label for="kyr" class="sym">k<sub>y</sub></label><input type="range" id="kyr" min="-10" max="10" step="0.05"><input type="number" id="kyn" min="-10" max="10" step="0.05" aria-label="Momentum k_y"></div>
+          <div class="row"><label for="sgr" class="sym">σ</label><input type="range" id="sgr" min="0" max="100" step="0.5"><input type="number" id="sgn" min="0.3" max="5" step="0.01" aria-label="Width σ"></div>
+          <button type="button" class="btn primary" id="drop">Drop Gaussian packet</button>
+        </div>
+        <div class="ctl" id="energyCtl"><p class="note">Pick a level on the energy ladder beside the field. Hovering a level previews its eigenstate.</p></div>
+        <div class="ctl" id="bumpCtl">
+          <div class="row"><label for="bh">Height V₀</label><input type="range" id="bh" min="-20" max="20" step="0.25" value="6"><span class="val" id="bhVal">6.00</span></div>
+          <div class="row"><label for="bw">Width</label><input type="range" id="bw" min="0.2" max="3" step="0.05" value="0.8"><span class="val" id="bwVal">0.80</span></div>
+          <div class="btns"><button type="button" class="btn" id="bumpUndo">Undo last</button><button type="button" class="btn" id="bumpClear">Clear bumps</button></div>
+        </div>
+        <div class="ctl" id="wallCtl">
+          <div class="seg" id="brushMode">
+            <button type="button" id="b-paint" data-v="paint">Paint</button>
+            <button type="button" id="b-erase" data-v="erase">Erase</button>
+          </div>
+          <div class="row"><label for="brush">Brush</label><input type="range" id="brush" min="0.15" max="1.5" step="0.05" value="0.35"><span class="val" id="brushVal">0.35</span></div>
+          <button type="button" class="btn" id="wallClear">Clear painted walls</button>
+        </div>
+        <p class="note hint-m" id="hint2"></p>
+        <label class="check" id="addRow"><input type="checkbox" id="add"> Add to current state (or hold Shift)</label>
+      </div>
+
+      <div class="group" id="g-pot">
+        <h2>Potential</h2>
+        <div class="chips" id="pots"></div>
+        <div class="row" id="paramRow"><label for="param" id="paramLabel">Height</label><input type="range" id="param"><span class="val" id="paramVal"></span></div>
+        <div class="seg" id="edges">
+          <button type="button" id="e-walls" data-v="walls">Hard edges</button>
+          <button type="button" id="e-absorb" data-v="absorb">Absorbing edges</button>
+        </div>
+        <p class="note" id="extraNote"></p>
+      </div>
+
+      <div class="group" id="g-show">
+        <h2>View and time</h2>
+        <div class="seg" id="view">
+          <button type="button" id="v-phase" data-v="phase">ψ + phase</button>
+          <button type="button" id="v-re" data-v="re">Re ψ</button>
+          <button type="button" id="v-prob" data-v="prob">|ψ|²</button>
+        </div>
+        <div class="legend" id="legend"><div class="wheel" id="wheel"></div><span id="viewNote"></span></div>
+        <div class="row"><label for="speed">Speed</label><input type="range" id="speed" min="1" max="20" step="1" value="4"><span class="val" id="speedVal"></span></div>
+      </div>
+
+      <div class="group" id="g-ex">
+        <h2>Examples</h2>
+        <div class="chips" id="presets"></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+(() => {
+"use strict";
+// ---------- grid ----------
+const n = 128, N2 = n * n, L = 20, XMIN = -10, DX = L / n, DT = 0.008, WALL = 100, KMAX = 10, KVIEW = 12, NLEV = 24;
+const XC = new Float64Array(n); for (let i = 0; i < n; i++) XC[i] = XMIN + (i + 0.5) * DX;
+const K1 = new Float64Array(n), T1 = new Float64Array(n);
+for (let i = 0; i < n; i++) { K1[i] = 2 * Math.PI / L * (i < n / 2 ? i : i - n); T1[i] = (1 - Math.cos(K1[i] * DX)) / (DX * DX); }
+
+// ---------- FFT ----------
+const BITS = Math.log2(n), rev = new Uint16Array(n), cosT = new Float64Array(n / 2), sinT = new Float64Array(n / 2);
+for (let i = 0; i < n; i++) { let r = 0; for (let b = 0; b < BITS; b++) r |= ((i >> b) & 1) << (BITS - 1 - b); rev[i] = r; }
+for (let i = 0; i < n / 2; i++) { cosT[i] = Math.cos(2 * Math.PI * i / n); sinT[i] = Math.sin(2 * Math.PI * i / n); }
+const br = new Float64Array(n), bi = new Float64Array(n);
+function fft1(re, im, inv) {
+  for (let i = 0; i < n; i++) { const j = rev[i]; if (j > i) { let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; } }
+  for (let size = 2; size <= n; size <<= 1) {
+    const half = size >> 1, step = n / size;
+    for (let i = 0; i < n; i += size) for (let j = 0; j < half; j++) {
+      const wr = cosT[j * step], wi = inv ? sinT[j * step] : -sinT[j * step];
+      const a = i + j, b = a + half, tr = wr * re[b] - wi * im[b], ti = wr * im[b] + wi * re[b];
+      re[b] = re[a] - tr; im[b] = im[a] - ti; re[a] += tr; im[a] += ti;
+    }
+  }
+}
+function fft2(re, im, inv) {
+  for (let r = 0; r < n; r++) {
+    const o = r * n; for (let i = 0; i < n; i++) { br[i] = re[o + i]; bi[i] = im[o + i]; }
+    fft1(br, bi, inv); for (let i = 0; i < n; i++) { re[o + i] = br[i]; im[o + i] = bi[i]; }
+  }
+  for (let c = 0; c < n; c++) {
+    for (let i = 0; i < n; i++) { br[i] = re[i * n + c]; bi[i] = im[i * n + c]; }
+    fft1(br, bi, inv); for (let i = 0; i < n; i++) { re[i * n + c] = br[i]; im[i * n + c] = bi[i]; }
+  }
+  if (inv) { const s = 1 / N2; for (let i = 0; i < N2; i++) { re[i] *= s; im[i] *= s; } }
+}
+
+// ---------- potentials (index = j*n + i, x = XC[i], y = XC[j]) ----------
+const inStadium = (x, y, a, R) => (Math.abs(x) <= a && Math.abs(y) < R) || Math.hypot(Math.abs(x) - a, y) < R;
+const POTS = {
+  free:     { name: "Free", V: () => 0, c0: [-5, 0] },
+  box:      { name: "Square box", param: { label: "Side", min: 4, max: 19, step: 0.5, def: 12 }, V: (x, y, p) => Math.abs(x) > p / 2 || Math.abs(y) > p / 2 ? WALL : 0, c0: [-2, 0] },
+  disk:     { name: "Disk", param: { label: "Radius", min: 2, max: 9.5, step: 0.25, def: 7 }, V: (x, y, p) => x * x + y * y > p * p ? WALL : 0, c0: [-3, 0] },
+  stadium:  { name: "Stadium", param: { label: "Straight part", min: 0, max: 5, step: 0.25, def: 3 }, V: (x, y, p) => inStadium(x, y, p, 5) ? 0 : WALL, c0: [-2, 1] },
+  harmonic: { name: "Harmonic", param: { label: "ω", min: 0.2, max: 2, step: 0.05, def: 0.7 }, V: (x, y, p) => Math.min(WALL, 0.5 * p * p * (x * x + y * y)), c0: [-4, 0] },
+  dslit:    { name: "Double slit", param: { label: "Slit spacing", min: 1.2, max: 8, step: 0.1, def: 3 }, V: (x, y, p) => Math.abs(x) < 0.3 && Math.abs(Math.abs(y) - p / 2) > 0.45 ? WALL : 0, c0: [-6, 0] },
+  sslit:    { name: "Single slit", param: { label: "Slit width", min: 0.3, max: 5, step: 0.05, def: 1 }, V: (x, y, p) => Math.abs(x) < 0.3 && Math.abs(y) > p / 2 ? WALL : 0, c0: [-6, 0] },
+  barrier:  { name: "Barrier", param: { label: "Height", min: 0.5, max: 30, step: 0.5, def: 10 }, V: (x, y, p) => Math.abs(x) < 0.35 ? p : 0, c0: [-6, 0] },
+  lattice:  { name: "Lattice", param: { label: "Depth", min: 0.5, max: 12, step: 0.25, def: 4 }, V: (x, y, p) => p * (Math.sin(Math.PI * x / 2.5) ** 2 + Math.sin(Math.PI * y / 2.5) ** 2), c0: [-5, 0] },
+  coulomb:  { name: "Soft Coulomb", param: { label: "Strength", min: 0.5, max: 5, step: 0.1, def: 2 }, V: (x, y, p) => -p / Math.sqrt(x * x + y * y + 0.3), c0: [-4, 0] },
+};
+
+// ---------- state ----------
+const S = {
+  pot: "dslit", params: {}, edges: "absorb", tool: "position", view: "phase", brushMode: "paint",
+  sigma: { position: 0.6, momentum: 2.2 }, pk: { x0: -5.5, y0: 0, kx: 4.5, ky: 0 },
+  bumps: [], bh: 6, bw: 0.8, brush: 0.35, walls: new Uint8Array(N2),
+  playing: true, speed: 4, t: 0, add: false, shift: false,
+};
+for (const k in POTS) if (POTS[k].param) S.params[k] = POTS[k].param.def;
+const pr = new Float64Array(N2), pi = new Float64Array(N2);
+let p0r = new Float64Array(N2), p0i = new Float64Array(N2);
+const Vt = new Float64Array(N2), vc = new Float64Array(N2), vs = new Float64Array(N2), tc = new Float64Array(N2), ts = new Float64Array(N2);
+const isWall = new Uint8Array(N2);
+for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const T = T1[i] + T1[j], q = j * n + i; tc[q] = Math.cos(-T * DT); ts[q] = Math.sin(-T * DT); }
+let vmin = 0, vref = 1;
+
+function buildPotential(skipEigen) {
+  const P = POTS[S.pot], p = S.params[S.pot];
+  vmin = Infinity; let vmaxIn = -Infinity;
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+    const q = j * n + i, x = XC[i], y = XC[j];
+    let v = P.V(x, y, p);
+    for (const b of S.bumps) { const dx = x - b.x0, dy = y - b.y0; v += b.A * Math.exp(-(dx * dx + dy * dy) / (2 * b.w * b.w)); }
+    if (S.walls[q]) v = WALL;
+    if (S.edges === "walls" && (Math.abs(x) > 9.7 || Math.abs(y) > 9.7)) v = WALL;
+    v = Math.min(v, WALL);
+    Vt[q] = v; isWall[q] = v >= WALL ? 1 : 0;
+    if (v < vmin) vmin = v;
+    if (v < WALL && v > vmaxIn) vmaxIn = v;
+    let g = 0;
+    if (S.edges === "absorb") { const d = 10 - Math.max(Math.abs(x), Math.abs(y)); if (d < 2.5) g = 25 * ((2.5 - d) / 2.5) ** 2; }
+    const amp = Math.exp(-g * DT / 2), ph = -v * DT / 2;
+    vc[q] = amp * Math.cos(ph); vs[q] = amp * Math.sin(ph);
+  }
+  vref = Math.max(1, Math.min(20, vmaxIn - vmin));
+  potDirty = true;
+  if (!skipEigen) scheduleEigen();
+}
+
+// ---------- eigenstates: Chebyshev-filtered subspace iteration in a worker ----------
+const WORKER_SRC = `
+self.onmessage = (ev) => {
+  const { id, V, n, dx, M } = ev.data, N2 = n * n, inv = 1 / (dx * dx), k = M + 8, deg = 14;
+  let vmin = Infinity, vmax = -Infinity; for (let i = 0; i < N2; i++) { if (V[i] < vmin) vmin = V[i]; if (V[i] > vmax) vmax = V[i]; }
+  const hi = vmax + 4 * inv + 1;
+  function H(s, d) {
+    for (let j = 0; j < n; j++) { const jp = ((j + 1) % n) * n, jm = ((j + n - 1) % n) * n, o = j * n;
+      for (let i = 0; i < n; i++) { const ip = (i + 1) % n, im = (i + n - 1) % n, q = o + i;
+        d[q] = -0.5 * inv * (s[o + ip] + s[o + im] + s[jp + i] + s[jm + i] - 4 * s[q]) + V[q] * s[q]; } }
+  }
+  const dot = (a, b) => { let s = 0; for (let i = 0; i < N2; i++) s += a[i] * b[i]; return s; };
+  function orth(X) { for (let pass = 0; pass < 2; pass++) for (let a = 0; a < X.length; a++) {
+    const xa = X[a]; for (let b = 0; b < a; b++) { const s = dot(X[b], xa), xb = X[b]; for (let i = 0; i < N2; i++) xa[i] -= s * xb[i]; }
+    let nn = Math.sqrt(dot(xa, xa)); if (nn < 1e-300) { for (let i = 0; i < N2; i++) xa[i] = Math.random() - .5; nn = Math.sqrt(dot(xa, xa)); } for (let i = 0; i < N2; i++) xa[i] /= nn; } }
+  function jacobi(A, m) {
+    const Q = []; for (let i = 0; i < m; i++) { Q.push(new Float64Array(m)); Q[i][i] = 1; }
+    for (let sweep = 0; sweep < 60; sweep++) { let off = 0;
+      for (let p = 0; p < m; p++) for (let q = p + 1; q < m; q++) off += A[p][q] * A[p][q];
+      if (off < 1e-22) break;
+      for (let p = 0; p < m; p++) for (let q = p + 1; q < m; q++) { if (Math.abs(A[p][q]) < 1e-30) continue;
+        const th = (A[q][q] - A[p][p]) / (2 * A[p][q]), t = Math.sign(th || 1) / (Math.abs(th) + Math.sqrt(th * th + 1)), c = 1 / Math.sqrt(t * t + 1), s = t * c;
+        for (let r = 0; r < m; r++) { const ap = A[r][p], aq = A[r][q]; A[r][p] = c * ap - s * aq; A[r][q] = s * ap + c * aq; }
+        for (let r = 0; r < m; r++) { const ap = A[p][r], aq = A[q][r]; A[p][r] = c * ap - s * aq; A[q][r] = s * ap + c * aq; }
+        for (let r = 0; r < m; r++) { const qp = Q[r][p], qq = Q[r][q]; Q[r][p] = c * qp - s * qq; Q[r][q] = s * qp + c * qq; } } }
+    return Q;
+  }
+  let seed = 12345; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647 - 0.5;
+  let X = []; for (let a = 0; a < k; a++) { const v = new Float64Array(N2); for (let i = 0; i < N2; i++) v[i] = V[i] >= 99 ? 0 : rnd(); X.push(v); }
+  orth(X);
+  const t0 = new Float64Array(N2), t1 = new Float64Array(N2), t2 = new Float64Array(N2), t3 = new Float64Array(N2);
+  let cut = vmin + (hi - vmin) * 0.03, vals = null;
+  for (let it = 0; it < 80; it++) {
+    const e = (hi - cut) / 2, c = (hi + cut) / 2;
+    for (let a = 0; a < k; a++) {
+      let ya = t0, yb = t1, yc = t3; ya.set(X[a]); H(ya, t2); for (let i = 0; i < N2; i++) yb[i] = (t2[i] - c * ya[i]) / e;
+      for (let d = 2; d <= deg; d++) { H(yb, t2); for (let i = 0; i < N2; i++) yc[i] = 2 * (t2[i] - c * yb[i]) / e - ya[i]; const tmp = ya; ya = yb; yb = yc; yc = tmp; }
+      X[a].set(yb);
+    }
+    orth(X);
+    const HX = X.map(x => { const d = new Float64Array(N2); H(x, d); return d; });
+    const A = []; for (let p = 0; p < k; p++) { A.push(new Float64Array(k)); }
+    for (let p = 0; p < k; p++) for (let q = p; q < k; q++) { const v = dot(X[p], HX[q]); A[p][q] = v; A[q][p] = v; }
+    const Q = jacobi(A, k);
+    const order = [...Array(k).keys()].sort((u, w) => A[u][u] - A[w][w]);
+    vals = order.map(u => A[u][u]);
+    const NX = [], NH = [];
+    for (const u of order) { const x = new Float64Array(N2), h = new Float64Array(N2);
+      for (let r = 0; r < k; r++) { const w = Q[r][u]; if (w === 0) continue; const xr = X[r], hr = HX[r]; for (let i = 0; i < N2; i++) { x[i] += w * xr[i]; h[i] += w * hr[i]; } }
+      NX.push(x); NH.push(h); }
+    X = NX;
+    let worst = 0;
+    for (let a = 0; a < M; a++) { let s = 0; const x = X[a], h = NH[a], l = vals[a]; for (let i = 0; i < N2; i++) { const r = h[i] - l * x[i]; s += r * r; } worst = Math.max(worst, Math.sqrt(s)); }
+    cut = vals[k - 1];
+    self.postMessage({ id, progress: Math.min(0.97, Math.max(0.05, 1 - Math.log10(Math.max(worst, 1e-3) / 1e-3) / 4)) });
+    if (worst < 1.5e-3 && it > 1) break;
+  }
+  const out = new Float32Array(M * N2);
+  for (let a = 0; a < M; a++) { const x = X[a]; let m = 0, idx = 0; for (let i = 0; i < N2; i++) if (Math.abs(x[i]) > m) { m = Math.abs(x[i]); idx = i; }
+    const sg = x[idx] < 0 ? -1 : 1; for (let i = 0; i < N2; i++) out[a * N2 + i] = sg * x[i]; }
+  self.postMessage({ id, E: Float64Array.from(vals.slice(0, M)), vecs: out }, [out.buffer]);
+};`;
+const workerURL = URL.createObjectURL(new Blob([WORKER_SRC], { type: "text/javascript" }));
+let worker = null, eigenId = 0, eigenTimer = 0, levels = null, vecs = null, eigProgress = 0, pops = [];
+function scheduleEigen() {
+  clearTimeout(eigenTimer);
+  levels = null; vecs = null; pops = []; eigProgress = 0; hoverLevel = -1;
+  eigenTimer = setTimeout(runEigen, 220);
+}
+function runEigen() {
+  if (worker) worker.terminate();
+  try { worker = new Worker(workerURL); } catch (e) { eigProgress = -1; return; }
+  const id = ++eigenId;
+  worker.onmessage = ev => {
+    const d = ev.data; if (d.id !== eigenId) return;
+    if (d.progress != null) { eigProgress = d.progress; return; }
+    levels = Array.from(d.E); vecs = [];
+    for (let a = 0; a < levels.length; a++) vecs.push(d.vecs.subarray(a * N2, (a + 1) * N2));
+    worker.terminate(); worker = null;
+  };
+  worker.onerror = () => { eigProgress = -1; };
+  worker.postMessage({ id, V: Float64Array.from(Vt), n, dx: DX, M: NLEV });
+}
+
+// ---------- making states ----------
+function normalize(re, im) {
+  let s = 0; for (let i = 0; i < N2; i++) s += re[i] * re[i] + im[i] * im[i];
+  s = Math.sqrt(s * DX * DX); if (s < 1e-12) return false;
+  for (let i = 0; i < N2; i++) { re[i] /= s; im[i] /= s; } return true;
+}
+function packet(x0, y0, kx, ky, sg) {
+  const re = new Float64Array(N2), im = new Float64Array(N2), f = 1 / (4 * sg * sg);
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+    const q = j * n + i; if (isWall[q]) continue;
+    const dx = XC[i] - x0, dy = XC[j] - y0, a = Math.exp(-(dx * dx + dy * dy) * f), ph = kx * XC[i] + ky * XC[j];
+    re[q] = a * Math.cos(ph); im[q] = a * Math.sin(ph);
+  }
+  return normalize(re, im) ? [re, im] : null;
+}
+function eigen(list) {
+  if (!vecs) return null;
+  const re = new Float64Array(N2), im = new Float64Array(N2);
+  for (const m of list) { const v = vecs[m]; if (v) for (let i = 0; i < N2; i++) re[i] += v[i]; }
+  return normalize(re, im) ? [re, im] : null;
+}
+function install(st, add) {
+  if (!st) return;
+  const [re, im] = st;
+  if (add) { for (let i = 0; i < N2; i++) { pr[i] += re[i]; pi[i] += im[i]; } if (!normalize(pr, pi)) { pr.set(re); pi.set(im); } }
+  else { pr.set(re); pi.set(im); }
+  p0r = pr.slice(); p0i = pi.slice(); S.t = 0; resetScale = true;
+}
+const wantAdd = () => S.add || S.shift;
+const sigmaKey = () => S.tool === "momentum" ? "momentum" : "position";
+const packetSigma = () => S.sigma[sigmaKey()];
+function dropPacket() { const k = S.pk; install(packet(k.x0, k.y0, k.kx, k.ky, packetSigma()), wantAdd()); }
+
+// ---------- time step ----------
+function step() {
+  for (let i = 0; i < N2; i++) { const a = pr[i], b = pi[i]; pr[i] = a * vc[i] - b * vs[i]; pi[i] = a * vs[i] + b * vc[i]; }
+  fft2(pr, pi, false);
+  for (let i = 0; i < N2; i++) { const a = pr[i], b = pi[i]; pr[i] = a * tc[i] - b * ts[i]; pi[i] = a * ts[i] + b * tc[i]; }
+  fft2(pr, pi, true);
+  for (let i = 0; i < N2; i++) { const a = pr[i], b = pi[i]; pr[i] = a * vc[i] - b * vs[i]; pi[i] = a * vs[i] + b * vc[i]; }
+}
+
+// ---------- observables ----------
+const wr = new Float64Array(N2), wi = new Float64Array(N2);
+const obs = { norm: 1, x: 0, y: 0, px: 0, py: 0, E: 0 };
+function measure() {
+  let nn = 0, sx = 0, sy = 0, sv = 0;
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const q = j * n + i, r = pr[q] * pr[q] + pi[q] * pi[q]; nn += r; sx += r * XC[i]; sy += r * XC[j]; sv += r * (isWall[q] ? 0 : Vt[q]); }
+  const a2 = DX * DX; nn *= a2; sx *= a2; sy *= a2; sv *= a2;
+  wr.set(pr); wi.set(pi); fft2(wr, wi, false);
+  let sk = 0, kx = 0, ky = 0, st = 0;
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const q = j * n + i, r = wr[q] * wr[q] + wi[q] * wi[q]; sk += r; kx += r * K1[i]; ky += r * K1[j]; st += r * (T1[i] + T1[j]); }
+  obs.norm = nn; obs.x = nn > 1e-9 ? sx / nn : 0; obs.y = nn > 1e-9 ? sy / nn : 0;
+  obs.px = sk > 0 ? kx / sk : 0; obs.py = sk > 0 ? ky / sk : 0; obs.E = (sk > 0 ? st / sk : 0) + (nn > 1e-9 ? sv / nn : 0);
+  if (vecs) pops = vecs.map(v => { let a = 0, b = 0; for (let i = 0; i < N2; i++) { a += v[i] * pr[i]; b += v[i] * pi[i]; } return (a * a + b * b) * a2 / Math.max(nn, 1e-12); });
+}
+
+// ---------- drawing helpers ----------
+const cvF = document.getElementById("field"), cvK = document.getElementById("mom"), cvL = document.getElementById("ladder");
+const ctxF = cvF.getContext("2d"), ctxK = cvK.getContext("2d"), ctxL = cvL.getContext("2d");
+const size = { F: [0, 0], K: [0, 0], L: [0, 0] };
+function fit() {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  for (const [cv, ctx, key] of [[cvF, ctxF, "F"], [cvK, ctxK, "K"], [cvL, ctxL, "L"]]) {
+    const r = cv.getBoundingClientRect(); cv.width = Math.max(1, Math.round(r.width * dpr)); cv.height = Math.max(1, Math.round(r.height * dpr));
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); size[key] = [r.width, r.height];
+  }
+}
+const ro = new ResizeObserver(fit); [cvF, cvK, cvL].forEach(c => ro.observe(c));
+
+let C = {}, HUE = new Uint8ClampedArray(360 * 3);
+function hexRGB(h) { h = h.replace("#", ""); if (h.length === 3) h = h.split("").map(c => c + c).join(""); const v = parseInt(h, 16); return [(v >> 16) & 255, (v >> 8) & 255, v & 255]; }
+function hslRGB(h, s, l) { s /= 100; l /= 100; const k = m => (m + h / 30) % 12, a = s * Math.min(l, 1 - l), f = m => l - a * Math.max(-1, Math.min(k(m) - 3, Math.min(9 - k(m), 1))); return [255 * f(0), 255 * f(8), 255 * f(4)]; }
+function readTokens() {
+  const cs = getComputedStyle(document.documentElement), g = v => cs.getPropertyValue(v).trim();
+  C = { plot: g("--plot"), ink: g("--ink"), muted: g("--muted"), line: g("--line"), accent: g("--accent"), im: g("--im"), grid: g("--grid"), wall: g("--wall"),
+        rPlot: hexRGB(g("--plot")), rTint: hexRGB(g("--pot-tint")), rWall: hexRGB(g("--wall")), rAcc: hexRGB(g("--accent")), rIm: hexRGB(g("--im")), rInk: hexRGB(g("--ink")),
+        L: parseFloat(g("--phase-l")), Sa: parseFloat(g("--phase-s")), mono: g("--f-mono") };
+  for (let h = 0; h < 360; h++) { const c = hslRGB(h, C.Sa, C.L); HUE[h * 3] = c[0]; HUE[h * 3 + 1] = c[1]; HUE[h * 3 + 2] = c[2]; }
+  const stops = []; for (let a = 0; a <= 360; a += 30) stops.push(`hsl(${(360 - a) % 360} ${C.Sa}% ${C.L}%) ${a}deg`);
+  document.getElementById("wheel").style.background = `conic-gradient(from 90deg, ${stops.join(",")})`;
+  potDirty = true;
+}
+
+// off-screen image at grid resolution
+const off = document.createElement("canvas"); off.width = n; off.height = n;
+const offCtx = off.getContext("2d"), img = offCtx.createImageData(n, n);
+const base = new Float32Array(N2 * 3); let potDirty = true;
+function buildBase() {
+  for (let q = 0; q < N2; q++) {
+    let c;
+    if (isWall[q]) c = C.rWall;
+    else { const t = Math.max(0, Math.min(1, (Vt[q] - vmin) / vref)) * 0.85; c = [C.rPlot[0] + (C.rTint[0] - C.rPlot[0]) * t, C.rPlot[1] + (C.rTint[1] - C.rPlot[1]) * t, C.rPlot[2] + (C.rTint[2] - C.rPlot[2]) * t]; }
+    base[q * 3] = c[0]; base[q * 3 + 1] = c[1]; base[q * 3 + 2] = c[2];
+  }
+  potDirty = false;
+}
+let ref = 1, refK = 1, resetScale = true, lastView = "";
+function paintField(re, im, mode, refOverride) {
+  if (potDirty) buildBase();
+  const d = img.data;
+  let cur = 0;
+  if (mode === "prob") { for (let q = 0; q < N2; q++) cur = Math.max(cur, re[q] * re[q] + im[q] * im[q]); }
+  else if (mode === "re") { for (let q = 0; q < N2; q++) cur = Math.max(cur, Math.abs(re[q])); }
+  else { for (let q = 0; q < N2; q++) cur = Math.max(cur, re[q] * re[q] + im[q] * im[q]); cur = Math.sqrt(cur); }
+  let R;
+  if (refOverride) R = cur || 1;
+  else { if (resetScale || lastView !== mode) { ref = cur || 1; resetScale = false; lastView = mode; } else ref = cur > ref ? cur : ref + (cur - ref) * 0.03; R = ref; }
+  const invR = 1 / Math.max(R, 1e-12);
+  for (let j = 0; j < n; j++) {
+    const row = (n - 1 - j) * n;
+    for (let i = 0; i < n; i++) {
+      const q = j * n + i, o = (row + i) * 4, b0 = base[q * 3], b1 = base[q * 3 + 1], b2 = base[q * 3 + 2];
+      let a, c0, c1, c2;
+      if (mode === "phase") {
+        const m = Math.sqrt(re[q] * re[q] + im[q] * im[q]) * invR; a = Math.min(1, Math.pow(m, 0.65));
+        let h = Math.round(Math.atan2(im[q], re[q]) * 57.29578); if (h < 0) h += 360; if (h >= 360) h -= 360;
+        c0 = HUE[h * 3]; c1 = HUE[h * 3 + 1]; c2 = HUE[h * 3 + 2];
+      } else if (mode === "re") {
+        const v = re[q] * invR; a = Math.min(1, Math.pow(Math.abs(v), 0.8)); const cc = v >= 0 ? C.rAcc : C.rIm; c0 = cc[0]; c1 = cc[1]; c2 = cc[2];
+      } else {
+        const v = (re[q] * re[q] + im[q] * im[q]) * invR; a = Math.min(1, Math.pow(v, 0.7));
+        const t = Math.max(0, (a - 0.6) / 0.4); c0 = C.rAcc[0] + (C.rInk[0] - C.rAcc[0]) * t * 0.5; c1 = C.rAcc[1] + (C.rInk[1] - C.rAcc[1]) * t * 0.5; c2 = C.rAcc[2] + (C.rInk[2] - C.rAcc[2]) * t * 0.5;
+      }
+      d[o] = b0 + (c0 - b0) * a; d[o + 1] = b1 + (c1 - b1) * a; d[o + 2] = b2 + (c2 - b2) * a; d[o + 3] = 255;
+    }
+  }
+  offCtx.putImageData(img, 0, 0);
+}
+const fW = () => size.F[0], fH = () => size.F[1];
+const wx2px = x => (x - XMIN) / L * fW(), wy2py = y => (1 - (y - XMIN) / L) * fH();
+const px2wx = px => XMIN + px / fW() * L, py2wy = py => XMIN + (1 - py / fH()) * L;
+
+let drag = null, cursor = null, hoverLevel = -1, ghostUntil = 0;
+function drawField() {
+  const c = ctxF, W = fW(), H = fH(); if (!W) return;
+  const preview = hoverLevel >= 0 && vecs && vecs[hoverLevel];
+  if (preview) { const v = vecs[hoverLevel]; const z = new Float64Array(N2); const vr = Float64Array.from(v); paintField(vr, z, "re", true); }
+  else paintField(pr, pi, S.view, false);
+  c.imageSmoothingEnabled = true; c.imageSmoothingQuality = "high";
+  c.clearRect(0, 0, W, H); c.drawImage(off, 0, 0, W, H);
+  // grid ticks
+  c.strokeStyle = C.grid; c.lineWidth = 1;
+  for (let x = -5; x <= 5; x += 5) { const px = Math.round(wx2px(x)) + 0.5, py = Math.round(wy2py(x)) + 0.5; c.beginPath(); c.moveTo(px, 0); c.lineTo(px, H); c.moveTo(0, py); c.lineTo(W, py); c.stroke(); }
+  c.font = "11px " + C.mono; c.fillStyle = C.muted; c.textBaseline = "alphabetic";
+  c.textAlign = "left"; c.fillText("x →", W - 34, H - 6); c.fillText("y ↑", 6, 14);
+  if (preview) {
+    c.font = "500 12px " + C.mono; c.fillStyle = C.ink; c.textAlign = "left";
+    c.fillText(`Preview: level n = ${hoverLevel},  E = ${levels[hoverLevel].toFixed(3)}  (Re ψ)`, 8, H - 8);
+  }
+  // packet preview
+  const isPk = S.tool === "position" || S.tool === "momentum";
+  const g = drag && drag.kind === "packet" ? drag : (isPk && performance.now() < ghostUntil ? S.pk : null);
+  if (g) {
+    const sg = packetSigma(), cx = wx2px(g.x0), cy = wy2py(g.y0), rpx = 2 * sg / L * W;
+    c.setLineDash([4, 3]); c.strokeStyle = C.ink; c.lineWidth = 1.3; c.beginPath(); c.arc(cx, cy, rpx, 0, Math.PI * 2); c.stroke(); c.setLineDash([]);
+    const ex = wx2px(g.x0 + g.kx * 0.5), ey = wy2py(g.y0 + g.ky * 0.5);
+    arrow(c, cx, cy, ex, ey, C.accent);
+    label(c, `k = (${g.kx.toFixed(1)}, ${g.ky.toFixed(1)})  σ = ${sg.toFixed(2)}`, cx, cy - rpx - 8, W);
+  }
+  if (S.tool === "bump" && (drag || cursor)) {
+    const p = drag || cursor, rpx = 2 * S.bw / L * W;
+    c.setLineDash([5, 3]); c.strokeStyle = S.bh >= 0 ? C.ink : C.accent; c.lineWidth = 1.5;
+    c.beginPath(); c.arc(wx2px(p.x0), wy2py(p.y0), rpx, 0, Math.PI * 2); c.stroke();
+    c.beginPath(); c.arc(wx2px(p.x0), wy2py(p.y0), rpx * 0.5, 0, Math.PI * 2); c.stroke(); c.setLineDash([]);
+    if (drag) label(c, `V₀ = ${S.bh.toFixed(1)}  w = ${S.bw.toFixed(2)}`, wx2px(p.x0), wy2py(p.y0) - rpx - 8, W);
+  }
+  if (S.tool === "wall" && cursor) {
+    c.strokeStyle = S.brushMode === "erase" ? C.im : C.ink; c.lineWidth = 1.3;
+    c.beginPath(); c.arc(wx2px(cursor.x0), wy2py(cursor.y0), S.brush / L * W, 0, Math.PI * 2); c.stroke();
+  }
+}
+function arrow(c, x0, y0, x1, y1, col) {
+  const dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy);
+  c.strokeStyle = col; c.fillStyle = col; c.lineWidth = 2.2; c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke();
+  if (len > 6) { const ux = dx / len, uy = dy / len; c.beginPath(); c.moveTo(x1 + ux * 6, y1 + uy * 6); c.lineTo(x1 - ux * 3 - uy * 5, y1 - uy * 3 + ux * 5); c.lineTo(x1 - ux * 3 + uy * 5, y1 - uy * 3 - ux * 5); c.closePath(); c.fill(); }
+}
+function label(c, t, x, y, W) {
+  c.font = "500 12px " + C.mono; c.textAlign = "center"; c.textBaseline = "alphabetic";
+  const w = c.measureText(t).width; x = Math.max(w / 2 + 6, Math.min(W - w / 2 - 6, x)); y = Math.max(16, y);
+  c.fillStyle = C.plot; c.globalAlpha = 0.85; c.fillRect(x - w / 2 - 4, y - 12, w + 8, 16); c.globalAlpha = 1;
+  c.fillStyle = C.ink; c.fillText(t, x, y);
+}
+
+// momentum map
+const DK = 2 * Math.PI / L, MK = Math.floor(KVIEW / DK), NK = 2 * MK + 1;
+const offK = document.createElement("canvas"); offK.width = NK; offK.height = NK;
+const offKCtx = offK.getContext("2d"), imgK = offKCtx.createImageData(NK, NK);
+let resetScaleK = true;
+const kIdx = m => (m + n) % n;
+function drawMom() {
+  const c = ctxK, [W, H] = size.K; if (!W) return;
+  let cur = 0;
+  for (let b = -MK; b <= MK; b++) for (let a = -MK; a <= MK; a++) { const q = kIdx(b) * n + kIdx(a); cur = Math.max(cur, wr[q] * wr[q] + wi[q] * wi[q]); }
+  if (resetScaleK) { refK = cur || 1; resetScaleK = false; } else refK = cur > refK ? cur : refK + (cur - refK) * 0.03;
+  const d = imgK.data, inv = 1 / Math.max(refK, 1e-20);
+  for (let b = -MK; b <= MK; b++) for (let a = -MK; a <= MK; a++) {
+    const q = kIdx(b) * n + kIdx(a), v = Math.min(1, Math.pow((wr[q] * wr[q] + wi[q] * wi[q]) * inv, 0.7));
+    const o = ((MK - b) * NK + (a + MK)) * 4;
+    d[o] = C.rPlot[0] + (C.rAcc[0] - C.rPlot[0]) * v; d[o + 1] = C.rPlot[1] + (C.rAcc[1] - C.rPlot[1]) * v; d[o + 2] = C.rPlot[2] + (C.rAcc[2] - C.rPlot[2]) * v; d[o + 3] = 255;
+  }
+  offKCtx.putImageData(imgK, 0, 0);
+  c.imageSmoothingEnabled = true; c.clearRect(0, 0, W, H); c.drawImage(offK, 0, 0, W, H);
+  const k2x = k => (k + (MK + 0.5) * DK) / ((2 * MK + 1) * DK) * W, k2y = k => (1 - (k + (MK + 0.5) * DK) / ((2 * MK + 1) * DK)) * H;
+  c.strokeStyle = C.grid; c.lineWidth = 1; c.beginPath(); c.moveTo(k2x(0), 0); c.lineTo(k2x(0), H); c.moveTo(0, k2y(0)); c.lineTo(W, k2y(0)); c.stroke();
+  if (obs.norm > 1e-4) { c.strokeStyle = C.ink; c.lineWidth = 1.5; c.beginPath(); c.arc(k2x(obs.px), k2y(obs.py), 4, 0, Math.PI * 2); c.stroke(); }
+  c.font = "11px " + C.mono; c.fillStyle = C.muted; c.textAlign = "left"; c.textBaseline = "top"; c.fillText("|φ(k)|²", 6, 5);
+  c.textBaseline = "alphabetic"; c.textAlign = "right"; c.fillText(`kₓ ±${KVIEW}`, W - 5, H - 5);
+}
+function momToK(px, py) { const [W, H] = size.K, span = (2 * MK + 1) * DK; return [px / W * span - span / 2, (1 - py / H) * span - span / 2]; }
+
+// energy ladder
+const LP = { l: 38, r: 8, t: 22, b: 10 };
+let ladderGeom = [];
+function niceStep(r) { const m = Math.pow(10, Math.floor(Math.log10(r))), f = r / m; return (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10) * m; }
+function drawLadder() {
+  const c = ctxL, [W, H] = size.L; if (!W) return;
+  c.clearRect(0, 0, W, H); c.fillStyle = C.plot; c.fillRect(0, 0, W, H);
+  c.font = "11px " + C.mono; c.textBaseline = "top"; c.textAlign = "left"; c.fillStyle = C.muted;
+  const hov = hoverLevel >= 0 && levels && levels[hoverLevel] != null;
+  if (hov) { c.fillStyle = C.accent; c.font = "500 11px " + C.mono; c.fillText(`n=${hoverLevel}  E=${levels[hoverLevel].toFixed(3)}`, 6, 5); c.font = "11px " + C.mono; c.fillStyle = C.muted; }
+  else c.fillText("E levels", 6, 5);
+  ladderGeom = [];
+  if (!levels) {
+    const msg = eigProgress < 0 ? "Levels unavailable" : `Finding levels… ${Math.round(eigProgress * 100)}%`;
+    c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(msg, W / 2, H / 2);
+    c.fillStyle = C.accent; c.fillRect(W * 0.2, H / 2 + 12, W * 0.6 * Math.max(0, eigProgress), 3);
+    return;
+  }
+  const lo0 = levels[0], hi0 = levels[levels.length - 1], span = Math.max(hi0 - lo0, 1e-3);
+  const lo = lo0 - span * 0.06, hi = hi0 + span * 0.06;
+  const e2y = E => LP.t + (hi - E) / (hi - lo) * (H - LP.t - LP.b);
+  const es = niceStep((hi - lo) / Math.max(2, Math.floor((H - LP.t) / 34)));
+  c.textBaseline = "middle"; c.textAlign = "right";
+  for (let E = Math.ceil(lo / es) * es; E <= hi; E += es) { const y = e2y(E); c.fillStyle = C.muted; c.fillText(fmt(E), LP.l - 6, y); c.fillStyle = C.grid; c.fillRect(LP.l, Math.round(y), W - LP.l - LP.r, 1); }
+  // group degenerate levels
+  const tol = span * 0.006, groups = [];
+  levels.forEach((E, m) => { const g = groups[groups.length - 1]; if (g && Math.abs(E - levels[g[g.length - 1]]) < tol) g.push(m); else groups.push([m]); });
+  const x0 = LP.l + 4, wTot = W - LP.l - LP.r - 8;
+  for (const g of groups) {
+    const segW = (wTot - (g.length - 1) * 4) / g.length;
+    g.forEach((m, s) => {
+      const y = Math.round(e2y(levels[m])) + 0.5, xa = x0 + s * (segW + 4);
+      ladderGeom.push({ m, y, xa, xb: xa + segW });
+      c.strokeStyle = m === hoverLevel ? C.accent : C.muted; c.globalAlpha = m === hoverLevel ? 1 : 0.7; c.lineWidth = m === hoverLevel ? 2 : 1;
+      c.beginPath(); c.moveTo(xa, y); c.lineTo(xa + segW, y); c.stroke(); c.globalAlpha = 1;
+      const p = pops[m] || 0; if (p > 0.004) { c.fillStyle = C.accent; c.fillRect(xa, y - 2.5, Math.max(2, segW * Math.min(1, p)), 5); }
+    });
+  }
+  // <E>
+  if (obs.norm > 1e-4) {
+    const y = e2y(obs.E);
+    c.fillStyle = C.ink; c.textAlign = "right"; c.textBaseline = "top";
+    if (y < LP.t) { if (!hov) c.fillText(`⟨E⟩ ${obs.E.toFixed(2)} ↑`, W - 6, 5); }
+    else if (y > H - LP.b) { c.textBaseline = "bottom"; c.fillText(`⟨E⟩ ${obs.E.toFixed(2)} ↓`, W - 6, H - 2); }
+    else { c.setLineDash([4, 3]); c.strokeStyle = C.ink; c.globalAlpha = 0.6; c.lineWidth = 1; c.beginPath(); c.moveTo(LP.l, y); c.lineTo(W - LP.r, y); c.stroke(); c.setLineDash([]); c.globalAlpha = 1; }
+  }
+}
+const fmt = v => Math.abs(v) < 1e-9 ? "0" : Math.abs(v) >= 10 ? v.toFixed(0) : Math.abs(v) >= 1 ? (+v.toFixed(1)).toString() : (+v.toFixed(2)).toString();
+function ladderHit(px, py) {
+  let best = -1, bd = Infinity;
+  for (const g of ladderGeom) { const dx = px < g.xa ? g.xa - px : px > g.xb ? px - g.xb : 0, d = Math.abs(py - g.y) + dx * 0.5; if (d < bd) { bd = d; best = g.m; } }
+  return bd < 14 ? best : -1;
+}
+
+// ---------- loop ----------
+const $ = id => document.getElementById(id);
+const R = { t: $("r-t"), x: $("r-x"), p: $("r-p"), e: $("r-e"), n: $("r-n") };
+let frame = 0;
+function loop() {
+  if (S.playing) { for (let s = 0; s < S.speed; s++) step(); S.t += S.speed * DT; }
+  if (frame++ % 90 === 0) readTokens();
+  measure();
+  drawField(); drawMom(); drawLadder();
+  R.t.textContent = S.t.toFixed(2); R.x.textContent = `${obs.x.toFixed(2)}, ${obs.y.toFixed(2)}`; R.p.textContent = `${obs.px.toFixed(2)}, ${obs.py.toFixed(2)}`;
+  R.e.textContent = obs.E.toFixed(3); R.n.textContent = obs.norm.toFixed(3);
+  requestAnimationFrame(loop);
+}
+
+// ---------- pointer ----------
+function local(e, cv) { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+const clampW = v => Math.max(-9.5, Math.min(9.5, v));
+function paintAt(x, y) {
+  const r = S.brush, val = S.brushMode === "erase" ? 0 : 1;
+  const i0 = Math.max(0, Math.floor((x - r - XMIN) / DX)), i1 = Math.min(n - 1, Math.ceil((x + r - XMIN) / DX));
+  const j0 = Math.max(0, Math.floor((y - r - XMIN) / DX)), j1 = Math.min(n - 1, Math.ceil((y + r - XMIN) / DX));
+  for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) if ((XC[i] - x) ** 2 + (XC[j] - y) ** 2 <= r * r) S.walls[j * n + i] = val;
+}
+function paintLine(a, b) {
+  const steps = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / (S.brush * 0.5)));
+  for (let s = 1; s <= steps; s++) paintAt(a[0] + (b[0] - a[0]) * s / steps, a[1] + (b[1] - a[1]) * s / steps);
+}
+cvF.addEventListener("pointerdown", e => {
+  const [px, py] = local(e, cvF), x = clampW(px2wx(px)), y = clampW(py2wy(py)); S.shift = e.shiftKey;
+  if (S.tool === "energy") return;
+  cvF.setPointerCapture(e.pointerId);
+  if (S.tool === "bump") { drag = { kind: "bump", x0: x, y0: y }; return; }
+  if (S.tool === "wall") { drag = { kind: "wall", last: [x, y] }; paintAt(x, y); buildPotential(true); return; }
+  drag = { kind: "packet", x0: x, y0: y, sx: x, sy: y, kx: 0, ky: 0 };
+});
+cvF.addEventListener("pointermove", e => {
+  const [px, py] = local(e, cvF), x = clampW(px2wx(px)), y = clampW(py2wy(py));
+  cursor = { x0: x, y0: y };
+  if (!drag) return;
+  if (drag.kind === "bump") { drag.x0 = x; drag.y0 = y; }
+  else if (drag.kind === "wall") { paintLine(drag.last, [x, y]); drag.last = [x, y]; buildPotential(true); }
+  else { let kx = (px2wx(px) - drag.sx), ky = (py2wy(py) - drag.sy); const m = Math.hypot(kx, ky); if (m > KMAX) { kx *= KMAX / m; ky *= KMAX / m; } drag.kx = kx; drag.ky = ky; }
+});
+function endDrag(e, cancel) {
+  if (!drag) return;
+  const d = drag; drag = null;
+  if (d.kind === "wall") { buildPotential(); syncExtras(); return; }
+  if (cancel) return;
+  if (d.kind === "bump") { S.bumps.push({ x0: d.x0, y0: d.y0, A: S.bh, w: S.bw }); buildPotential(); syncExtras(); return; }
+  S.shift = e.shiftKey || S.shift;
+  S.pk = { x0: d.x0, y0: d.y0, kx: d.kx, ky: d.ky }; syncPacketInputs(); dropPacket();
+}
+cvF.addEventListener("pointerup", e => endDrag(e, false));
+cvF.addEventListener("pointercancel", e => endDrag(e, true));
+cvF.addEventListener("pointerleave", () => { if (!drag) cursor = null; });
+
+cvK.addEventListener("pointerdown", e => {
+  const [px, py] = local(e, cvK); let [kx, ky] = momToK(px, py); const m = Math.hypot(kx, ky); if (m > KMAX) { kx *= KMAX / m; ky *= KMAX / m; }
+  S.shift = e.shiftKey; const c0 = POTS[S.pot].c0;
+  S.pk = { x0: c0[0], y0: c0[1], kx, ky };
+  install(packet(c0[0], c0[1], kx, ky, Math.max(S.sigma.momentum, 1.5)), wantAdd());
+  syncPacketInputs();
+});
+cvL.addEventListener("pointermove", e => { if (e.pointerType === "touch") return; const [px, py] = local(e, cvL); hoverLevel = ladderHit(px, py); });
+cvL.addEventListener("pointerleave", () => { hoverLevel = -1; });
+cvL.addEventListener("pointerdown", e => {
+  const [px, py] = local(e, cvL), m = ladderHit(px, py); if (m < 0 || !vecs) return;
+  S.shift = e.shiftKey; install(eigen([m]), wantAdd()); resetScaleK = true;
+  if (e.pointerType === "touch") hoverLevel = -1;
+});
+addEventListener("keydown", e => { if (e.key === "Shift") S.shift = true; if (e.code === "Space" && e.target === document.body) { e.preventDefault(); togglePlay(); } });
+addEventListener("keyup", e => { if (e.key === "Shift") S.shift = false; });
+
+// ---------- controls ----------
+const SMIN = 0.3, SMAX = 5;
+const sToR = s => 100 * Math.log(s / SMIN) / Math.log(SMAX / SMIN), rToS = r => SMIN * Math.pow(SMAX / SMIN, r / 100);
+const HINTS = {
+  position: "Press the field to drop a tight Gaussian packet (close to a position eigenstate). Drag while pressing to aim its momentum. Or set x₀, y₀, k and σ and tap Drop.",
+  momentum: "Press to drop a wide Gaussian packet (close to a momentum eigenstate) and drag to aim k. You can also press the momentum map to pick k directly.",
+  energy: "Pick a level on the energy ladder to load that eigenstate. Hover a level to preview it. Tick “Add” or hold Shift to build superpositions; bars show |cₙ|².",
+  bump: "Press the field to drop a Gaussian bump (positive V₀) or dip (negative V₀). Drag to place it before letting go.",
+  wall: "Drag across the field to paint hard walls, or switch to Erase. The energy levels update when you let go.",
+};
+function syncPacketInputs() {
+  const k = S.pk, sg = packetSigma();
+  $("x0r").value = k.x0; $("x0n").value = k.x0.toFixed(1); $("y0r").value = k.y0; $("y0n").value = k.y0.toFixed(1);
+  $("kxr").value = k.kx; $("kxn").value = k.kx.toFixed(2); $("kyr").value = k.ky; $("kyn").value = k.ky.toFixed(2);
+  $("sgr").value = sToR(sg); $("sgn").value = sg.toFixed(2);
+}
+function syncTool() {
+  document.querySelectorAll(".tool button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === S.tool)));
+  const pk = S.tool === "position" || S.tool === "momentum";
+  $("packetCtl").hidden = !pk; $("energyCtl").hidden = S.tool !== "energy"; $("bumpCtl").hidden = S.tool !== "bump"; $("wallCtl").hidden = S.tool !== "wall";
+  $("addRow").hidden = !(pk || S.tool === "energy");
+  if (pk) syncPacketInputs();
+  $("hint").textContent = $("hint2").textContent = HINTS[S.tool];
+  cvF.style.cursor = S.tool === "energy" ? "default" : "crosshair";
+}
+document.querySelectorAll(".tool").forEach(el => el.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; S.tool = b.dataset.v; syncTool(); }));
+const poke = () => { ghostUntil = performance.now() + 1800; };
+const num = (v, lo, hi, d) => { v = parseFloat(v); return Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d; };
+for (const [key, r, nId, lo, hi, dp] of [["x0", "x0r", "x0n", -9.5, 9.5, 1], ["y0", "y0r", "y0n", -9.5, 9.5, 1], ["kx", "kxr", "kxn", -10, 10, 2], ["ky", "kyr", "kyn", -10, 10, 2]]) {
+  $(r).addEventListener("input", e => { S.pk[key] = +e.target.value; $(nId).value = S.pk[key].toFixed(dp); poke(); });
+  $(nId).addEventListener("change", e => { S.pk[key] = num(e.target.value, lo, hi, S.pk[key]); syncPacketInputs(); poke(); });
+}
+$("sgr").addEventListener("input", e => { const v = rToS(+e.target.value); S.sigma[sigmaKey()] = v; $("sgn").value = v.toFixed(2); poke(); });
+$("sgn").addEventListener("change", e => { S.sigma[sigmaKey()] = num(e.target.value, SMIN, SMAX, packetSigma()); syncPacketInputs(); poke(); });
+$("drop").addEventListener("click", () => { S.shift = false; dropPacket(); });
+$("add").addEventListener("change", e => S.add = e.target.checked);
+
+$("bh").addEventListener("input", e => { S.bh = +e.target.value; $("bhVal").textContent = S.bh.toFixed(2); });
+$("bw").addEventListener("input", e => { S.bw = +e.target.value; $("bwVal").textContent = S.bw.toFixed(2); });
+$("brush").addEventListener("input", e => { S.brush = +e.target.value; $("brushVal").textContent = S.brush.toFixed(2); });
+$("brushMode").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; S.brushMode = b.dataset.v; syncBrush(); });
+function syncBrush() { $("brushMode").querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === S.brushMode))); }
+function syncExtras() {
+  const nb = S.bumps.length; let nw = 0; for (let i = 0; i < N2; i++) nw += S.walls[i];
+  $("bumpUndo").disabled = $("bumpClear").disabled = nb === 0;
+  $("bumpClear").textContent = nb ? `Clear bumps (${nb})` : "Clear bumps";
+  $("wallClear").disabled = nw === 0;
+  const parts = []; if (nb) parts.push(`${nb} Gaussian bump${nb > 1 ? "s" : ""}`); if (nw) parts.push("painted walls");
+  $("extraNote").textContent = parts.length ? `Plus ${parts.join(" and ")} on top. Remove them from the Create panel.` : "";
+  $("extraNote").hidden = !parts.length;
+}
+$("bumpUndo").addEventListener("click", () => { S.bumps.pop(); buildPotential(); syncExtras(); });
+$("bumpClear").addEventListener("click", () => { S.bumps = []; buildPotential(); syncExtras(); });
+$("wallClear").addEventListener("click", () => { S.walls.fill(0); buildPotential(); syncExtras(); });
+
+const NOTES = {
+  phase: "Brightness is |ψ|, hue is the phase arg ψ (the wheel runs counterclockwise from 0).",
+  re: "Re ψ: blue where positive, pink where negative.",
+  prob: "Probability density |ψ|². The phase is hidden.",
+};
+function syncView() { $("view").querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === S.view))); $("wheel").hidden = S.view !== "phase"; $("viewNote").textContent = NOTES[S.view]; }
+$("view").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; S.view = b.dataset.v; syncView(); });
+function syncEdges() { $("edges").querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === S.edges))); }
+$("edges").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; S.edges = b.dataset.v; syncEdges(); buildPotential(); });
+
+const potsEl = $("pots");
+for (const k in POTS) { const b = document.createElement("button"); b.type = "button"; b.dataset.v = k; b.id = "pot-" + k; b.textContent = POTS[k].name; potsEl.appendChild(b); }
+function syncPot() {
+  potsEl.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === S.pot)));
+  const P = POTS[S.pot]; $("paramRow").hidden = !P.param;
+  if (P.param) { const el = $("param"); el.min = P.param.min; el.max = P.param.max; el.step = P.param.step; el.value = S.params[S.pot]; $("paramLabel").textContent = P.param.label; $("paramVal").textContent = (+S.params[S.pot]).toFixed(2); }
+}
+potsEl.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; S.pot = b.dataset.v; syncPot(); buildPotential(); });
+let paramPending = false;
+$("param").addEventListener("input", e => {
+  S.params[S.pot] = +e.target.value; $("paramVal").textContent = (+e.target.value).toFixed(2);
+  if (!paramPending) { paramPending = true; requestAnimationFrame(() => { paramPending = false; buildPotential(); }); }
+});
+
+const ICON_PAUSE = '<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><rect x="4.5" y="3.5" width="3.6" height="13" rx="1" fill="currentColor"/><rect x="11.9" y="3.5" width="3.6" height="13" rx="1" fill="currentColor"/></svg><span>Pause</span>';
+const ICON_PLAY = '<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M5.5 3.6v12.8a.8.8 0 0 0 1.2.7l10-6.4a.8.8 0 0 0 0-1.4l-10-6.4a.8.8 0 0 0-1.2.7z" fill="currentColor"/></svg><span>Play</span>';
+function syncPlay() { const b = $("play"); b.innerHTML = S.playing ? ICON_PAUSE : ICON_PLAY; b.setAttribute("aria-label", S.playing ? "Pause" : "Play"); b.title = (S.playing ? "Pause" : "Play") + " (Space)"; }
+function togglePlay() { S.playing = !S.playing; syncPlay(); }
+$("play").addEventListener("click", togglePlay);
+$("restart").addEventListener("click", () => { pr.set(p0r); pi.set(p0i); S.t = 0; resetScale = resetScaleK = true; });
+const speedText = () => `${(S.speed * DT * 60).toFixed(1)}/s`;
+$("speed").addEventListener("input", e => { S.speed = +e.target.value; $("speedVal").textContent = speedText(); });
+
+let tab = "g-create";
+try { tab = localStorage.getItem("ss2d-tab") || tab; } catch (e) {}
+function syncTabs() {
+  document.querySelectorAll("#tabs button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.tab === tab)));
+  document.querySelectorAll(".group").forEach(g => g.classList.toggle("active", g.id === tab));
+}
+$("tabs").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; tab = b.dataset.tab; syncTabs(); try { localStorage.setItem("ss2d-tab", tab); } catch (e) {} });
+
+const PRESETS = [
+  { name: "Double slit", pot: "dslit", p: 3, speed: 4, edges: "absorb", pk: [-5.5, 0, 4.5, 0, 1.6] },
+  { name: "Single slit", pot: "sslit", p: 1, speed: 4, edges: "absorb", pk: [-5.5, 0, 4.5, 0, 1.8] },
+  { name: "Coherent orbit", pot: "harmonic", p: 0.7, speed: 6, pk: [-4, 0, 0, -2.8, 1 / Math.sqrt(1.4)] },
+  { name: "Squeezed breathing", pot: "harmonic", p: 0.7, speed: 5, pk: [0, 0, 0, 0, 0.4] },
+  { name: "Stadium billiard", pot: "stadium", p: 3, speed: 6, pk: [-3, 1, 5, 2, 0.7] },
+  { name: "Tunneling", pot: "barrier", p: 10, speed: 4, edges: "absorb", pk: [-5, 0, 4, 0, 1.3] },
+  { name: "Lattice scattering", pot: "lattice", p: 2, speed: 5, pk: [-5, 0, 3, 1.2, 1.4] },
+  { name: "Bump scattering", pot: "free", speed: 4, edges: "absorb", pk: [-6, 0.4, 5, 0, 1.3], bumps: [{ x0: 0, y0: 0, A: 12, w: 0.9 }] },
+];
+const presetsEl = $("presets");
+PRESETS.forEach((p, i) => { const b = document.createElement("button"); b.type = "button"; b.id = "preset-" + i; b.textContent = p.name; b.addEventListener("click", () => loadPreset(p)); presetsEl.appendChild(b); });
+function loadPreset(p) {
+  S.pot = p.pot; if (p.p != null) S.params[p.pot] = p.p; S.edges = p.edges || "walls"; S.bumps = (p.bumps || []).map(b => ({ ...b })); S.walls.fill(0);
+  syncEdges(); syncPot(); buildPotential(); syncExtras();
+  S.speed = p.speed; $("speed").value = p.speed; $("speedVal").textContent = speedText();
+  const [x0, y0, kx, ky, sg] = p.pk; S.pk = { x0, y0, kx, ky }; S.sigma[sigmaKey()] = sg; syncPacketInputs();
+  install(packet(x0, y0, kx, ky, sg), false); resetScaleK = true;
+  if (!S.playing) togglePlay();
+}
+
+// ---------- boot ----------
+readTokens(); fit(); syncPot(); syncEdges(); syncView(); syncTool(); syncTabs(); syncExtras(); syncBrush(); syncPlay();
+$("speedVal").textContent = speedText();
+buildPotential();
+const P0 = PRESETS[0]; S.pk = { x0: P0.pk[0], y0: P0.pk[1], kx: P0.pk[2], ky: P0.pk[3] }; S.sigma.position = 0.6; syncPacketInputs();
+install(packet(...P0.pk), false);
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", readTokens);
+new MutationObserver(readTokens).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+if (matchMedia("(prefers-reduced-motion: reduce)").matches) togglePlay();
+requestAnimationFrame(loop);
+})();
+</script>
+
+</body></html>

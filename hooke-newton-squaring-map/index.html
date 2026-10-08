@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hooke ↔ Newton: the squaring map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,500;1,400;1,500&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EDF0F2; --panel:#F8F9FA; --ink:#1B2430; --muted:#5B6875; --grid:#DCE2E7; --rule:#C9D1D8;
+  --osc:#23638A; --kep:#A8323E;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#12161B; --panel:#181D23; --ink:#DDE3E9; --muted:#8E9AA6; --grid:#262E37; --rule:#323B45;
+    --osc:#78B7DC; --kep:#EE8892;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#12161B; --panel:#181D23; --ink:#DDE3E9; --muted:#8E9AA6; --grid:#262E37; --rule:#323B45;
+  --osc:#78B7DC; --kep:#EE8892;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"Public Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:15px;line-height:1.5}
+main{max-width:1120px;margin:0 auto;padding:28px 20px 44px}
+h1{font-family:"Spectral",Georgia,"Times New Roman",serif;font-weight:500;font-size:clamp(1.7rem,3.4vw,2.4rem);
+  line-height:1.15;margin:0 0 .35em;letter-spacing:-.01em}
+.lede{font-family:"Spectral",Georgia,serif;font-size:1.07rem;line-height:1.6;max-width:70ch;color:var(--muted);margin:0 0 24px}
+.lede i, .note i{color:var(--ink)}
+.planes{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:18px;align-items:center}
+.plane h2{font-family:"Spectral",Georgia,serif;font-weight:500;font-size:1.12rem;margin:0 0 6px;display:flex;gap:.5em;align-items:baseline;flex-wrap:wrap}
+.plane h2 small{font-family:"Public Sans",system-ui,sans-serif;font-size:.82rem;color:var(--muted);font-weight:400}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block;align-self:center}
+.canvas-wrap{aspect-ratio:1;background:var(--panel);border:1px solid var(--rule);border-radius:4px;overflow:hidden;touch-action:none;cursor:crosshair}
+canvas{display:block;width:100%;height:100%}
+.map{font-family:"Spectral",Georgia,serif;font-style:italic;font-size:1.35rem;text-align:center;white-space:nowrap;padding-top:28px}
+.map b{display:block;font-weight:400;font-style:normal;font-size:2.2rem;line-height:1;color:var(--muted)}
+.map .down{display:none}
+.note{min-height:3.4em;margin:18px 0 6px;font-family:"Spectral",Georgia,serif;font-size:1.04rem;line-height:1.6;max-width:78ch}
+.controls{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:32px;margin-top:14px;border-top:1px solid var(--rule);padding-top:20px}
+.slider{display:grid;grid-template-columns:11em minmax(0,1fr) 4.6em;gap:12px;align-items:center;margin-bottom:9px}
+.slider label{font-size:.92rem}
+.slider output{font-variant-numeric:tabular-nums;text-align:right;font-size:.92rem}
+input[type=range]{width:100%;accent-color:var(--osc)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:14px 0 4px}
+.row .lbl{font-size:.88rem;color:var(--muted);margin-right:4px}
+button{font:inherit;font-size:.88rem;color:var(--ink);background:var(--panel);border:1px solid var(--rule);border-radius:3px;padding:5px 11px;cursor:pointer}
+button:hover{border-color:var(--muted)}
+button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--osc);outline-offset:2px}
+dl{display:grid;grid-template-columns:auto 1fr;gap:6px 18px;margin:0;font-size:.93rem}
+dt{color:var(--muted)}
+dd{margin:0;font-variant-numeric:tabular-nums}
+.foot{margin-top:26px;font-size:.86rem;color:var(--muted);max-width:78ch}
+@media (max-width:760px){
+  .planes{grid-template-columns:minmax(0,1fr)}
+  .map{padding-top:0}
+  .map .right{display:none}
+  .map .down{display:block}
+  .controls{grid-template-columns:minmax(0,1fr)}
+  .slider{grid-template-columns:8.5em minmax(0,1fr) 4.2em}
+}
+</style>
+</head>
+<body>
+<main>
+  <a href="../index.html" style="display:table;flex-basis:100%;margin-bottom:6px;font-size:13px;color:inherit;opacity:.7;text-decoration:none">← All widgets</a>
+  <h1>Hooke’s oscillator, squared, is Newton’s orbit</h1>
+  <p class="lede">The left plane shows a particle in the potential <i>−E|w|²</i>. Squaring every point, <i>z = w²</i>, gives a Kepler orbit with energy <i>E</i> and coupling <i>k</i> equal to the oscillator’s energy. Drag in either plane to move the starting point, or use the sliders.</p>
+
+  <div class="planes">
+    <section class="plane">
+      <h2><span class="dot" style="background:var(--osc)"></span>w-plane <small>oscillator, centered at 0</small></h2>
+      <div class="canvas-wrap"><canvas id="cw" aria-label="Oscillator orbit in the w-plane"></canvas></div>
+    </section>
+    <div class="map" aria-hidden="true"><b class="right">→</b><b class="down">↓</b>z = w²</div>
+    <section class="plane">
+      <h2><span class="dot" style="background:var(--kep)"></span>z-plane <small>Kepler problem, force center at 0</small></h2>
+      <div class="canvas-wrap"><canvas id="cz" aria-label="Kepler orbit in the z-plane"></canvas></div>
+    </section>
+  </div>
+
+  <p class="note" id="note" aria-live="polite"></p>
+
+  <div class="controls">
+    <div>
+      <div class="slider"><label for="sE">Kepler energy E</label><input id="sE" type="range" min="-1" max="0.8" step="0.01"><output id="oE"></output></div>
+      <div class="slider"><label for="sa">Start distance |w₀|</label><input id="sa" type="range" min="0" max="2" step="0.01"><output id="oa"></output></div>
+      <div class="slider"><label for="sv">Start speed w′₀ (sideways)</label><input id="sv" type="range" min="-2" max="2" step="0.01"><output id="ov"></output></div>
+      <div class="slider"><label for="sphi">Start angle arg w₀</label><input id="sphi" type="range" min="-180" max="180" step="1"><output id="ophi"></output></div>
+      <div class="slider"><label for="sR">View radius in w</label><input id="sR" type="range" min="0.8" max="3" step="0.05"><output id="oR"></output></div>
+      <div class="slider"><label for="sspd">Playback speed</label><input id="sspd" type="range" min="0.2" max="3" step="0.1"><output id="ospd"></output></div>
+
+      <div class="row"><span class="lbl">Clock</span>
+        <button id="bOsc" aria-pressed="true">Oscillator time τ</button>
+        <button id="bKep" aria-pressed="false">Kepler time t</button>
+        <button id="bPlay">Pause</button>
+      </div>
+      <div class="row"><span class="lbl">Try</span>
+        <button data-p="circle">Circle</button>
+        <button data-p="ellipse">Ellipse</button>
+        <button data-p="radial">Collision</button>
+        <button data-p="parabola">Parabola</button>
+        <button data-p="hyperbola">Hyperbola</button>
+        <button data-p="repulsive">Repulsive</button>
+      </div>
+    </div>
+    <dl>
+      <dt>Kepler orbit</dt><dd id="rtype"></dd>
+      <dt>Coupling k</dt><dd id="rk"></dd>
+      <dt>Oscillator</dt><dd id="rosc"></dd>
+      <dt>Eccentricity</dt><dd id="re"></dd>
+      <dt>Angular momentum</dt><dd id="rL"></dd>
+      <dt>Semi-major axis</dt><dd id="rsemi"></dd>
+      <dt>Kepler period</dt><dd id="rper"></dd>
+    </dl>
+  </div>
+
+  <p class="foot">Unit mass throughout. The oscillator solves <i>w″ = 2E w</i> with energy <i>k = ½|w′|² − E|w|²</i>; the clocks are related by <i>dt = 2|w|² dτ</i>. The hollow dot is <i>−w</i>, the other preimage of the same Kepler point. The square marks the start point, which is an apsis of both orbits (Kepler distance |w₀|²).</p>
+</main>
+
+<script>
+(function(){
+const $=id=>document.getElementById(id);
+const reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+const S={E:-0.5,a:1.1,v:0.55,phi:0.35,R:2,clock:'osc',playing:!reduce,speed:1,tau:0};
+let orbit=null, info=null;
+
+function cs(t){
+  const E=S.E;
+  if(E<0){const O=Math.sqrt(-2*E);return [Math.cos(O*t),Math.sin(O*t)/O];}
+  if(E>0){const l=Math.sqrt(2*E);return [Math.cosh(l*t),Math.sinh(l*t)/l];}
+  return [1,t];
+}
+function wAt(t){
+  const [C,Sn]=cs(t), re=S.a*C, im=S.v*Sn, c=Math.cos(S.phi), s=Math.sin(S.phi);
+  return [re*c-im*s, re*s+im*c];
+}
+const sq=p=>[p[0]*p[0]-p[1]*p[1],2*p[0]*p[1]];
+
+function computeOrbit(){
+  const E=S.E;
+  if(S.a<1e-6&&Math.abs(S.v)<1e-6) return {kind:'origin'};
+  if(E===0&&Math.abs(S.v)<1e-6) return {kind:'rest'};
+  let t0,t1,bound=false;
+  if(E<0){bound=true;t0=0;t1=2*Math.PI/Math.sqrt(-2*E);}
+  else{
+    const L=S.R*1.7, mag=t=>Math.hypot(...wAt(t));
+    let T=0.25; while(mag(T)<L&&T<400) T*=1.3;
+    t0=-T;t1=T;
+  }
+  const N=1400,w=[],z=[],h=(t1-t0)/N; let tVis=0;
+  for(let i=0;i<=N;i++){
+    const p=wAt(t0+h*i), r2=p[0]*p[0]+p[1]*p[1];
+    w.push(p); z.push(sq(p));
+    if(r2<=S.R*S.R*1.05) tVis+=2*r2*h;
+  }
+  return {kind:'orbit',bound,t0,t1,w,z,tVis:Math.max(tVis,1e-6)};
+}
+
+const f=(x,n=3)=>Math.abs(x)<5e-10?'0':x.toFixed(n);
+
+function classify(){
+  const E=S.E,a=S.a,v=S.v,k=0.5*v*v-E*a*a,L=a*v,radial=Math.abs(L)<1e-9,kz=Math.abs(k)<1e-9;
+  let e=kz?NaN:Math.sqrt(Math.max(0,1+2*E*L*L/(k*k)));
+  let type,note,semi=null,period=null;
+  if(orbit.kind==='origin'){type='none';note='Both start values are zero, so w sits at the origin. Drag in either plane to move the start point.';}
+  else if(orbit.kind==='rest'){type='at rest';note='At E = 0 with no starting velocity nothing moves. The oscillator energy k is 0 as well, so the Kepler particle feels no force either.';}
+  else if(E<0){
+    semi=k/(-2*E); period=2*Math.PI*Math.pow(semi,1.5)/Math.sqrt(k);
+    if(radial){type='radial collision orbit';note='The oscillator swings straight through w = 0. The Kepler particle falls into the center and comes straight back out. In τ nothing singular happens: the squaring map regularizes the collision.';}
+    else if(e<2e-3){type='circle';note='A circle about 0 squares to a circle about 0. Watch the angle arcs: the z-point turns twice as fast as the w-point.';}
+    else{type='ellipse';note='One lap of the centered w-ellipse traces the focal z-ellipse twice, because squaring doubles angles. Switch to Kepler time to see the z-point speed up near the focus.';}
+  }else if(E===0){
+    if(radial){type='radial, escape speed';note='The w-line passes through the origin, so the parabola collapses to a ray: the Kepler particle falls in at exactly escape speed and leaves the same way.';}
+    else{type='parabola';note='At E = 0 the oscillator force vanishes, so w moves on a straight line. A line missing the origin squares to a parabola with focus at 0.';}
+  }else{
+    if(!kz&&k>0){type=radial?'radial, hyperbolic':'hyperbola';note=radial?'A straight w-line through 0 squares to a ray: the Kepler particle falls in faster than escape speed and leaves the same way.':'For E > 0 the oscillator is inverted (repulsive) and w runs along a hyperbola centered at 0. Its square is the near branch of a hyperbola with focus at 0: an attractive Kepler flyby.';}
+    else if(!kz&&k<0){type=radial?'radial, repulsive':'repulsive hyperbola';note='The oscillator energy k is negative here, so the squared orbit is the far branch of its hyperbola: the Kepler force is repulsive, like two like charges, and the orbit bends away from 0.';}
+    else{type='straight line (k = 0)';note='The oscillator energy is exactly 0, so the Kepler coupling vanishes and z moves in a straight line. In w this is a rectangular hyperbola: one conic squaring to a line.';}
+  }
+  return {k,L,e,type,note,semi,period};
+}
+
+function rebuild(){
+  orbit=computeOrbit(); info=classify();
+  if(orbit.kind==='orbit'&&!orbit.bound&&(S.tau<orbit.t0||S.tau>orbit.t1)) S.tau=0;
+  $('note').textContent=info.note;
+  $('rtype').textContent=info.type;
+  $('rk').textContent=f(info.k)+(info.k<-1e-9?' (repulsive)':'');
+  const E=S.E;
+  $('rosc').textContent=E<0?`Ω = ${f(Math.sqrt(-2*E))}, period ${f(2*Math.PI/Math.sqrt(-2*E),2)}`:E===0?'no force (free particle)':`inverted, rate λ = ${f(Math.sqrt(2*E))}`;
+  $('re').textContent=isNaN(info.e)?'—':f(info.e);
+  $('rL').textContent=f(info.L);
+  $('rsemi').textContent=info.semi!=null?f(info.semi):'—';
+  $('rper').textContent=info.period!=null&&isFinite(info.period)?f(info.period,2):'—';
+}
+
+/* ---------- sliders ---------- */
+const sl=[
+  ['sE','oE',()=>S.E,v=>{S.E=Math.abs(v)<1e-9?0:v;},v=>f(v,2)],
+  ['sa','oa',()=>S.a,v=>{S.a=v;},v=>f(v,2)],
+  ['sv','ov',()=>S.v,v=>{S.v=v;},v=>f(v,2)],
+  ['sphi','ophi',()=>S.phi*180/Math.PI,v=>{S.phi=v*Math.PI/180;},v=>Math.round(v)+'°'],
+  ['sR','oR',()=>S.R,v=>{S.R=v;},v=>f(v,2)],
+  ['sspd','ospd',()=>S.speed,v=>{S.speed=v;},v=>f(v,1)+'×'],
+];
+function syncSliders(){for(const [i,o,g,,fm] of sl){$(i).value=g();$(o).textContent=fm(g());}}
+for(const [i,o,,set,fm] of sl){
+  $(i).addEventListener('input',e=>{const v=parseFloat(e.target.value);set(v);$(o).textContent=fm(v);if(i!=='sspd')rebuild();});
+}
+function setClock(c){S.clock=c;$('bOsc').setAttribute('aria-pressed',c==='osc');$('bKep').setAttribute('aria-pressed',c==='kep');}
+$('bOsc').onclick=()=>setClock('osc');
+$('bKep').onclick=()=>setClock('kep');
+$('bPlay').onclick=()=>{S.playing=!S.playing;$('bPlay').textContent=S.playing?'Pause':'Play';};
+$('bPlay').textContent=S.playing?'Pause':'Play';
+const presets={
+  circle:{E:-0.5,a:1,v:1,phi:0.3},
+  ellipse:{E:-0.5,a:1.25,v:0.45,phi:0.35},
+  radial:{E:-0.5,a:1.2,v:0,phi:0.5},
+  parabola:{E:0,a:0.8,v:0.7,phi:0.2},
+  hyperbola:{E:0.3,a:0.7,v:1,phi:0.25},
+  repulsive:{E:0.4,a:1.1,v:0.5,phi:0.25},
+};
+document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{Object.assign(S,presets[b.dataset.p]);S.tau=0;syncSliders();rebuild();});
+
+/* ---------- dragging ---------- */
+function attachDrag(cv,isZ){
+  let down=false;
+  const set=ev=>{
+    const r=cv.getBoundingClientRect(), half=isZ?S.R*S.R:S.R;
+    const x=((ev.clientX-r.left)/r.width*2-1)*half, y=-((ev.clientY-r.top)/r.height*2-1)*half;
+    let a,phi;
+    if(isZ){a=Math.sqrt(Math.hypot(x,y));phi=Math.atan2(y,x)/2;}
+    else{a=Math.hypot(x,y);phi=Math.atan2(y,x);}
+    S.a=Math.min(2,Math.round(a*100)/100);S.phi=phi;S.tau=0;syncSliders();rebuild();
+  };
+  cv.addEventListener('pointerdown',e=>{down=true;cv.setPointerCapture(e.pointerId);set(e);});
+  cv.addEventListener('pointermove',e=>{if(down)set(e);});
+  const up=()=>{down=false;};
+  cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
+}
+
+/* ---------- drawing ---------- */
+function drawPlane(cv,isZ,col){
+  const rect=cv.getBoundingClientRect(), d=window.devicePixelRatio||1, W=Math.max(1,Math.round(rect.width*d));
+  if(cv.width!==W){cv.width=W;cv.height=W;}
+  const ctx=cv.getContext('2d'), half=isZ?S.R*S.R:S.R, c=W/2, sc=c/half;
+  const X=x=>c+x*sc, Y=y=>c-y*sc;
+  ctx.clearRect(0,0,W,W);
+  ctx.lineWidth=d; ctx.strokeStyle=col('--grid');
+  for(let r=0.5;r<=S.R*1.45;r+=0.5){const rr=isZ?r*r:r;ctx.beginPath();ctx.arc(c,c,rr*sc,0,2*Math.PI);ctx.stroke();}
+  const nr=isZ?6:12;
+  for(let i=0;i<nr;i++){const th=i*2*Math.PI/nr;ctx.beginPath();ctx.moveTo(c,c);ctx.lineTo(c+Math.cos(th)*W,c-Math.sin(th)*W);ctx.stroke();}
+
+  const hue=col(isZ?'--kep':'--osc'), ink=col('--ink'), muted=col('--muted');
+  ctx.fillStyle=muted; ctx.font=`italic ${16*d}px Spectral, Georgia, serif`; ctx.fillText(isZ?'z':'w',12*d,22*d);
+
+  if(orbit.kind==='orbit'){
+    const pts=isZ?orbit.z:orbit.w;
+    ctx.strokeStyle=hue; ctx.lineWidth=2*d; ctx.globalAlpha=0.85; ctx.beginPath();
+    pts.forEach((p,i)=>{const px=X(p[0]),py=Y(p[1]);i?ctx.lineTo(px,py):ctx.moveTo(px,py);});
+    ctx.stroke(); ctx.globalAlpha=1;
+  }
+  // force center
+  if(isZ){ctx.fillStyle=ink;ctx.beginPath();ctx.arc(c,c,5*d,0,2*Math.PI);ctx.fill();}
+  else{ctx.strokeStyle=ink;ctx.lineWidth=1.5*d;ctx.beginPath();ctx.moveTo(c-6*d,c);ctx.lineTo(c+6*d,c);ctx.moveTo(c,c-6*d);ctx.lineTo(c,c+6*d);ctx.stroke();}
+  // start handle
+  const w0=[S.a*Math.cos(S.phi),S.a*Math.sin(S.phi)], h0=isZ?sq(w0):w0;
+  ctx.strokeStyle=muted;ctx.lineWidth=1.5*d;ctx.strokeRect(X(h0[0])-5*d,Y(h0[1])-5*d,10*d,10*d);
+
+  if(orbit.kind!=='orbit'&&orbit.kind!=='rest') return;
+  const pw=orbit.kind==='rest'?w0:wAt(S.tau), p=isZ?sq(pw):pw;
+  // ray and angle arc
+  ctx.setLineDash([4*d,4*d]);ctx.strokeStyle=muted;ctx.lineWidth=d;
+  ctx.beginPath();ctx.moveTo(c,c);ctx.lineTo(X(p[0]),Y(p[1]));ctx.stroke();ctx.setLineDash([]);
+  if(Math.hypot(p[0],p[1])>1e-9){
+    const ang=Math.atan2(p[1],p[0]);
+    ctx.strokeStyle=hue;ctx.lineWidth=2*d;ctx.beginPath();ctx.arc(c,c,26*d,0,-ang,ang>0);ctx.stroke();
+  }
+  if(!isZ){ctx.strokeStyle=hue;ctx.lineWidth=2*d;ctx.beginPath();ctx.arc(X(-p[0]),Y(-p[1]),5.5*d,0,2*Math.PI);ctx.stroke();}
+  ctx.fillStyle=hue;ctx.beginPath();ctx.arc(X(p[0]),Y(p[1]),6.5*d,0,2*Math.PI);ctx.fill();
+}
+
+function step(ms){
+  if(orbit.kind!=='orbit') return;
+  const span=orbit.t1-orbit.t0, base=S.speed*Math.min(ms,50)/1000/7;
+  if(S.clock==='osc') S.tau+=base*span;
+  else{
+    const p=wAt(S.tau), r2=p[0]*p[0]+p[1]*p[1];
+    S.tau+=Math.min(base*orbit.tVis/Math.max(2*r2,1e-12),span/60);
+  }
+  if(orbit.bound) S.tau=orbit.t0+(((S.tau-orbit.t0)%span)+span)%span;
+  else if(S.tau>orbit.t1||S.tau<orbit.t0) S.tau=orbit.t0;
+}
+
+let last=null;
+function frame(ts){
+  const ms=last==null?16:ts-last; last=ts;
+  if(S.playing) step(ms);
+  const css=getComputedStyle(document.documentElement), col=n=>css.getPropertyValue(n).trim();
+  drawPlane($('cw'),false,col); drawPlane($('cz'),true,col);
+  requestAnimationFrame(frame);
+}
+
+attachDrag($('cw'),false); attachDrag($('cz'),true);
+syncSliders(); rebuild(); requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

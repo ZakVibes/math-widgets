@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Zak's Math Widgets</title>
+  <meta name="description" content="Interactive math and physics widgets: fractals, gravity, chaos and quantum mechanics.">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@1,500&display=swap" rel="stylesheet">
+
+  <style>
+    /* Colors live here as named variables, so the whole look can be changed in one place. */
+    :root {
+      --bg: #f7f6f2;
+      --card: #ffffff;
+      --text: #1c1c1f;
+      --muted: #5f5f66;
+      --border: #e2e0d8;
+      --fractals: #7a4fd6;
+      --gravity: #2a7fb8;
+      --chaos: #d0662a;
+      --quantum: #1f9a7a;
+    }
+    /* Dark mode: used automatically when the visitor's computer is set to dark. */
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #131317;
+        --card: #1c1c22;
+        --text: #ececf0;
+        --muted: #a0a0aa;
+        --border: #2e2e36;
+        --fractals: #a888f0;
+        --gravity: #63aee0;
+        --chaos: #ef9058;
+        --quantum: #4fc9a6;
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "IBM Plex Sans", system-ui, sans-serif;
+      line-height: 1.5;
+    }
+
+    main {
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 56px 16px 72px;
+    }
+
+    header { margin-bottom: 40px; }
+    h1 {
+      font-family: "IBM Plex Serif", Georgia, serif;
+      font-style: italic;
+      font-weight: 500;
+      font-size: clamp(2rem, 5vw, 2.8rem);
+      line-height: 1.15;
+      margin: 0 0 12px;
+    }
+    .intro {
+      color: var(--muted);
+      font-size: 1.1rem;
+      max-width: 36em;
+      margin: 0;
+    }
+
+    /* One section per topic */
+    section { margin-top: 40px; }
+    h2 {
+      font-size: 0.85rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin: 0 0 14px;
+    }
+    .fractals { --accent: var(--fractals); }
+    .gravity  { --accent: var(--gravity); }
+    .chaos    { --accent: var(--chaos); }
+    .quantum  { --accent: var(--quantum); }
+
+    /* The grid of cards: as many columns as fit, each at least 280px wide */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .card {
+      display: block;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-top: 3px solid var(--accent);
+      border-radius: 10px;
+      padding: 18px 20px 20px;
+      color: inherit;
+      text-decoration: none;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .card:hover, .card:focus-visible {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+      outline: none;
+    }
+    .card h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin: 0 0 6px;
+    }
+    .card p {
+      color: var(--muted);
+      font-size: 0.95rem;
+      margin: 0 0 14px;
+    }
+    .open {
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--accent);
+    }
+
+    footer {
+      margin-top: 56px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Zak's Math Widgets</h1>
+      <p class="intro">Interactive explorations of fractals, gravity, chaos and quantum mechanics. Pick one and start playing; everything runs right in your browser.</p>
+    </header>
+
+    <section class="fractals">
+      <h2>Fractals &amp; complex dynamics</h2>
+      <div class="grid">
+        <a class="card" href="mandelbrot-descent/index.html">
+          <h3>Mandelbrot Descent</h3>
+          <p>A deep-zoom dive into the Mandelbrot set, with GIF export of your descent.</p>
+          <span class="open">Open →</span>
+        </a>
+        <a class="card" href="rational-map-explorer/index.html">
+          <h3>Rational Map Explorer</h3>
+          <p>Explore z<sup>n</sup> + c/z<sup>m</sup> side by side in the parameter plane and the dynamical plane.</p>
+          <span class="open">Open →</span>
+        </a>
+      </div>
+    </section>
+
+    <section class="gravity">
+      <h2>Gravity &amp; orbits</h2>
+      <div class="grid">
+        <a class="card" href="gravity-well/index.html">
+          <h3>Gravity Well</h3>
+          <p>A 2D N-body simulator. Place bodies, throw them, and watch orbits form.</p>
+          <span class="open">Open →</span>
+        </a>
+        <a class="card" href="gravity-well-3d/index.html">
+          <h3>Gravity Well 3D</h3>
+          <p>The same N-body playground in three dimensions, with a rotatable view.</p>
+          <span class="open">Open →</span>
+        </a>
+        <a class="card" href="hooke-newton-squaring-map/index.html">
+          <h3>Hooke ↔ Newton</h3>
+          <p>Squaring the plane turns Hooke's spring oscillator into Newton's Kepler orbit.</p>
+          <span class="open">Open →</span>
+        </a>
+      </div>
+    </section>
+
+    <section class="chaos">
+      <h2>Chaos</h2>
+      <div class="grid">
+        <a class="card" href="double-pendulum-flip-map/index.html">
+          <h3>Double Pendulum Flip Map</h3>
+          <p>Every pixel is a pendulum. Color them by when they flip over the top, or by how chaotic they are.</p>
+          <span class="open">Open →</span>
+        </a>
+      </div>
+    </section>
+
+    <section class="quantum">
+      <h2>Quantum mechanics</h2>
+      <div class="grid">
+        <a class="card" href="schrodinger-sandbox/index.html">
+          <h3>Schrödinger Sandbox</h3>
+          <p>Build potentials and watch a 1D wave packet evolve under the Schrödinger equation.</p>
+          <span class="open">Open →</span>
+        </a>
+        <a class="card" href="schrodinger-sandbox-2d/index.html">
+          <h3>Schrödinger Sandbox 2D</h3>
+          <p>Wave packets in a plane: scattering, tunneling and interference in two dimensions.</p>
+          <span class="open">Open →</span>
+        </a>
+      </div>
+    </section>
+
+    <footer>Made by Zak · 2026</footer>
+  </main>
+</body>
+</html>
