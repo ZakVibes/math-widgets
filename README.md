@@ -13,5 +13,6 @@ Each folder is one self-contained page: open its index.html in a browser.
 | hooke-newton-squaring-map | Hooke ↔ Newton: the squaring map |
 | schrodinger-sandbox | Schrödinger Sandbox (1D) |
 | schrodinger-sandbox-2d | Schrödinger Sandbox 2D |
+| kaleidoscope | Kaleidoscope |
 
 Goal: turn this folder into a website that showcases these widgets.

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Zak's Math Widgets</title>
-  <meta name="description" content="Interactive math and physics widgets: fractals, gravity, chaos and quantum mechanics.">
+  <meta name="description" content="Interactive math and physics widgets: fractals, symmetry, gravity, chaos and quantum mechanics.">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -22,6 +22,7 @@
       --gravity: #2a7fb8;
       --chaos: #d0662a;
       --quantum: #1f9a7a;
+      --symmetry: #a87a22;
     }
     /* Dark mode: used automatically when the visitor's computer is set to dark. */
     @media (prefers-color-scheme: dark) {
@@ -35,6 +36,7 @@
         --gravity: #63aee0;
         --chaos: #ef9058;
         --quantum: #4fc9a6;
+        --symmetry: #d6a74e;
       }
     }
 
@@ -84,6 +86,7 @@
     .gravity  { --accent: var(--gravity); }
     .chaos    { --accent: var(--chaos); }
     .quantum  { --accent: var(--quantum); }
+    .symmetry { --accent: var(--symmetry); }
 
     /* The grid of cards: as many columns as fit, each at least 280px wide */
     .grid {
@@ -135,7 +138,7 @@
   <main>
     <header>
       <h1>Zak's Math Widgets</h1>
-      <p class="intro">Interactive explorations of fractals, gravity, chaos and quantum mechanics. Pick one and start playing; everything runs right in your browser.</p>
+      <p class="intro">Interactive explorations of fractals, symmetry, gravity, chaos and quantum mechanics. Pick one and start playing; everything runs right in your browser.</p>
     </header>
 
     <section class="fractals">
@@ -149,6 +152,17 @@
         <a class="card" href="rational-map-explorer/index.html">
           <h3>Rational Map Explorer</h3>
           <p>Explore z<sup>n</sup> + c/z<sup>m</sup> side by side in the parameter plane and the dynamical plane.</p>
+          <span class="open">Open →</span>
+        </a>
+      </div>
+    </section>
+
+    <section class="symmetry">
+      <h2>Symmetry</h2>
+      <div class="grid">
+        <a class="card" href="kaleidoscope/index.html">
+          <h3>Kaleidoscope</h3>
+          <p>A real kaleidoscope with tumbling glass pieces, plus a symmetry toy you can paint into or fill with your own image.</p>
           <span class="open">Open →</span>
         </a>
       </div>
