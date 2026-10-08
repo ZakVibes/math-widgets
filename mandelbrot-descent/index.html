@@ -37,7 +37,7 @@ body.idle #bar{backdrop-filter:none;-webkit-backdrop-filter:none}
 #bar svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 #bar .sep{width:1px;height:18px;background:var(--line);margin:0 4px}
 #speed{min-width:48px;font-variant-numeric:tabular-nums}
-#panel{position:fixed;left:50%;bottom:calc(76px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:min(360px,calc(100vw - 32px));box-sizing:border-box;padding:18px 18px 16px;border-radius:16px;background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(18px) saturate(1.2);-webkit-backdrop-filter:blur(18px) saturate(1.2);box-shadow:0 20px 60px rgba(0,0,0,.45);display:grid;gap:14px}
+#panel{position:fixed;left:50%;bottom:calc(76px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:min(360px,calc(100vw - 32px));box-sizing:border-box;padding:18px 18px 16px;border-radius:16px;background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(18px) saturate(1.2);-webkit-backdrop-filter:blur(18px) saturate(1.2);box-shadow:0 20px 60px rgba(0,0,0,.45);display:grid;gap:14px;overflow-y:auto;max-height:calc(100vh - 96px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));max-height:calc(100dvh - 96px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))}
 #panel h2{margin:0;font:italic 500 22px/1 var(--display)}
 #panel .row{display:grid;gap:7px}
 #panel .lab{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--mute)}
@@ -52,7 +52,7 @@ body.idle #bar{backdrop-filter:none;-webkit-backdrop-filter:none}
 #prog{height:3px;border-radius:2px;background:var(--line);overflow:hidden}
 #prog i{display:block;height:100%;width:0;background:var(--gilt);transition:width .15s linear}
 #result{display:grid;gap:10px}
-#result img{width:100%;border-radius:8px;display:block;image-rendering:auto}
+#result img{width:auto;max-width:100%;max-height:40vh;margin:0 auto;border-radius:8px;display:block;image-rendering:auto}
 .acts{display:flex;gap:8px;align-items:center;justify-content:space-between}
 #close{all:unset;cursor:pointer;position:absolute;right:14px;top:14px;color:var(--mute);font-size:18px;line-height:1;padding:2px 6px}
 #veil{position:fixed;inset:0;display:grid;place-items:center;pointer-events:none;transition:opacity 1.2s ease}
@@ -991,11 +991,19 @@ function estimate() {
 }
 function openPanel() { if (!$('panel').hidden) return; EXP.wasPaused = S.paused; if (!S.paused) togglePause(); $('panel').hidden = false; $('result').hidden = true; $('progRow').hidden = true; $('go').disabled = false; estimate(); poke(); }
 function closePanel() { if ($('panel').hidden) return; EXP.cancel = true; $('panel').hidden = true; if (!EXP.wasPaused && S.paused) togglePause(); }
+// Only one export may run at a time: a new one stops any older one and waits until it has wound down.
+let expId = 0, expDone = Promise.resolve();
 async function runExport() {
   const J = S.cur; if (!J) return;
-  $('go').disabled = true; $('result').hidden = true; $('progRow').hidden = false; EXP.cancel = false;
+  const id = ++expId; EXP.cancel = true;
+  $('go').disabled = true; $('result').hidden = true; $('progRow').hidden = false;
   const bar = $('prog').firstElementChild, lab = $('progLab');
-  const setP = (f, t) => { bar.style.width = (f * 100).toFixed(1) + '%'; lab.textContent = t; };
+  const setP = (f, t) => { if (id !== expId) return; bar.style.width = (f * 100).toFixed(1) + '%'; lab.textContent = t; };
+  setP(0, 'Waiting for the previous export to stop');
+  await expDone;
+  if (id !== expId) return;
+  let finish; expDone = new Promise(r => finish = r);
+  EXP.cancel = false;
   S.exporting = true;
   try {
     // wait for any in-flight keyframe tiles, then render offline
@@ -1026,23 +1034,28 @@ async function runExport() {
       gif.frame(quant(px, W, H), delay);
       setP(0.04 + 0.9 * (F + k + 1) / (N + F), `Rendering frame ${F + k + 1} of ${N + F}`);
     }
+    if (EXP.cancel) throw 'cancel';
     setP(1, 'Finishing');
     EXP.blob = gif.finish();
     if (EXP.url) URL.revokeObjectURL(EXP.url); EXP.url = URL.createObjectURL(EXP.blob);
     $('gifimg').src = EXP.url;
     $('gifinfo').textContent = `${W}×${H} · ${N} frames · ${(EXP.blob.size / 1048576).toFixed(1)} MB`;
     $('result').hidden = false; $('progRow').hidden = true;
-    const dl = await getDownloads(); $('save').hidden = !dl;
-    if (!dl) $('gifinfo').textContent += ' · right-click the preview to save';
-  } catch (e) { if (e !== 'cancel') { console.error(e); lab.textContent = 'Export failed: ' + (e.message || e); } else $('progRow').hidden = true; }
-  finally { S.exporting = false; $('go').disabled = false; }
+    $('gifimg').onload = () => { $('panel').scrollTop = $('panel').scrollHeight; };   // on small screens, bring the preview and Save button into view
+    EXP.locId = J.loc.id;
+  } catch (e) { if (e !== 'cancel') { console.error(e); if (id === expId) lab.textContent = 'Export failed: ' + (e.message || e); } else if (id === expId) $('progRow').hidden = true; }
+  finally { S.exporting = false; finish(); if (id === expId) $('go').disabled = false; }
 }
 let dlNs; async function getDownloads() { if (dlNs !== undefined) return dlNs; try { dlNs = (window.claude && window.claude.use) ? await window.claude.use('downloads') : null; } catch (_) { dlNs = null; } return dlNs; }
 segInit('optLen', 'len'); segInit('optSize', 'size'); segInit('optQ', 'q');
 EXP.len = 5; $('exp').onclick = () => $('panel').hidden ? openPanel() : closePanel(); $('close').onclick = closePanel; $('go').onclick = runExport;
+// an ordinary browser download, for when the page isn't running inside Claude
+function browserDownload(name) { const a = document.createElement('a'); a.href = EXP.url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
 $('save').onclick = async () => {
-  const dl = await getDownloads(); if (!dl || !EXP.blob) return;
-  try { await dl.save({ filename: `mandelbrot-${S.cur.loc.id}-${Date.now() % 100000}.gif`, data: EXP.blob }); } catch (e) { if (e && e.code !== 'declined') $('gifinfo').textContent = 'Saving is unavailable here. Right-click the preview to save.'; }
+  if (!EXP.blob) return;
+  const name = `mandelbrot-${EXP.locId}-${Date.now() % 100000}.gif`;
+  const dl = await getDownloads(); if (!dl) return browserDownload(name);
+  try { await dl.save({ filename: name, data: EXP.blob }); } catch (e) { if (e && e.code !== 'declined') browserDownload(name); }
 };
 
 // ---------- main loop & UI ----------
@@ -1089,7 +1102,7 @@ function frame(now) {
   }
   // journey end → hold, then dissolve into the next location
   if (C && C.Uend - C.u < 7) prepareNext();
-  if (C && C.Uend - C.u < 0.03) { S.hold += dt; if (S.hold > 3.5) S.advance = true; }
+  if (C && C.Uend - C.u < 0.03) { if (!S.paused) S.hold += dt; if (S.hold > 3.5) S.advance = true; }
   if (S.advance && S.next && readyToShow(S.next) && S.fade === 0) { S.fade = 1e-6; swapName(S.next.loc.name); }
   if (S.fade > 0) {
     S.fade += dt / 3.2;
@@ -1114,7 +1127,6 @@ function frame(now) {
   // GPU work: cost-estimated batches. With a GPU timer we size each batch to a fixed slice of GPU
   // time; without one we adapt to frame pacing. A floor keeps progress going whatever happens.
   try { gpuSchedule(dt); } catch (err) { console.error(err); if (S.job && S.job.prev) S.job.prev.pin--; S.job = null; }
-  if (frameCount % 120 === 0 && S.cur && S.cur.shown) saveResume();
   if (frameCount % 6 === 0) updateHud();
 }
 
