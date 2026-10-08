@@ -210,6 +210,7 @@ const S = {
   tool: 'body', mass: 300, sign: 1, autoOrbit: true, planeH: 0, tilt: 0,
   spin: false, drops: true, grid: true, paused: false, t: 0, e0: null, eNow: 0
 };
+const ETA = 0.03;
 const cam = { tx: 0, ty: 0, tz: 0, yaw: 0.6, pitch: 0.45, dist: 1500, fov: 50 * Math.PI / 180 };
 let bodies = [];
 
@@ -252,7 +253,7 @@ const dot = (a, b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
 
 // ---------- physics ----------
 function accel() {
-  const b = bodies, n = b.length, e2 = S.eps * S.eps, hits = [];
+  const b = bodies, n = b.length, e2 = S.eps * S.eps, hits = []; let rate = 0;
   for (const o of b) { o.ax = o.fixed ? 0 : S.gx; o.ay = o.fixed ? 0 : S.gy; o.az = o.fixed ? 0 : S.gz; }
   for (let i = 0; i < n; i++) {
     const p = b[i];
@@ -263,9 +264,11 @@ function accel() {
       const inv = 1 / (d2 * Math.sqrt(d2));
       if (!p.fixed) { const f = inv * q.m; p.ax += dx*f; p.ay += dy*f; p.az += dz*f; }
       if (!q.fixed) { const f = inv * p.m; q.ax -= dx*f; q.ay -= dy*f; q.az -= dz*f; }
-      if (S.merge) { const rr = p.r + q.r; if (r2 < rr*rr) hits.push(i, j); }
+      const w = inv * (Math.abs(p.m) + Math.abs(q.m)); if (w > rate) rate = w;
+      if (S.merge || p.fixed !== q.fixed) { const rr = p.r + q.r; if (r2 < rr*rr) hits.push(i, j); }
     }
   }
+  S.tmin = rate > 0 ? 1 / Math.sqrt(rate) : Infinity;
   return hits;
 }
 function resolve(hits) {
@@ -282,13 +285,17 @@ function resolve(hits) {
   if (any) { bodies = bodies.filter(b => !b.dead); changed(); }
   return any;
 }
-function step() {
-  const dt = S.dt, h = dt/2;
+function step(dt) {
+  const h = dt/2;
   for (const o of bodies) if (!o.fixed) { o.vx += o.ax*h; o.vy += o.ay*h; o.vz += o.az*h; o.x += o.vx*dt; o.y += o.vy*dt; o.z += o.vz*dt; }
   const hits = accel();
   if (hits.length && resolve(hits)) accel();
   for (const o of bodies) if (!o.fixed) { o.vx += o.ax*h; o.vy += o.ay*h; o.vz += o.az*h; }
   S.t += dt;
+}
+function advance() {
+  const k = Math.min(8, Math.max(1, Math.ceil(S.dt / (ETA * S.tmin))));
+  for (let j = 0; j < k; j++) step(S.dt / k);
 }
 function energy() {
   let E = 0; const e2 = S.eps*S.eps, n = bodies.length;
@@ -350,7 +357,7 @@ function orbitVelocity(x, y, z, m) {
   const M = best.m + (best.fixed ? 0 : m);
   const v = Math.sqrt(M * d * d / Math.pow(d*d + S.eps*S.eps, 1.5));
   const tv = applyTilt([t[0]*v, t[1]*v, t[2]*v], rh);
-  return [best.vx + tv[0], best.vy + tv[1], best.vz + tv[2]];
+  return [best.vx + tv[0], best.vy + tv[1], best.vz + tv[2], best];
 }
 function com() {
   let M = 0, x = 0, y = 0, z = 0;
@@ -467,7 +474,12 @@ function launchFor(g) {
 function commitPlace(g) {
   const [x, y, z] = g.w;
   if (S.tool === 'fixed') { addBody({ x, y, z, m: S.mass * S.sign, fixed: true }); return; }
-  const [vx, vy, vz] = launchFor(g);
+  let [vx, vy, vz, best] = launchFor(g);
+  if (best && !best.fixed) {
+    const M = best.m + S.mass, rx = vx - best.vx, ry = vy - best.vy, rz = vz - best.vz;
+    vx = best.vx + rx * best.m / M; vy = best.vy + ry * best.m / M; vz = best.vz + rz * best.m / M;
+    best.vx -= rx * S.mass / M; best.vy -= ry * S.mass / M; best.vz -= rz * S.mass / M;
+  }
   addBody({ x, y, z, vx, vy, vz, m: S.mass });
 }
 function eraseAt(sx, sy) {
@@ -663,7 +675,7 @@ let frameN = 0;
 function frame() {
   if (!S.paused && bodies.length) {
     accel();
-    for (let i = 0; i < S.substeps; i++) step();
+    for (let i = 0; i < S.substeps; i++) advance();
     cull();
     for (const b of bodies) {
       if (b.fixed) continue;
@@ -759,6 +771,7 @@ function scene(name) {
     for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) addBody({ x: -210 + i*60, y: 260 + Math.random()*30, z: -210 + j*60, m: 1 });
     fit(420, 0.3); cam.ty = -60;
   } else if (name === 'empty') {
+    set(base);
     fit(500);
   }
   syncUI();
@@ -829,12 +842,12 @@ $('dust').addEventListener('click', () => {
 });
 window.addEventListener('keydown', e => {
   if (e.key === 'Shift') shiftDown = true;
-  if (e.target.matches('input[type=checkbox],button') && e.code === 'Space') return;
+  if (e.code === 'Space' && e.target.matches('input[type=checkbox]')) return;
   if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) togglePause(); }
   else if (e.key >= '1' && e.key <= '4') setTool(['body','fixed','erase','orbit'][+e.key - 1]);
   else if (e.key === 'f') { S.showField = !S.showField; syncUI(); }
 });
-window.addEventListener('keyup', e => { if (e.key === 'Shift') shiftDown = false; });
+window.addEventListener('keyup', e => { if (e.key === 'Shift') shiftDown = false; if (e.code === 'Space' && e.target.matches('button')) e.preventDefault(); });
 
 setMass(300); syncUI(); basis(); scene('system');
 requestAnimationFrame(frame);
