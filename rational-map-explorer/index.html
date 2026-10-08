@@ -46,7 +46,7 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid 
 <div class="wrap">
 <a href="../index.html" style="display:table;flex-basis:100%;margin-bottom:6px;font-size:13px;color:inherit;opacity:.7;text-decoration:none">← All widgets</a>
 <h1>Rational map explorer: z<sup>n</sup> + c / z<sup>m</sup></h1>
-<p class="hint">Left: the parameter plane (where the critical orbit stays bounded). Right: the dynamical plane for the c you pick. Tap the left panel or drag its marker to set c. On both panels, drag to pan and pinch or scroll to zoom; double-tap or double-click the right panel to reset it. Try n = 2, m = 3 and a small c. Set m = 0 for the ordinary z<sup>n</sup> + c (Mandelbrot and Julia sets). Both panels zoom far beyond normal precision (the zoom label shows "deep"); deep views usually need more iterations. Animate c moves the marker around the centre of the left view; Path sets the shape of the loop.</p>
+<p class="hint">The parameter plane (c) shows where the critical orbit stays bounded; the dynamical plane (z) shows the dynamics for the c you pick. Tap the parameter plane or drag its marker to set c. On both panels, drag to pan and pinch or scroll to zoom; double-tap or double-click the dynamical plane to reset it. Try n = 2, m = 3 and a small c. Set m = 0 for the ordinary z<sup>n</sup> + c (Mandelbrot and Julia sets). Both panels zoom far beyond normal precision (the zoom label shows "deep"); deep views usually need more iterations. Animate c moves the marker around the centre of the parameter plane view; Path sets the shape of the loop.</p>
 <div class="grid">
 <div><div class="cap"><span>Parameter plane (c)</span><span id="z0">x1.0</span></div>
 <div class="view" id="mv"><canvas id="mc"></canvas><div id="mk"></div></div></div>
@@ -58,7 +58,7 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid 
 <div class="row"><label for="n">Power n</label><input type="range" id="n" min="2" max="8" step="1" value="2"><output id="nv">2</output></div>
 <div class="row"><label for="m">Pole m</label><input type="range" id="m" min="0" max="8" step="1" value="2"><output id="mv2">2</output></div>
 <div class="row"><label for="it">Iterations</label><input type="range" id="it" min="50" max="3000" step="50" value="200"><output id="itv">200</output></div>
-<div class="row"><label for="cd">Color</label><input type="range" id="cd" min="0.02" max="0.5" step="0.01" value="0.12"><output id="cdv">0.12</output></div>
+<div class="row"><label for="cd">Color</label><input type="range" id="cd" min="0.02" max="0.5" step="0.01" value="0.02"><output id="cdv">0.02</output></div>
 <div class="row"><label for="lr">Re(c)</label><input type="range" id="lr" min="-2.5" max="2.5" step="0.001" value="0.06"><output id="lrv">0.060</output></div>
 <div class="row"><label for="li">Im(c)</label><input type="range" id="li" min="-2.5" max="2.5" step="0.001" value="0.02"><output id="liv">0.020</output></div>
 <div class="row"><label for="sp">Anim speed</label><input type="range" id="sp" min="0.1" max="4" step="0.1" value="1"><output id="spv">1.0</output></div>
@@ -76,10 +76,10 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid 
 <label for="rs">Resolution</label>
 <select id="rs"><option value="480">480 px</option><option value="720" selected>720 px</option><option value="1000">1000 px</option></select>
 </div>
-<div class="bar" id="ex" hidden>
+<div class="bar" id="ex">
 <label for="es">Export size</label>
 <select id="es"><option value="2000">2000 px</option><option value="3000" selected>3000 px</option><option value="4000">4000 px</option></select>
-<button id="sl">Save left PNG</button><button id="sr">Save right PNG</button>
+<button id="sl">Save parameter PNG</button><button id="sr">Save dynamical PNG</button>
 </div>
 </div>
 <script>
@@ -88,7 +88,7 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid 
 var $=function(i){return document.getElementById(i)};
 
 /* ---------- settings ---------- */
-var S={n:2,m:2,it:200,cd:0.12,lr:0.06,li:0.02,pal:0,R:720,E:3000,ss:1,sp:1,path:1,reg:1};
+var S={n:2,m:2,it:200,cd:0.02,lr:0.06,li:0.02,pal:0,R:720,E:3000,ss:1,sp:1,path:1,reg:1};
 var PALS=[[[.5,.5,.5],[.5,.5,.5],[1,1,1],[0,.1,.2]],[[.25,.5,.6],[.25,.4,.4],[1,1,1],[.5,.6,.7]],[[.5,.5,.5],[.5,.5,.5],[1,1,1],[0,0,0]]];
 
 /* ---------- math kernel (these functions are also copied into the worker threads) ---------- */
@@ -563,7 +563,7 @@ function zoomV(V,u0,v0,u1,v1,f,hmax){    // zoom by f about screen point (u0,v0)
  return mkV(V.BX+d2b((2*u0-1)*V.h-(2*u1-1)*nh,PB),V.BY+d2b((1-2*v0)*V.h-(1-2*v1)*nh,PB),nh);
 }
 // One finger or the mouse pans, two fingers pinch, the wheel zooms. A tap calls onTap if given;
-// otherwise a double tap or double click resets the panel. On the left panel, dragging the marker moves c.
+// otherwise a double tap or double click resets the panel. On the parameter plane, dragging the marker moves c.
 function attach(p,onTap,mk){
  var box=p.box,pts=new Map(),drag=-1,multi=false,lastTap=0;
  function apply(){tfo(p);marker();clearTimeout(p.t);p.t=setTimeout(function(){render(p,false)},150)}
@@ -675,7 +675,7 @@ document.addEventListener('visibilitychange',function(){if(document.hidden)stopA
 /* ---------- PNG export ---------- */
 function showMsg(t){st.textContent=t;setTimeout(status,2500)}
 function exportPng(src){
- if(!DL||X.busy||X.enc)return;
+ if(X.busy||X.enc)return;
  var N2=S.E,c=document.createElement('canvas'),ctx;
  var name=(src===P1?'dynamical':'parameter')+'_n'+S.n+'_m'+S.m+'_c'+S.lr.toFixed(3)+(S.li<0?'':'+')+S.li.toFixed(3)+'i_'+N2+'px.png';
  c.width=c.height=N2;ctx=c.getContext('2d');
@@ -691,14 +691,15 @@ function exportPng(src){
   X.onprog=X.onfin=null;X.enc=true;X.msg='Encoding PNG...';status();
   c.toBlob(function(b){
    if(!b){done('Could not create the image. Try a smaller export size.');return}
-   DL.save({filename:name,data:b}).then(function(){done('Saved.')},function(err){done(err&&err.code==='declined'?'':'Save failed: '+((err&&err.code)||'error'))});
+   function dl(){var u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(u)},10000);done('Saved.')}
+   if(DL)DL.save({filename:name,data:b}).then(function(){done('Saved.')},function(err){if(err&&err.code==='declined')done('');else dl()});else dl();
   },'image/png');
  };
  render(X,false);
 }
 $('sl').addEventListener('click',function(){exportPng(P0)});
 $('sr').addEventListener('click',function(){exportPng(P1)});
-try{if(window.claude&&window.claude.use)window.claude.use('downloads').then(function(d){if(d){DL=d;$('ex').hidden=false}},function(){})}catch(err){}
+try{if(window.claude&&window.claude.use)window.claude.use('downloads').then(function(d){if(d)DL=d},function(){})}catch(err){}
 
 initPool();setBases();setSize();all(true);
 })();
