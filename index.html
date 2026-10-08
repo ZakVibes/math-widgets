@@ -4,41 +4,38 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Zak's Math Widgets</title>
-  <meta name="description" content="Interactive math and physics widgets: fractals, symmetry, gravity, chaos and quantum mechanics.">
+  <meta name="description" content="Interactive math and physics widgets: fractals, symmetry, gravity, chaos, quantum mechanics and waves.">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@1,500&display=swap" rel="stylesheet">
 
   <style>
-    /* Colors live here as named variables, so the whole look can be changed in one place. */
+    /* Colors live here as named variables, so the whole look can be changed in one place.
+       Theme: soft blush pink with deep rose accents; a deep plum in dark mode. */
     :root {
-      --bg: #f7f6f2;
+      --bg: #fbf1f5;
+      --glow: #f7dbe7;
       --card: #ffffff;
-      --text: #1c1c1f;
-      --muted: #5f5f66;
-      --border: #e2e0d8;
-      --fractals: #7a4fd6;
-      --gravity: #2a7fb8;
-      --chaos: #d0662a;
-      --quantum: #1f9a7a;
-      --symmetry: #a87a22;
-      --waves: #c2417e;
+      --text: #2a1620;
+      --muted: #7a5a68;
+      --border: #f0d9e3;
+      --rose: #b0306f;
+      --thumb-bg: #f3e3ea;
+      --shadow: rgba(176, 48, 111, 0.14);
     }
     /* Dark mode: used automatically when the visitor's computer is set to dark. */
     @media (prefers-color-scheme: dark) {
       :root {
-        --bg: #131317;
-        --card: #1c1c22;
-        --text: #ececf0;
-        --muted: #a0a0aa;
-        --border: #2e2e36;
-        --fractals: #a888f0;
-        --gravity: #63aee0;
-        --chaos: #ef9058;
-        --quantum: #4fc9a6;
-        --symmetry: #d6a74e;
-        --waves: #f07aa8;
+        --bg: #1d1219;
+        --glow: #2e1a27;
+        --card: #281822;
+        --text: #f6e9ef;
+        --muted: #c4a3b3;
+        --border: #3d2634;
+        --rose: #f28ab4;
+        --thumb-bg: #321f2b;
+        --shadow: rgba(0, 0, 0, 0.35);
       }
     }
 
@@ -51,14 +48,24 @@
       font-family: "IBM Plex Sans", system-ui, sans-serif;
       line-height: 1.5;
     }
+    /* a soft pink glow behind the title */
+    body::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto 0;
+      height: 420px;
+      background: radial-gradient(60% 100% at 30% 0%, var(--glow), transparent 70%);
+      pointer-events: none;
+      z-index: -1;
+    }
 
     main {
-      max-width: 1040px;
+      max-width: 1080px;
       margin: 0 auto;
       padding: 56px 16px 72px;
     }
 
-    header { margin-bottom: 40px; }
+    header { margin-bottom: 36px; }
     h1 {
       font-family: "IBM Plex Serif", Georgia, serif;
       font-style: italic;
@@ -66,6 +73,7 @@
       font-size: clamp(2rem, 5vw, 2.8rem);
       line-height: 1.15;
       margin: 0 0 12px;
+      color: var(--rose);
     }
     .intro {
       color: var(--muted);
@@ -81,39 +89,49 @@
       font-weight: 600;
       letter-spacing: 0.08em;
       text-transform: uppercase;
-      color: var(--accent);
+      color: var(--rose);
       margin: 0 0 14px;
     }
-    .fractals { --accent: var(--fractals); }
-    .gravity  { --accent: var(--gravity); }
-    .chaos    { --accent: var(--chaos); }
-    .quantum  { --accent: var(--quantum); }
-    .symmetry { --accent: var(--symmetry); }
-    .waves    { --accent: var(--waves); }
 
     /* The grid of cards: as many columns as fit, each at least 280px wide */
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 16px;
+      gap: 18px;
     }
 
     .card {
-      display: block;
+      display: flex;
+      flex-direction: column;
       background: var(--card);
       border: 1px solid var(--border);
-      border-top: 3px solid var(--accent);
-      border-radius: 10px;
-      padding: 18px 20px 20px;
+      border-radius: 14px;
+      overflow: hidden;
       color: inherit;
       text-decoration: none;
       transition: transform 0.15s ease, box-shadow 0.15s ease;
     }
     .card:hover, .card:focus-visible {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+      transform: translateY(-3px);
+      box-shadow: 0 10px 28px var(--shadow);
       outline: none;
     }
+    .card:focus-visible { box-shadow: 0 0 0 3px var(--rose); }
+
+    /* The preview picture at the top of each card */
+    .thumb {
+      display: block;
+      width: 100%;
+      height: auto;
+      aspect-ratio: 16 / 9;
+      object-fit: cover;
+      background: var(--thumb-bg);
+      border-bottom: 1px solid var(--border);
+      transition: transform 0.3s ease;
+    }
+    .card:hover .thumb { transform: scale(1.03); }
+
+    .body { padding: 16px 20px 18px; display: flex; flex-direction: column; flex: 1; }
     .card h3 {
       font-size: 1.1rem;
       font-weight: 600;
@@ -123,17 +141,23 @@
       color: var(--muted);
       font-size: 0.95rem;
       margin: 0 0 14px;
+      flex: 1;
     }
     .open {
       font-size: 0.9rem;
       font-weight: 500;
-      color: var(--accent);
+      color: var(--rose);
     }
 
     footer {
       margin-top: 56px;
       color: var(--muted);
       font-size: 0.9rem;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .card, .thumb { transition: none; }
+      .card:hover .thumb { transform: none; }
     }
   </style>
 </head>
@@ -144,93 +168,126 @@
       <p class="intro">Interactive explorations of fractals, symmetry, gravity, chaos, quantum mechanics and waves. Pick one and start playing; everything runs right in your browser.</p>
     </header>
 
-    <section class="fractals">
+    <section>
       <h2>Fractals &amp; complex dynamics</h2>
       <div class="grid">
         <a class="card" href="mandelbrot-descent/index.html">
-          <h3>Mandelbrot Descent</h3>
-          <p>A deep-zoom dive into the Mandelbrot set, with GIF export of your descent.</p>
-          <span class="open">Open →</span>
+          <img class="thumb" src="previews/mandelbrot-descent.jpg" alt="A deep, colourful spiral inside the Mandelbrot set" width="640" height="360" loading="lazy">
+          <div class="body">
+            <h3>Mandelbrot Descent</h3>
+            <p>A deep-zoom dive into the Mandelbrot set, with GIF export of your descent.</p>
+            <span class="open">Open →</span>
+          </div>
         </a>
         <a class="card" href="rational-map-explorer/index.html">
-          <h3>Rational Map Explorer</h3>
-          <p>Explore z<sup>n</sup> + c/z<sup>m</sup> side by side in the parameter plane and the dynamical plane.</p>
-          <span class="open">Open →</span>
+          <img class="thumb" src="previews/rational-map-explorer.jpg" alt="A lacy fractal in the parameter plane of a rational map" width="640" height="360" loading="lazy">
+          <div class="body">
+            <h3>Rational Map Explorer</h3>
+            <p>Explore z<sup>n</sup> + c/z<sup>m</sup> side by side in the parameter plane and the dynamical plane.</p>
+            <span class="open">Open →</span>
+          </div>
         </a>
       </div>
     </section>
 
-    <section class="symmetry">
+    <section>
       <h2>Symmetry</h2>
       <div class="grid">
         <a class="card" href="kaleidoscope/index.html">
-          <h3>Kaleidoscope</h3>
-          <p>A real kaleidoscope with tumbling glass pieces, plus a symmetry toy you can paint into or fill with your own image.</p>
-          <span class="open">Open →</span>
+          <img class="thumb" src="previews/kaleidoscope.jpg" alt="A symmetric kaleidoscope pattern of coloured glass" width="640" height="360" loading="lazy">
+          <div class="body">
+            <h3>Kaleidoscope</h3>
+            <p>A real kaleidoscope with tumbling glass pieces, plus a symmetry toy you can paint into or fill with your own image.</p>
+            <span class="open">Open →</span>
+          </div>
         </a>
       </div>
     </section>
 
-    <section class="gravity">
+    <section>
       <h2>Gravity &amp; orbits</h2>
       <div class="grid">
         <a class="card" href="gravity-well/index.html">
-          <h3>Gravity Well</h3>
-          <p>A 2D N-body simulator. Place bodies, throw them, and watch orbits form.</p>
-          <span class="open">Open →</span>
+          <img class="thumb" src="previews/gravity-well.jpg" alt="Planets with glowing orbit trails around a star" width="640" height="360" loading="lazy">
+          <div class="body">
+            <h3>Gravity Well</h3>
+            <p>A 2D N-body simulator. Place bodies, throw them, and watch orbits form.</p>
+            <span class="open">Open →</span>
+          </div>
         </a>
         <a class="card" href="gravity-well-3d/index.html">
-          <h3>Gravity Well 3D</h3>
-          <p>The same N-body playground in three dimensions, with a rotatable view.</p>
-          <span class="open">Open →</span>
+          <img class="thumb" src="previews/gravity-well-3d.jpg" alt="A tilted 3D star system with orbit trails above a grid" width="640" height="360" loading="lazy">
+          <div class="body">
+            <h3>Gravity Well 3D</h3>
+            <p>The same N-body playground in three dimensions, with a rotatable view.</p>
+            <span class="open">Open →</span>
+          </div>
         </a>
         <a class="card" href="hooke-newton-squaring-map/index.html">
-          <h3>Hooke ↔ Newton</h3>
-          <p>Squaring the plane turns Hooke's spring oscillator into Newton's Kepler orbit.</p>
-          <span class="open">Open →</span>
+          <img class="thumb" src="previews/hooke-newton-squaring-map.jpg" alt="An ellipse from a spring oscillator and the Kepler orbit it maps to" width="640" height="360" loading="lazy">
+          <div class="body">
+            <h3>Hooke ↔ Newton</h3>
+            <p>Squaring the plane turns Hooke's spring oscillator into Newton's Kepler orbit.</p>
+            <span class="open">Open →</span>
+          </div>
         </a>
       </div>
     </section>
 
-    <section class="chaos">
+    <section>
       <h2>Chaos</h2>
       <div class="grid">
         <a class="card" href="double-pendulum-flip-map/index.html">
-          <h3>Double Pendulum Flip Map</h3>
-          <p>Every pixel is a pendulum. Color them by when they flip over the top, or by how chaotic they are.</p>
-          <span class="open">Open →</span>
+          <img class="thumb" src="previews/double-pendulum-flip-map.jpg" alt="The double pendulum flip map: swirling orange regions around a black lens" width="640" height="360" loading="lazy">
+          <div class="body">
+            <h3>Double Pendulum Flip Map</h3>
+            <p>Every pixel is a pendulum. Color them by when they flip over the top, or by how chaotic they are.</p>
+            <span class="open">Open →</span>
+          </div>
         </a>
         <a class="card" href="bifurcation-mandelbrot/index.html">
-          <h3>Bifurcation ↔ Mandelbrot</h3>
-          <p>The logistic map's route to chaos, lined up under the Mandelbrot set. Every branch splits exactly where the real axis enters a new bulb.</p>
-          <span class="open">Open →</span>
+          <img class="thumb" src="previews/bifurcation-mandelbrot.jpg" alt="The logistic map's bifurcation diagram lined up with the Mandelbrot set" width="640" height="360" loading="lazy">
+          <div class="body">
+            <h3>Bifurcation ↔ Mandelbrot</h3>
+            <p>The logistic map's route to chaos, lined up under the Mandelbrot set. Every branch splits exactly where the real axis enters a new bulb.</p>
+            <span class="open">Open →</span>
+          </div>
         </a>
       </div>
     </section>
 
-    <section class="quantum">
+    <section>
       <h2>Quantum mechanics</h2>
       <div class="grid">
         <a class="card" href="schrodinger-sandbox/index.html">
-          <h3>Schrödinger Sandbox</h3>
-          <p>Build potentials and watch a 1D wave packet evolve under the Schrödinger equation.</p>
-          <span class="open">Open →</span>
+          <img class="thumb" src="previews/schrodinger-sandbox.jpg" alt="A rainbow-coloured wave packet tunnelling through a barrier" width="640" height="360" loading="lazy">
+          <div class="body">
+            <h3>Schrödinger Sandbox</h3>
+            <p>Build potentials and watch a 1D wave packet evolve under the Schrödinger equation.</p>
+            <span class="open">Open →</span>
+          </div>
         </a>
         <a class="card" href="schrodinger-sandbox-2d/index.html">
-          <h3>Schrödinger Sandbox 2D</h3>
-          <p>Wave packets in a plane: scattering, tunneling and interference in two dimensions.</p>
-          <span class="open">Open →</span>
+          <img class="thumb" src="previews/schrodinger-sandbox-2d.jpg" alt="A quantum wave spreading through a double slit and interfering" width="640" height="360" loading="lazy">
+          <div class="body">
+            <h3>Schrödinger Sandbox 2D</h3>
+            <p>Wave packets in a plane: scattering, tunneling and interference in two dimensions.</p>
+            <span class="open">Open →</span>
+          </div>
         </a>
       </div>
     </section>
 
-    <section class="waves">
+    <section>
       <h2>Waves &amp; signals</h2>
       <div class="grid">
         <a class="card" href="fourier-studio/index.html">
-          <h3>Fourier Studio</h3>
-          <p>Draw any loop and watch spinning circles rebuild it, then split chords, beats and your own voice into their frequencies.</p>
-          <span class="open">Open →</span>
+          <img class="thumb" src="previews/fourier-studio.jpg" alt="A heart traced by a chain of spinning circles" width="640" height="360" loading="lazy">
+          <div class="body">
+            <h3>Fourier Studio</h3>
+            <p>Draw any loop and watch spinning circles rebuild it, then split chords, beats and your own voice into their frequencies.</p>
+            <span class="open">Open →</span>
+          </div>
         </a>
       </div>
     </section>
