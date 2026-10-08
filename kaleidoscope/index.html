@@ -536,7 +536,7 @@ function buildGeom() {
 }
 
 /* ---------------- view layout ---------------- */
-let W = innerWidth, H = innerHeight, rs = 1;
+let W = innerWidth, H = innerHeight, rs = 1, ready = false;
 const view = { cx: W / 2, cy: H / 2, eyeR: 100, tcx: W / 2, tcy: H / 2, teyeR: 100, ppu: 100, maxIt: 20, rotA: [1, 0], rotB: [1, 0] };
 const panel = $('#panel');
 function targets() {
@@ -555,9 +555,12 @@ function targets() {
 function resize() {
   W = innerWidth; H = innerHeight;
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  cv.width = Math.max(2, Math.round(W * dpr * rs));
-  cv.height = Math.max(2, Math.round(H * dpr * rs));
+  const nw = Math.max(2, Math.round(W * dpr * rs)), nh = Math.max(2, Math.round(H * dpr * rs));
   targets();
+  if (nw !== cv.width || nh !== cv.height) {
+    cv.width = nw; cv.height = nh;   // this clears the canvas, so draw again straight away
+    if (ready) { updateView(0); render(); }
+  }
 }
 function farCorner() {
   return Math.max(Math.hypot(view.cx, view.cy), Math.hypot(W - view.cx, view.cy), Math.hypot(view.cx, H - view.cy), Math.hypot(W - view.cx, H - view.cy));
@@ -780,8 +783,8 @@ function addContact(A, B, nx, ny, px, py, depth, mu, h) {
   c.mt = 1 / (A.im + imB + A.iI * rta * rta + iIB * rtb * rtb);
   relVel(c);
   const vn = RV[0] * nx + RV[1] * ny;
-  c.bias = Math.min(BETA / h * Math.max(depth - SLOP, 0), MAXB);
-  if (vn < -0.6) c.bias = Math.max(c.bias, -REST * vn);
+  c.depth = depth;
+  c.bias = vn < -0.6 ? -REST * vn : 0;
 }
 function substep(h) {
   const gx = grav[0] * GRAV, gy = grav[1] * GRAV, w = turn.w;
@@ -832,6 +835,13 @@ function substep(h) {
       applyImp(c, tx * dt, ty * dt);
     }
   }
+  for (let i = 0; i < nC; i++) {
+    const c = pool[i], corr = Math.max(c.depth - SLOP, 0) * 0.2;
+    if (corr <= 0) continue;
+    const A = c.A, B = c.B, k = corr / (A.im + (B ? B.im : 0));
+    A.x -= c.nx * k * A.im; A.y -= c.ny * k * A.im;
+    if (B) { B.x += c.nx * k * B.im; B.y += c.ny * k * B.im; }
+  }
   for (const b of bodies) {
     const sp = Math.hypot(b.vx, b.vy);
     if (sp > 8) { b.vx *= 8 / sp; b.vy *= 8 / sp; }
@@ -842,10 +852,10 @@ function substep(h) {
   }
 }
 function stepPhysics(dt) {
-  acc += dt;
-  let n = 0;
-  while (acc >= H_STEP && n < 10) { substep(H_STEP); acc -= H_STEP; n++; }
-  if (n === 10) acc = 0;
+  if (dt <= 0) return;
+  const n = Math.min(10, Math.max(1, Math.round(dt / H_STEP)));
+  const h = dt / n;
+  for (let i = 0; i < n; i++) substep(h);
 }
 function drawChamber() {
   const x = cctx, k = CH / 2;
@@ -1085,14 +1095,23 @@ function render() {
 }
 
 /* adaptive resolution */
-let ema = 16.7, floorMs = 16.7, slowN = 0, fastN = 0;
+const frameLog = [];
+let slowFor = 0, fastFor = 0, lastScale = 0;
 function adapt(ms) {
-  if (ms > 200) return;
-  ema = ema * 0.9 + ms * 0.1;
-  floorMs = Math.min(floorMs + 0.01, ms);
-  if (ema > floorMs * 1.45 + 2) { slowN++; fastN = 0; } else if (ema < floorMs * 1.15) { fastN++; slowN = 0; }
-  if (slowN > 45 && rs > 0.5) { rs = Math.max(0.5, rs * 0.85); slowN = 0; resize(); }
-  if (fastN > 300 && rs < 1) { rs = Math.min(1, rs * 1.12); fastN = 0; resize(); }
+  if (ms > 250 || document.hidden) return;
+  frameLog.push(ms); if (frameLog.length > 120) frameLog.shift();
+  if (frameLog.length < 60) return;
+  const sorted = frameLog.slice().sort((a, b) => a - b);
+  const refresh = Math.min(17.5, Math.max(6.5, sorted[Math.floor(sorted.length * 0.1)]));
+  const typical = sorted[Math.floor(sorted.length * 0.5)];
+  const now = performance.now();
+  if (typical > refresh * 1.35 + 1) { slowFor += ms; fastFor = 0; }
+  else { slowFor = 0; fastFor = typical <= refresh * 1.1 ? fastFor + ms : 0; }
+  if (slowFor > 1000 && rs > 0.5 && now - lastScale > 2000) {
+    rs = Math.max(0.5, rs * 0.85); lastScale = now; slowFor = 0; frameLog.length = 0; resize();
+  } else if (fastFor > 8000 && rs < 1 && now - lastScale > 8000) {
+    rs = Math.min(1, rs * 1.12); lastScale = now; fastFor = 0; frameLog.length = 0; resize();
+  }
 }
 
 let last = performance.now();
@@ -1114,8 +1133,8 @@ function frame(now) {
     camAR = (camVideo.videoWidth || 16) / (camVideo.videoHeight || 9);
     upload(texVid, camVideo, false);
   }
-  render();
   adapt(ms);
+  render();
   requestAnimationFrame(frame);
 }
 
@@ -1347,6 +1366,7 @@ resize();
 targets();
 updateView(0, true);
 showHint();
+ready = true;
 requestAnimationFrame(t => { last = t; requestAnimationFrame(frame); });
 })();
 </script>
