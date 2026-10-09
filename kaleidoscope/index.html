@@ -97,6 +97,7 @@ details[open] > summary::after{transform:translateY(2px) rotate(-135deg)}
 .seg button[hidden]{display:none}
 .lead{margin:0 0 -6px;font-size:12.5px;color:var(--muted)}
 .note{margin:0;font-size:12px;line-height:1.5;color:var(--muted)}
+.note.flash{background:var(--sel);color:var(--ink);border-radius:6px}
 .stack{display:grid;gap:12px}
 .btns{display:flex;gap:8px;flex-wrap:wrap}
 .btn{appearance:none;font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:999px;padding:7px 14px;cursor:pointer}
@@ -175,14 +176,17 @@ body.src-pattern .p-pattern, body.src-paint .p-paint, body.src-image .p-image, b
     <summary>Group</summary>
     <div class="sect">
       <div class="seg" data-key="gKind" role="group" aria-label="Kind of group">
-        <button type="button" data-v="C">Cₙ (rotations)</button>
-        <button type="button" data-v="D">Dₙ (rotations + flips)</button>
+        <button type="button" data-v="C">Cₙ</button>
+        <button type="button" data-v="D">Dₙ</button>
+        <button type="button" data-v="CC">Cₙ × C₂</button>
+        <button type="button" data-v="DC">Dₙ × C₂</button>
+        <button type="button" data-v="Dic">Dicyclic (Q₈…)</button>
       </div>
       <label class="row"><span>Steps around (n)</span><output id="gNOut"></output>
         <input type="range" id="gN" min="1" max="12" step="1"></label>
       <p class="note" id="gInfo"></p>
       <label class="tog"><input type="checkbox" id="gLabels"><span>Show copies &amp; labels</span></label>
-      <p class="note">r = rotate one step (360°/n anticlockwise). s = flip across the mirror line. Labels are read right to left like functions: r²s means do s first, then r².</p>
+      <p class="note" id="gNote"></p>
       <div class="stack">
         <p class="lead">Do two moves commute?</p>
         <label class="row"><span>Move A</span><select id="gA"></select></label>
@@ -190,6 +194,12 @@ body.src-pattern .p-pattern, body.src-paint .p-paint, body.src-image .p-image, b
         <div class="btns"><button type="button" class="btn" id="gCmp">Compare A then B with B then A</button></div>
         <p class="note"><span class="gold">Gold F</span>: A then B. <span class="teal">Teal F</span>: B then A. If they land in the same place, the order didn’t matter.</p>
         <p class="note" id="gResult" aria-live="polite"></p>
+      </div>
+      <div class="stack">
+        <p class="lead">Watch a move</p>
+        <label class="row"><span>Move</span><select id="gMv"></select></label>
+        <div class="btns"><button type="button" class="btn" id="gPlay">Play this move</button></div>
+        <p class="note" id="gMoveInfo" aria-live="polite"></p>
       </div>
     </div>
   </details>
@@ -280,7 +290,7 @@ body.src-pattern .p-pattern, body.src-paint .p-paint, body.src-image .p-image, b
         <input type="range" id="tint" min="0" max="100" step="1"></label>
       <label class="row not-groups"><span>Mirror misalignment</span><output id="misOut"></output>
         <input type="range" id="mis" min="0" max="100" step="1"></label>
-      <label class="tog"><input type="checkbox" id="eyepiece"><span>Round eyepiece</span></label>
+      <label class="tog" id="eyeRow"><input type="checkbox" id="eyepiece"><span>Round eyepiece</span></label>
     </div>
   </details>
 </aside>
@@ -339,28 +349,33 @@ void main(){
   gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);
 }`;
 
-// eyepiece + brass ring, shared by the mirror and group shaders
+// eyepiece + brass ring (blue-steel when blue = 1), shared by the mirror and group shaders
 const EYE_GLSL = `
 uniform float uEye;
 uniform float uEyeR;
 uniform vec3 uStage;
 vec3 toLin(vec3 c){ return pow(max(c, vec3(0.0)), vec3(2.2)); }
-vec3 eyepiece(vec3 col, vec2 d, float rpx){
+float eyeA(float rpx){ float aa = 1.2 / uEyeR; return smoothstep(1.0 - aa, 1.0 + aa, rpx / uEyeR); }   // 1 outside the eyepiece
+vec3 eyeStage(float rpx){ return toLin(uStage) * (0.55 + 0.45 * smoothstep(1.045, 1.17, rpx / uEyeR)); }
+vec4 eyeRim(vec2 d, float rpx, float blue){   // rgb: the ring, a: how much of this pixel is ring
+  float r = rpx / uEyeR;
+  float aa = 1.2 / uEyeR;
+  float ang = atan(d.y, d.x);
+  float band = clamp((r - 1.0) / 0.042, 0.0, 1.0);
+  float sb = sin(band * 3.14159);
+  vec3 brass = mix(vec3(0.46, 0.30, 0.10), vec3(0.15, 0.26, 0.46), blue) * (0.5 + 0.5 * cos(ang + 2.3)) * (0.45 + 0.8 * sb)
+             + mix(vec3(0.40, 0.32, 0.20), vec3(0.28, 0.36, 0.50), blue) * pow(max(0.0, cos(ang - 0.8)), 20.0) * sb;
+  float inRing = smoothstep(1.0 - aa, 1.0 + aa, r) * (1.0 - smoothstep(1.042 - aa, 1.042 + aa, r));
+  return vec4(brass, inRing);
+}
+vec3 eyepiece(vec3 col, vec2 d, float rpx, float blue){
   if (uEye > 0.5) {
     float r = rpx / uEyeR;
-    float aa = 1.2 / uEyeR;
     float vig = 1.0 - smoothstep(0.72, 1.0, r);
     col *= pow(vig, 1.5);
-    vec3 st = toLin(uStage);
-    vec3 outside = st * (0.55 + 0.45 * smoothstep(1.045, 1.17, r));
-    float ang = atan(d.y, d.x);
-    float band = clamp((r - 1.0) / 0.042, 0.0, 1.0);
-    float sb = sin(band * 3.14159);
-    vec3 brass = vec3(0.46, 0.30, 0.10) * (0.5 + 0.5 * cos(ang + 2.3)) * (0.45 + 0.8 * sb)
-               + vec3(0.40, 0.32, 0.20) * pow(max(0.0, cos(ang - 0.8)), 20.0) * sb;
-    float inRing = smoothstep(1.0 - aa, 1.0 + aa, r) * (1.0 - smoothstep(1.042 - aa, 1.042 + aa, r));
-    outside = mix(outside, brass, inRing);
-    col = mix(col, outside, smoothstep(1.0 - aa, 1.0 + aa, r));
+    vec4 rim = eyeRim(d, rpx, blue);
+    vec3 outside = mix(eyeStage(rpx), rim.rgb, rim.a);
+    col = mix(col, outside, eyeA(rpx));
   }
   return col;
 }`;
@@ -419,15 +434,21 @@ void main(){
     float e = edge * uPPU;
     col = mix(col, vec3(1.0), 0.6 * (1.0 - smoothstep(0.5 * uDpr, 1.6 * uDpr, e)));
   }
-  col = eyepiece(col, d, rpx);
+  col = eyepiece(col, d, rpx, 0.0);
   o = vec4(pow(col, vec3(1.0 / 2.2)), 1.0);
 }`;
 
-// symmetry group Cn / Dn: fold each pixel into the seed region, remember which copy it was
+// symmetry groups: fold each pixel into the seed region, remember which copy it was.
+// Twin groups have two discs (gold, blue). While a move plays, "content discs" travel and transform instead.
 const GROUP_FS = `#version 300 es
 precision highp float;
 out vec4 o;
 uniform vec2 uCenter;
+uniform vec2 uC1;
+uniform int uTwin;
+uniform vec2 uP[2];
+uniform vec4 uX[2];
+uniform float uTM[2];
 uniform float uPPU;
 uniform vec2 uRotB;
 uniform int uN;
@@ -439,27 +460,74 @@ uniform float uWedge;
 uniform float uDpr;${EYE_GLSL}
 vec2 rot(vec2 p, vec2 cs){ return vec2(cs.x*p.x - cs.y*p.y, cs.y*p.x + cs.x*p.y); }
 vec2 srcUV(vec2 m){ vec2 q = rot(vec2(m.x, -m.y), uRotB); return vec2(dot(uSA.xy, q), dot(uSA.zw, q)) + uSB; }
-void main(){
-  vec2 d = vec2(gl_FragCoord.x - uCenter.x, uCenter.y - gl_FragCoord.y);
-  float rpx = length(d);
-  vec2 m = vec2(d.x, -d.y) / uPPU;            // maths frame: y up, angles anticlockwise
+vec3 tintOf(float b){ return mix(vec3(1.17, 1.03, 0.78), vec3(0.80, 0.99, 1.20), b); }   // warm gold, cool blue
+// fold m (maths frame, y up) into the seed region; k = which rotation, fl = flipped copy
+vec2 foldp(vec2 m, out float k, out bool fl, out float phi){
   float n = float(uN), a = 6.2831853 / n;
   bool dih = uDih == 1;
-  float phi = dih ? 0.5 * a : a;             // angle of the seed region
+  phi = dih ? 0.5 * a : a;                   // angle of the seed region
   float th = atan(m.y, m.x); if (th < 0.0) th += 6.2831853;
   float w = mod(floor(th / phi), dih ? 2.0 * n : n);
-  bool fl = dih && mod(w, 2.0) > 0.5;
-  float k = dih ? (fl ? mod((w + 1.0) * 0.5, n) : w * 0.5) : w;
+  fl = dih && mod(w, 2.0) > 0.5;
+  k = dih ? (fl ? mod((w + 1.0) * 0.5, n) : w * 0.5) : w;
   float c = -k * a;
   vec2 p = rot(m, vec2(cos(c), sin(c)));
   if (fl) p.y = -p.y;
-  vec2 g = dFdx(srcUV(m)), h = dFdy(srcUV(m)); // gradients from the unfolded point: no seams in the mip level
-  vec3 col = toLin(textureGrad(uSrc, srcUV(p), g, h).rgb);
-  if (uWedge > 0.5 && k < 0.5 && !fl && phi < 6.28) {
+  return p;
+}
+float hlAmt(vec2 m){   // outline of the first copy, for painting
+  if (uWedge < 0.5) return 0.0;
+  float k, phi; bool fl;
+  vec2 p = foldp(m, k, fl, phi);
+  if (k < 0.5 && !fl && phi < 6.28) {
     float e = min(p.y, p.x * sin(phi) - p.y * cos(phi)) * uPPU;
-    col = mix(col, vec3(1.0), 0.6 * (1.0 - smoothstep(0.5 * uDpr, 1.6 * uDpr, e)));
+    return 1.0 - smoothstep(0.5 * uDpr, 1.6 * uDpr, e);
   }
-  col = eyepiece(col, d, rpx);
+  return 0.0;
+}
+vec3 pic(vec2 m, vec2 g, vec2 h, float hl){
+  float k, phi; bool fl;
+  vec2 p = foldp(m, k, fl, phi);
+  vec3 col = toLin(textureGrad(uSrc, srcUV(p), g, h).rgb);
+  return mix(col, vec3(1.0), 0.6 * hl);
+}
+void main(){
+  vec2 fp = gl_FragCoord.xy;
+  vec2 d = vec2(fp.x - uCenter.x, uCenter.y - fp.y);
+  float blue = 0.0;
+  if (uTwin == 1) {                          // each pixel belongs to the nearer disc
+    vec2 d1 = vec2(fp.x - uC1.x, uC1.y - fp.y);
+    if (dot(d1, d1) < dot(d, d)) { d = d1; blue = 1.0; }
+  }
+  float rpx = length(d);
+  vec2 m = vec2(d.x, -d.y) / uPPU;            // maths frame: y up, angles anticlockwise
+  float hl = blue < 0.5 ? hlAmt(m) : 0.0;     // the first copy sits on the gold disc
+  // Content discs: one per layer, drawn at uP[j] after the matrix uX[j] (identity and at its own slot when nothing is moving).
+  bool eye = uEye > 0.5;
+  vec3 col = vec3(0.004, 0.003, 0.004);
+  if (eye) {   // under the content: stage and rim outside the slot, an empty dark tube inside
+    vec4 rim = eyeRim(d, rpx, blue);
+    col = mix(col, mix(eyeStage(rpx), rim.rgb, rim.a), step(1.0 - 1.2 / uEyeR, rpx / uEyeR));
+    hl *= 1.0 - eyeA(rpx);
+  }
+  for (int j = 0; j < 2; j++) {
+    if (j == 1 && uTwin == 0) break;
+    vec2 q = fp - uP[j];
+    vec4 X = uX[j];
+    float det = X.x * X.w - X.y * X.z;
+    float ok = abs(det) > 1e-3 ? 1.0 : 0.0;   // squashed flat: nothing to draw
+    vec2 u = vec2(X.w * q.x - X.y * q.y, X.x * q.y - X.z * q.x) * (ok > 0.5 ? 1.0 / det : 0.0);   // back into the content's own frame
+    vec2 mq = u / uPPU;
+    vec2 g = dFdx(srcUV(mq)), h = dFdy(srcUV(mq));   // gradients from the unfolded point: no seams in the mip level
+    float rc = length(u) / uEyeR, aa = 1.2 / uEyeR;
+    float cover = (eye ? 1.0 - smoothstep(1.0 - aa, 1.0 + aa, rc) : 1.0) * ok;
+    if (cover > 0.0) {
+      vec3 c = pic(mq, g, h, hl);
+      if (uTwin == 1) c *= tintOf(uTM[j]);
+      if (eye) c *= pow(1.0 - smoothstep(0.72, 1.0, rc), 1.5);
+      col = mix(col, c, cover);
+    }
+  }
   o = vec4(pow(col, vec3(1.0 / 2.2)), 1.0);
 }`;
 
@@ -622,7 +690,8 @@ function buildGeom() {
 
 /* ---------------- view layout ---------------- */
 let W = innerWidth, H = innerHeight, rs = 1, ready = false;
-const view = { cx: W / 2, cy: H / 2, eyeR: 100, tcx: W / 2, tcy: H / 2, teyeR: 100, ppu: 100, maxIt: 20, rotA: [1, 0], rotB: [1, 0] };
+// twin discs: (cx, cy) is the middle of the pair, the discs sit at c[0] (gold) and c[1] (blue), offset by (dx, dy) each way
+const view = { cx: W / 2, cy: H / 2, eyeR: 100, tcx: W / 2, tcy: H / 2, teyeR: 100, dx: 0, dy: 0, tdx: 0, tdy: 0, twin: false, c: [[W / 2, H / 2], [W / 2, H / 2]], ppu: 100, maxIt: 20, rotA: [1, 0], rotB: [1, 0] };
 const panel = $('#panel');
 const ov = $('#ov'), octx = ov.getContext('2d');
 let ovDpr = 1, ovOn = false;
@@ -637,7 +706,11 @@ function targets() {
     }
   }
   view.tcx = (left + right) / 2; view.tcy = (top + bottom) / 2;
-  view.teyeR = 0.47 * Math.min(right - left, bottom - top);
+  const w = right - left, h = bottom - top;
+  if (isTwin()) {   // two discs: side by side when the area is wider than tall, else stacked
+    const side = w > h, R = 0.47 * (side ? Math.min(w / 2.1, h) : Math.min(w, h / 2.1));
+    view.teyeR = R; view.tdx = side ? 1.1 * R : 0; view.tdy = side ? 0 : 1.1 * R;
+  } else { view.teyeR = 0.47 * Math.min(w, h); view.tdx = view.tdy = 0; }
 }
 function resize() {
   W = innerWidth; H = innerHeight;
@@ -658,8 +731,11 @@ function farCorner() {
 function updateView(dt, snap) {
   const k = snap ? 1 : Math.min(1, dt * 9);
   view.cx += (view.tcx - view.cx) * k; view.cy += (view.tcy - view.cy) * k; view.eyeR += (view.teyeR - view.eyeR) * k;
+  view.dx += (view.tdx - view.dx) * k; view.dy += (view.tdy - view.dy) * k;
+  view.twin = isTwin();
+  view.c = [[view.cx - view.dx, view.cy - view.dy], [view.cx + view.dx, view.cy + view.dy]];
   if (S.mode === 'groups') {
-    view.ppu = S.eyepiece ? view.eyeR : farCorner();
+    view.ppu = (S.eyepiece || view.twin) ? view.eyeR : farCorner();
   } else if (S.mirrorKind === '2') {
     view.ppu = S.eyepiece ? view.eyeR : farCorner();
     view.maxIt = 2 * S.n + 8;
@@ -692,45 +768,132 @@ function screenToSource(x, y) {
 
 /* ---------------- groups: the maths ----------------
    Maths orientation: angles run anticlockwise on screen (screen y points down, so y is negated).
-   r = rotate by a = 2*pi/n, s = flip across the horizontal axis through the centre.
-   Element [k, f] is the map x -> r^k s^f x (s first). Composition A.B means "do B, then A". */
+   A disc map [k, f] (m steps round, step 2*pi/m) is p -> rot(k*2*pi/m)(flip^f p), flip = (x, y) -> (x, -y).
+   A group element is {sw, M: [M0, M1]}: a point on layer l goes to layer l^sw at position M_l(p).
+   Single-disc groups ignore layer 1 (M1 = M0, sw = 0). Composition g.h means "do h, then g".
+   Families (n = steps; m = disc steps): Cn, Dn (m = n); Cn x C2, Dn x C2 (twin discs, m = n); Dicyclic (twin, m = 2n). */
 const SUPD = '⁰¹²³⁴⁵⁶⁷⁸⁹', SUBD = '₀₁₂₃₄₅₆₇₈₉';
 const digits = (v, set) => String(v).replace(/\d/g, c => set[c]);
 const gmod = (a, n) => ((a % n) + n) % n;
-const gDih = () => S.gKind === 'D';
-const gMul = (A, B) => [gmod(A[0] + (A[1] ? -B[0] : B[0]), S.gN), A[1] ^ B[1]];
-const gName = g => (g[0] === 0 && !g[1]) ? 'e' : (g[0] ? 'r' + (g[0] > 1 ? digits(g[0], SUPD) : '') : '') + (g[1] ? 's' : '');
+const GFAM = {   // lo..hi: range of n; gens: generator letters; twin: two discs; dih: the seed region is a wedge (flips present)
+  C: { lo: 1, hi: 12, gens: 'r', twin: false, dih: false },
+  D: { lo: 1, hi: 12, gens: 'rs', twin: false, dih: true },
+  CC: { lo: 1, hi: 12, gens: 'rc', twin: true, dih: false },
+  DC: { lo: 1, hi: 6, gens: 'rsc', twin: true, dih: true },
+  Dic: { lo: 2, hi: 6, gens: 'ax', twin: true, dih: false }
+};
+const dmul = (A, B, m) => [gmod(A[0] + (A[1] ? -B[0] : B[0]), m), A[1] ^ B[1]];
+const gmul = (g, h, m) => ({ sw: g.sw ^ h.sw, M: [dmul(g.M[h.sw], h.M[0], m), dmul(g.M[1 ^ h.sw], h.M[1], m)] });
+const gkey = g => [g.sw, g.M[0][0], g.M[0][1], g.M[1][0], g.M[1][1]].join();
+// all elements of a family, each built as a product of generators (so names and actions always agree)
+function gModel(kind, n) {
+  const F = GFAM[kind], m = kind === 'Dic' ? 2 * n : n, o1 = gmod(1, m);
+  const mk = (sw, M0, M1) => ({ sw, M: [M0, M1] });
+  const gen = { r: mk(0, [o1, 0], [o1, 0]), s: mk(0, [0, 1], [0, 1]), c: mk(1, [0, 0], [0, 0]), a: mk(0, [1, 0], [m - 1, 0]), x: mk(1, [0, 0], [n, 0]) };
+  const ord = { r: n, s: 2, c: 2, a: 2 * n, x: 2 }, L = F.gens.split(''), els = [], ex = L.map(() => 0);
+  for (;;) {
+    let e = mk(0, [0, 0], [0, 0]);
+    L.forEach((ch, i) => { for (let j = 0; j < ex[i]; j++) e = gmul(e, gen[ch], m); });   // r^k s^f c^g: letters left to right
+    e.ex = ex.slice();
+    e.parts = L.map((ch, i) => ({ ch, k: ex[i] })).filter(p => p.k).reverse();             // in the order they act
+    e.name = e.parts.length ? L.map((ch, i) => ex[i] ? ch + (ex[i] > 1 ? digits(ex[i], SUPD) : '') : '').join('') : 'e';
+    e.i = els.length; els.push(e);
+    let i = 0;
+    while (i < L.length && ++ex[i] === ord[L[i]]) ex[i++] = 0;
+    if (i === L.length) break;
+  }
+  const copyAt = [[], []];   // copyAt[disc][f * m + k]: the element whose first-layer map is (k, f) and which lives on that disc
+  els.forEach(e => { copyAt[e.sw][e.M[0][1] * m + e.M[0][0]] = e; });
+  let abel = true;
+  for (const g of els) for (const h of els) if (gkey(gmul(g, h, m)) !== gkey(gmul(h, g, m))) abel = false;
+  return { kind, n, m, twin: F.twin, dih: F.dih, els, copyAt, order: els.length, abel, gen, gens: L.map(ch => gen[ch]) };
+}
+let GM = gModel(S.gKind, S.gN);
+const isTwin = () => S.mode === 'groups' && GM.twin;
+const gFind = (Mo, g) => Mo.els.find(e => gkey(e) === gkey(g));
+const gName = g => g.name;
 function gDesc(g) {
-  const [k, f] = g, deg = +(k * 360 / S.gN).toFixed(1), rot = `rotate ${k} step${k > 1 ? 's' : ''} (${deg}°)`;
-  if (!k && !f) return 'e — do nothing';
-  if (!f) return `${gName(g)} — ${rot}`;
-  return k ? `${gName(g)} — flip, then ${rot}` : 's — flip across the mirror line';
+  if (g.name === 'e') return 'e — do nothing';
+  const step = k => `${k} step${k > 1 ? 's' : ''} (${+(k * 360 / GM.m).toFixed(1)}°)`, sole = g.parts.length === 1;
+  const txt = p => ({
+    r: `rotate ${step(p.k)}`, s: sole ? 'flip across the mirror line' : 'flip', c: 'swap the gold and blue discs',
+    a: `turn gold ${step(p.k)} anticlockwise and blue clockwise`, x: 'move to the other disc (blue → gold also turns half way)'
+  })[p.ch];
+  return `${g.name} — ${g.parts.map(txt).join(', then ')}`;
 }
-function gList() { const L = []; for (let f = 0; f < (gDih() ? 2 : 1); f++) for (let k = 0; k < S.gN; k++) L.push([k, f]); return L; }
-function gMat(g) { // matrix [a, b, c, d] of r^k s^f in maths coordinates
-  const t = g[0] * TAU / S.gN, c = Math.cos(t), s = Math.sin(t);
-  return g[1] ? [c, s, s, -c] : [c, -s, s, c];
+function gMat(M, m = GM.m) { // matrix [a, b, c, d] of a disc map in maths coordinates
+  const t = M[0] * TAU / m, c = Math.cos(t), s = Math.sin(t);
+  return M[1] ? [c, s, s, -c] : [c, -s, s, c];
 }
-const gRegion = () => gDih() ? Math.PI / S.gN : TAU / S.gN;   // angle of the seed region
-function gMid(g) { // middle angle of the region g(F)
-  const a = TAU / S.gN, phi = gRegion();
-  return g[0] * a + (g[1] ? -phi / 2 : phi / 2);
+const gRegion = (Mo = GM) => Mo.dih ? Math.PI / Mo.m : TAU / Mo.m;   // angle of the seed region
+function gMid(g, Mo = GM) { // middle angle of the region g(F), on the disc g.sw
+  const a = TAU / Mo.m, phi = gRegion(Mo);
+  return g.M[0][0] * a + (g.M[0][1] ? -phi / 2 : phi / 2);
 }
 // which copy holds the maths-frame point (mx, my), and where it sits in the seed region: g^-1 p
-function gFold(mx, my) {
-  const n = S.gN, a = TAU / n, dih = gDih();
+function gFold(mx, my, Mo = GM) {
+  const m = Mo.m, a = TAU / m, dih = Mo.dih;
   let th = Math.atan2(my, mx); if (th < 0) th += TAU;
-  const w = Math.floor(th / (dih ? a / 2 : a)) % (dih ? 2 * n : n);
-  const fl = dih && (w & 1) === 1, k = dih ? (fl ? ((w + 1) / 2) % n : w / 2) : w;
+  const w = Math.floor(th / (dih ? a / 2 : a)) % (dih ? 2 * m : m);
+  const fl = dih && (w & 1) === 1, k = dih ? (fl ? ((w + 1) / 2) % m : w / 2) : w;
   const c = Math.cos(-k * a), s = Math.sin(-k * a);
   const x = c * mx - s * my, y = s * mx + c * my;
   return { k, f: fl ? 1 : 0, x, y: fl ? -y : y };
 }
+// the disc under a screen point (nearest centre) and that disc's centre
+function discAt(x, y) {
+  if (S.mode !== 'groups') return { l: 0, cx: view.cx, cy: view.cy };
+  const [a, b] = view.c;
+  if (view.twin && Math.hypot(x - b[0], y - b[1]) < Math.hypot(x - a[0], y - a[1])) return { l: 1, cx: b[0], cy: b[1] };
+  return { l: 0, cx: a[0], cy: a[1] };
+}
 function groupToSource(x, y) {
-  const f = gFold((x - view.cx) / view.ppu, (view.cy - y) / view.ppu), B = view.rotB;
+  const d = discAt(x, y), f = gFold((x - d.cx) / view.ppu, (d.cy - y) / view.ppu), B = view.rotB;
   const px = f.x, py = -f.y;
   return [B[0] * px - B[1] * py, B[1] * px + B[0] * py];
 }
+// self-check: run gSelfTest() in the console
+function gSelfTest() {
+  const fails = [], abelRule = { C: () => true, D: n => n <= 2, CC: () => true, DC: n => n <= 2, Dic: () => false };
+  let cases = 0;
+  for (const kind in GFAM) for (let n = GFAM[kind].lo; n <= GFAM[kind].hi; n++) {
+    cases++;
+    const Mo = gModel(kind, n), m = Mo.m, E = Mo.els, N = E.length, bad = msg => fails.push(`${kind} n=${n}: ${msg}`);
+    const mul = (g, h) => gmul(g, h, m), eq = (g, h) => gkey(g) === gkey(h), has = g => E.some(e => eq(e, g));
+    const want = { C: n, D: 2 * n, CC: 2 * n, DC: 4 * n, Dic: 4 * n }[kind];
+    if (N !== want) bad(`order ${N}, expected ${want}`);
+    if (new Set(E.map(gkey)).size !== N) bad('elements not all distinct');
+    const id = E.find(e => e.name === 'e');
+    if (!id || E.some(g => !eq(mul(id, g), g) || !eq(mul(g, id), g))) bad('identity missing or wrong');
+    let closed = true, assoc = true;
+    for (const g of E) for (const h of E) {
+      if (!has(mul(g, h))) closed = false;
+      for (const k of E) if (!eq(mul(mul(g, h), k), mul(g, mul(h, k)))) assoc = false;
+    }
+    if (!closed) bad('not closed'); if (!assoc) bad('not associative');
+    if (E.some(g => !E.some(h => eq(mul(g, h), id)))) bad('some element has no inverse');
+    const nd = Mo.twin ? 2 : 1, per = m * (Mo.dih ? 2 : 1);
+    if (new Set(E.map(e => `${e.sw}|${e.M[0]}`)).size !== N) bad('copy regions (disc, M0) not distinct');
+    for (let l = 0; l < nd; l++) if (E.filter(e => e.sw === l).length !== per) bad(`disc ${l} does not hold exactly ${per} copies`);
+    for (const e of E) {   // the fold finds the right element from the middle of its region
+      const t = gMid(e, Mo), f = gFold(0.5 * Math.cos(t), 0.5 * Math.sin(t), Mo);
+      if (Mo.copyAt[e.sw][f.f * m + f.k] !== e) bad(`fold of ${e.name} lands on the wrong copy`);
+    }
+    if (Mo.abel !== abelRule[kind](n)) bad(`abelian is ${Mo.abel}, expected ${abelRule[kind](n)}`);
+    if (kind === 'Dic') {
+      const pw = (g, k) => { let e = id; for (let i = 0; i < k; i++) e = mul(e, g); return e; }, a = Mo.gen.a, x = Mo.gen.x;
+      if (!eq(pw(a, 2 * n), id)) bad('a^2n ≠ e');
+      for (let k = 1; k < 2 * n; k++) if (eq(pw(a, k), id)) bad(`a^${k} = e`);
+      if (!eq(mul(x, x), pw(a, n))) bad('x² ≠ aⁿ');
+      if (!eq(mul(x, a), mul(pw(a, 2 * n - 1), x))) bad('x·a ≠ a⁻¹·x');
+      if (E.filter(g => !eq(g, id) && eq(mul(g, g), id)).length !== 1) bad('Dic should have exactly one move of order 2');
+    }
+  }
+  const ok = !fails.length;
+  console[ok ? 'log' : 'error'](ok ? `gSelfTest: all ${cases} groups pass` : `gSelfTest: ${fails.length} failure(s)\n` + fails.join('\n'));
+  return { ok, cases, fails };
+}
+window.gSelfTest = gSelfTest;
 
 /* ---------------- turning ---------------- */
 const turn = { angle: 0, w: 0, wm: 0, drag: null, lastMove: 0 };
@@ -1165,63 +1328,160 @@ async function setTilt(on) {
   tiltProbe = setTimeout(() => { if (!gotOri) fail(); }, 1500);
 }
 
-/* ---------------- groups: panel, overlay and commute tester ---------------- */
-const CMP_DUR = 0.6, CMP_PAUSE = 0.35;
-const gSelA = $('#gA'), gSelB = $('#gB'), gPick = { A: null, B: null };
+/* ---------------- groups: panel, overlay, commute tester and move player ---------------- */
+const CMP_DUR = 0.6, CMP_PAUSE = 0.35, MV_DUR = 1.6, MV_HOLD = 0.6;
+const gSelA = $('#gA'), gSelB = $('#gB'), gSelM = $('#gMv'), gPick = { A: null, B: null, M: null };
 let cmp = null;   // the running or finished "A then B" vs "B then A" comparison
+let mv = null;    // the move being played: { g, t0, said }
+let ovFade = 1, ovT = 0;   // overlay opacity (fades out while a move plays)
+const sm = p => p * p * (3 - 2 * p), clamp01 = v => Math.min(1, Math.max(0, v));
 function fillSelect(sel, g) {
   sel.innerHTML = '';
-  gList().forEach((e, j) => { const o = document.createElement('option'); o.value = j; o.textContent = gDesc(e); sel.appendChild(o); });
-  sel.value = g[1] * S.gN + g[0];
+  GM.els.forEach(e => { const o = document.createElement('option'); o.value = e.i; o.textContent = gDesc(e); sel.appendChild(o); });
+  sel.value = g.i;
+}
+function gInfoText() {
+  const { kind, n, order: N, abel } = GM, sb = digits(n, SUBD), tw = GM.twin;
+  const head = {
+    C: `C${sb} — rotations of a ${n}-armed pinwheel. `,
+    D: `D${sb} — symmetries of a ${n}-armed snowflake. `,
+    CC: `C${sb} × C₂ — rotations of a pinwheel, plus a swap of the gold and blue discs. `,
+    DC: `D${sb} × C₂ — rotations and flips of a snowflake, plus a swap of the gold and blue discs. `,
+    Dic: `Dic${sb} — a turns gold one way and blue the other; x moves to the other disc (x² = a${digits(n, SUPD)}). `
+  }[kind];
+  const count = `${N} element${N > 1 ? 's' : ''} (${N} cop${N > 1 ? 'ies' : 'y'} of the picture${tw ? ', across the two discs' : ''}). `;
+  const ab = abel ? 'Abelian: every pair of moves commutes.' : 'Non-abelian: some pairs of moves give different results in different orders.';
+  const d2 = digits(2 * n, SUBD);
+  const dis = {
+    C: '',
+    D: '',
+    CC: n === 2 ? ' C₂ × C₂ is the Klein four-group, the same as D₂.' : n % 2 ? ` Same group in disguise as C${n === 1 ? '₂' : d2}.` : '',
+    DC: n === 1 ? ' Same as D₂ (the Klein four-group).' : n === 2 ? ' Same as C₂ × C₂ × C₂.' : n % 2 ? ` Same group in disguise as D${d2}.` : '',
+    Dic: ''
+  }[kind];
+  if (kind === 'Dic') return head + count + (n === 2
+    ? 'Q₈, the quaternion group: a ↔ i, x ↔ j, ax ↔ k, a² ↔ −1. Non-abelian with no mirrors at all, which a single kaleidoscope can never be. It has just one move of order 2 (a²).'
+    : `Non-abelian without any mirrors; a${digits(n, SUPD)} is the only move of order 2.`);
+  return head + count + ab + dis;
+}
+function gNoteText() {
+  const rd = 'Labels are read right to left like functions: ';
+  return {
+    C: 'r = rotate one step (360°/n anticlockwise). ' + rd + 'r² means do r twice.',
+    D: 'r = rotate one step (360°/n anticlockwise). s = flip across the mirror line. ' + rd + 'r²s means do s first, then r².',
+    CC: 'r = rotate both discs one step (360°/n anticlockwise). c = swap the gold and blue discs. ' + rd + 'r²c means do c first, then r².',
+    DC: 'r = rotate one step (360°/n anticlockwise). s = flip across the mirror line. c = swap the gold and blue discs. ' + rd + 'r²sc means do c first, then s, then r².',
+    Dic: 'a = turn gold anticlockwise and blue clockwise by one step (360°/2n). x = move to the other disc (blue → gold also turns half way round). ' + rd + 'a²x means do x first, then a².'
+  }[GM.kind];
 }
 function groupChanged() {
-  cmp = null; $('#gResult').textContent = '';
-  const n = S.gN, dih = gDih(), N = gOrder();
-  const ok = g => g && g[0] < n && (dih || !g[1]);
-  if (!ok(gPick.A)) gPick.A = [1 % n, 0];
-  if (!ok(gPick.B)) gPick.B = dih ? [0, 1] : [2 % n, 0];
-  fillSelect(gSelA, gPick.A); fillSelect(gSelB, gPick.B);
-  const sb = digits(n, SUBD), abel = !dih || n <= 2;
-  $('#gInfo').textContent = (dih ? `D${sb} — symmetries of a ${n}-armed snowflake. ` : `C${sb} — rotations of a ${n}-armed pinwheel. `)
-    + `${N} element${N > 1 ? 's' : ''} (${N} cop${N > 1 ? 'ies' : 'y'} of the picture). `
-    + (abel ? 'Abelian: every pair of moves commutes.' : 'Non-abelian: some pairs of moves give different results in different orders.');
+  endMove(true); cmp = null; $('#gResult').textContent = '';
+  const F = GFAM[S.gKind], nEl = $('#gN');
+  S.gN = Math.min(F.hi, Math.max(F.lo, Math.round(S.gN)));
+  nEl.min = F.lo; nEl.max = F.hi; nEl.value = S.gN; $('#gNOut').textContent = S.gN;
+  GM = gModel(S.gKind, S.gN);
+  const gen = GM.gen, m = GM.m, find = nm => GM.els.find(e => e.name === nm);
+  const dA = GM.kind === 'Dic' ? gen.a : gen.r;
+  const dB = { C: () => gmul(gen.r, gen.r, m), D: () => gen.s, CC: () => gen.c, DC: () => gen.s, Dic: () => gen.x }[GM.kind]();
+  // gPick holds only what the viewer chose, so a fallback (e.g. "e" in C₁) never sticks to later groups
+  fillSelect(gSelA, find(gPick.A) || gFind(GM, dA)); fillSelect(gSelB, find(gPick.B) || gFind(GM, dB)); fillSelect(gSelM, find(gPick.M) || gFind(GM, dA));
+  $('#gInfo').textContent = gInfoText();
+  $('#gNote').textContent = gNoteText();
+  $('#eyeRow').hidden = isTwin();   // twin discs are always round
+  targets();
 }
-function gOrder() { return gDih() ? 2 * S.gN : S.gN; }
-gSelA.addEventListener('change', () => { gPick.A = gList()[+gSelA.value]; });
-gSelB.addEventListener('change', () => { gPick.B = gList()[+gSelB.value]; });
+gSelA.addEventListener('change', () => { gPick.A = GM.els[+gSelA.value].name; });
+gSelB.addEventListener('change', () => { gPick.B = GM.els[+gSelB.value].name; });
+gSelM.addEventListener('change', () => { gPick.M = GM.els[+gSelM.value].name; });
 
-// a move as animation steps: flip first, then rotate the short way round
-function gActs(g) {
-  const n = S.gN, acts = [];
-  if (g[1]) acts.push({ flip: true });
-  if (g[0]) acts.push({ ang: (g[0] > n / 2 ? g[0] - n : g[0]) * TAU / n });
+// a move as animation steps for a marker on disc l: flip first, then rotate the short way round, then fly across if the discs swap
+function gActs(g, l) {
+  const [k, f] = g.M[l], m = GM.m, acts = [];
+  if (f) acts.push({ flip: true });
+  if (k) acts.push({ ang: (k > m / 2 ? k - m : k) * TAU / m });
+  if (g.sw) acts.push({ fly: true });
   return acts;
 }
 const actsDur = acts => acts.length ? acts.length * CMP_DUR : CMP_DUR * 0.5;
 const mat2 = (P, Q) => [P[0] * Q[0] + P[1] * Q[2], P[0] * Q[1] + P[1] * Q[3], P[2] * Q[0] + P[3] * Q[2], P[2] * Q[1] + P[3] * Q[3]];
-function routeMat(stages, t, d) {
-  let M = [1, 0, 0, 1];
+// where a marker is at time t: its matrix about its disc, the disc it is on, and (mid-flight) which way it is crossing
+function routeState(stages, t, d) {
+  let M = [1, 0, 0, 1], L = 0, fly = null;
   for (let i = 0; i < 2; i++) {
     let u = t - i * (d + CMP_PAUSE);
     for (const a of stages[i]) {
-      const p = Math.min(1, Math.max(0, u / CMP_DUR)), e = p * p * (3 - 2 * p);
+      const p = clamp01(u / CMP_DUR), e = sm(p);
       u -= CMP_DUR;
       if (a.flip) M = mat2([1, 0, 0, 1 - 2 * e], M);      // squash through the mirror line
+      else if (a.fly) { if (p >= 1) L ^= 1; else if (p > 0) fly = { from: L, e }; }
       else { const t2 = a.ang * e, c = Math.cos(t2), s = Math.sin(t2); M = mat2([c, -s, s, c], M); }
     }
   }
-  return M;
+  return { M, L, fly };
 }
 function showResult() {
   const c = cmp, nA = gName(c.A), nB = gName(c.B), nBA = gName(c.BA), nAB = gName(c.AB), same = nBA === nAB;
-  $('#gResult').innerHTML = `<span class="gold">A then B = ${nBA}</span>. <span class="teal">B then A = ${nAB}</span>. `
+  const at = e => GM.twin ? ` on the ${e.sw ? 'blue' : 'gold'} disc` : '';
+  $('#gResult').innerHTML = `<span class="gold">A then B = ${nBA}${at(c.BA)}</span>. <span class="teal">B then A = ${nAB}${at(c.AB)}</span>. `
     + (same ? `Same place (${nBA}), so ${nA} and ${nB} commute.` : `Different places, so ${nA} and ${nB} do not commute.`);
 }
 function runCompare() {
-  const A = gList()[+gSelA.value], B = gList()[+gSelB.value];
-  const d = Math.max(actsDur(gActs(A)), actsDur(gActs(B)));
-  cmp = { A, B, BA: gMul(B, A), AB: gMul(A, B), gold: [gActs(A), gActs(B)], teal: [gActs(B), gActs(A)], d, total: 2 * d + CMP_PAUSE + 0.25, t0: performance.now(), done: false };
+  if (mv) return;
+  const A = GM.els[+gSelA.value], B = GM.els[+gSelB.value], m = GM.m;
+  const st = (X, Y) => [gActs(X, 0), gActs(Y, X.sw)];   // the second move starts on the disc the first one ended on
+  const gold = st(A, B), teal = st(B, A), d = Math.max(...gold.concat(teal).map(actsDur));
+  cmp = { A, B, BA: gFind(GM, gmul(B, A, m)), AB: gFind(GM, gmul(A, B, m)), gold, teal, d, total: 2 * d + CMP_PAUSE + 0.25, t0: performance.now(), done: false };
   if (reduced) { cmp.done = true; showResult(); } else $('#gResult').textContent = 'Watch the two routes…';
+}
+
+/* "Watch a move": the whole picture is moved by g, then it looks just as it did before */
+const MV_TAIL = 'The picture ends up exactly as it started — that’s what makes it a symmetry.';
+function gPhrase(M, pl) {
+  const [k, f] = M, m = GM.m, v = pl ? '' : 's';
+  if (!k && !f) return pl ? 'stay as they are' : 'stays as it is';
+  const kk = k > m / 2 ? k - m : k, n = Math.abs(kk);
+  const rot = 2 * k === m ? 'half way round' : `${kk < 0 ? 'clockwise' : 'anticlockwise'} ${n} step${n > 1 ? 's' : ''}`;
+  return (f ? `flip${v} across the mirror line` : '') + (f && k ? ', then ' : '') + (k ? `turn${v} ${rot}` : '');
+}
+function gMoveText(g) {
+  const [A, B] = g.M, nm = g.name, still = M => !M[0] && !M[1];
+  if (!GM.twin) return still(A) ? `${nm}: nothing moves` : `${nm}: the picture ${gPhrase(A, false)}`;
+  if (still(A) && still(B)) return g.sw ? `${nm}: the two pictures swap discs` : `${nm}: nothing moves`;
+  return `${nm}: ` + (A.join() === B.join() ? `both discs ${gPhrase(A, true)}` : `the gold disc ${gPhrase(A, false)} and the blue disc ${gPhrase(B, false)}`)
+    + (g.sw ? ', and the two pictures swap discs' : '');
+}
+function playMove() {
+  if (mv) return;
+  const g = GM.els[+gSelM.value], txt = gMoveText(g), info = $('#gMoveInfo');
+  if (reduced) {
+    info.textContent = `${txt}. ${MV_TAIL}`; info.classList.add('flash');
+    setTimeout(() => info.classList.remove('flash'), 700); return;
+  }
+  mv = { g, t0: performance.now(), said: false };
+  info.textContent = txt + '…';
+  $('#gPlay').disabled = $('#gCmp').disabled = true;
+}
+function endMove(quiet) {
+  mv = null; $('#gPlay').disabled = $('#gCmp').disabled = false;
+  if (quiet) $('#gMoveInfo').textContent = '';
+}
+function mvTick(now) {
+  if (!mv) return;
+  const t = (now - mv.t0) / 1000;
+  if (t >= MV_DUR && !mv.said) { mv.said = true; $('#gMoveInfo').textContent = `${gMoveText(mv.g)}. ${MV_TAIL}`; }
+  if (t >= MV_DUR + MV_HOLD) endMove(false);
+}
+// pose of each content disc at progress u: where it is, its matrix (flip squash, then turn), and its colour (0 gold .. 1 blue)
+function mvPose(g, u) {
+  const m = GM.m, nl = GM.twin ? 2 : 1, Ms = g.M.slice(0, nl), hasF = Ms.some(M => M[1]), hasR = Ms.some(M => M[0]);
+  const ns = (hasF ? 1 : 0) + (hasR ? 1 : 0), seg = i => sm(clamp01(u * ns - i));
+  const eF = hasF ? seg(0) : 0, eR = hasR ? seg(hasF ? 1 : 0) : 0, eT = sm(u), out = [];
+  for (let j = 0; j < nl; j++) {
+    const [k, f] = g.M[j], ang = (k > m / 2 ? k - m : k) * TAU / m * eR, c = Math.cos(ang), s = Math.sin(ang), fl = f ? 1 - 2 * eF : 1;
+    const A = view.c[j], B = view.c[j ^ g.sw], dx = B[0] - A[0], dy = B[1] - A[1], bow = 0.28 * Math.sin(Math.PI * eT);
+    out.push({ x: A[0] + dx * eT - dy * bow, y: A[1] + dy * eT + dx * bow, X: [c, -s * fl, s, c * fl], tm: j + ((j ^ g.sw) - j) * eT });
+  }
+  return out;
 }
 
 function drawOverlay() {
@@ -1230,36 +1490,43 @@ function drawOverlay() {
     return;
   }
   ovOn = true;
-  const x = octx, R = view.eyeR, cx = view.cx, cy = view.cy, n = S.gN, a = TAU / n, dih = gDih(), phi = gRegion();
-  const pt = (r, th) => [cx + r * Math.cos(th), cy - r * Math.sin(th)];
+  const x = octx, R = view.eyeR, m = GM.m, dih = GM.dih, phi = gRegion(), nd = view.twin ? 2 : 1;
+  const now = performance.now();
+  ovFade = reduced ? (mv ? 0 : 1) : clamp01(ovFade + (mv ? -1 : 1) * Math.min(0.1, (now - ovT) / 1000) / 0.35); ovT = now;
   x.setTransform(ovDpr, 0, 0, ovDpr, 0, 0);
   x.clearRect(0, 0, W, H);
-  if (R < 8) return;   // panel squeezed the view to nothing
+  if (R < 8 || ovFade < 0.01) return;   // panel squeezed the view to nothing, or a move is playing
+  x.globalAlpha = ovFade;
   x.lineCap = 'round'; x.lineJoin = 'round';
   if (S.gLabels) {
-    // copy boundaries: solid = mirror lines (Dn), dashed = sector edges (Cn, not mirrors)
-    const nb = dih ? 2 * n : n, rays = () => { x.beginPath(); for (let j = 0; j < nb; j++) { x.moveTo(cx, cy); x.lineTo(...pt(R, j * phi)); } x.stroke(); };
-    x.setLineDash(dih ? [] : [6, 6]);
-    x.strokeStyle = 'rgba(14,6,20,.45)'; x.lineWidth = 3.4; rays();
-    x.strokeStyle = dih ? 'rgba(255,255,255,.88)' : 'rgba(255,255,255,.6)'; x.lineWidth = dih ? 1.5 : 1.2; rays();
-    x.setLineDash([]);
-    // the identity region is the seed: outline it a little heavier
-    x.beginPath(); x.moveTo(cx, cy); x.lineTo(...pt(R * 0.995, 0)); x.arc(cx, cy, R * 0.995, 0, -phi, true); x.closePath();
-    x.strokeStyle = 'rgba(14,6,20,.4)'; x.lineWidth = 5; x.stroke();
-    x.strokeStyle = 'rgba(255,217,138,.95)'; x.lineWidth = 2.6; x.stroke();
-    // labels
-    const L = gList(), N = L.length, maxc = Math.max(...L.map(g => gName(g).length));
-    const fs = Math.max(8, Math.min(0.075 * R, 0.9 * (0.62 * R * TAU / N) / (0.6 * (maxc + 1))));
-    x.font = `600 ${fs.toFixed(1)}px Sora, ui-sans-serif, system-ui, sans-serif`;
-    x.textAlign = 'center'; x.textBaseline = 'middle';
-    for (const g of L) {
-      const t = gName(g), [lx, ly] = pt(0.62 * R, gMid(g)), w = x.measureText(t).width + fs * 0.8, h = fs * 1.45, id = t === 'e';
-      x.fillStyle = id ? 'rgba(46,30,8,.72)' : 'rgba(16,9,24,.64)';
-      x.beginPath();
-      if (x.roundRect) x.roundRect(lx - w / 2, ly - h / 2, w, h, h / 2); else x.rect(lx - w / 2, ly - h / 2, w, h);
-      x.fill();
-      x.fillStyle = id ? '#ffd98a' : '#fff';
-      x.fillText(t, lx, ly + fs * 0.04);
+    const L = GM.els, maxc = Math.max(...L.map(g => gName(g).length)), per = L.length / nd;
+    const fs = Math.max(8, Math.min(0.075 * R, 0.9 * (0.62 * R * TAU / per) / (0.6 * (maxc + 1))));
+    for (let l = 0; l < nd; l++) {
+      const [cx, cy] = view.c[l], pt = (r, th) => [cx + r * Math.cos(th), cy - r * Math.sin(th)];
+      // copy boundaries: solid = mirror lines (flips), dashed = sector edges (rotations only, not mirrors)
+      const nb = dih ? 2 * m : m, rays = () => { x.beginPath(); for (let j = 0; j < nb; j++) { x.moveTo(cx, cy); x.lineTo(...pt(R, j * phi)); } x.stroke(); };
+      x.setLineDash(dih ? [] : [6, 6]);
+      x.strokeStyle = 'rgba(14,6,20,.45)'; x.lineWidth = 3.4; rays();
+      x.strokeStyle = dih ? 'rgba(255,255,255,.88)' : 'rgba(255,255,255,.6)'; x.lineWidth = dih ? 1.5 : 1.2; rays();
+      x.setLineDash([]);
+      if (l === 0) {   // the identity region is the seed: outline it a little heavier
+        x.beginPath(); x.moveTo(cx, cy); x.lineTo(...pt(R * 0.995, 0)); x.arc(cx, cy, R * 0.995, 0, -phi, true); x.closePath();
+        x.strokeStyle = 'rgba(14,6,20,.4)'; x.lineWidth = 5; x.stroke();
+        x.strokeStyle = 'rgba(255,217,138,.95)'; x.lineWidth = 2.6; x.stroke();
+      }
+      // labels
+      x.font = `600 ${fs.toFixed(1)}px Sora, ui-sans-serif, system-ui, sans-serif`;
+      x.textAlign = 'center'; x.textBaseline = 'middle';
+      for (const g of L) {
+        if (g.sw !== l) continue;
+        const t = gName(g), [lx, ly] = pt(0.62 * R, gMid(g)), w = x.measureText(t).width + fs * 0.8, h = fs * 1.45, id = t === 'e';
+        x.fillStyle = id ? 'rgba(46,30,8,.72)' : 'rgba(16,9,24,.64)';
+        x.beginPath();
+        if (x.roundRect) x.roundRect(lx - w / 2, ly - h / 2, w, h, h / 2); else x.rect(lx - w / 2, ly - h / 2, w, h);
+        x.fill();
+        x.fillStyle = id ? '#ffd98a' : '#fff';
+        x.fillText(t, lx, ly + fs * 0.04);
+      }
     }
   }
   if (cmp) {
@@ -1268,20 +1535,29 @@ function drawOverlay() {
     const done = cmp.done || t >= cmp.total;
     const rho = 0.4 * R, s = Math.min(0.11 * R, 0.8 * rho * Math.sin(Math.min(phi, Math.PI) / 2));
     const c0x = rho * Math.cos(phi / 2), c0y = rho * Math.sin(phi / 2);
-    const mark = (M, col, lw, back) => {
-      const P = (u, v) => { const px = c0x + s * u, py = c0y + s * v; return [cx + M[0] * px + M[1] * py, cy - (M[2] * px + M[3] * py)]; };
+    const mark = (M, C, col, lw, back) => {
+      const P = (u, v) => { const px = c0x + s * u, py = c0y + s * v; return [C[0] + M[0] * px + M[1] * py, C[1] - (M[2] * px + M[3] * py)]; };
       x.beginPath();
       x.moveTo(...P(-0.35, -0.55)); x.lineTo(...P(-0.35, 0.55)); x.lineTo(...P(0.4, 0.55));
       x.moveTo(...P(-0.35, 0.05)); x.lineTo(...P(0.25, 0.05));
       if (back) { x.strokeStyle = 'rgba(14,6,20,.6)'; x.lineWidth = lw + 3; x.stroke(); }
       x.strokeStyle = col; x.lineWidth = lw; x.stroke();
     };
-    mark([1, 0, 0, 1], 'rgba(255,255,255,.5)', 1.5, false);   // where the F started
-    const mT = done ? gMat(cmp.AB) : routeMat(cmp.teal, t, cmp.d), mG = done ? gMat(cmp.BA) : routeMat(cmp.gold, t, cmp.d);
-    mark(mT, '#27c4bd', Math.max(4.5, s * 0.42), true);
+    // a marker crossing to the other disc follows an arc (the two routes bow opposite ways)
+    const where = (st, sg) => {
+      if (!st.fly) return view.c[st.L];
+      const A = view.c[st.fly.from], B = view.c[st.fly.from ^ 1], e = st.fly.e, dx = B[0] - A[0], dy = B[1] - A[1], bow = 0.3 * sg * Math.sin(Math.PI * e);
+      return [A[0] + dx * e - dy * bow, A[1] + dy * e + dx * bow];
+    };
+    const fin = e => ({ M: gMat(e.M[0]), L: e.sw, fly: null });
+    const sT = done ? fin(cmp.AB) : routeState(cmp.teal, t, cmp.d), sG = done ? fin(cmp.BA) : routeState(cmp.gold, t, cmp.d);
+    const cT = where(sT, -1), cG = where(sG, 1);
+    mark([1, 0, 0, 1], view.c[0], 'rgba(255,255,255,.5)', 1.5, false);   // where the F started
+    mark(sT.M, cT, '#27c4bd', Math.max(4.5, s * 0.42), true);
     // when both land on the same spot, the thin gold F sits inside the teal one
-    mark(mG, '#f2b632', Math.max(2.2, s * 0.2), mT.some((v, i) => Math.abs(v - mG[i]) > 1e-6));
+    mark(sG.M, cG, '#f2b632', Math.max(2.2, s * 0.2), sT.M.some((v, i) => Math.abs(v - sG.M[i]) > 1e-6) || Math.hypot(cT[0] - cG[0], cT[1] - cG[1]) > 0.5);
   }
+  x.globalAlpha = 1;
 }
 
 /* ---------------- rendering ---------------- */
@@ -1322,12 +1598,20 @@ function render() {
   gl.viewport(0, 0, cv.width, cv.height);
   const grp = S.mode === 'groups', P = grp ? GP : MP, u = P.u;
   gl.useProgram(P.p);
-  gl.uniform2f(u.uCenter, view.cx * sc, (H - view.cy) * sc);
+  const c0 = grp ? view.c[0] : [view.cx, view.cy], eye = grp ? (view.twin || S.eyepiece) : S.eyepiece;
+  gl.uniform2f(u.uCenter, c0[0] * sc, (H - c0[1]) * sc);
   gl.uniform1f(u.uPPU, view.ppu * sc);
   gl.uniform2f(u.uRotB, view.rotB[0], view.rotB[1]);
   if (grp) {
-    gl.uniform1i(u.uN, S.gN);
-    gl.uniform1i(u.uDih, gDih() ? 1 : 0);
+    gl.uniform1i(u.uN, GM.m);
+    gl.uniform1i(u.uDih, GM.dih ? 1 : 0);
+    gl.uniform1i(u.uTwin, view.twin ? 1 : 0);
+    gl.uniform2f(u.uC1, view.c[1][0] * sc, (H - view.c[1][1]) * sc);
+    const P = new Float32Array(4), X = new Float32Array(8), T = new Float32Array(2);   // content discs: at rest, or mid-move
+    mvPose(mv ? mv.g : GM.els[0], mv ? clamp01((performance.now() - mv.t0) / 1000 / MV_DUR) : 0).forEach((q, j) => {
+      P[2 * j] = q.x * sc; P[2 * j + 1] = (H - q.y) * sc; X.set(q.X, 4 * j); T[j] = q.tm;
+    });
+    gl.uniform2fv(u.uP, P); gl.uniform4fv(u.uX, X); gl.uniform1fv(u.uTM, T);
   } else {
     gl.uniform2f(u.uViewC, G.viewC[0], G.viewC[1]);
     gl.uniform2f(u.uRotA, view.rotA[0], view.rotA[1]);
@@ -1344,7 +1628,7 @@ function render() {
   gl.uniform4f(u.uSA, src.sa[0], src.sa[1], src.sa[2], src.sa[3]);
   gl.uniform2f(u.uSB, src.sb[0], src.sb[1]);
   gl.uniform1i(u.uClip, src.clip);
-  gl.uniform1f(u.uEye, S.eyepiece ? 1 : 0);
+  gl.uniform1f(u.uEye, eye ? 1 : 0);
   gl.uniform1f(u.uEyeR, view.eyeR * sc);
   gl.uniform3f(u.uStage, STAGE[0], STAGE[1], STAGE[2]);
   gl.uniform1f(u.uWedge, (S.mode !== 'physical' && S.src === 'paint') ? 1 : 0);
@@ -1392,6 +1676,7 @@ function frame(now) {
     upload(texVid, camVideo, false);
   }
   adapt(ms);
+  mvTick(now);
   render();
   drawOverlay();
   requestAnimationFrame(frame);
@@ -1405,7 +1690,7 @@ function tool() {
   if (S.mode !== 'physical' && S.src === 'image') return 'image';
   return 'turn';
 }
-function angleAt(x, y) { return Math.atan2(y - view.cy, x - view.cx); }
+function angleAt(x, y, cx, cy) { return Math.atan2(y - cy, x - cx); }
 function pinchState() {
   const [a, b] = Array.from(ptrs.values());
   return { ang: Math.atan2(b.y - a.y, b.x - a.x), dist: Math.hypot(b.x - a.x, b.y - a.y) };
@@ -1421,11 +1706,12 @@ cv.addEventListener('pointerdown', e => {
   hideHint();
   const t = tool();
   if (t === 'paint') {
-    if (ptrs.size === 1) { paintLast = [e.clientX, e.clientY]; stamp(e.clientX, e.clientY); }
+    if (ptrs.size === 1 && !mv) { paintLast = [e.clientX, e.clientY]; stamp(e.clientX, e.clientY); }
   } else if (t === 'image') {
     if (ptrs.size === 2) pinch = pinchState();
   } else if (ptrs.size === 1) {
-    turn.drag = { a: angleAt(e.clientX, e.clientY) };
+    const dc = discAt(e.clientX, e.clientY);   // turn around the disc the pointer is on
+    turn.drag = { a: angleAt(e.clientX, e.clientY, dc.cx, dc.cy), cx: dc.cx, cy: dc.cy };
     turn.wm = 0; turn.lastMove = performance.now();
   }
 });
@@ -1447,8 +1733,8 @@ cv.addEventListener('pointermove', e => {
       pinch = n; syncImageSliders();
     }
   } else if (turn.drag && ptrs.size === 1) {
-    if (Math.hypot(p.x - view.cx, p.y - view.cy) < 14) return;
-    const a = angleAt(p.x, p.y);
+    if (Math.hypot(p.x - turn.drag.cx, p.y - turn.drag.cy) < 14) return;
+    const a = angleAt(p.x, p.y, turn.drag.cx, turn.drag.cy);
     let da = a - turn.drag.a; if (da > Math.PI) da -= TAU; if (da < -Math.PI) da += TAU;
     const now = performance.now(), dts = Math.max(4, now - turn.lastMove) / 1000;
     turn.angle += da;
@@ -1495,6 +1781,8 @@ function applyState() {
   document.body.classList.add('mode-' + S.mode, 'mk-' + S.mirrorKind, 'src-' + S.src);
   const t = tool(); if (t !== 'turn') document.body.classList.add('tool-' + t);
   buildGeom();
+  $('#eyeRow').hidden = isTwin();
+  targets();
   if (S.mode !== 'physical' && S.src === 'camera') startCamera(); else stopCamera();
 }
 function setSeg(key, v) {
@@ -1514,6 +1802,7 @@ $$('.seg').forEach(seg => {
 });
 function setMode(m) {
   S.mode = m;
+  if (mv) endMove(true);
   $$('.modes button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === m)));
   applyState(); showHint();
 }
@@ -1557,6 +1846,7 @@ bindToggle('rainbow');
 bindToggle('eyepiece');
 bindToggle('gLabels');
 $('#gCmp').addEventListener('click', runCompare);
+$('#gPlay').addEventListener('click', playMove);
 bindToggle('tilt', on => setTilt(on));
 $('#paintColor').value = S.paintColor;
 $('#paintColor').addEventListener('input', e => { S.paintColor = e.target.value; S.rainbow = false; $('#rainbow').checked = false; });
