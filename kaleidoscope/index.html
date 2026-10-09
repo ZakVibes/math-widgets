@@ -12,6 +12,7 @@
   --stage:#ddd5e0; --ink:#241a29; --muted:#6a5d70; --panel:rgba(250,247,251,.9);
   --line:rgba(36,26,41,.14); --chip:rgba(36,26,41,.06); --sel:rgba(36,26,41,.13);
   --brass:#a87a22; --brass-ink:#fffaf0; --shadow:0 10px 30px rgba(40,20,50,.18);
+  --gold:#a8730a; --teal:#0b857f;
   color-scheme:light;
   box-sizing:border-box;
   padding-top:env(safe-area-inset-top,0px);
@@ -22,6 +23,7 @@
     --stage:#1c1321; --ink:#efe6da; --muted:#a3949f; --panel:rgba(36,25,42,.88);
     --line:rgba(239,230,218,.12); --chip:rgba(239,230,218,.06); --sel:rgba(239,230,218,.16);
     --brass:#d6a74e; --brass-ink:#26190a; --shadow:0 10px 30px rgba(0,0,0,.4);
+    --gold:#f0bd4a; --teal:#3fcdc5;
     color-scheme:dark;
   }
 }
@@ -29,6 +31,7 @@
   --stage:#1c1321; --ink:#efe6da; --muted:#a3949f; --panel:rgba(36,25,42,.88);
   --line:rgba(239,230,218,.12); --chip:rgba(239,230,218,.06); --sel:rgba(239,230,218,.16);
   --brass:#d6a74e; --brass-ink:#26190a; --shadow:0 10px 30px rgba(0,0,0,.4);
+  --gold:#f0bd4a; --teal:#3fcdc5;
   color-scheme:dark;
 }
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
@@ -39,6 +42,7 @@ body{background:var(--stage);color:var(--ink);font:400 14px/1.45 'Sora',ui-sans-
 #view:active{cursor:grabbing}
 body.tool-paint #view{cursor:crosshair}
 body.tool-image #view{cursor:move}
+#ov{position:fixed;inset:0;width:100%;height:100%;display:block;pointer-events:none;z-index:1}
 :focus-visible{outline:2px solid var(--brass);outline-offset:2px}
 
 .bar{position:fixed;top:0;left:0;right:0;z-index:5;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;padding:calc(env(safe-area-inset-top,0px) + 12px) 14px 8px;pointer-events:none}
@@ -51,11 +55,13 @@ body.tool-image #view{cursor:move}
 .acts{justify-self:end;display:flex;gap:8px}
 .home{width:max-content;pointer-events:auto;gap:.35em;padding:11px 16px;color:#d0457f;font-weight:500;text-decoration:none;white-space:nowrap}
 .home:hover{color:var(--ink)}
+.short{display:none}
 @media (max-width:560px){
   .bar{grid-template-columns:auto auto 1fr;padding-left:8px;padding-right:8px;gap:6px}
   .home{padding:11px 12px;font-size:13px}
   .pill button{padding:8px 11px;font-size:13px}
   .long{display:none}
+  .short{display:inline}
 }
 @media (max-width:400px){
   .bar{gap:4px}
@@ -81,6 +87,9 @@ details[open] > summary::after{transform:translateY(2px) rotate(-135deg)}
 .row{display:grid;grid-template-columns:1fr auto;gap:2px 8px;font-size:13px;color:var(--muted)}
 .row output{color:var(--ink);font-variant-numeric:tabular-nums}
 .row input[type=range]{grid-column:1 / -1;width:100%;margin:4px 0 0;accent-color:var(--brass)}
+.row select{grid-column:1 / -1;width:100%;margin:4px 0 0;font:inherit;font-size:13px;color:var(--ink);background:var(--chip);border:1px solid var(--line);border-radius:9px;padding:7px 8px}
+.gold{color:var(--gold);font-weight:600}
+.teal{color:var(--teal);font-weight:600}
 .seg{display:flex;flex-wrap:wrap;gap:3px;padding:3px;border-radius:12px;background:var(--chip)}
 .seg button{flex:1 1 auto;appearance:none;border:0;background:transparent;color:var(--muted);font:inherit;font-size:12.5px;font-weight:500;padding:7px 8px;border-radius:9px;cursor:pointer;white-space:nowrap}
 .seg button:hover{color:var(--ink)}
@@ -104,8 +113,10 @@ label.btn:focus-within{outline:2px solid var(--brass);outline-offset:2px}
 .colorrow{display:flex;align-items:center;gap:12px;font-size:13px;color:var(--muted)}
 .colorrow input[type=color]{width:38px;height:28px;padding:0;border:1px solid var(--line);border-radius:8px;background:none;cursor:pointer}
 
-body:not(.mode-toy) .only-toy{display:none}
-body.mode-toy .only-physical{display:none}
+body.mode-physical .only-pics{display:none}
+body:not(.mode-physical) .only-physical{display:none}
+body:not(.mode-groups) .only-groups{display:none}
+body.mode-groups .not-groups{display:none}
 body:not(.mk-3) .only-three{display:none}
 body.mk-3 .only-two{display:none}
 .pane{display:none}
@@ -123,12 +134,14 @@ body.src-pattern .p-pattern, body.src-paint .p-paint, body.src-image .p-image, b
 </head>
 <body class="mode-physical mk-2 src-pattern">
 <canvas id="view" aria-label="Kaleidoscope view. Drag to turn."></canvas>
+<canvas id="ov" aria-hidden="true"></canvas>
 
 <header class="bar">
   <div class="spacer"><a class="pill home" href="../index.html">←<span class="long"> All widgets</span></a></div>
   <div class="pill modes" role="group" aria-label="Mode">
     <button type="button" data-mode="physical" aria-pressed="true">Real <span class="long">kaleidoscope</span></button>
-    <button type="button" data-mode="toy" aria-pressed="false">Symmetry toy</button>
+    <button type="button" data-mode="toy" aria-pressed="false"><span class="long">Symmetry toy</span><span class="short">Toy</span></button>
+    <button type="button" data-mode="groups" aria-pressed="false">Groups</button>
   </div>
   <div class="acts">
     <div class="pill"><button type="button" id="saveBtn">Save<span class="long"> PNG</span></button></div>
@@ -137,7 +150,7 @@ body.src-pattern .p-pattern, body.src-paint .p-paint, body.src-image .p-image, b
 </header>
 
 <aside id="panel" aria-label="Controls">
-  <details open>
+  <details open class="not-groups">
     <summary>Mirrors</summary>
     <div class="sect">
       <div class="seg" data-key="mirrorKind" role="group" aria-label="Mirror set">
@@ -154,6 +167,29 @@ body.src-pattern .p-pattern, body.src-paint .p-paint, body.src-image .p-image, b
         </div>
         <label class="row"><span>Field of view</span><output id="fovOut"></output>
           <input type="range" id="fov" min="0.8" max="5" step="0.1"></label>
+      </div>
+    </div>
+  </details>
+
+  <details open class="only-groups">
+    <summary>Group</summary>
+    <div class="sect">
+      <div class="seg" data-key="gKind" role="group" aria-label="Kind of group">
+        <button type="button" data-v="C">Cₙ (rotations)</button>
+        <button type="button" data-v="D">Dₙ (rotations + flips)</button>
+      </div>
+      <label class="row"><span>Steps around (n)</span><output id="gNOut"></output>
+        <input type="range" id="gN" min="1" max="12" step="1"></label>
+      <p class="note" id="gInfo"></p>
+      <label class="tog"><input type="checkbox" id="gLabels"><span>Show copies &amp; labels</span></label>
+      <p class="note">r = rotate one step (360°/n anticlockwise). s = flip across the mirror line. Labels are read right to left like functions: r²s means do s first, then r².</p>
+      <div class="stack">
+        <p class="lead">Do two moves commute?</p>
+        <label class="row"><span>Move A</span><select id="gA"></select></label>
+        <label class="row"><span>Move B</span><select id="gB"></select></label>
+        <div class="btns"><button type="button" class="btn" id="gCmp">Compare A then B with B then A</button></div>
+        <p class="note"><span class="gold">Gold F</span>: A then B. <span class="teal">Teal F</span>: B then A. If they land in the same place, the order didn’t matter.</p>
+        <p class="note" id="gResult" aria-live="polite"></p>
       </div>
     </div>
   </details>
@@ -191,7 +227,7 @@ body.src-pattern .p-pattern, body.src-paint .p-paint, body.src-image .p-image, b
     </div>
   </details>
 
-  <details open class="only-toy">
+  <details open class="only-pics">
     <summary>Source</summary>
     <div class="sect">
       <div class="seg" data-key="src" role="group" aria-label="Source">
@@ -219,7 +255,7 @@ body.src-pattern .p-pattern, body.src-paint .p-paint, body.src-image .p-image, b
         <label class="row"><span>Brush size</span><output id="brushOut"></output>
           <input type="range" id="brush" min="3" max="48" step="1"></label>
         <div class="btns"><button type="button" class="btn" id="clearPaint">Clear drawing</button></div>
-        <p class="note">Draw anywhere on the view. Each stroke folds back into the mirror wedge, which is outlined while you paint.</p>
+        <p class="note">Draw anywhere on the view. Each stroke folds back into the <span class="not-groups">mirror wedge</span><span class="only-groups">first copy (e)</span>, which is outlined while you paint.</p>
       </div>
       <div class="pane p-image">
         <div class="btns"><label class="btn">Choose an image<input type="file" id="imgFile" accept="image/*"></label></div>
@@ -238,11 +274,11 @@ body.src-pattern .p-pattern, body.src-paint .p-paint, body.src-image .p-image, b
   <details open>
     <summary>Realism</summary>
     <div class="sect">
-      <label class="row"><span>Light lost per reflection</span><output id="lossOut"></output>
+      <label class="row not-groups"><span>Light lost per reflection</span><output id="lossOut"></output>
         <input type="range" id="loss" min="0" max="20" step="1"></label>
-      <label class="row"><span>Mirror tint</span><output id="tintOut"></output>
+      <label class="row not-groups"><span>Mirror tint</span><output id="tintOut"></output>
         <input type="range" id="tint" min="0" max="100" step="1"></label>
-      <label class="row"><span>Mirror misalignment</span><output id="misOut"></output>
+      <label class="row not-groups"><span>Mirror misalignment</span><output id="misOut"></output>
         <input type="range" id="mis" min="0" max="100" step="1"></label>
       <label class="tog"><input type="checkbox" id="eyepiece"><span>Round eyepiece</span></label>
     </div>
@@ -269,7 +305,8 @@ const S = {
   src: 'pattern', pat: 'flow', patSpeed: 1, patZoom: 1, patHue: 0,
   paintColor: '#f0b040', rainbow: true, brush: 14,
   imgRot: 0, imgScale: 1, imgX: 0, imgY: 0,
-  loss: 8, tint: 40, mis: 20, eyepiece: true
+  loss: 8, tint: 40, mis: 20, eyepiece: true,
+  gKind: 'D', gN: 6, gLabels: true
 };
 
 /* ---------------- messages ---------------- */
@@ -280,8 +317,9 @@ function toast(msg) {
 }
 function hintText() {
   if (S.mode === 'physical') return tiltActive ? 'Tilt the phone, or drag to turn the cell' : 'Drag to turn. Let go and it keeps spinning.';
-  if (S.src === 'paint') return 'Draw anywhere: strokes fold into the mirror wedge';
+  if (S.src === 'paint') return S.mode === 'groups' ? 'Draw anywhere: every stroke is copied into all the copies' : 'Draw anywhere: strokes fold into the mirror wedge';
   if (S.src === 'image') return 'Drag to move the picture. Scroll or pinch to rotate it.';
+  if (S.mode === 'groups') return 'Each copy is labelled by the move that made it. Drag to turn the picture.';
   return 'Drag to turn';
 }
 function showHint() {
@@ -301,6 +339,32 @@ void main(){
   gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);
 }`;
 
+// eyepiece + brass ring, shared by the mirror and group shaders
+const EYE_GLSL = `
+uniform float uEye;
+uniform float uEyeR;
+uniform vec3 uStage;
+vec3 toLin(vec3 c){ return pow(max(c, vec3(0.0)), vec3(2.2)); }
+vec3 eyepiece(vec3 col, vec2 d, float rpx){
+  if (uEye > 0.5) {
+    float r = rpx / uEyeR;
+    float aa = 1.2 / uEyeR;
+    float vig = 1.0 - smoothstep(0.72, 1.0, r);
+    col *= pow(vig, 1.5);
+    vec3 st = toLin(uStage);
+    vec3 outside = st * (0.55 + 0.45 * smoothstep(1.045, 1.17, r));
+    float ang = atan(d.y, d.x);
+    float band = clamp((r - 1.0) / 0.042, 0.0, 1.0);
+    float sb = sin(band * 3.14159);
+    vec3 brass = vec3(0.46, 0.30, 0.10) * (0.5 + 0.5 * cos(ang + 2.3)) * (0.45 + 0.8 * sb)
+               + vec3(0.40, 0.32, 0.20) * pow(max(0.0, cos(ang - 0.8)), 20.0) * sb;
+    float inRing = smoothstep(1.0 - aa, 1.0 + aa, r) * (1.0 - smoothstep(1.042 - aa, 1.042 + aa, r));
+    outside = mix(outside, brass, inRing);
+    col = mix(col, outside, smoothstep(1.0 - aa, 1.0 + aa, r));
+  }
+  return col;
+}`;
+
 const MIRROR_FS = `#version 300 es
 precision highp float;
 out vec4 o;
@@ -317,13 +381,9 @@ uniform sampler2D uSrc;
 uniform vec4 uSA;
 uniform vec2 uSB;
 uniform int uClip;
-uniform float uEye;
-uniform float uEyeR;
-uniform vec3 uStage;
 uniform float uWedge;
-uniform float uDpr;
+uniform float uDpr;${EYE_GLSL}
 vec2 rot(vec2 p, vec2 cs){ return vec2(cs.x*p.x - cs.y*p.y, cs.y*p.x + cs.x*p.y); }
-vec3 toLin(vec3 c){ return pow(max(c, vec3(0.0)), vec3(2.2)); }
 void main(){
   vec2 d = vec2(gl_FragCoord.x - uCenter.x, uCenter.y - gl_FragCoord.y);
   float rpx = length(d);
@@ -359,22 +419,47 @@ void main(){
     float e = edge * uPPU;
     col = mix(col, vec3(1.0), 0.6 * (1.0 - smoothstep(0.5 * uDpr, 1.6 * uDpr, e)));
   }
-  if (uEye > 0.5) {
-    float r = rpx / uEyeR;
-    float aa = 1.2 / uEyeR;
-    float vig = 1.0 - smoothstep(0.72, 1.0, r);
-    col *= pow(vig, 1.5);
-    vec3 st = toLin(uStage);
-    vec3 outside = st * (0.55 + 0.45 * smoothstep(1.045, 1.17, r));
-    float ang = atan(d.y, d.x);
-    float band = clamp((r - 1.0) / 0.042, 0.0, 1.0);
-    float sb = sin(band * 3.14159);
-    vec3 brass = vec3(0.46, 0.30, 0.10) * (0.5 + 0.5 * cos(ang + 2.3)) * (0.45 + 0.8 * sb)
-               + vec3(0.40, 0.32, 0.20) * pow(max(0.0, cos(ang - 0.8)), 20.0) * sb;
-    float inRing = smoothstep(1.0 - aa, 1.0 + aa, r) * (1.0 - smoothstep(1.042 - aa, 1.042 + aa, r));
-    outside = mix(outside, brass, inRing);
-    col = mix(col, outside, smoothstep(1.0 - aa, 1.0 + aa, r));
+  col = eyepiece(col, d, rpx);
+  o = vec4(pow(col, vec3(1.0 / 2.2)), 1.0);
+}`;
+
+// symmetry group Cn / Dn: fold each pixel into the seed region, remember which copy it was
+const GROUP_FS = `#version 300 es
+precision highp float;
+out vec4 o;
+uniform vec2 uCenter;
+uniform float uPPU;
+uniform vec2 uRotB;
+uniform int uN;
+uniform int uDih;
+uniform sampler2D uSrc;
+uniform vec4 uSA;
+uniform vec2 uSB;
+uniform float uWedge;
+uniform float uDpr;${EYE_GLSL}
+vec2 rot(vec2 p, vec2 cs){ return vec2(cs.x*p.x - cs.y*p.y, cs.y*p.x + cs.x*p.y); }
+vec2 srcUV(vec2 m){ vec2 q = rot(vec2(m.x, -m.y), uRotB); return vec2(dot(uSA.xy, q), dot(uSA.zw, q)) + uSB; }
+void main(){
+  vec2 d = vec2(gl_FragCoord.x - uCenter.x, uCenter.y - gl_FragCoord.y);
+  float rpx = length(d);
+  vec2 m = vec2(d.x, -d.y) / uPPU;            // maths frame: y up, angles anticlockwise
+  float n = float(uN), a = 6.2831853 / n;
+  bool dih = uDih == 1;
+  float phi = dih ? 0.5 * a : a;             // angle of the seed region
+  float th = atan(m.y, m.x); if (th < 0.0) th += 6.2831853;
+  float w = mod(floor(th / phi), dih ? 2.0 * n : n);
+  bool fl = dih && mod(w, 2.0) > 0.5;
+  float k = dih ? (fl ? mod((w + 1.0) * 0.5, n) : w * 0.5) : w;
+  float c = -k * a;
+  vec2 p = rot(m, vec2(cos(c), sin(c)));
+  if (fl) p.y = -p.y;
+  vec2 g = dFdx(srcUV(m)), h = dFdy(srcUV(m)); // gradients from the unfolded point: no seams in the mip level
+  vec3 col = toLin(textureGrad(uSrc, srcUV(p), g, h).rgb);
+  if (uWedge > 0.5 && k < 0.5 && !fl && phi < 6.28) {
+    float e = min(p.y, p.x * sin(phi) - p.y * cos(phi)) * uPPU;
+    col = mix(col, vec3(1.0), 0.6 * (1.0 - smoothstep(0.5 * uDpr, 1.6 * uDpr, e)));
   }
+  col = eyepiece(col, d, rpx);
   o = vec4(pow(col, vec3(1.0 / 2.2)), 1.0);
 }`;
 
@@ -457,8 +542,8 @@ function program(fs) {
   }
   return { p, u };
 }
-let MP, PP;
-try { MP = program(MIRROR_FS); PP = program(PATTERN_FS); }
+let MP, GP, PP;
+try { MP = program(MIRROR_FS); GP = program(GROUP_FS); PP = program(PATTERN_FS); }
 catch (err) { console.error(err); $('#fail').hidden = false; $('#fail p').textContent = 'The mirror shader could not start on this device.'; return; }
 gl.bindVertexArray(gl.createVertexArray());
 
@@ -539,6 +624,8 @@ function buildGeom() {
 let W = innerWidth, H = innerHeight, rs = 1, ready = false;
 const view = { cx: W / 2, cy: H / 2, eyeR: 100, tcx: W / 2, tcy: H / 2, teyeR: 100, ppu: 100, maxIt: 20, rotA: [1, 0], rotB: [1, 0] };
 const panel = $('#panel');
+const ov = $('#ov'), octx = ov.getContext('2d');
+let ovDpr = 1, ovOn = false;
 function targets() {
   const bar = document.querySelector('.bar').getBoundingClientRect();
   let top = bar.bottom + 4, left = 0, right = W, bottom = H;
@@ -557,6 +644,9 @@ function resize() {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const nw = Math.max(2, Math.round(W * dpr * rs)), nh = Math.max(2, Math.round(H * dpr * rs));
   targets();
+  const ow = Math.max(2, Math.round(W * dpr)), oh = Math.max(2, Math.round(H * dpr));
+  if (ow !== ov.width || oh !== ov.height) { ov.width = ow; ov.height = oh; }
+  ovDpr = dpr;
   if (nw !== cv.width || nh !== cv.height) {
     cv.width = nw; cv.height = nh;   // this clears the canvas, so draw again straight away
     if (ready) { updateView(0); render(); }
@@ -568,7 +658,9 @@ function farCorner() {
 function updateView(dt, snap) {
   const k = snap ? 1 : Math.min(1, dt * 9);
   view.cx += (view.tcx - view.cx) * k; view.cy += (view.tcy - view.cy) * k; view.eyeR += (view.teyeR - view.eyeR) * k;
-  if (S.mirrorKind === '2') {
+  if (S.mode === 'groups') {
+    view.ppu = S.eyepiece ? view.eyeR : farCorner();
+  } else if (S.mirrorKind === '2') {
     view.ppu = S.eyepiece ? view.eyeR : farCorner();
     view.maxIt = 2 * S.n + 8;
   } else {
@@ -598,12 +690,54 @@ function screenToSource(x, y) {
   return [B[0] * px - B[1] * py, B[1] * px + B[0] * py];
 }
 
+/* ---------------- groups: the maths ----------------
+   Maths orientation: angles run anticlockwise on screen (screen y points down, so y is negated).
+   r = rotate by a = 2*pi/n, s = flip across the horizontal axis through the centre.
+   Element [k, f] is the map x -> r^k s^f x (s first). Composition A.B means "do B, then A". */
+const SUPD = '⁰¹²³⁴⁵⁶⁷⁸⁹', SUBD = '₀₁₂₃₄₅₆₇₈₉';
+const digits = (v, set) => String(v).replace(/\d/g, c => set[c]);
+const gmod = (a, n) => ((a % n) + n) % n;
+const gDih = () => S.gKind === 'D';
+const gMul = (A, B) => [gmod(A[0] + (A[1] ? -B[0] : B[0]), S.gN), A[1] ^ B[1]];
+const gName = g => (g[0] === 0 && !g[1]) ? 'e' : (g[0] ? 'r' + (g[0] > 1 ? digits(g[0], SUPD) : '') : '') + (g[1] ? 's' : '');
+function gDesc(g) {
+  const [k, f] = g, deg = +(k * 360 / S.gN).toFixed(1), rot = `rotate ${k} step${k > 1 ? 's' : ''} (${deg}°)`;
+  if (!k && !f) return 'e — do nothing';
+  if (!f) return `${gName(g)} — ${rot}`;
+  return k ? `${gName(g)} — flip, then ${rot}` : 's — flip across the mirror line';
+}
+function gList() { const L = []; for (let f = 0; f < (gDih() ? 2 : 1); f++) for (let k = 0; k < S.gN; k++) L.push([k, f]); return L; }
+function gMat(g) { // matrix [a, b, c, d] of r^k s^f in maths coordinates
+  const t = g[0] * TAU / S.gN, c = Math.cos(t), s = Math.sin(t);
+  return g[1] ? [c, s, s, -c] : [c, -s, s, c];
+}
+const gRegion = () => gDih() ? Math.PI / S.gN : TAU / S.gN;   // angle of the seed region
+function gMid(g) { // middle angle of the region g(F)
+  const a = TAU / S.gN, phi = gRegion();
+  return g[0] * a + (g[1] ? -phi / 2 : phi / 2);
+}
+// which copy holds the maths-frame point (mx, my), and where it sits in the seed region: g^-1 p
+function gFold(mx, my) {
+  const n = S.gN, a = TAU / n, dih = gDih();
+  let th = Math.atan2(my, mx); if (th < 0) th += TAU;
+  const w = Math.floor(th / (dih ? a / 2 : a)) % (dih ? 2 * n : n);
+  const fl = dih && (w & 1) === 1, k = dih ? (fl ? ((w + 1) / 2) % n : w / 2) : w;
+  const c = Math.cos(-k * a), s = Math.sin(-k * a);
+  const x = c * mx - s * my, y = s * mx + c * my;
+  return { k, f: fl ? 1 : 0, x, y: fl ? -y : y };
+}
+function groupToSource(x, y) {
+  const f = gFold((x - view.cx) / view.ppu, (view.cy - y) / view.ppu), B = view.rotB;
+  const px = f.x, py = -f.y;
+  return [B[0] * px - B[1] * py, B[1] * px + B[0] * py];
+}
+
 /* ---------------- turning ---------------- */
 const turn = { angle: 0, w: 0, wm: 0, drag: null, lastMove: 0 };
 let tiltActive = false;
 const grav = [0, 1];
 function mirrorRot() { return (S.mode === 'physical' && S.turnWhat === 'tube' && !tiltActive) ? turn.angle : 0; }
-function srcRot() { return S.mode === 'toy' ? turn.angle : 0; }
+function srcRot() { return S.mode !== 'physical' ? turn.angle : 0; }
 function updateTurning(dt) {
   if (turn.drag) {
     if (performance.now() - turn.lastMove > 60) turn.wm *= Math.exp(-12 * dt);
@@ -914,7 +1048,7 @@ let paintDirty = true, paintLast = null, paintHue = 30;
 function clearPaint() { pctx.fillStyle = '#150e1b'; pctx.fillRect(0, 0, PS, PS); paintDirty = true; }
 clearPaint();
 function stamp(x, y) {
-  const q = screenToSource(x, y);
+  const q = S.mode === 'groups' ? groupToSource(x, y) : screenToSource(x, y);
   const u = (q[0] * 0.5 + 0.5) * PS, v = (q[1] * 0.5 + 0.5) * PS;
   const r = Math.max(0.6, (S.brush / view.ppu) * PS / 2);
   let col;
@@ -961,7 +1095,7 @@ async function loadImageFile(f) {
     c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
     setImageSource(c, c.width, c.height);
     S.imgX = 0; S.imgY = 0; S.imgRot = 0; S.imgScale = 1; syncImageSliders();
-    if (S.mode !== 'toy') setMode('toy');
+    if (S.mode === 'physical') setMode('toy');
     setSeg('src', 'image');
   } catch (e) { toast('That image couldn’t be opened. Try a PNG or JPEG.'); }
 }
@@ -977,7 +1111,7 @@ async function startCamera() {
     camVideo = document.createElement('video');
     camVideo.playsInline = true; camVideo.muted = true; camVideo.srcObject = camStream;
     await camVideo.play();
-    if (S.src !== 'camera' || S.mode !== 'toy') stopCamera();
+    if (S.src !== 'camera' || S.mode === 'physical') stopCamera();
   } catch (e) {
     stopCamera();
     $('#camBtn').hidden = true;
@@ -1031,6 +1165,125 @@ async function setTilt(on) {
   tiltProbe = setTimeout(() => { if (!gotOri) fail(); }, 1500);
 }
 
+/* ---------------- groups: panel, overlay and commute tester ---------------- */
+const CMP_DUR = 0.6, CMP_PAUSE = 0.35;
+const gSelA = $('#gA'), gSelB = $('#gB'), gPick = { A: null, B: null };
+let cmp = null;   // the running or finished "A then B" vs "B then A" comparison
+function fillSelect(sel, g) {
+  sel.innerHTML = '';
+  gList().forEach((e, j) => { const o = document.createElement('option'); o.value = j; o.textContent = gDesc(e); sel.appendChild(o); });
+  sel.value = g[1] * S.gN + g[0];
+}
+function groupChanged() {
+  cmp = null; $('#gResult').textContent = '';
+  const n = S.gN, dih = gDih(), N = gOrder();
+  const ok = g => g && g[0] < n && (dih || !g[1]);
+  if (!ok(gPick.A)) gPick.A = [1 % n, 0];
+  if (!ok(gPick.B)) gPick.B = dih ? [0, 1] : [2 % n, 0];
+  fillSelect(gSelA, gPick.A); fillSelect(gSelB, gPick.B);
+  const sb = digits(n, SUBD), abel = !dih || n <= 2;
+  $('#gInfo').textContent = (dih ? `D${sb} — symmetries of a ${n}-armed snowflake. ` : `C${sb} — rotations of a ${n}-armed pinwheel. `)
+    + `${N} element${N > 1 ? 's' : ''} (${N} cop${N > 1 ? 'ies' : 'y'} of the picture). `
+    + (abel ? 'Abelian: every pair of moves commutes.' : 'Non-abelian: some pairs of moves give different results in different orders.');
+}
+function gOrder() { return gDih() ? 2 * S.gN : S.gN; }
+gSelA.addEventListener('change', () => { gPick.A = gList()[+gSelA.value]; });
+gSelB.addEventListener('change', () => { gPick.B = gList()[+gSelB.value]; });
+
+// a move as animation steps: flip first, then rotate the short way round
+function gActs(g) {
+  const n = S.gN, acts = [];
+  if (g[1]) acts.push({ flip: true });
+  if (g[0]) acts.push({ ang: (g[0] > n / 2 ? g[0] - n : g[0]) * TAU / n });
+  return acts;
+}
+const actsDur = acts => acts.length ? acts.length * CMP_DUR : CMP_DUR * 0.5;
+const mat2 = (P, Q) => [P[0] * Q[0] + P[1] * Q[2], P[0] * Q[1] + P[1] * Q[3], P[2] * Q[0] + P[3] * Q[2], P[2] * Q[1] + P[3] * Q[3]];
+function routeMat(stages, t, d) {
+  let M = [1, 0, 0, 1];
+  for (let i = 0; i < 2; i++) {
+    let u = t - i * (d + CMP_PAUSE);
+    for (const a of stages[i]) {
+      const p = Math.min(1, Math.max(0, u / CMP_DUR)), e = p * p * (3 - 2 * p);
+      u -= CMP_DUR;
+      if (a.flip) M = mat2([1, 0, 0, 1 - 2 * e], M);      // squash through the mirror line
+      else { const t2 = a.ang * e, c = Math.cos(t2), s = Math.sin(t2); M = mat2([c, -s, s, c], M); }
+    }
+  }
+  return M;
+}
+function showResult() {
+  const c = cmp, nA = gName(c.A), nB = gName(c.B), nBA = gName(c.BA), nAB = gName(c.AB), same = nBA === nAB;
+  $('#gResult').innerHTML = `<span class="gold">A then B = ${nBA}</span>. <span class="teal">B then A = ${nAB}</span>. `
+    + (same ? `Same place (${nBA}), so ${nA} and ${nB} commute.` : `Different places, so ${nA} and ${nB} do not commute.`);
+}
+function runCompare() {
+  const A = gList()[+gSelA.value], B = gList()[+gSelB.value];
+  const d = Math.max(actsDur(gActs(A)), actsDur(gActs(B)));
+  cmp = { A, B, BA: gMul(B, A), AB: gMul(A, B), gold: [gActs(A), gActs(B)], teal: [gActs(B), gActs(A)], d, total: 2 * d + CMP_PAUSE + 0.25, t0: performance.now(), done: false };
+  if (reduced) { cmp.done = true; showResult(); } else $('#gResult').textContent = 'Watch the two routes…';
+}
+
+function drawOverlay() {
+  if (S.mode !== 'groups') {
+    if (ovOn) { octx.setTransform(1, 0, 0, 1, 0, 0); octx.clearRect(0, 0, ov.width, ov.height); ovOn = false; }
+    return;
+  }
+  ovOn = true;
+  const x = octx, R = view.eyeR, cx = view.cx, cy = view.cy, n = S.gN, a = TAU / n, dih = gDih(), phi = gRegion();
+  const pt = (r, th) => [cx + r * Math.cos(th), cy - r * Math.sin(th)];
+  x.setTransform(ovDpr, 0, 0, ovDpr, 0, 0);
+  x.clearRect(0, 0, W, H);
+  if (R < 8) return;   // panel squeezed the view to nothing
+  x.lineCap = 'round'; x.lineJoin = 'round';
+  if (S.gLabels) {
+    // copy boundaries: solid = mirror lines (Dn), dashed = sector edges (Cn, not mirrors)
+    const nb = dih ? 2 * n : n, rays = () => { x.beginPath(); for (let j = 0; j < nb; j++) { x.moveTo(cx, cy); x.lineTo(...pt(R, j * phi)); } x.stroke(); };
+    x.setLineDash(dih ? [] : [6, 6]);
+    x.strokeStyle = 'rgba(14,6,20,.45)'; x.lineWidth = 3.4; rays();
+    x.strokeStyle = dih ? 'rgba(255,255,255,.88)' : 'rgba(255,255,255,.6)'; x.lineWidth = dih ? 1.5 : 1.2; rays();
+    x.setLineDash([]);
+    // the identity region is the seed: outline it a little heavier
+    x.beginPath(); x.moveTo(cx, cy); x.lineTo(...pt(R * 0.995, 0)); x.arc(cx, cy, R * 0.995, 0, -phi, true); x.closePath();
+    x.strokeStyle = 'rgba(14,6,20,.4)'; x.lineWidth = 5; x.stroke();
+    x.strokeStyle = 'rgba(255,217,138,.95)'; x.lineWidth = 2.6; x.stroke();
+    // labels
+    const L = gList(), N = L.length, maxc = Math.max(...L.map(g => gName(g).length));
+    const fs = Math.max(8, Math.min(0.075 * R, 0.9 * (0.62 * R * TAU / N) / (0.6 * (maxc + 1))));
+    x.font = `600 ${fs.toFixed(1)}px Sora, ui-sans-serif, system-ui, sans-serif`;
+    x.textAlign = 'center'; x.textBaseline = 'middle';
+    for (const g of L) {
+      const t = gName(g), [lx, ly] = pt(0.62 * R, gMid(g)), w = x.measureText(t).width + fs * 0.8, h = fs * 1.45, id = t === 'e';
+      x.fillStyle = id ? 'rgba(46,30,8,.72)' : 'rgba(16,9,24,.64)';
+      x.beginPath();
+      if (x.roundRect) x.roundRect(lx - w / 2, ly - h / 2, w, h, h / 2); else x.rect(lx - w / 2, ly - h / 2, w, h);
+      x.fill();
+      x.fillStyle = id ? '#ffd98a' : '#fff';
+      x.fillText(t, lx, ly + fs * 0.04);
+    }
+  }
+  if (cmp) {
+    const t = (performance.now() - cmp.t0) / 1000;
+    if (!cmp.done && t >= cmp.total) { cmp.done = true; showResult(); }
+    const done = cmp.done || t >= cmp.total;
+    const rho = 0.4 * R, s = Math.min(0.11 * R, 0.8 * rho * Math.sin(Math.min(phi, Math.PI) / 2));
+    const c0x = rho * Math.cos(phi / 2), c0y = rho * Math.sin(phi / 2);
+    const mark = (M, col, lw, back) => {
+      const P = (u, v) => { const px = c0x + s * u, py = c0y + s * v; return [cx + M[0] * px + M[1] * py, cy - (M[2] * px + M[3] * py)]; };
+      x.beginPath();
+      x.moveTo(...P(-0.35, -0.55)); x.lineTo(...P(-0.35, 0.55)); x.lineTo(...P(0.4, 0.55));
+      x.moveTo(...P(-0.35, 0.05)); x.lineTo(...P(0.25, 0.05));
+      if (back) { x.strokeStyle = 'rgba(14,6,20,.6)'; x.lineWidth = lw + 3; x.stroke(); }
+      x.strokeStyle = col; x.lineWidth = lw; x.stroke();
+    };
+    mark([1, 0, 0, 1], 'rgba(255,255,255,.5)', 1.5, false);   // where the F started
+    const mT = done ? gMat(cmp.AB) : routeMat(cmp.teal, t, cmp.d), mG = done ? gMat(cmp.BA) : routeMat(cmp.gold, t, cmp.d);
+    mark(mT, '#27c4bd', Math.max(4.5, s * 0.42), true);
+    // when both land on the same spot, the thin gold F sits inside the teal one
+    mark(mG, '#f2b632', Math.max(2.2, s * 0.2), mT.some((v, i) => Math.abs(v - mG[i]) > 1e-6));
+  }
+}
+
 /* ---------------- rendering ---------------- */
 function stageColor() {
   const h = getComputedStyle(document.documentElement).getPropertyValue('--stage').trim();
@@ -1067,18 +1320,23 @@ function render() {
   const sc = cv.width / W;
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.viewport(0, 0, cv.width, cv.height);
-  gl.useProgram(MP.p);
-  const u = MP.u;
+  const grp = S.mode === 'groups', P = grp ? GP : MP, u = P.u;
+  gl.useProgram(P.p);
   gl.uniform2f(u.uCenter, view.cx * sc, (H - view.cy) * sc);
   gl.uniform1f(u.uPPU, view.ppu * sc);
-  gl.uniform2f(u.uViewC, G.viewC[0], G.viewC[1]);
-  gl.uniform2f(u.uRotA, view.rotA[0], view.rotA[1]);
   gl.uniform2f(u.uRotB, view.rotB[0], view.rotB[1]);
-  gl.uniform1i(u.uNL, G.nl);
-  gl.uniform3fv(u.uL, G.flat);
-  gl.uniform1i(u.uMaxIt, view.maxIt);
-  const keep = 1 - S.loss / 100, t = S.tint / 100;
-  gl.uniform3f(u.uBounce, keep * (1 + (0.93 - 1) * t), keep, keep * (1 + (0.955 - 1) * t));
+  if (grp) {
+    gl.uniform1i(u.uN, S.gN);
+    gl.uniform1i(u.uDih, gDih() ? 1 : 0);
+  } else {
+    gl.uniform2f(u.uViewC, G.viewC[0], G.viewC[1]);
+    gl.uniform2f(u.uRotA, view.rotA[0], view.rotA[1]);
+    gl.uniform1i(u.uNL, G.nl);
+    gl.uniform3fv(u.uL, G.flat);
+    gl.uniform1i(u.uMaxIt, view.maxIt);
+    const keep = 1 - S.loss / 100, t = S.tint / 100;
+    gl.uniform3f(u.uBounce, keep * (1 + (0.93 - 1) * t), keep, keep * (1 + (0.955 - 1) * t));
+  }
   const src = sourceBinding();
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, src.tex);
@@ -1089,7 +1347,7 @@ function render() {
   gl.uniform1f(u.uEye, S.eyepiece ? 1 : 0);
   gl.uniform1f(u.uEyeR, view.eyeR * sc);
   gl.uniform3f(u.uStage, STAGE[0], STAGE[1], STAGE[2]);
-  gl.uniform1f(u.uWedge, (S.mode === 'toy' && S.src === 'paint') ? 1 : 0);
+  gl.uniform1f(u.uWedge, (S.mode !== 'physical' && S.src === 'paint') ? 1 : 0);
   gl.uniform1f(u.uDpr, sc);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 }
@@ -1135,6 +1393,7 @@ function frame(now) {
   }
   adapt(ms);
   render();
+  drawOverlay();
   requestAnimationFrame(frame);
 }
 
@@ -1142,8 +1401,8 @@ function frame(now) {
 const ptrs = new Map();
 let pinch = null;
 function tool() {
-  if (S.mode === 'toy' && S.src === 'paint') return 'paint';
-  if (S.mode === 'toy' && S.src === 'image') return 'image';
+  if (S.mode !== 'physical' && S.src === 'paint') return 'paint';
+  if (S.mode !== 'physical' && S.src === 'image') return 'image';
   return 'turn';
 }
 function angleAt(x, y) { return Math.atan2(y - view.cy, x - view.cx); }
@@ -1232,16 +1491,17 @@ window.addEventListener('drop', e => {
 
 /* ---------------- UI wiring ---------------- */
 function applyState() {
-  document.body.classList.remove('mode-physical', 'mode-toy', 'mk-2', 'mk-3', 'src-pattern', 'src-paint', 'src-image', 'src-camera', 'tool-paint', 'tool-image');
+  document.body.classList.remove('mode-physical', 'mode-toy', 'mode-groups', 'mk-2', 'mk-3', 'src-pattern', 'src-paint', 'src-image', 'src-camera', 'tool-paint', 'tool-image');
   document.body.classList.add('mode-' + S.mode, 'mk-' + S.mirrorKind, 'src-' + S.src);
   const t = tool(); if (t !== 'turn') document.body.classList.add('tool-' + t);
   buildGeom();
-  if (S.mode === 'toy' && S.src === 'camera') startCamera(); else stopCamera();
+  if (S.mode !== 'physical' && S.src === 'camera') startCamera(); else stopCamera();
 }
 function setSeg(key, v) {
   S[key] = v;
   $$(`.seg[data-key="${key}"] button`).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === v)));
   applyState();
+  if (key === 'gKind') groupChanged();
   if (key === 'src') showHint();
 }
 $$('.seg').forEach(seg => {
@@ -1283,6 +1543,7 @@ bindRange('imgScale', v => v.toFixed(2) + '×');
 bindRange('loss', pct);
 bindRange('tint', pct);
 bindRange('mis', pct, buildGeom);
+bindRange('gN', v => String(v), groupChanged);
 function syncImageSliders() {
   $('#imgRot').value = S.imgRot; $('#imgRotOut').textContent = Math.round(S.imgRot) + '°';
   $('#imgScale').value = S.imgScale; $('#imgScaleOut').textContent = S.imgScale.toFixed(2) + '×';
@@ -1294,6 +1555,8 @@ function bindToggle(id, cb) {
 bindToggle('autoRot');
 bindToggle('rainbow');
 bindToggle('eyepiece');
+bindToggle('gLabels');
+$('#gCmp').addEventListener('click', runCompare);
 bindToggle('tilt', on => setTilt(on));
 $('#paintColor').value = S.paintColor;
 $('#paintColor').addEventListener('input', e => { S.paintColor = e.target.value; S.rainbow = false; $('#rainbow').checked = false; });
@@ -1329,7 +1592,13 @@ async function savePNG() {
   const prev = rs;
   if (rs < 1) { rs = 1; resize(); updateView(0, true); }
   render();
-  const blobP = new Promise(res => cv.toBlob(res, 'image/png'));
+  let out = cv;
+  if (S.mode === 'groups') {   // copy lines, labels and markers go into the picture too
+    drawOverlay();
+    out = document.createElement('canvas'); out.width = cv.width; out.height = cv.height;
+    const ox = out.getContext('2d'); ox.drawImage(cv, 0, 0); ox.drawImage(ov, 0, 0, out.width, out.height);
+  }
+  const blobP = new Promise(res => out.toBlob(res, 'image/png'));
   if (prev !== rs) { rs = prev; resize(); }
   const blob = await blobP;
   if (!blob) { toast('The view couldn’t be captured. Try again.'); return; }
@@ -1360,6 +1629,7 @@ cv.addEventListener('webglcontextrestored', () => location.reload());
 
 /* ---------------- start ---------------- */
 if (MOBILE) setPanel(false); else setPanel(true);
+groupChanged();
 applyState();
 makePieces();
 resize();
