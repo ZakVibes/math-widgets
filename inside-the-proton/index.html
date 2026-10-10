@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Inside the Proton</title>
+<title>Inside the Atom</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@1,500&display=swap">
 <style>
@@ -113,17 +113,112 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
   .seg button{min-height:40px}
   .btn{min-height:38px}
   .row{min-height:34px}
+  #aPlot{height:150px}
+  .picks .btn{min-height:36px}
 }
+/* Atom view */
+.vsw{max-width:240px;margin:6px 0 4px}
+.stage{display:grid;gap:12px;width:100%;max-width:min(100%,82vh);margin-inline:auto;min-width:0}
+.afield{width:100%;aspect-ratio:1;max-width:100%;touch-action:manipulation}
+.afield.drag{cursor:grab;touch-action:pan-y}
+@media (min-width:1080px){.stage{max-width:min(100%,max(340px,calc(100vh - 500px)))}}
+.afield.drag:active{cursor:grabbing}
+#aPlot{width:100%;height:170px}
+.seg.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(60px,1fr))}
+.seg.grid button{border:1px solid var(--line);border-width:1px 0 0 1px;margin:-1px 0 0 -1px;font-size:12.5px;overflow-wrap:anywhere}
+.seg button:disabled{opacity:.35;cursor:default}
+sub{font-size:.75em;line-height:0}
+.picks{display:flex;flex-wrap:wrap;gap:6px}
+.picks .btn{padding:4px 10px;font-size:12.5px}
+.vgrp{display:grid;gap:10px}
+.afwrap{position:relative;min-width:0}
+#aGl{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;background:transparent}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
     <a href="../index.html" style="display:table;flex-basis:100%;margin-bottom:6px;font-size:13px;color:#d0457f;font-weight:500;text-decoration:none">← All widgets</a>
-    <h1>Inside the Proton</h1>
-    <p class="sub">The same quantum beam hits two targets with equal total charge and equal size. One is a smooth blob of charge, the other is quarks. Turn the beam momentum up and watch the large-angle scattering separate them.</p>
+    <h1>Inside the Atom</h1>
+    <div class="seg vsw" id="viewsw" role="group" aria-label="Choose a view">
+      <button type="button" data-v="atom" aria-pressed="true">Atom</button>
+      <button type="button" data-v="nucleus" aria-pressed="false">Nucleus</button>
+    </div>
+    <p class="sub" id="sub">One electron bound to one proton. These are the exact solutions of the Schrödinger equation for hydrogen: pick a state and see where the electron can be.</p>
   </header>
 
+  <div id="atom-view" hidden>
+  <div class="app">
+    <section class="bench" aria-label="Hydrogen orbital">
+      <div class="topbar">
+        <div class="readout">
+          <span><b id="a-name"></b></span>
+          <span>n l m <b id="a-q"></b></span>
+          <span>E <b id="a-e"></b></span>
+          <span>nodes <b id="a-nd"></b></span>
+        </div>
+      </div>
+      <div class="stage">
+        <div class="afwrap"><canvas class="afield" id="aCv" role="img" aria-label="Hydrogen orbital"></canvas><canvas id="aGl" aria-hidden="true" hidden></canvas></div>
+        <div class="detector">
+          <div class="dhead"><h2>Radial probability · how far from the nucleus</h2></div>
+          <canvas id="aPlot" role="img" aria-label="Radial probability against distance from the nucleus"></canvas>
+        </div>
+      </div>
+      <p class="note" id="aNote"></p>
+    </section>
+
+    <aside class="rail">
+      <nav class="tabs" id="atabs" aria-label="Control panels">
+        <button type="button" data-tab="ag-orb">Orbital</button>
+        <button type="button" data-tab="ag-view">View</button>
+      </nav>
+
+      <div class="group" id="ag-orb">
+        <h2>Orbital</h2>
+        <p class="lbl">Energy level <span class="math">n</span></p>
+        <div class="seg" id="a-n"></div>
+        <p class="lbl">Shape <span class="math">l</span></p>
+        <div class="seg" id="a-l"></div>
+        <p class="lbl">Orientation <span class="math">m</span></p>
+        <div class="seg grid" id="a-m"></div>
+        <p class="lbl">Quick pick</p>
+        <div class="picks" id="a-picks"></div>
+        <p class="lbl">Shape style</p>
+        <div class="seg" id="a-style">
+          <button type="button" data-v="chem">Chemistry</button>
+          <button type="button" data-v="phys">Physics</button>
+        </div>
+        <p class="note" id="a-stnote"></p>
+      </div>
+
+      <div class="group" id="ag-view">
+        <h2>View</h2>
+        <div class="seg" id="a-mode">
+          <button type="button" data-v="slice">Slice</button>
+          <button type="button" data-v="cloud">3D cloud</button>
+          <button type="button" data-v="surface" id="a-surfBtn">Surface</button>
+        </div>
+        <div class="vgrp" id="a-surf">
+          <div class="row"><label for="a-lev">Encloses</label><input type="range" id="a-lev" min="50" max="95" step="5" value="90"><span class="val" id="a-levVal">90%</span></div>
+          <label class="check"><input type="checkbox" id="a-cut"> Cutaway: slice off the front half</label>
+        </div>
+        <div class="vgrp" id="a-slice">
+          <p class="lbl">Slice plane</p>
+          <div class="seg" id="a-plane">
+            <button type="button" data-v="xz">xz</button>
+            <button type="button" data-v="xy">xy</button>
+            <button type="button" data-v="yz">yz</button>
+          </div>
+          <div class="row"><label for="a-tilt">Tilt</label><input type="range" id="a-tilt" min="-90" max="90" step="1" value="0"><span class="val" id="a-tiltVal">0°</span></div>
+        </div>
+        <p class="note" id="a-vnote"></p>
+      </div>
+    </aside>
+  </div>
+  </div>
+
+  <div id="nucleus-view" hidden>
   <div class="app">
     <section class="bench" aria-label="Experiment">
       <div class="topbar">
@@ -210,6 +305,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
         <p class="note" id="viewNote"></p>
       </div>
     </aside>
+  </div>
   </div>
 </div>
 
@@ -406,6 +502,104 @@ if (typeof module !== "undefined") module.exports = { makeEngine };
 
 </script>
 <script>
+// ---------- hydrogen: exact bound states ψ = R_nl(r)·Y_lm(θ,φ), atomic units (a0 = 1, energies in hartree) ----------
+function makeHydrogen() {
+  const EV = 27.2114, NICE = [2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50, 60, 80, 100, 120, 150, 200];
+  const fact = k => { let f = 1; for (let i = 2; i <= k; i++) f *= i; return f; };
+  // generalized Laguerre L^a_k(x) by recurrence
+  function lag(k, a, x) {
+    if (k === 0) return 1;
+    let p = 1, c = 1 + a - x;
+    for (let j = 1; j < k; j++) { const t = ((2 * j + 1 + a - x) * c - (j + a) * p) / (j + 1); p = c; c = t; }
+    return c;
+  }
+  function Rfn(n, l) {
+    const k = n - l - 1, a = 2 * l + 1, N = Math.sqrt(Math.pow(2 / n, 3) * fact(k) / (2 * n * fact(n + l)));
+    return r => { const x = 2 * r / n; return N * Math.exp(-r / n) * Math.pow(x, l) * lag(k, a, x); };
+  }
+  const R = (n, l, r) => Rfn(n, l)(r);
+  // associated Legendre P_l^m(x), m ≥ 0, without the Condon–Shortley phase
+  function Plm(l, m, x) {
+    let df = 1; for (let i = 2 * m - 1; i > 1; i -= 2) df *= i;
+    const pmm = df * Math.pow(Math.max(0, 1 - x * x), m / 2);
+    if (l === m) return pmm;
+    let a = pmm, b = x * (2 * m + 1) * pmm;
+    for (let q = m + 2; q <= l; q++) { const c = ((2 * q - 1) * x * b - (q + m - 1) * a) / (q - m); a = b; b = c; }
+    return b;
+  }
+  const Nlm = (l, m) => Math.sqrt((2 * l + 1) / (4 * Math.PI) * fact(l - m) / fact(l + m));
+  // Y_lm as o = [re, im]. style "chem": real orbitals; "phys": complex e^{imφ}
+  function Yfn(l, m, style) {
+    const a = Math.abs(m), N = Nlm(l, a);
+    if (style === "phys") return (ct, ph, o) => { const p = N * Plm(l, a, ct); o[0] = p * Math.cos(m * ph); o[1] = p * Math.sin(m * ph); };
+    const k = m === 0 ? N : Math.SQRT2 * N;
+    return (ct, ph, o) => { const p = k * Plm(l, a, ct); o[0] = m === 0 ? p : m > 0 ? p * Math.cos(a * ph) : p * Math.sin(a * ph); o[1] = 0; };
+  }
+  function psi(n, l, m, style, r, ct, ph, o) { Yfn(l, m, style)(ct, ph, o); const f = R(n, l, r); o[0] *= f; o[1] *= f; return o; }
+  const amCache = {};
+  function angMax(l, m, style) {   // max |Y|² over the sphere, plus a 10% margin for the rejection sampler
+    const key = l + "," + m + style; if (amCache[key]) return amCache[key];
+    const Y = Yfn(l, m, style), o = [0, 0]; let mx = 0;
+    for (let i = 0; i <= 240; i++) for (let j = 0; j <= 180; j++) { Y(-1 + i / 120, 2 * Math.PI * j / 180, o); const v = o[0] * o[0] + o[1] * o[1]; if (v > mx) mx = v; }
+    return amCache[key] = mx * 1.1;
+  }
+  const rdCache = {};
+  // radial table: cumulative probability, nodes, ⟨r⟩, and a view radius holding ~99.5% of the probability
+  function radial(n, l) {
+    const key = n + "," + l; if (rdCache[key]) return rdCache[key];
+    const Rf = Rfn(n, l), Rt = 12 * n * n + 20, M = 4000, dr = Rt / M, cdf = new Float64Array(M + 1);
+    let prev = 0, s = 0, s1 = 0, nodes = [], sg = 0;
+    for (let i = 1; i <= M; i++) {
+      const r = i * dr, v = Rf(r), f = r * r * v * v;
+      s += (prev + f) * dr / 2; s1 += (prev * (r - dr) + f * r) * dr / 2; cdf[i] = s; prev = f;
+      const q = Math.sign(v);
+      if (sg && q && q !== sg) {
+        let lo = r - dr, hi = r; const sl = Math.sign(Rf(lo));
+        for (let it = 0; it < 60; it++) { const mid = (lo + hi) / 2; if (Math.sign(Rf(mid)) === sl) lo = mid; else hi = mid; }
+        nodes.push((lo + hi) / 2);
+      }
+      if (q) sg = q;
+    }
+    for (let i = 0; i <= M; i++) cdf[i] /= s;
+    let i995 = 0; while (cdf[i995] < 0.995) i995++;
+    const r995 = i995 * dr, rview = NICE.find(v => v >= r995) || Math.ceil(r995 / 50) * 50;
+    function sampleR(u) {
+      let lo = 0, hi = M; while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (cdf[mid] < u) lo = mid; else hi = mid; }
+      const c0 = cdf[lo], c1 = cdf[hi], t = c1 > c0 ? (u - c0) / (c1 - c0) : 0; return (lo + t) * dr;
+    }
+    return rdCache[key] = { nodes, rmean: (3 * n * n - l * (l + 1)) / 2, rmeanNum: s1 / s, rview, r995, sampleR };
+  }
+  // random points distributed as |ψ|²: r by inverse CDF, angles by rejection against max|Y|²
+  function cloud(n, l, m, style, count, rnd) {
+    rnd = rnd || Math.random;
+    const info = radial(n, l), Y = Yfn(l, m, style), Rf = Rfn(n, l), mx = angMax(l, m, style), o = [0, 0];
+    const x = new Float32Array(count), y = new Float32Array(count), z = new Float32Array(count), ph = new Float32Array(count), rr = new Float32Array(count);
+    for (let i = 0; i < count; i++) {
+      const r = info.sampleR(rnd()); let ct = 0, phi = 0;
+      for (let t = 0; t < 5000; t++) { ct = 2 * rnd() - 1; phi = 2 * Math.PI * rnd(); Y(ct, phi, o); if (rnd() * mx < o[0] * o[0] + o[1] * o[1]) break; }
+      const st = Math.sqrt(1 - ct * ct), f = Rf(r);
+      x[i] = r * st * Math.cos(phi); y[i] = r * st * Math.sin(phi); z[i] = r * ct; rr[i] = r;
+      ph[i] = Math.atan2(f * o[1], f * o[0]);
+    }
+    return { x, y, z, ph, r: rr, count };
+  }
+  const LET = "spdfg";
+  const CH = { 1: { "-1": "y", 0: "z", 1: "x" }, 2: { "-2": "xy", "-1": "yz", 0: "z²", 1: "xz", 2: "x²−y²" },
+               3: { "-3": "y(3x²−y²)", "-2": "xyz", "-1": "yz²", 0: "z³", 1: "xz²", 2: "z(x²−y²)", 3: "x(x²−3y²)" } };
+  const sgn = m => m > 0 ? "+" + m : m < 0 ? "−" + (-m) : "0";
+  // sub: the part after the orbital letter, as plain text. text: "3d_z²"; html: "3d<sub>z²</sub>"
+  function sub(l, m, style) { return style === "chem" ? (CH[l] ? CH[l][m] : null) : null; }
+  function label(n, l, m, style) {
+    const base = n + LET[l], s = sub(l, m, style);
+    if (l === 0) return { text: base, html: base, short: style === "chem" ? "s" : "0", shortHtml: style === "chem" ? "s" : "0" };
+    if (s) return { text: base + "_" + s, html: base + "<sub>" + s + "</sub>", short: LET[l] + "_" + s, shortHtml: LET[l] + "<sub>" + s + "</sub>" };
+    const t = base + ", m = " + sgn(m);
+    return { text: t, html: t, short: sgn(m), shortHtml: sgn(m) };
+  }
+  return { EV, NICE, lag, Rfn, R, Plm, Nlm, Yfn, psi, angMax, radial, cloud, label, sub, sgn, LET, energy: n => -0.5 / (n * n) * EV };
+}
+</script>
+<script>
 (() => {
 "use strict";
 const $ = id => document.getElementById(id);
@@ -416,6 +610,7 @@ const m = iv1 - iv0 + 1, VX0 = XC[iv0] - DX / 2, VSPAN = m * DX;
 
 // ---------- state ----------
 const S = { k: 6, nq: 3, d: 1.2, Q: 2.5, rand: true, rot: 0, auto: true, show: "scat", mode: "phase", born: false, speed: 4 };
+let active = false, running = false;   // the Atom view is the default, so this view sleeps until shown
 const BEAM = () => ({ x0: -4.6, k: S.k, sx: 1.0, sy: 2.4 });
 const sims = [E.makeSim(), E.makeSim()]; sims[0].kind = "smooth"; sims[1].kind = "quark";
 const NA = 360;
@@ -469,6 +664,7 @@ const fields = [{ cv: cvS, ctx: cvS.getContext("2d"), w: 0 }, { cv: cvQ, ctx: cv
 const ctxP = cvP.getContext("2d"), ctxM = cvM.getContext("2d");
 let PW = 0, PH = 0, MW = 0, MH = 0, plotDirty = true, meterDirty = true;
 function fit() {
+  if (!active) return;
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   for (const f of fields) { const r = f.cv.getBoundingClientRect(); f.cv.width = Math.max(1, Math.round(r.width * dpr)); f.cv.height = Math.max(1, Math.round(r.height * dpr)); f.ctx.setTransform(dpr, 0, 0, dpr, 0, 0); f.w = r.width; }
   let r = cvP.getBoundingClientRect(); cvP.width = Math.max(1, Math.round(r.width * dpr)); cvP.height = Math.max(1, Math.round(r.height * dpr)); ctxP.setTransform(dpr, 0, 0, dpr, 0, 0); PW = r.width; PH = r.height;
@@ -675,6 +871,7 @@ function updateResNote() {
 // ---------- loop ----------
 let stepCost = 4, frame = 0;
 function loop() {
+  if (!active) { running = false; return; }
   if (frame++ % 30 === 0) readTokens();
   const now = performance.now();
   if (dirty) { dirty = false; clearAcc(); updateVerdict(); plotDirty = true; fire(); }
@@ -725,21 +922,373 @@ function syncAuto() { $("auto").setAttribute("aria-pressed", String(S.auto)); }
 $("auto").addEventListener("click", () => { S.auto = !S.auto; syncAuto(); });
 $("fire").addEventListener("click", () => fire());
 $("clear").addEventListener("click", () => { clearAcc(); updateVerdict(); plotDirty = true; });
-cvS.addEventListener("click", () => fire()); cvQ.addEventListener("click", () => fire());
-addEventListener("keydown", e => { if (e.code === "Space" && (e.target === document.body || e.target.tagName === "CANVAS")) { e.preventDefault(); fire(); } });
+cvS.addEventListener("click", () => active && fire()); cvQ.addEventListener("click", () => active && fire());
+addEventListener("keydown", e => { if (active && e.code === "Space" && (e.target === document.body || e.target.tagName === "CANVAS")) { e.preventDefault(); fire(); } });
 
 let tab = "g-beam";
 try { tab = localStorage.getItem("itp-tab") || tab; } catch (e) {}
 function syncTabs() {
   document.querySelectorAll("#tabs button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.tab === tab)));
-  document.querySelectorAll(".group").forEach(g => g.classList.toggle("active", g.id === tab));
+  $("nucleus-view").querySelectorAll(".group").forEach(g => g.classList.toggle("active", g.id === tab));
 }
 $("tabs").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; tab = b.dataset.tab; syncTabs(); try { localStorage.setItem("itp-tab", tab); } catch (e) {} });
 
 syncTabs(); syncNq(); syncViewNote(); syncAuto(); updateResNote(); updateVerdict();
-readTokens(); fit();
+readTokens();
 buildTargets(0);
-requestAnimationFrame(loop);
+window.itpNucleus = { show(on) { active = on; if (!on) return; readTokens(); fit(); if (!running) { running = true; requestAnimationFrame(loop); } } };
+})();
+</script>
+<script>
+(() => {
+"use strict";
+const $ = id => document.getElementById(id);
+const H = makeHydrogen();
+const A = { n: 3, l: 1, m: 0, style: "chem", mode: "slice", plane: "xz", tilt: 0, lev: 90, cut: false };
+let info = H.radial(A.n, A.l), active = false, sliceDirty = true, cloudDirty = true, plotDirty = true, raf = 0, last = 0, themeTimer = 0;
+let yaw = -0.6, pitch = 0.35, dragging = false, idleAt = 0, pts = null, groups = null, lx = 0, ly = 0;
+const RM = matchMedia("(prefers-reduced-motion: reduce)"), COARSE = matchMedia("(pointer: coarse)"), A_PER_A0 = 0.529177;
+
+// ---------- colour ----------
+let C = {}, themeKey = ""; const HUE = new Uint8ClampedArray(360 * 3), BK = new Array(36);
+function hexRGB(h) { h = h.replace("#", ""); if (h.length === 3) h = h.split("").map(c => c + c).join(""); const v = parseInt(h, 16); return [(v >> 16) & 255, (v >> 8) & 255, v & 255]; }
+function hslRGB(h, s, l) { s /= 100; l /= 100; const k = m => (m + h / 30) % 12, a = s * Math.min(l, 1 - l), f = m => l - a * Math.max(-1, Math.min(k(m) - 3, Math.min(9 - k(m), 1))); return [255 * f(0), 255 * f(8), 255 * f(4)]; }
+function readTokens() {
+  const cs = getComputedStyle(document.documentElement), g = v => cs.getPropertyValue(v).trim();
+  const key = g("--plot") + g("--ink") + g("--phase-l") + g("--phase-s");
+  if (key === themeKey) return; themeKey = key;
+  C = { plot: g("--plot"), ink: g("--ink"), muted: g("--muted"), line: g("--line"), grid: g("--grid"), accent: g("--accent"), rPlot: hexRGB(g("--plot")),
+        L: parseFloat(g("--phase-l")), Sa: parseFloat(g("--phase-s")), mono: g("--f-mono") || "monospace" };
+  C.dark = C.rPlot[0] * 0.299 + C.rPlot[1] * 0.587 + C.rPlot[2] * 0.114 < 110;
+  for (let h = 0; h < 360; h++) { const c = hslRGB(h, C.Sa, C.L); HUE[h * 3] = c[0]; HUE[h * 3 + 1] = c[1]; HUE[h * 3 + 2] = c[2]; }
+  for (let b = 0; b < 36; b++) BK[b] = `rgba(${Math.round(HUE[b * 30])},${Math.round(HUE[b * 30 + 1])},${Math.round(HUE[b * 30 + 2])},${C.dark ? 0.4 : 0.34})`;
+  sliceDirty = plotDirty = true; schedule();
+}
+
+// ---------- canvases ----------
+const cv = $("aCv"), ctx = cv.getContext("2d"), cvR = $("aPlot"), ctxR = cvR.getContext("2d");
+let W = 0, RW = 0, RH = 0;
+function size(c, g) {
+  const dpr = Math.min(2, window.devicePixelRatio || 1), r = c.getBoundingClientRect(), w = Math.max(1, Math.round(r.width * dpr)), h = Math.max(1, Math.round(r.height * dpr));
+  if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+  g.setTransform(dpr, 0, 0, dpr, 0, 0); return r;
+}
+function fit() {
+  if (!active) return;
+  let r = size(cv, ctx); W = r.width; r = size(cvR, ctxR); RW = r.width; RH = r.height;
+  sliceDirty = plotDirty = true; schedule();
+}
+new ResizeObserver(fit).observe(document.querySelector(".wrap"));
+
+// ---------- slice ----------
+const G = 256, off = document.createElement("canvas"); off.width = off.height = G;
+const offCtx = off.getContext("2d"), img = offCtx.createImageData(G, G), PP = new Float32Array(G * G), HH = new Uint16Array(G * G);
+const AX = { xz: [[1, 0, 0], [0, 0, 1]], xy: [[1, 0, 0], [0, 1, 0]], yz: [[0, 1, 0], [0, 0, 1]] }, AXN = { xz: ["x", "z"], xy: ["x", "y"], yz: ["y", "z"] };
+function basis() {   // screen-right and screen-up vectors; tilt turns "up" toward the plane normal about the right axis
+  const [e, u] = AX[A.plane], a = A.tilt * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+  const nm = [e[1] * u[2] - e[2] * u[1], e[2] * u[0] - e[0] * u[2], e[0] * u[1] - e[1] * u[0]];
+  return [e, u.map((v, i) => v * c + nm[i] * s)];
+}
+function renderSlice() {
+  sliceDirty = false; if (!W) return;
+  const [e, u] = basis(), Rv = info.rview, Rf = H.Rfn(A.n, A.l), Y = H.Yfn(A.l, A.m, A.style), o = [0, 0]; let mx = 0;
+  for (let j = 0; j < G; j++) for (let i = 0; i < G; i++) {
+    const a = ((i + 0.5) / G * 2 - 1) * Rv, b = (1 - (j + 0.5) / G * 2) * Rv;
+    const x = a * e[0] + b * u[0], y = a * e[1] + b * u[1], z = a * e[2] + b * u[2], r = Math.hypot(x, y, z);
+    Y(r > 0 ? z / r : 0, Math.atan2(y, x), o);
+    const f = Rf(r), re = f * o[0], im = f * o[1], p = re * re + im * im, q = j * G + i;
+    PP[q] = p; if (p > mx) mx = p;
+    let h = Math.round(Math.atan2(im, re) * 57.29578); if (h < 0) h += 360; if (h >= 360) h -= 360; HH[q] = h;
+  }
+  const inv = mx > 0 ? 1 / mx : 0, d = img.data, bg = C.rPlot;
+  for (let q = 0; q < G * G; q++) {
+    const al = Math.sqrt(PP[q] * inv), h = HH[q] * 3, o4 = q * 4;
+    d[o4] = bg[0] + (HUE[h] - bg[0]) * al; d[o4 + 1] = bg[1] + (HUE[h + 1] - bg[1]) * al; d[o4 + 2] = bg[2] + (HUE[h + 2] - bg[2]) * al; d[o4 + 3] = 255;
+  }
+  offCtx.putImageData(img, 0, 0);
+  ctx.globalCompositeOperation = "source-over"; ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+  ctx.clearRect(0, 0, W, W); ctx.drawImage(off, 0, 0, W, W);
+  overlay();
+}
+function overlay() {
+  const c = ctx, cx = W / 2, ppa = W / (2 * info.rview), [ax, ay] = AXN[A.plane];
+  c.strokeStyle = C.grid; c.lineWidth = 1; c.beginPath(); c.moveTo(0, cx + 0.5); c.lineTo(W, cx + 0.5); c.moveTo(cx + 0.5, 0); c.lineTo(cx + 0.5, W); c.stroke();
+  c.fillStyle = C.ink; c.strokeStyle = C.plot; c.lineWidth = 1.5; c.beginPath(); c.arc(cx, cx, 3, 0, Math.PI * 2); c.fill(); c.stroke();
+  c.font = `${W < 300 ? 10 : 11.5}px ${C.mono}`; c.fillStyle = C.muted; c.textBaseline = "middle";
+  c.textAlign = "right"; c.fillText(ax, W - 8, cx - 9); c.textAlign = "left"; c.fillText(A.tilt ? "up" : ay, cx + 8, 12);
+  c.textBaseline = "alphabetic"; c.fillText(`${ax}${ay} plane${A.tilt ? `, tilted ${A.tilt}°` : ""}`, 8, W - 8);
+  let L = 0.1; for (const v of [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50]) if (v / A_PER_A0 * ppa <= W * 0.28) L = v;
+  const px = L / A_PER_A0 * ppa, x1 = W - 12, x0 = x1 - px, y = W - 18;
+  c.strokeStyle = C.muted; c.lineWidth = 1.5; c.beginPath(); c.moveTo(x0, y - 4); c.lineTo(x0, y + 4); c.moveTo(x0, y); c.lineTo(x1, y); c.moveTo(x1, y - 4); c.lineTo(x1, y + 4); c.stroke();
+  c.textAlign = "center"; c.fillText(`${L} Å`, (x0 + x1) / 2, y - 8);
+}
+
+// ---------- 3D cloud ----------
+function resample() {
+  cloudDirty = false;
+  pts = H.cloud(A.n, A.l, A.m, A.style, innerWidth < 760 ? 8000 : 20000);
+  groups = Array.from({ length: 36 }, () => []);
+  for (let i = 0; i < pts.count; i++) { let h = Math.round(pts.ph[i] * 57.29578 / 10); h = ((h % 36) + 36) % 36; groups[h].push(i); }
+  pts.sx = new Float32Array(pts.count); pts.sy = new Float32Array(pts.count); pts.sp = new Float32Array(pts.count);
+}
+function draw3D() {
+  if (!W || (!pts && A.mode === "cloud")) return;
+  const c = ctx, Rv = info.rview, sc = W * 0.46 / Rv, D = 5 * Rv, yc = Math.cos(yaw), ys = Math.sin(yaw), pc = Math.cos(pitch), ps = Math.sin(pitch);
+  const proj = (x, y, z) => { const x1 = x * yc - y * ys, y1 = x * ys + y * yc, z2 = y1 * ps + z * pc, y2 = y1 * pc - z * ps, p = D / (D + y2); return [W / 2 + x1 * sc * p, W / 2 - z2 * sc * p, p]; };
+  c.globalCompositeOperation = "source-over"; c.clearRect(0, 0, W, W); c.fillStyle = C.plot; c.fillRect(0, 0, W, W);
+  if (A.mode === "cloud") {   // in surface mode this canvas is only the backdrop: axes and labels under the WebGL layer
+    const { x, y, z, sx, sy, sp, count } = pts;
+    for (let i = 0; i < count; i++) {
+      const x1 = x[i] * yc - y[i] * ys, y1 = x[i] * ys + y[i] * yc, z2 = y1 * ps + z[i] * pc, y2 = y1 * pc - z[i] * ps, p = D / (D + y2);
+      sx[i] = W / 2 + x1 * sc * p; sy[i] = W / 2 - z2 * sc * p; sp[i] = p;
+    }
+    const s0 = Math.max(1.5, W / 340);
+    if (C.dark) c.globalCompositeOperation = "lighter";
+    for (let b = 0; b < 36; b++) {
+      const gI = groups[b]; if (!gI.length) continue;
+      c.fillStyle = BK[b];
+      for (let k = 0; k < gI.length; k++) { const i = gI[k], s = s0 * sp[i]; c.fillRect(sx[i] - s / 2, sy[i] - s / 2, s, s); }
+    }
+  }
+  c.globalCompositeOperation = "source-over";
+  c.strokeStyle = C.muted; c.globalAlpha = 0.45; c.lineWidth = 1; c.beginPath();
+  const ends = [[1, 0, 0, "x"], [0, 1, 0, "y"], [0, 0, 1, "z"]], L = Rv * 0.95;
+  for (const [a, b, d] of ends) { const p0 = proj(-a * L, -b * L, -d * L), p1 = proj(a * L, b * L, d * L); c.moveTo(p0[0], p0[1]); c.lineTo(p1[0], p1[1]); }
+  c.stroke(); c.globalAlpha = 1;
+  c.font = `${W < 300 ? 10 : 11.5}px ${C.mono}`; c.fillStyle = C.muted; c.textAlign = "center"; c.textBaseline = "middle";
+  for (const [a, b, d, nm] of ends) { const p = proj(a * L * 1.08, b * L * 1.08, d * L * 1.08); c.fillText(nm, Math.max(8, Math.min(W - 8, p[0])), Math.max(8, Math.min(W - 8, p[1]))); }
+  const o = proj(0, 0, 0); c.fillStyle = C.ink; c.strokeStyle = C.plot; c.lineWidth = 1.5; c.beginPath(); c.arc(o[0], o[1], 3, 0, Math.PI * 2); c.fill(); c.stroke();
+  c.textAlign = "left"; c.textBaseline = "alphabetic"; const h0 = COARSE.matches ? "swipe sideways to spin" : "drag to rotate", h1 = h0 + " · it turns slowly on its own";
+  c.fillText(!RM.matches && c.measureText(h1).width <= W - 16 ? h1 : h0, 8, W - 8);
+}
+
+// ---------- 3D surface: WebGL ray-march of |ψ| = level, coloured by phase ----------
+// Same camera as the cloud. The level is the |ψ| whose inside holds the chosen share of the probability (from |ψ|²-distributed samples).
+const glc = $("aGl"); let gl = null, GP = null, GU = {}, surfLev = 0, surfDirty = true, gres = 1, slow = 0;
+const GFS = `precision highp float;
+varying vec2 v;
+uniform mat3 M; uniform float D, Rb, scc, lev, nn, nl, nm, chem, NR, NY, cut, steps, Sa, La;
+float lag(float k, float a, float x) { if (k < .5) return 1.; float p = 1., c = 1. + a - x;
+  for (int j = 1; j < 5; j++) { float fj = float(j); if (fj > k - .5) break; float t = ((2. * fj + 1. + a - x) * c - (fj + a) * p) / (fj + 1.); p = c; c = t; } return c; }
+vec2 psi(vec3 q) {
+  float r = max(length(q), 1e-5), x = 2. * r / nn, rl = 1.;
+  for (int i = 0; i < 4; i++) { if (float(i) > nl - .5) break; rl *= x; }
+  float ct = q.z / r, am = abs(nm), pm = 1.;   // P_l^m / sinᵐθ by the usual recurrence; sinᵐθ·e^{imφ} = ((x+iy)/r)ᵐ
+  for (int i = 1; i < 5; i++) { if (float(i) > am + .5) break; pm *= 2. * float(i) - 1.; }
+  float P = pm;
+  if (nl > am + .5) { float a = pm, b = ct * (2. * am + 1.) * pm;
+    for (int i = 2; i < 5; i++) { float fq = am + float(i); if (fq > nl + .5) break; float c = ((2. * fq - 1.) * ct * b - (fq + am - 1.) * a) / (fq - am); a = b; b = c; } P = b; }
+  vec2 e = vec2(1., 0.), u = q.xy / r;
+  for (int i = 0; i < 4; i++) { if (float(i) > am - .5) break; e = vec2(e.x * u.x - e.y * u.y, e.x * u.y + e.y * u.x); }
+  float Y = NY * P * NR * exp(-r / nn) * rl * lag(nn - nl - 1., 2. * nl + 1., x);
+  if (chem > .5) return vec2(nm < -.5 ? Y * e.y : Y * e.x, 0.);
+  return vec2(Y * e.x, (nm < 0. ? -1. : 1.) * Y * e.y);
+}
+float F(vec3 q) { return length(psi(q)) - lev; }
+vec3 hue(vec2 z) { float h = degrees(atan(z.y, z.x)); if (h < 0.) h += 360.;
+  vec3 k = mod(vec3(0., 8., 4.) + h / 30., 12.); float a = Sa * min(La, 1. - La); return La - a * max(vec3(-1.), min(min(k - 3., 9. - k), vec3(1.))); }
+void main() {
+  vec3 ro = M * vec3(0., -D, 0.), rd = normalize(M * vec3(v.x / scc, D, v.y / scc)), fw = M * vec3(0., 1., 0.);
+  float b = dot(ro, rd), h = b * b - dot(ro, ro) + Rb * Rb; if (h < 0.) discard;
+  h = sqrt(h); float t0 = -b - h, t1 = -b + h; bool cap = false;
+  if (cut > .5) { float tp = -dot(ro, fw) / dot(rd, fw); if (tp > t0) { t0 = tp; cap = true; } if (t0 >= t1) discard; }
+  vec3 p = ro + rd * t0;
+  if (F(p) > 0.) { gl_FragColor = vec4(hue(psi(p)) * (cap ? .8 : 1.), 1.); return; }   // the cut face, inside a lobe
+  float dt = (t1 - t0) / steps, t = t0; bool hit = false;
+  for (int i = 0; i < 320; i++) {
+    if (float(i) >= steps) break;
+    if (F(ro + rd * (t + dt)) > 0.) { float a = t, c = t + dt; for (int k = 0; k < 12; k++) { float m = .5 * (a + c); if (F(ro + rd * m) > 0.) c = m; else a = m; } t = c; hit = true; break; }
+    t += dt;
+  }
+  if (!hit) discard;
+  p = ro + rd * t; float e = Rb * 1e-3;
+  vec3 g = vec3(F(p + vec3(e, 0., 0.)) - F(p - vec3(e, 0., 0.)), F(p + vec3(0., e, 0.)) - F(p - vec3(0., e, 0.)), F(p + vec3(0., 0., e)) - F(p - vec3(0., 0., e)));
+  vec3 N = -normalize(g), L = normalize(M * vec3(-.45, -.75, .55)), Hv = normalize(L - rd);
+  float dif = max(dot(N, L), 0.), sp = pow(max(dot(N, Hv), 0.), 48.);
+  gl_FragColor = vec4(hue(psi(p)) * (.36 + .64 * dif) + vec3(.3 * sp), 1.);
+}`;
+function initGL() {
+  try { gl = glc.getContext("webgl", { antialias: false, premultipliedAlpha: true, preserveDrawingBuffer: true }); } catch (e) { gl = null; }
+  if (!gl) return false;
+  const sh = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(o)); return o; };
+  try {
+    GP = gl.createProgram();
+    gl.attachShader(GP, sh(gl.VERTEX_SHADER, "attribute vec2 p;varying vec2 v;void main(){v=p;gl_Position=vec4(p,0.,1.);}"));
+    gl.attachShader(GP, sh(gl.FRAGMENT_SHADER, GFS)); gl.linkProgram(GP);
+    if (!gl.getProgramParameter(GP, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(GP));
+  } catch (e) { console.warn("Surface view unavailable:", e.message); gl = null; return false; }
+  gl.useProgram(GP);
+  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer()); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+  const ap = gl.getAttribLocation(GP, "p"); gl.enableVertexAttribArray(ap); gl.vertexAttribPointer(ap, 2, gl.FLOAT, false, 0, 0);
+  for (const k of ["M", "D", "Rb", "scc", "lev", "nn", "nl", "nm", "chem", "NR", "NY", "cut", "steps", "Sa", "La"]) GU[k] = gl.getUniformLocation(GP, k);
+  glc.addEventListener("webglcontextlost", e => { e.preventDefault(); gl = null; $("a-surfBtn").hidden = true; if (A.mode === "surface") { A.mode = "cloud"; sync(); schedule(); } });
+  return true;
+}
+function surfLevel() {   // |ψ| at the (1 − share) quantile of |ψ|² over |ψ|²-distributed samples
+  surfDirty = false;
+  const s = H.cloud(A.n, A.l, A.m, A.style, 30000), o = [0, 0], v = new Float64Array(s.count);
+  for (let i = 0; i < s.count; i++) { const r = s.r[i]; H.psi(A.n, A.l, A.m, A.style, r, r > 0 ? s.z[i] / r : 0, Math.atan2(s.y[i], s.x[i]), o); v[i] = o[0] * o[0] + o[1] * o[1]; }
+  v.sort(); surfLev = Math.sqrt(v[Math.floor((1 - A.lev / 100) * v.length)]);
+}
+function drawSurface(now) {
+  if (!gl || !W) return;
+  if (surfDirty) surfLevel();
+  const dpr = Math.min(2, window.devicePixelRatio || 1), px = Math.max(64, Math.round(W * dpr * gres));
+  if (glc.width !== px) glc.width = glc.height = px;
+  gl.viewport(0, 0, px, px); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+  const Rv = info.rview, yc = Math.cos(yaw), ys = Math.sin(yaw), pc = Math.cos(pitch), ps = Math.sin(pitch), a = Math.abs(A.m);
+  gl.uniformMatrix3fv(GU.M, false, [yc, -ys, 0, pc * ys, pc * yc, -ps, ps * ys, ps * yc, pc]);
+  const N = Math.sqrt(Math.pow(2 / A.n, 3) * fact(A.n - A.l - 1) / (2 * A.n * fact(A.n + A.l)));
+  const u = { D: 5 * Rv, Rb: Rv, scc: 0.92 / Rv, lev: surfLev, nn: A.n, nl: A.l, nm: A.m, chem: A.style === "chem" ? 1 : 0, NR: N,
+              NY: H.Nlm(A.l, a) * (A.style === "chem" && A.m ? Math.SQRT2 : 1), cut: A.cut ? 1 : 0, steps: COARSE.matches ? 140 : 220, Sa: C.Sa / 100, La: C.L / 100 };
+  for (const k in u) gl.uniform1f(GU[k], u[k]);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  // drop resolution when frames come slowly (a weak GPU), creep back up when they're quick
+  const iv = now - lastSurf; lastSurf = now;
+  if (!document.hidden && iv > 0 && iv < 500) {
+    if (iv > 34 && gres > 0.35) { if (++slow > 3) { gres = Math.max(0.35, gres * 0.8); slow = 0; } } else { slow = 0; if (iv < 20 && gres < 1) gres = Math.min(1, gres * 1.03); }
+  }
+}
+let lastSurf = 0;
+const fact = k => { let f = 1; for (let i = 2; i <= k; i++) f *= i; return f; };
+
+// ---------- radial probability ----------
+function drawRadial() {
+  plotDirty = false; const c = ctxR, w = RW, h = RH; if (!w) return;
+  c.clearRect(0, 0, w, h); c.fillStyle = C.plot; c.fillRect(0, 0, w, h);
+  const x0 = 14, x1 = w - 14, y0 = 22, y1 = h - 36, Rv = info.rview, Rf = H.Rfn(A.n, A.l), NS = 240, v = new Float64Array(NS + 1);
+  let mx = 0; for (let i = 0; i <= NS; i++) { const r = i / NS * Rv, f = Rf(r); v[i] = r * r * f * f; if (v[i] > mx) mx = v[i]; }
+  const X = r => x0 + r / Rv * (x1 - x0), Yy = p => y1 - p / (mx * 1.08) * (y1 - y0);
+  const step = [0.5, 1, 2, 5, 10, 20, 50].find(s => Rv / s <= 8) || 50;
+  c.font = `11px ${C.mono}`; c.textAlign = "center"; c.textBaseline = "top";
+  for (let t = 0; t <= Rv + 1e-9; t += step) { const x = X(t); c.fillStyle = C.grid; c.fillRect(Math.round(x), y0, 1, y1 - y0); c.fillStyle = C.muted; c.fillText(step < 1 ? t.toFixed(1) : String(Math.round(t)), x, y1 + 5); }
+  c.fillStyle = C.muted; c.textAlign = "right"; c.textBaseline = "alphabetic"; c.fillText(w > 380 ? "distance r from the nucleus (a₀)" : "r (a₀)", x1, h - 4);
+  c.beginPath(); c.moveTo(x0, y1); for (let i = 0; i <= NS; i++) c.lineTo(X(i / NS * Rv), Yy(v[i])); c.lineTo(x1, y1); c.closePath();
+  c.globalAlpha = 0.22; c.fillStyle = C.accent; c.fill(); c.globalAlpha = 1;
+  c.strokeStyle = C.accent; c.lineWidth = 2; c.lineJoin = "round"; c.beginPath(); for (let i = 0; i <= NS; i++) { const x = X(i / NS * Rv), y = Yy(v[i]); i ? c.lineTo(x, y) : c.moveTo(x, y); } c.stroke();
+  c.fillStyle = C.muted; c.fillRect(x0, y1, x1 - x0, 1);
+  c.font = `10px ${C.mono}`; c.textAlign = "center"; c.textBaseline = "bottom"; c.lineWidth = 3; c.strokeStyle = C.plot;
+  for (const r of info.nodes) {
+    const x = X(r); c.fillStyle = C.muted; c.fillRect(Math.round(x), y1 - 6, 1.5, 6);
+    const t = r.toFixed(1); c.strokeText(t, x, y1 - 8); c.fillText(t, x, y1 - 8);
+  }
+  const xm = X(info.rmean); c.strokeStyle = C.ink; c.globalAlpha = 0.6; c.lineWidth = 1.2; c.setLineDash([4, 3]); c.beginPath(); c.moveTo(xm, y0 - 4); c.lineTo(xm, y1); c.stroke(); c.setLineDash([]); c.globalAlpha = 1;
+  c.font = `11px ${C.mono}`; c.fillStyle = C.ink; c.textBaseline = "alphabetic"; c.textAlign = xm > w * 0.6 ? "right" : "left";
+  c.fillText(`average ${info.rmean}`, xm + (xm > w * 0.6 ? -5 : 5), y0 - 8);
+}
+
+// ---------- frame ----------
+function schedule() { if (active && !raf) raf = requestAnimationFrame(frame); }
+function frame(now) {
+  raf = 0; if (!active) return;
+  const dt = last ? Math.min(0.05, (now - last) / 1000) : 0; last = now;
+  if (A.mode === "slice") { if (sliceDirty) renderSlice(); }
+  else {
+    if (A.mode === "cloud" && (cloudDirty || !pts)) resample();
+    if (!RM.matches && !dragging && now > idleAt) yaw += dt * 0.22;
+    draw3D(); if (A.mode === "surface") drawSurface(now);
+  }
+  if (plotDirty) drawRadial();
+  if (A.mode !== "slice" && !RM.matches) schedule(); else last = 0;
+}
+
+// ---------- controls ----------
+const press = (id, fn) => $(id).querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(fn(b.dataset.v))));
+const minus = s => s.replace("-", "−");
+const PICKS = [[1, 0], [2, 0], [2, 1], [3, 0], [3, 1], [3, 2], [4, 0], [4, 3]];
+$("a-n").innerHTML = [1, 2, 3, 4, 5].map(v => `<button type="button" data-v="${v}">${v}</button>`).join("");
+$("a-l").innerHTML = [...H.LET].map((c, i) => `<button type="button" data-v="${i}">${c}</button>`).join("");
+$("a-picks").innerHTML = PICKS.map(([n, l]) => `<button type="button" class="btn" data-n="${n}" data-l="${l}">${n}${H.LET[l]}</button>`).join("");
+function sync() {
+  const { n, l, m, style, mode } = A, lab = H.label(n, l, m, style), rn = n - l - 1;
+  press("a-n", v => +v === n);
+  press("a-l", v => +v === l); $("a-l").querySelectorAll("button").forEach(b => { b.disabled = +b.dataset.v >= n; });
+  $("a-m").innerHTML = Array.from({ length: 2 * l + 1 }, (_, i) => i - l).map(q => `<button type="button" data-v="${q}">${H.label(n, l, q, style).shortHtml}</button>`).join("");
+  press("a-m", v => +v === m);
+  $("a-picks").querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.n === n && +b.dataset.l === l)));
+  press("a-style", v => v === style); press("a-mode", v => v === mode); press("a-plane", v => v === A.plane);
+  $("a-slice").hidden = mode !== "slice"; $("a-surf").hidden = glc.hidden = mode !== "surface";
+  $("a-stnote").textContent = style === "chem" ? "Real orbitals, as drawn in chemistry books: each lobe is positive (one colour) or negative (the other)." : "The exact states of definite m. Colour is the phase, which winds m times round the z-axis, so m ≠ 0 gives a donut.";
+  $("a-vnote").textContent = mode === "slice" ? "A slice shows the electron's wave on a flat plane through the nucleus. Brightness is probability density, boosted so faint outer lobes show. Colour is the phase."
+    : mode === "cloud" ? "Each dot is a place the electron could be found, drawn at random from the probability. Colour is the phase. Drag to rotate."
+    : `A skin around the region where the electron spends ${A.lev}% of its time, the way textbooks draw orbitals. Colour is the phase. Inner shells hide inside: try the cutaway.`;
+  $("a-name").innerHTML = lab.html;
+  $("a-q").textContent = `${n} ${l} ${minus(String(m))}`;
+  $("a-e").textContent = minus(H.energy(n).toFixed(3)) + " eV";
+  $("a-nd").textContent = `${rn} radial · ${l} angular`;
+  $("aNote").innerHTML = (rn === 0 ? "<b>No radial nodes</b>: no empty shells, the density just fades out with distance." : `<b>${rn} radial node${rn > 1 ? "s" : ""}</b>: ${rn > 1 ? "spheres" : "a sphere"} where the electron is never found, at r = ${info.nodes.map(r => r.toFixed(1)).join(", ")} a₀.`)
+    + (l === 0 ? " It is spherically symmetric, so it looks the same from every side." : ` <b>${l} angular node${l > 1 ? "s" : ""}</b>: ${l > 1 ? "surfaces" : "a surface"} through the nucleus (planes or cones) where the sign flips.`);
+  cv.setAttribute("aria-label", `Hydrogen ${lab.text} orbital, ${mode === "slice" ? `slice through the ${A.plane} plane` : mode === "cloud" ? "3D probability cloud, drag to rotate" : `3D surface enclosing ${A.lev}% of the probability${A.cut ? ", front half cut away" : ""}, drag to rotate`}`);
+  cvR.setAttribute("aria-label", `Radial probability for the ${n}${H.LET[l]} state, from 0 to ${info.rview} Bohr radii; average distance ${info.rmean} Bohr radii`);
+  cv.classList.toggle("drag", mode !== "slice"); if (mode !== "slice") cv.setAttribute("tabindex", "0"); else cv.removeAttribute("tabindex");
+}
+function setOrb(p) {
+  Object.assign(A, p); A.l = Math.min(A.l, A.n - 1); A.m = Math.max(-A.l, Math.min(A.l, A.m));
+  info = H.radial(A.n, A.l); sliceDirty = cloudDirty = surfDirty = plotDirty = true; sync(); schedule();
+}
+const hit = (id, fn) => $(id).addEventListener("click", e => { const b = e.target.closest("button"); if (b && !b.disabled) fn(b); });
+hit("a-n", b => setOrb({ n: +b.dataset.v }));
+hit("a-l", b => setOrb({ l: +b.dataset.v }));
+hit("a-m", b => setOrb({ m: +b.dataset.v }));
+hit("a-picks", b => { const l = +b.dataset.l; setOrb({ n: +b.dataset.n, l, m: A.l === l ? A.m : 0 }); });
+hit("a-style", b => setOrb({ style: b.dataset.v }));
+hit("a-mode", b => { A.mode = b.dataset.v; sliceDirty = true; sync(); schedule(); });
+hit("a-plane", b => { A.plane = b.dataset.v; sliceDirty = true; sync(); schedule(); });
+$("a-tilt").addEventListener("input", e => { A.tilt = +e.target.value; $("a-tiltVal").textContent = A.tilt + "°"; sliceDirty = true; schedule(); });
+$("a-lev").addEventListener("input", e => { A.lev = +e.target.value; $("a-levVal").textContent = A.lev + "%"; surfDirty = true; sync(); schedule(); });
+$("a-cut").addEventListener("change", e => { A.cut = e.target.checked; sync(); schedule(); });
+
+cv.addEventListener("pointerdown", e => { if (A.mode === "slice") return; dragging = true; lx = e.clientX; ly = e.clientY; cv.setPointerCapture(e.pointerId); });
+cv.addEventListener("pointermove", e => {
+  if (!dragging) return;
+  yaw += (e.clientX - lx) * 0.008; if (e.pointerType !== "touch") pitch = Math.max(-1.5, Math.min(1.5, pitch + (e.clientY - ly) * 0.008)); lx = e.clientX; ly = e.clientY; schedule();
+});
+const endDrag = () => { if (dragging) { dragging = false; idleAt = performance.now() + 1500; schedule(); } };
+cv.addEventListener("pointerup", endDrag); cv.addEventListener("pointercancel", endDrag);
+cv.addEventListener("keydown", e => {
+  if (A.mode === "slice") return;
+  const k = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key]; if (!k) return;
+  e.preventDefault(); yaw += k[0] * 0.12; pitch = Math.max(-1.5, Math.min(1.5, pitch + k[1] * 0.12)); idleAt = performance.now() + 3000; schedule();
+});
+
+let tab = "ag-orb";
+try { tab = localStorage.getItem("ita-atom-tab") || tab; } catch (e) {}
+function syncTabs() {
+  document.querySelectorAll("#atabs button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.tab === tab)));
+  $("atom-view").querySelectorAll(".group").forEach(g => g.classList.toggle("active", g.id === tab));
+}
+$("atabs").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; tab = b.dataset.tab; syncTabs(); try { localStorage.setItem("ita-atom-tab", tab); } catch (e) {} });
+
+new MutationObserver(() => active && readTokens()).observe(document.documentElement, { attributes: true });
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => active && readTokens());
+RM.addEventListener("change", () => { last = 0; schedule(); });
+
+if (!initGL()) $("a-surfBtn").hidden = true;
+sync(); syncTabs(); readTokens();
+window.itaAtom = { show(on) {
+  active = on; clearInterval(themeTimer); themeTimer = 0;
+  if (on) { readTokens(); themeTimer = setInterval(readTokens, 1000); fit(); sliceDirty = plotDirty = true; schedule(); }
+  else if (raf) { cancelAnimationFrame(raf); raf = 0; last = 0; }
+} };
+})();
+</script>
+<script>
+(() => {
+"use strict";
+const $ = id => document.getElementById(id);
+const SUB = { atom: $("sub").textContent, nucleus: "The same quantum beam hits two targets with equal total charge and equal size. One is a smooth blob of charge, the other is quarks. Turn the beam momentum up and watch the large-angle scattering separate them." };
+const PAGE = { atom: [$("atom-view"), window.itaAtom], nucleus: [$("nucleus-view"), window.itpNucleus] };
+let view = "atom";
+try { const v = localStorage.getItem("ita-view"); if (v === "atom" || v === "nucleus") view = v; } catch (e) {}
+function apply() {
+  const out = view === "atom" ? "nucleus" : "atom";
+  PAGE[out][1].show(false); PAGE[out][0].hidden = true;
+  PAGE[view][0].hidden = false; PAGE[view][1].show(true);
+  $("viewsw").querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === view)));
+  $("sub").textContent = SUB[view];
+}
+$("viewsw").addEventListener("click", e => { const b = e.target.closest("button"); if (!b || b.dataset.v === view) return; view = b.dataset.v; apply(); try { localStorage.setItem("ita-view", view); } catch (e) {} });
+apply();
 })();
 </script>
 
