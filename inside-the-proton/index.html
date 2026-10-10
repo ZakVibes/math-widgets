@@ -677,7 +677,7 @@ let acc = null;           // accumulated cross-sections
 function clearAcc() { acc = { n: 0, ex: [new Float64Array(NA), new Float64Array(NA)], bo: [new Float64Array(NA), new Float64Array(NA)], k: S.k }; }
 clearAcc();
 let shot = null;          // { phase: "run" | "out", rot, measured }
-let sites = [], smoothR = 1, pauseUntil = 0, dirty = false, smoothKey = "";
+let sites = [], lastRot = 0, holdRot = false, smoothR = 1, pauseUntil = 0, dirty = false, smoothKey = "";
 
 function buildTargets(rot) {
   const key = `${S.nq}|${S.d}|${S.Q}`;
@@ -686,7 +686,7 @@ function buildTargets(rot) {
   sites = E.quarkSites(S.nq, S.d, rot);
 }
 function fire() {
-  const rot = S.rand ? Math.random() * 2 * Math.PI : S.rot * Math.PI / 180;
+  const rot = holdRot ? lastRot : S.rand ? Math.random() * 2 * Math.PI : S.rot * Math.PI / 180; holdRot = false; lastRot = rot;   // after a zoom lands, the first shot keeps the quarks where the zoom drew them
   buildTargets(rot);
   E.setupShot(sims, BEAM());
   shot = { phase: "run", rot, peak: 0 };
@@ -995,7 +995,7 @@ $("tabs").addEventListener("click", e => { const b = e.target.closest("button");
 syncTabs(); syncNq(); syncViewNote(); syncAuto(); updateResNote(); updateVerdict();
 readTokens();
 buildTargets(0);
-window.itpNucleus = { show(on) { active = on; if (!on) return; readTokens(); fit(); if (!running) { running = true; requestAnimationFrame(loop); } } };
+window.itpNucleus = { geom: () => ({ sites, VIEW, QW: E.QW, nq: S.nq, x0: VX0, span: VSPAN }), holdRot() { holdRot = true; }, show(on) { active = on; if (!on) return; readTokens(); fit(); if (!running) { running = true; requestAnimationFrame(loop); } } };
 })();
 </script>
 <script>
@@ -1732,7 +1732,7 @@ RM.addEventListener("change", () => { last = 0; schedule(); });
 
 if (!initGL()) { $("a-surfBtn").hidden = true; A.mode = "cloud"; }
 sync(); syncTabs(); readTokens();
-window.itaAtom = { jumpMix, startJump, aim: setAim, fire, getAim: () => aim, lamNm, dipole: (i, f, st) => dip(i, f, st || A.style), lines: () => [...found], state: () => ({ J, ...A }), show(on) {
+window.itaAtom = { halfWidth: () => (Rd || info.rview) * (A.mode === "slice" ? 1 : 1 / 0.92) * A_PER_A0 * 1e-10, jumpMix, startJump, aim: setAim, fire, getAim: () => aim, lamNm, dipole: (i, f, st) => dip(i, f, st || A.style), lines: () => [...found], state: () => ({ J, ...A }), show(on) {
   active = on; clearInterval(themeTimer); themeTimer = 0;
   if (on) { readTokens(); themeTimer = setInterval(readTokens, 1000); fit(); sliceDirty = plotDirty = true; schedule(); }
   else if (raf) { cancelAnimationFrame(raf); raf = 0; last = 0; }
@@ -1754,7 +1754,156 @@ function apply() {
   $("viewsw").querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === view)));
   $("sub").textContent = SUB[view];
 }
-$("viewsw").addEventListener("click", e => { const b = e.target.closest("button"); if (!b || b.dataset.v === view) return; view = b.dataset.v; apply(); try { localStorage.setItem("ita-view2", view); } catch (e) {} });
+const persist = () => { try { localStorage.setItem("ita-view2", view); } catch (e) {} };
+
+// ---------- the zoom between the two views: a full-viewport canvas dives from the atom's scale (~1e-10 m) to the proton's (~1e-15 m), or back ----------
+const RMQ = matchMedia("(prefers-reduced-motion: reduce)"), TZ = 3000, FM = 1e-15, SIM = 0.25 * FM, RP = 0.84 * FM;
+const CAP = "The nucleus is about 100,000 times smaller than the atom. If the atom were a football stadium, the nucleus would be a pea on the centre spot.";
+const cl = (x, a = 0, b = 1) => x < a ? a : x > b ? b : x, sm = x => (x = cl(x)) * x * (3 - 2 * x), lerp = (a, b, f) => a + (b - a) * f, lg = Math.log10;
+const ease = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(2 - 2 * t, 3) / 2;
+const rgb = h => { h = h.replace("#", ""); if (h.length === 3) h = h.split("").map(c => c + c).join(""); const v = parseInt(h, 16); return [(v >> 16) & 255, (v >> 8) & 255, v & 255]; };
+const rgba = (h, a) => { const c = rgb(h); return `rgba(${c[0]},${c[1]},${c[2]},${a})`; };
+const rect = el => { const r = el.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; };
+function rr(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+function tokens() { const cs = getComputedStyle(document.documentElement), g = v => cs.getPropertyValue(v).trim(); return { bg: g("--bg"), plot: g("--plot"), ink: g("--ink"), muted: g("--muted"), smooth: g("--smooth"), q: [g("--qr"), g("--qg"), g("--qb")], sans: g("--f-sans"), mono: g("--f-mono") }; }
+function wrapText(g, text, maxW) { const lines = []; let l = ""; for (const w of text.split(" ")) { const s = l ? l + " " + w : w; if (g.measureText(s).width > maxW && l) { lines.push(l); l = w; } else l = s; } if (l) lines.push(l); return lines; }
+function fmtM(M) { if (M < 10) return M.toFixed(1); if (M < 100) return String(Math.round(M)); const k = Math.pow(10, Math.floor(lg(M)) - 1); return (Math.round(M / k) * k).toLocaleString("en-US"); }
+let Z = null, linger = null, lingerT = 0, noteEl = null, noteT = 0;
+const live = document.createElement("div"); live.setAttribute("aria-live", "polite"); live.style.cssText = "position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap"; document.body.appendChild(live);
+
+function showNote() {   // reduced motion: no dive, so the caption becomes a small note under the header for a few seconds
+  if (!noteEl) { noteEl = document.createElement("p"); noteEl.className = "note"; noteEl.append(CAP + " "); const b = document.createElement("button"); b.type = "button"; b.className = "lnk"; b.textContent = "Dismiss"; b.addEventListener("click", () => { noteEl.hidden = true; clearTimeout(noteT); }); noteEl.append(b); document.querySelector("header").after(noteEl); }
+  noteEl.hidden = false; clearTimeout(noteT); noteT = setTimeout(() => { noteEl.hidden = true; }, 4000);
+}
+function snapOf(r, d, tk, cvs) {   // a picture of a canvas (or a stack of them) at its screen rect, on --plot with the same rounded corners
+  const c = document.createElement("canvas"); c.width = Math.max(1, Math.round(r.w * d)); c.height = Math.max(1, Math.round(r.h * d));
+  const g = c.getContext("2d"); g.fillStyle = tk.plot; rr(g, 0, 0, c.width, c.height, 6 * d); g.fill(); g.clip();
+  for (const v of cvs) if (v && !v.hidden && v.width) g.drawImage(v, 0, 0, c.width, c.height);
+  return c;
+}
+function place(el, ref) {   // if the target would be off-screen, scroll (instantly, under the overlay) so it sits at about the viewport y the source had
+  const r = el.getBoundingClientRect(), vh = document.documentElement.clientHeight;
+  if (r.top < 0 || r.bottom > vh) scrollBy(0, r.top - cl(ref.y, 0, Math.max(0, vh - r.height)));
+}
+function clearLinger() { clearTimeout(lingerT); if (linger) linger.remove(); linger = null; }
+
+function startZoom(to) {
+  if (Z) return; clearLinger();
+  const ia = window.itaAtom, inn = to === "nucleus", tk = tokens(), d = Math.min(2, window.devicePixelRatio || 1), de = document.documentElement, vw = de.clientWidth, vh = de.clientHeight;
+  const gm = window.itpNucleus.geom(), startEl = $(inn ? "aCv" : "fQ"), Rs = rect(startEl);
+  if (Rs.w < 4 || Rs.h < 4) { view = to; apply(); persist(); return; }
+  const cv = document.createElement("canvas"); cv.width = Math.round(vw * d); cv.height = Math.round(vh * d);
+  cv.setAttribute("aria-hidden", "true"); cv.style.cssText = `position:fixed;left:0;top:0;width:${vw}px;height:${vh}px;z-index:9999;pointer-events:auto;border-radius:0;background:transparent;touch-action:none;cursor:pointer`;
+  const z = Z = { to, from: view, inn, tk, d, vw, vh, cv, g: cv.getContext("2d"), Rs, Re: Rs, gm, h0: ia.halfWidth(), h1: gm.span / 2 * SIM, t0: performance.now(), swapped: false, frames: 0, snap: null, csnap: null, hc: null, hcT: null, endEl: null, raf: 0, timer: 0, sy: scrollY, last: null, prev: 0 };
+  if (inn) z.snap = snapOf(Rs, d, tk, [$("aGl"), $("aCv")]); else z.csnap = snapOf(Rs, d, tk, [$("fQ")]);
+  z.hc = rgb(tk.muted); if (z.snap) z.hc = z.hcT = avgColor(z.snap);
+  PAGE[view][1].show(false);   // both views sleep for the dive
+  sw.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === to)));
+  live.textContent = inn ? "Zooming into the nucleus" : "Zooming out to the atom";
+  z.onKey = () => finish(false); z.onResize = () => finish(false); z.onScroll = () => { if (Math.abs(scrollY - z.sy) > 1) finish(false); };
+  cv.addEventListener("click", z.onKey); for (const ev of ["wheel", "touchmove"]) cv.addEventListener(ev, e => e.preventDefault(), { passive: false });
+  addEventListener("keydown", z.onKey, true); addEventListener("resize", z.onResize); addEventListener("scroll", z.onScroll, { passive: true });
+  document.body.appendChild(cv);
+  draw(0, 0); z.raf = requestAnimationFrame(tick); z.timer = setTimeout(() => finish(true), TZ + 700);   // the timer finishes the dive even if frames are throttled
+}
+function avgColor(c) {   // mean colour of the picture's central half
+  const s = document.createElement("canvas"); s.width = s.height = 16; const g = s.getContext("2d");
+  g.drawImage(c, c.width / 4, c.height / 4, c.width / 2, c.height / 2, 0, 0, 16, 16);
+  const a = g.getImageData(0, 0, 16, 16).data, o = [0, 0, 0]; for (let i = 0; i < a.length; i += 4) { o[0] += a[i]; o[1] += a[i + 1]; o[2] += a[i + 2]; } return o.map(v => v / 256);
+}
+function tick() {
+  const z = Z; if (!z) return; z.raf = 0;
+  const now = performance.now(), t = cl((now - z.t0) / TZ), dt = Math.min(0.1, (now - z.prev) / 1000 || 0); z.prev = now;
+  if (z.inn && !z.swapped && t >= 0.7) swap(z);   // under the opaque backdrop, bring the target layout in and measure it
+  else if (!z.inn && !z.swapped && t >= 0.5) { swap(z); PAGE.atom[1].show(true); }
+  if (z.swapped) z.Re = rect(z.endEl);
+  if (!z.inn && z.swapped && !z.snap && ++z.frames >= 3) { z.snap = snapOf(z.Re, z.d, z.tk, [$("aGl"), $("aCv")]); z.h0 = window.itaAtom.halfWidth(); z.hcT = avgColor(z.snap); }   // the atom has had two frames to draw
+  if (z.hc && z.hcT) for (let i = 0; i < 3; i++) z.hc[i] += (z.hcT[i] - z.hc[i]) * Math.min(1, dt * 6);
+  draw(t, dt);
+  if (t >= 1) finish(true); else z.raf = requestAnimationFrame(tick);
+}
+function swap(z) {
+  PAGE.atom[0].hidden = z.inn; PAGE.nucleus[0].hidden = !z.inn; $("sub").textContent = SUB[z.to];   // the subtitle's length changes the header height too
+  if (z.inn) { PAGE.nucleus[1].show(true); PAGE.nucleus[1].show(false); }   // size its canvases now (no animation runs: the loop it queues sees it asleep and ends), so the layout is final when measured
+  z.endEl = $(z.inn ? "fQ" : "aCv"); place(z.endEl, z.Rs); z.sy = scrollY; z.swapped = true; z.Re = rect(z.endEl);
+}
+function draw(t, dt) {
+  const z = Z, g = z.g, d = z.d, tk = z.tk, e = ease(t), p = z.inn ? e : 1 - e, h = Math.pow(z.h0, 1 - p) * Math.pow(z.h1, p), M = z.h0 / h, lM = lg(Math.max(1, M));
+  const f = sm((t - 0.72) / 0.28), Rs = z.Rs, Re = z.Re, F = { x: lerp(Rs.x, Re.x, f), y: lerp(Rs.y, Re.y, f), w: lerp(Rs.w, Re.w, f), h: lerp(Rs.h, Re.h, f) };
+  const cx = F.x + F.w / 2, cy = F.y + F.h / 2, pxm = F.w / 2 / h, rp = RP * pxm;
+  g.setTransform(d, 0, 0, d, 0, 0); g.globalAlpha = 1; g.clearRect(0, 0, z.vw, z.vh);
+  g.globalAlpha = sm(t / 0.2); g.fillStyle = tk.bg; g.fillRect(0, 0, z.vw, z.vh); g.globalAlpha = 1;   // the page fades away behind the picture
+  g.save(); rr(g, F.x, F.y, F.w, F.h, 6); g.clip(); g.fillStyle = tk.plot; g.fillRect(F.x, F.y, F.w, F.h);
+  if (z.csnap) { const a = 1 - sm(t / 0.12); if (a > 0.003) { g.globalAlpha = a; g.drawImage(z.csnap, F.x, F.y, F.w, F.h); g.globalAlpha = 1; } }
+  if (z.snap) { const a = 1 - sm((lM - lg(4)) / (lg(20) - lg(4))); if (a > 0.003) { g.globalAlpha = a; g.drawImage(z.snap, cx - F.w * M / 2, cy - F.h * M / 2, F.w * M, F.h * M); g.globalAlpha = 1; } }
+  // the electron haze: an even wash of the orbital's mean colour that thins out toward the nucleus
+  const hf = cl((lg(h) + 12) / (lg(z.h0 / 12) + 12)), ha = 0.32 * hf * hf * sm((lM - lg(3)) / (lg(12) - lg(3)));
+  if (ha > 0.002) { const R = F.w * 0.62, gr = g.createRadialGradient(cx, cy, 0, cx, cy, R), c = z.hc.map(Math.round); gr.addColorStop(0, `rgba(${c},${ha})`); gr.addColorStop(1, `rgba(${c},${ha * 0.25})`); g.fillStyle = gr; g.fillRect(F.x, F.y, F.w, F.h); }
+  // the nucleus: a glowing point, then the proton as a disc once it is wider than a couple of pixels
+  const ga = sm(lM / lg(4)) * (1 - sm((rp - 6) / 10));
+  if (ga > 0.003) { const gr = g.createRadialGradient(cx, cy, 0, cx, cy, 11); gr.addColorStop(0, rgba(tk.smooth, 0.7 * ga)); gr.addColorStop(1, rgba(tk.smooth, 0)); g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, 11, 0, 7); g.fill(); }
+  const ka = sm(M - 1) * (1 - sm((rp - 3) / 4));
+  if (ka > 0.003) { g.globalAlpha = ka; g.fillStyle = tk.ink; g.strokeStyle = tk.plot; g.lineWidth = 1.5; g.beginPath(); g.arc(cx, cy, 3, 0, 7); g.fill(); g.stroke(); g.globalAlpha = 1; }
+  const da = sm((rp - 2) / 3) * (1 - sm((p - 0.93) / 0.07));
+  if (da > 0.003) {
+    const gr = g.createRadialGradient(cx, cy, 0, cx, cy, rp * 1.1); gr.addColorStop(0, rgba(tk.smooth, 0.34 * da)); gr.addColorStop(0.74, rgba(tk.smooth, 0.34 * da)); gr.addColorStop(1, rgba(tk.smooth, 0));
+    g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, rp * 1.1, 0, 7); g.fill();
+    g.strokeStyle = rgba(tk.smooth, 0.7 * da); g.lineWidth = 1.5; g.setLineDash([4, 3]); g.beginPath(); g.arc(cx, cy, rp, 0, 7); g.stroke(); g.setLineDash([]);
+  }
+  // the quarks, where the chamber has them
+  const qa = sm((2 * rp - 60) / 60);
+  if (qa > 0.003) {
+    const gm = window.itpNucleus.geom(), k = pxm * SIM, r = Math.max(2.5, gm.QW * k * 1.1), ox = gm.x0 + gm.span / 2, oy = gm.x0 + gm.span / 2;
+    g.globalAlpha = qa; g.lineWidth = 1; g.strokeStyle = tk.plot;
+    gm.sites.forEach(([x, y], i) => { g.fillStyle = tk.q[i % 3]; g.beginPath(); g.arc(cx + (x - ox) * k, cy - (y - oy) * k, r, 0, 7); g.fill(); g.stroke(); });
+    g.globalAlpha = 1;
+  }
+  // scale bar, magnification, caption
+  const ua = sm(t / 0.06) * (1 - sm((t - 0.94) / 0.06)), ca = sm((t - 0.2) / 0.1) * (1 - sm((t - 0.7) / 0.1)), halo = (txt, x, y) => { g.strokeStyle = rgba(tk.plot, 0.85); g.lineWidth = 3; g.lineJoin = "round"; g.strokeText(txt, x, y); g.fillText(txt, x, y); };
+  const Lm = 90 / pxm, p10 = Math.pow(10, Math.floor(lg(Lm))), mm = Lm / p10, L = (mm >= 5 ? 5 : mm >= 2 ? 2 : 1) * p10, len = L * pxm;
+  const lab = L >= 1e-10 * 0.999 ? `${Math.round(L / 1e-10).toLocaleString("en-US")} Å` : L >= 1e-12 * 0.999 ? `${Math.round(L / 1e-12)} pm` : `≈ ${Math.round(L / FM)} fm`;
+  if (ua > 0.003) {
+    g.globalAlpha = ua; const x1 = F.x + F.w - 14, y1 = F.y + F.h - 16;
+    g.strokeStyle = tk.ink; g.lineWidth = 1.5; g.beginPath(); g.moveTo(x1 - len, y1 - 4); g.lineTo(x1 - len, y1); g.lineTo(x1, y1); g.lineTo(x1, y1 - 4); g.stroke();
+    g.font = `500 12px ${tk.mono}`; g.fillStyle = tk.ink; g.textAlign = "right"; g.textBaseline = "alphabetic"; halo(lab, x1, y1 - 8);
+    g.textAlign = "left"; g.fillStyle = tk.muted; g.font = `500 12.5px ${tk.mono}`; halo(`zoom × ${fmtM(M)}`, F.x + 12, F.y + 20);
+    g.globalAlpha = 1;
+  }
+  if (ca > 0.003) {
+    g.font = `13px ${tk.sans}`; g.textAlign = "left"; g.textBaseline = "alphabetic";
+    const bw = F.w - 24, lines = wrapText(g, CAP, bw - 20), bh = lines.length * 18 + 16, bx = F.x + 12, by = F.y + 34;
+    g.globalAlpha = ca * 0.88; g.fillStyle = tk.plot; rr(g, bx, by, bw, bh, 6); g.fill(); g.globalAlpha = ca; g.fillStyle = tk.ink; lines.forEach((l, i) => g.fillText(l, bx + 10, by + 22 + i * 18)); g.globalAlpha = 1;
+  }
+  g.restore();
+  z.last = { t, p, h, M, frame: F, scaleBar: lab, readout: "zoom × " + fmtM(M), dir: z.inn ? "in" : "out", swapped: z.swapped };
+}
+function finish(fade) {
+  const z = Z; if (!z) return; Z = null;
+  cancelAnimationFrame(z.raf); clearTimeout(z.timer);
+  removeEventListener("keydown", z.onKey, true); removeEventListener("resize", z.onResize); removeEventListener("scroll", z.onScroll);
+  if (z.inn) window.itpNucleus.holdRot();
+  view = z.to; apply(); persist(); place($(z.inn ? "fQ" : "aCv"), z.Rs);
+  if (z.swapped && z.last) { const dy = rect(z.endEl).y - z.last.frame.y; if (Math.abs(dy) > 0.5) scrollBy(0, dy); }   // keep the page exactly under the last frame
+  setTimeout(() => { if (!Z) live.textContent = ""; }, 1500);
+  if (!fade) { z.cv.remove(); return; }
+  z.cv.style.pointerEvents = "none"; z.cv.style.transition = "opacity .35s ease-out"; void z.cv.offsetWidth; z.cv.style.opacity = "0"; linger = z.cv; lingerT = setTimeout(clearLinger, 380);
+}
+window.itaZoom = { active: () => !!Z, info: () => Z && Z.last && { ...Z.last, rs: Z.Rs, re: Z.Re, h0: Z.h0, h1: Z.h1 } };
+
+function go(v, instant) {
+  if (v === view) return;
+  if (instant || RMQ.matches || window.itaAtom.state().J) { view = v; apply(); persist(); if (RMQ.matches && !instant) showNote(); return; }   // a jump in progress, or reduced motion: switch at once
+  startZoom(v);
+}
+const sw = $("viewsw");
+sw.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; const v = b.dataset.v; if (Z) { finish(false); if (v !== view) go(v, true); return; } go(v); });
+{ // a click on the nucleus at the centre of the atom picture dives in; a drag, even from the centre, only rotates
+  const ac = $("aCv"); let dn = null;
+  ac.addEventListener("pointerdown", e => { const r = ac.getBoundingClientRect(); dn = e.button === 0 && view === "atom" && !Z && Math.hypot(e.clientX - r.left - r.width / 2, e.clientY - r.top - r.height / 2) <= 14 ? { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId, mv: 0 } : null; });
+  ac.addEventListener("pointermove", e => { if (dn && e.pointerId === dn.id) dn.mv = Math.max(dn.mv, Math.hypot(e.clientX - dn.x, e.clientY - dn.y)); });
+  ac.addEventListener("pointerup", e => { const s = dn; dn = null; if (s && e.pointerId === s.id && s.mv < 5 && Math.hypot(e.clientX - s.x, e.clientY - s.y) < 5 && performance.now() - s.t < 350) go("nucleus"); });
+  ac.addEventListener("pointercancel", () => { dn = null; });
+}
 apply();
 })();
 </script>
