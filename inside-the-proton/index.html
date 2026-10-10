@@ -131,8 +131,10 @@ sub{font-size:.75em;line-height:0}
 .picks{display:flex;flex-wrap:wrap;gap:6px}
 .picks .btn{padding:4px 10px;font-size:12.5px}
 .vgrp{display:grid;gap:10px}
-.afwrap{position:relative;min-width:0}
-#aGl{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;background:transparent}
+.afwrap{position:relative;min-width:0;background:var(--plot);border-radius:6px}
+.afwrap .afield{position:relative;z-index:1}
+.afwrap .afield.surf{background:transparent}
+#aGl{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;background:transparent;z-index:0}
 </style>
 </head>
 <body>
@@ -202,6 +204,16 @@ sub{font-size:.75em;line-height:0}
         <div class="vgrp" id="a-surf">
           <div class="row"><label for="a-lev">Encloses</label><input type="range" id="a-lev" min="50" max="95" step="5" value="90"><span class="val" id="a-levVal">90%</span></div>
           <label class="check"><input type="checkbox" id="a-cut"> Cutaway: slice off the front half</label>
+          <label class="check"><input type="checkbox" id="a-grid" checked> Floor grid (the xy-plane)</label>
+        </div>
+        <div class="vgrp" id="a-cams">
+          <p class="lbl">Look from</p>
+          <div class="picks" id="a-cam">
+            <button type="button" class="btn" data-v="angled">Angled</button>
+            <button type="button" class="btn" data-v="front">Front</button>
+            <button type="button" class="btn" data-v="side">Side</button>
+            <button type="button" class="btn" data-v="top">Top</button>
+          </div>
         </div>
         <div class="vgrp" id="a-slice">
           <p class="lbl">Slice plane</p>
@@ -610,7 +622,7 @@ const m = iv1 - iv0 + 1, VX0 = XC[iv0] - DX / 2, VSPAN = m * DX;
 
 // ---------- state ----------
 const S = { k: 6, nq: 3, d: 1.2, Q: 2.5, rand: true, rot: 0, auto: true, show: "scat", mode: "phase", born: false, speed: 4 };
-let active = false, running = false;   // the Atom view is the default, so this view sleeps until shown
+let active = false, running = false;   // sleeps until the view switch shows it
 const BEAM = () => ({ x0: -4.6, k: S.k, sx: 1.0, sy: 2.4 });
 const sims = [E.makeSim(), E.makeSim()]; sims[0].kind = "smooth"; sims[1].kind = "quark";
 const NA = 360;
@@ -944,9 +956,37 @@ window.itpNucleus = { show(on) { active = on; if (!on) return; readTokens(); fit
 "use strict";
 const $ = id => document.getElementById(id);
 const H = makeHydrogen();
-const A = { n: 3, l: 1, m: 0, style: "chem", mode: "slice", plane: "xz", tilt: 0, lev: 90, cut: false };
+const A = { n: 3, l: 1, m: 0, style: "chem", mode: "surface", plane: "xz", tilt: 0, lev: 90, cut: false, grid: true };
 let info = H.radial(A.n, A.l), active = false, sliceDirty = true, cloudDirty = true, plotDirty = true, raf = 0, last = 0, themeTimer = 0;
-let yaw = -0.6, pitch = 0.35, dragging = false, idleAt = 0, pts = null, groups = null, lx = 0, ly = 0;
+let dragging = false, idleAt = 0, pts = null, groups = null, lx = 0, ly = 0, snap = null;
+// ---------- camera: V is a rotation whose rows are screen-right, depth (away from the viewer) and screen-up, in world coordinates ----------
+const viewFrom = (yw, pt) => { const yc = Math.cos(yw), ys = Math.sin(yw), pc = Math.cos(pt), ps = Math.sin(pt); return [yc, -ys, 0, pc * ys, pc * yc, -ps, ps * ys, ps * yc, pc]; };
+const CAMS = { angled: viewFrom(-0.6, 0.35), front: [1, 0, 0, 0, 1, 0, 0, 0, 1], side: [0, 1, 0, -1, 0, 0, 0, 0, 1], top: [1, 0, 0, 0, 0, -1, 0, 1, 0] };
+let V = CAMS.angled.slice();
+const mul = (a, b) => { const o = new Array(9); for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) o[i * 3 + j] = a[i * 3] * b[j] + a[i * 3 + 1] * b[3 + j] + a[i * 3 + 2] * b[6 + j]; return o; };
+function ortho(m) {   // re-orthonormalise so rounding can't drift the rotation
+  let [a, b, c, d, e, f] = m, n = Math.hypot(a, b, c); a /= n; b /= n; c /= n;
+  const k = a * d + b * e + c * f; d -= k * a; e -= k * b; f -= k * c; n = Math.hypot(d, e, f); d /= n; e /= n; f /= n;
+  return [a, b, c, d, e, f, b * f - c * e, c * d - a * f, a * e - b * d];
+}
+function turn(h, v) {   // trackball: h turns about the screen-up axis (front moves right), v about screen-right (front moves down)
+  const ch = Math.cos(h), sh = Math.sin(h), cv_ = Math.cos(v), sv = Math.sin(v);
+  V = ortho(mul([1, 0, 0, 0, cv_, -sv, 0, sv, cv_], mul([ch, -sh, 0, sh, ch, 0, 0, 0, 1], V)));
+}
+const spin = d => { const c = Math.cos(d), s = Math.sin(d); V = ortho(mul(V, [c, -s, 0, s, c, 0, 0, 0, 1])); };   // about the atom's own z-axis
+function m2q([a, b, c, d, e, f, g, h, i]) {
+  const t = a + e + i; let s;
+  if (t > 0) { s = Math.sqrt(t + 1) * 2; return [s / 4, (h - f) / s, (c - g) / s, (d - b) / s]; }
+  if (a > e && a > i) { s = Math.sqrt(1 + a - e - i) * 2; return [(h - f) / s, s / 4, (b + d) / s, (c + g) / s]; }
+  if (e > i) { s = Math.sqrt(1 + e - a - i) * 2; return [(c - g) / s, (b + d) / s, s / 4, (f + h) / s]; }
+  s = Math.sqrt(1 + i - a - e) * 2; return [(d - b) / s, (c + g) / s, (f + h) / s, s / 4];
+}
+const q2m = ([w, x, y, z]) => [1 - 2 * (y * y + z * z), 2 * (x * y - w * z), 2 * (x * z + w * y), 2 * (x * y + w * z), 1 - 2 * (x * x + z * z), 2 * (y * z - w * x), 2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y)];
+function stepSnap(now) {   // eased turn to a preset view (normalised quaternion blend)
+  const u = Math.min(1, (now - snap.t0) / 650), e = u * u * (3 - 2 * u), [p, q] = [snap.q0, snap.q1];
+  const r = p.map((v, i) => v * (1 - e) + q[i] * e), n = Math.hypot(...r);
+  V = u < 1 ? q2m(r.map(v => v / n)) : snap.to.slice(); if (u >= 1) snap = null;
+}
 const RM = matchMedia("(prefers-reduced-motion: reduce)"), COARSE = matchMedia("(pointer: coarse)"), A_PER_A0 = 0.529177;
 
 // ---------- colour ----------
@@ -957,7 +997,7 @@ function readTokens() {
   const cs = getComputedStyle(document.documentElement), g = v => cs.getPropertyValue(v).trim();
   const key = g("--plot") + g("--ink") + g("--phase-l") + g("--phase-s");
   if (key === themeKey) return; themeKey = key;
-  C = { plot: g("--plot"), ink: g("--ink"), muted: g("--muted"), line: g("--line"), grid: g("--grid"), accent: g("--accent"), rPlot: hexRGB(g("--plot")),
+  C = { plot: g("--plot"), ink: g("--ink"), muted: g("--muted"), line: g("--line"), grid: g("--grid"), accent: g("--accent"), rPlot: hexRGB(g("--plot")), rInk: hexRGB(g("--ink")), rMuted: hexRGB(g("--muted")),
         L: parseFloat(g("--phase-l")), Sa: parseFloat(g("--phase-s")), mono: g("--f-mono") || "monospace" };
   C.dark = C.rPlot[0] * 0.299 + C.rPlot[1] * 0.587 + C.rPlot[2] * 0.114 < 110;
   for (let h = 0; h < 360; h++) { const c = hslRGB(h, C.Sa, C.L); HUE[h * 3] = c[0]; HUE[h * 3 + 1] = c[1]; HUE[h * 3 + 2] = c[2]; }
@@ -1033,14 +1073,15 @@ function resample() {
 }
 function draw3D() {
   if (!W || (!pts && A.mode === "cloud")) return;
-  const c = ctx, Rv = info.rview, sc = W * 0.46 / Rv, D = 5 * Rv, yc = Math.cos(yaw), ys = Math.sin(yaw), pc = Math.cos(pitch), ps = Math.sin(pitch);
-  const proj = (x, y, z) => { const x1 = x * yc - y * ys, y1 = x * ys + y * yc, z2 = y1 * ps + z * pc, y2 = y1 * pc - z * ps, p = D / (D + y2); return [W / 2 + x1 * sc * p, W / 2 - z2 * sc * p, p]; };
-  c.globalCompositeOperation = "source-over"; c.clearRect(0, 0, W, W); c.fillStyle = C.plot; c.fillRect(0, 0, W, W);
-  if (A.mode === "cloud") {   // in surface mode this canvas is only the backdrop: axes and labels under the WebGL layer
+  const c = ctx, Rv = info.rview, sc = W * 0.46 / Rv, D = 5 * Rv, [r0, r1, r2, d0, d1, d2, u0, u1, u2] = V, surf = A.mode === "surface";
+  const proj = (x, y, z) => { const p = D / (D + d0 * x + d1 * y + d2 * z); return [W / 2 + (r0 * x + r1 * y + r2 * z) * sc * p, W / 2 - (u0 * x + u1 * y + u2 * z) * sc * p, p]; };
+  c.globalCompositeOperation = "source-over"; c.clearRect(0, 0, W, W);
+  if (!surf) {   // in surface mode this canvas is a transparent layer over the WebGL scene, carrying only the labels
+    c.fillStyle = C.plot; c.fillRect(0, 0, W, W);
     const { x, y, z, sx, sy, sp, count } = pts;
     for (let i = 0; i < count; i++) {
-      const x1 = x[i] * yc - y[i] * ys, y1 = x[i] * ys + y[i] * yc, z2 = y1 * ps + z[i] * pc, y2 = y1 * pc - z[i] * ps, p = D / (D + y2);
-      sx[i] = W / 2 + x1 * sc * p; sy[i] = W / 2 - z2 * sc * p; sp[i] = p;
+      const p = D / (D + d0 * x[i] + d1 * y[i] + d2 * z[i]);
+      sx[i] = W / 2 + (r0 * x[i] + r1 * y[i] + r2 * z[i]) * sc * p; sy[i] = W / 2 - (u0 * x[i] + u1 * y[i] + u2 * z[i]) * sc * p; sp[i] = p;
     }
     const s0 = Math.max(1.5, W / 340);
     if (C.dark) c.globalCompositeOperation = "lighter";
@@ -1051,14 +1092,16 @@ function draw3D() {
     }
   }
   c.globalCompositeOperation = "source-over";
-  c.strokeStyle = C.muted; c.globalAlpha = 0.45; c.lineWidth = 1; c.beginPath();
   const ends = [[1, 0, 0, "x"], [0, 1, 0, "y"], [0, 0, 1, "z"]], L = Rv * 0.95;
-  for (const [a, b, d] of ends) { const p0 = proj(-a * L, -b * L, -d * L), p1 = proj(a * L, b * L, d * L); c.moveTo(p0[0], p0[1]); c.lineTo(p1[0], p1[1]); }
-  c.stroke(); c.globalAlpha = 1;
+  if (!surf) {   // the surface scene draws its own axes and nucleus, with depth
+    c.strokeStyle = C.muted; c.globalAlpha = 0.45; c.lineWidth = 1; c.beginPath();
+    for (const [a, b, d] of ends) { const p0 = proj(-a * L, -b * L, -d * L), p1 = proj(a * L, b * L, d * L); c.moveTo(p0[0], p0[1]); c.lineTo(p1[0], p1[1]); }
+    c.stroke(); c.globalAlpha = 1;
+  }
   c.font = `${W < 300 ? 10 : 11.5}px ${C.mono}`; c.fillStyle = C.muted; c.textAlign = "center"; c.textBaseline = "middle";
   for (const [a, b, d, nm] of ends) { const p = proj(a * L * 1.08, b * L * 1.08, d * L * 1.08); c.fillText(nm, Math.max(8, Math.min(W - 8, p[0])), Math.max(8, Math.min(W - 8, p[1]))); }
-  const o = proj(0, 0, 0); c.fillStyle = C.ink; c.strokeStyle = C.plot; c.lineWidth = 1.5; c.beginPath(); c.arc(o[0], o[1], 3, 0, Math.PI * 2); c.fill(); c.stroke();
-  c.textAlign = "left"; c.textBaseline = "alphabetic"; const h0 = COARSE.matches ? "swipe sideways to spin" : "drag to rotate", h1 = h0 + " · it turns slowly on its own";
+  if (!surf) { const o = proj(0, 0, 0); c.fillStyle = C.ink; c.strokeStyle = C.plot; c.lineWidth = 1.5; c.beginPath(); c.arc(o[0], o[1], 3, 0, Math.PI * 2); c.fill(); c.stroke(); }
+  c.textAlign = "left"; c.textBaseline = "alphabetic"; const h0 = COARSE.matches ? "swipe sideways to spin" : "drag to turn it any way", h1 = h0 + " · it turns slowly on its own";
   c.fillText(!RM.matches && c.measureText(h1).width <= W - 16 ? h1 : h0, 8, W - 8);
 }
 
@@ -1067,7 +1110,7 @@ function draw3D() {
 const glc = $("aGl"); let gl = null, GP = null, GU = {}, surfLev = 0, surfDirty = true, gres = 1, slow = 0;
 const GFS = `precision highp float;
 varying vec2 v;
-uniform mat3 M; uniform float D, Rb, scc, lev, nn, nl, nm, chem, NR, NY, cut, steps, Sa, La;
+uniform mat3 M; uniform float D, Rb, scc, lev, nn, nl, nm, chem, NR, NY, cut, steps, Sa, La, wpp, grid, gsp; uniform vec3 AC, GC;
 float lag(float k, float a, float x) { if (k < .5) return 1.; float p = 1., c = 1. + a - x;
   for (int j = 1; j < 5; j++) { float fj = float(j); if (fj > k - .5) break; float t = ((2. * fj + 1. + a - x) * c - (fj + a) * p) / (fj + 1.); p = c; c = t; } return c; }
 vec2 psi(vec3 q) {
@@ -1087,25 +1130,63 @@ vec2 psi(vec3 q) {
 float F(vec3 q) { return length(psi(q)) - lev; }
 vec3 hue(vec2 z) { float h = degrees(atan(z.y, z.x)); if (h < 0.) h += 360.;
   vec3 k = mod(vec3(0., 8., 4.) + h / 30., 12.); float a = Sa * min(La, 1. - La); return La - a * max(vec3(-1.), min(min(k - 3., 9. - k), vec3(1.))); }
+vec4 over(vec4 c, vec3 rgb, float a) { return vec4(rgb * a, a) + c * (1. - a); }   // premultiplied: a nearer layer over c
 void main() {
   vec3 ro = M * vec3(0., -D, 0.), rd = normalize(M * vec3(v.x / scc, D, v.y / scc)), fw = M * vec3(0., 1., 0.);
   float b = dot(ro, rd), h = b * b - dot(ro, ro) + Rb * Rb; if (h < 0.) discard;
-  h = sqrt(h); float t0 = -b - h, t1 = -b + h; bool cap = false;
-  if (cut > .5) { float tp = -dot(ro, fw) / dot(rd, fw); if (tp > t0) { t0 = tp; cap = true; } if (t0 >= t1) discard; }
-  vec3 p = ro + rd * t0;
-  if (F(p) > 0.) { gl_FragColor = vec4(hue(psi(p)) * (cap ? .8 : 1.), 1.); return; }   // the cut face, inside a lobe
-  float dt = (t1 - t0) / steps, t = t0; bool hit = false;
-  for (int i = 0; i < 320; i++) {
-    if (float(i) >= steps) break;
-    if (F(ro + rd * (t + dt)) > 0.) { float a = t, c = t + dt; for (int k = 0; k < 12; k++) { float m = .5 * (a + c); if (F(ro + rd * m) > 0.) c = m; else a = m; } t = c; hit = true; break; }
-    t += dt;
+  h = sqrt(h);
+  vec4 col = vec4(0.); float tS = 1e9;
+  // the orbital surface: march to the first crossing of |ψ| = lev, refine by bisection
+  float t0 = -b - h, t1 = -b + h; bool cap = false, go = true;
+  if (cut > .5) { float tp = -dot(ro, fw) / dot(rd, fw); if (tp > t0) { t0 = tp; cap = true; } if (t0 >= t1) go = false; }
+  if (go) {
+    vec3 p = ro + rd * t0;
+    if (F(p) > 0.) { col = vec4(hue(psi(p)) * (cap ? .8 : 1.), 1.); tS = t0; }   // the cut face, inside a lobe
+    else {
+      float dt = (t1 - t0) / steps, t = t0; bool hit = false;
+      for (int i = 0; i < 320; i++) {
+        if (float(i) >= steps) break;
+        if (F(ro + rd * (t + dt)) > 0.) { float a = t, c = t + dt; for (int k = 0; k < 12; k++) { float m = .5 * (a + c); if (F(ro + rd * m) > 0.) c = m; else a = m; } t = c; hit = true; break; }
+        t += dt;
+      }
+      if (hit) {
+        p = ro + rd * t; tS = t; float e = Rb * 1e-3;
+        vec3 g = vec3(F(p + vec3(e, 0., 0.)) - F(p - vec3(e, 0., 0.)), F(p + vec3(0., e, 0.)) - F(p - vec3(0., e, 0.)), F(p + vec3(0., 0., e)) - F(p - vec3(0., 0., e)));
+        // the key light is fixed to the atom, not the camera, so highlights and shade move as it turns; a dim fill from the viewer keeps the far side readable
+        vec3 N = -normalize(g), L = normalize(vec3(.1, -.6, .8)), Hv = normalize(L - rd);
+        float dif = max(dot(N, L), 0.), fill = max(dot(N, -rd), 0.), sp = pow(max(dot(N, Hv), 0.), 40.);
+        col = vec4(hue(psi(p)) * (.2 + .6 * dif + .25 * fill) + vec3(.3 * sp), 1.);
+      }
+    }
   }
-  if (!hit) discard;
-  p = ro + rd * t; float e = Rb * 1e-3;
-  vec3 g = vec3(F(p + vec3(e, 0., 0.)) - F(p - vec3(e, 0., 0.)), F(p + vec3(0., e, 0.)) - F(p - vec3(0., e, 0.)), F(p + vec3(0., 0., e)) - F(p - vec3(0., 0., e)));
-  vec3 N = -normalize(g), L = normalize(M * vec3(-.45, -.75, .55)), Hv = normalize(L - rd);
-  float dif = max(dot(N, L), 0.), sp = pow(max(dot(N, Hv), 0.), 48.);
-  gl_FragColor = vec4(hue(psi(p)) * (.36 + .64 * dif) + vec3(.3 * sp), 1.);
+  // world-space overlays, each drawn only where it is nearer than the surface; wp = world size of a pixel at distance t
+  float wpd = wpp / D;
+  if (grid > .5 && abs(rd.z) > 1e-4) {   // floor grid on the xy-plane
+    float tg = -ro.z / rd.z;
+    if (tg > 0. && tg < tS) {
+      vec2 q = (ro + rd * tg).xy; float rr = length(q), Rg = Rb * .95;
+      if (rr < Rg) {
+        float wp = wpd * tg / max(abs(rd.z), .25), fade = 1. - smoothstep(.75 * Rg, Rg, rr);
+        vec2 f = abs(fract(q / gsp - .5) - .5) * gsp; float dl = min(f.x, f.y);
+        float line = (1. - smoothstep(.4, 1.3, dl / wp)) * smoothstep(3., 9., gsp / wp);
+        float ring = 1. - smoothstep(.4, 1.3, abs(rr - Rg * .97) / wp);
+        col = over(col, GC, fade * (.035 + .16 * line) + .22 * ring);
+      }
+    }
+  }
+  for (int i = 0; i < 3; i++) {   // axes as thin lines through the origin
+    vec3 a = i == 0 ? vec3(1., 0., 0.) : i == 1 ? vec3(0., 1., 0.) : vec3(0., 0., 1.);
+    float ba = dot(rd, a), dr = dot(rd, ro), ea = dot(a, ro), den = 1. - ba * ba;
+    if (den < 1e-5) continue;
+    float t = (ba * ea - dr) / den, s = (ea - ba * dr) / den;
+    if (t <= 0. || t >= tS || abs(s) > Rb * .95) continue;
+    float d = length(ro + rd * t - a * s), wp = wpd * t;
+    col = over(col, AC, .6 * (1. - smoothstep(.35, 1.1, d / wp)) * (1. - smoothstep(.85, .95, abs(s) / Rb)));
+  }
+  float rn = 3. * wpp, bn = dot(ro, rd), hn = bn * bn - dot(ro, ro) + rn * rn;   // the nucleus, a small dot that hides inside lobes
+  if (hn > 0. && -bn - sqrt(hn) < tS) col = over(col, GC, 1.);
+  if (col.a < .004) discard;
+  gl_FragColor = col;
 }`;
 function initGL() {
   try { gl = glc.getContext("webgl", { antialias: false, premultipliedAlpha: true, preserveDrawingBuffer: true }); } catch (e) { gl = null; }
@@ -1120,7 +1201,7 @@ function initGL() {
   gl.useProgram(GP);
   gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer()); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
   const ap = gl.getAttribLocation(GP, "p"); gl.enableVertexAttribArray(ap); gl.vertexAttribPointer(ap, 2, gl.FLOAT, false, 0, 0);
-  for (const k of ["M", "D", "Rb", "scc", "lev", "nn", "nl", "nm", "chem", "NR", "NY", "cut", "steps", "Sa", "La"]) GU[k] = gl.getUniformLocation(GP, k);
+  for (const k of ["M", "D", "Rb", "scc", "lev", "nn", "nl", "nm", "chem", "NR", "NY", "cut", "steps", "Sa", "La", "wpp", "grid", "gsp", "AC", "GC"]) GU[k] = gl.getUniformLocation(GP, k);
   glc.addEventListener("webglcontextlost", e => { e.preventDefault(); gl = null; $("a-surfBtn").hidden = true; if (A.mode === "surface") { A.mode = "cloud"; sync(); schedule(); } });
   return true;
 }
@@ -1136,12 +1217,14 @@ function drawSurface(now) {
   const dpr = Math.min(2, window.devicePixelRatio || 1), px = Math.max(64, Math.round(W * dpr * gres));
   if (glc.width !== px) glc.width = glc.height = px;
   gl.viewport(0, 0, px, px); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
-  const Rv = info.rview, yc = Math.cos(yaw), ys = Math.sin(yaw), pc = Math.cos(pitch), ps = Math.sin(pitch), a = Math.abs(A.m);
-  gl.uniformMatrix3fv(GU.M, false, [yc, -ys, 0, pc * ys, pc * yc, -ps, ps * ys, ps * yc, pc]);
+  const Rv = info.rview, a = Math.abs(A.m);
+  gl.uniformMatrix3fv(GU.M, false, V);   // column-major, so the columns are V's rows: view → world
   const N = Math.sqrt(Math.pow(2 / A.n, 3) * fact(A.n - A.l - 1) / (2 * A.n * fact(A.n + A.l)));
   const u = { D: 5 * Rv, Rb: Rv, scc: 0.92 / Rv, lev: surfLev, nn: A.n, nl: A.l, nm: A.m, chem: A.style === "chem" ? 1 : 0, NR: N,
-              NY: H.Nlm(A.l, a) * (A.style === "chem" && A.m ? Math.SQRT2 : 1), cut: A.cut ? 1 : 0, steps: COARSE.matches ? 140 : 220, Sa: C.Sa / 100, La: C.L / 100 };
+              NY: H.Nlm(A.l, a) * (A.style === "chem" && A.m ? Math.SQRT2 : 1), cut: A.cut ? 1 : 0, steps: COARSE.matches ? 140 : 220, Sa: C.Sa / 100, La: C.L / 100,
+              wpp: 2 / (0.92 / Rv * W), grid: A.grid ? 1 : 0, gsp: [0.5, 1, 2, 5, 10, 20].find(s => Rv / s <= 6) || 20 };
   for (const k in u) gl.uniform1f(GU[k], u[k]);
+  gl.uniform3fv(GU.AC, C.rMuted.map(v => v / 255)); gl.uniform3fv(GU.GC, C.rInk.map(v => v / 255));
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   // drop resolution when frames come slowly (a weak GPU), creep back up when they're quick
   const iv = now - lastSurf; lastSurf = now;
@@ -1185,7 +1268,7 @@ function frame(now) {
   if (A.mode === "slice") { if (sliceDirty) renderSlice(); }
   else {
     if (A.mode === "cloud" && (cloudDirty || !pts)) resample();
-    if (!RM.matches && !dragging && now > idleAt) yaw += dt * 0.22;
+    if (snap) stepSnap(now); else if (!RM.matches && !dragging && now > idleAt) spin(dt * 0.22);
     draw3D(); if (A.mode === "surface") drawSurface(now);
   }
   if (plotDirty) drawRadial();
@@ -1207,7 +1290,7 @@ function sync() {
   press("a-m", v => +v === m);
   $("a-picks").querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.n === n && +b.dataset.l === l)));
   press("a-style", v => v === style); press("a-mode", v => v === mode); press("a-plane", v => v === A.plane);
-  $("a-slice").hidden = mode !== "slice"; $("a-surf").hidden = glc.hidden = mode !== "surface";
+  $("a-slice").hidden = mode !== "slice"; $("a-surf").hidden = glc.hidden = mode !== "surface"; $("a-cams").hidden = mode === "slice"; cv.classList.toggle("surf", mode === "surface");
   $("a-stnote").textContent = style === "chem" ? "Real orbitals, as drawn in chemistry books: each lobe is positive (one colour) or negative (the other)." : "The exact states of definite m. Colour is the phase, which winds m times round the z-axis, so m ≠ 0 gives a donut.";
   $("a-vnote").textContent = mode === "slice" ? "A slice shows the electron's wave on a flat plane through the nucleus. Brightness is probability density, boosted so faint outer lobes show. Colour is the phase."
     : mode === "cloud" ? "Each dot is a place the electron could be found, drawn at random from the probability. Colour is the phase. Drag to rotate."
@@ -1237,18 +1320,24 @@ hit("a-plane", b => { A.plane = b.dataset.v; sliceDirty = true; sync(); schedule
 $("a-tilt").addEventListener("input", e => { A.tilt = +e.target.value; $("a-tiltVal").textContent = A.tilt + "°"; sliceDirty = true; schedule(); });
 $("a-lev").addEventListener("input", e => { A.lev = +e.target.value; $("a-levVal").textContent = A.lev + "%"; surfDirty = true; sync(); schedule(); });
 $("a-cut").addEventListener("change", e => { A.cut = e.target.checked; sync(); schedule(); });
+$("a-grid").addEventListener("change", e => { A.grid = e.target.checked; schedule(); });
+$("a-cam").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return; const to = CAMS[b.dataset.v];
+  if (RM.matches) { snap = null; V = to.slice(); } else snap = { t0: performance.now(), q0: m2q(V), q1: (() => { const q = m2q(to), p = m2q(V); return q.reduce((s, v, i) => s + v * p[i], 0) < 0 ? q.map(v => -v) : q; })(), to };
+  idleAt = performance.now() + 6000; schedule();   // hold the chosen view for a while before the slow spin resumes
+});
 
-cv.addEventListener("pointerdown", e => { if (A.mode === "slice") return; dragging = true; lx = e.clientX; ly = e.clientY; cv.setPointerCapture(e.pointerId); });
+cv.addEventListener("pointerdown", e => { if (A.mode === "slice") return; snap = null; dragging = true; lx = e.clientX; ly = e.clientY; cv.setPointerCapture(e.pointerId); });
 cv.addEventListener("pointermove", e => {
   if (!dragging) return;
-  yaw += (e.clientX - lx) * 0.008; if (e.pointerType !== "touch") pitch = Math.max(-1.5, Math.min(1.5, pitch + (e.clientY - ly) * 0.008)); lx = e.clientX; ly = e.clientY; schedule();
+  turn((e.clientX - lx) * 0.008, e.pointerType !== "touch" ? (e.clientY - ly) * 0.008 : 0); lx = e.clientX; ly = e.clientY; schedule();
 });
 const endDrag = () => { if (dragging) { dragging = false; idleAt = performance.now() + 1500; schedule(); } };
 cv.addEventListener("pointerup", endDrag); cv.addEventListener("pointercancel", endDrag);
 cv.addEventListener("keydown", e => {
   if (A.mode === "slice") return;
   const k = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key]; if (!k) return;
-  e.preventDefault(); yaw += k[0] * 0.12; pitch = Math.max(-1.5, Math.min(1.5, pitch + k[1] * 0.12)); idleAt = performance.now() + 3000; schedule();
+  e.preventDefault(); snap = null; turn(k[0] * 0.12, k[1] * 0.12); idleAt = performance.now() + 3000; schedule();
 });
 
 let tab = "ag-orb";
@@ -1263,7 +1352,7 @@ new MutationObserver(() => active && readTokens()).observe(document.documentElem
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => active && readTokens());
 RM.addEventListener("change", () => { last = 0; schedule(); });
 
-if (!initGL()) $("a-surfBtn").hidden = true;
+if (!initGL()) { $("a-surfBtn").hidden = true; A.mode = "cloud"; }
 sync(); syncTabs(); readTokens();
 window.itaAtom = { show(on) {
   active = on; clearInterval(themeTimer); themeTimer = 0;
@@ -1278,8 +1367,8 @@ window.itaAtom = { show(on) {
 const $ = id => document.getElementById(id);
 const SUB = { atom: $("sub").textContent, nucleus: "The same quantum beam hits two targets with equal total charge and equal size. One is a smooth blob of charge, the other is quarks. Turn the beam momentum up and watch the large-angle scattering separate them." };
 const PAGE = { atom: [$("atom-view"), window.itaAtom], nucleus: [$("nucleus-view"), window.itpNucleus] };
-let view = "atom";
-try { const v = localStorage.getItem("ita-view"); if (v === "atom" || v === "nucleus") view = v; } catch (e) {}
+let view = "nucleus";   // first visit opens on the nucleus; the key was renamed from "ita-view" so earlier visitors start there once too
+try { const v = localStorage.getItem("ita-view2"); if (v === "atom" || v === "nucleus") view = v; } catch (e) {}
 function apply() {
   const out = view === "atom" ? "nucleus" : "atom";
   PAGE[out][1].show(false); PAGE[out][0].hidden = true;
@@ -1287,7 +1376,7 @@ function apply() {
   $("viewsw").querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === view)));
   $("sub").textContent = SUB[view];
 }
-$("viewsw").addEventListener("click", e => { const b = e.target.closest("button"); if (!b || b.dataset.v === view) return; view = b.dataset.v; apply(); try { localStorage.setItem("ita-view", view); } catch (e) {} });
+$("viewsw").addEventListener("click", e => { const b = e.target.closest("button"); if (!b || b.dataset.v === view) return; view = b.dataset.v; apply(); try { localStorage.setItem("ita-view2", view); } catch (e) {} });
 apply();
 })();
 </script>
