@@ -1,0 +1,747 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Inside the Proton</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@1,500&display=swap">
+<style>
+/* Layout: the sandbox's instrument bench. Two identical target chambers side by side, the shared detector plot under them, controls on the right (tabs on phones). */
+:root{
+  --bg:#EDF0F5; --panel:#FFFFFF; --plot:#FAFBFD; --ink:#141A26; --muted:#5A6477; --line:#D5DBE5;
+  --accent:#2C57CF; --accent-soft:rgba(44,87,207,.14);
+  --smooth:#2F7F8F; --quark:#C9581C; --pot-tint:#B4BED0; --grid:rgba(20,26,38,.08);
+  --qr:#D9443A; --qg:#2C9A57; --qb:#3467D8;
+  --phase-l:48%; --phase-s:78%;
+  --f-sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  --f-math:"IBM Plex Serif",Georgia,"Times New Roman",serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0C111B; --panel:#131A27; --plot:#0D121D; --ink:#E3E8F1; --muted:#8C97AC; --line:#253046;
+  --accent:#7FA0FF; --accent-soft:rgba(127,160,255,.16);
+  --smooth:#6CC3D3; --quark:#FF9B5C; --pot-tint:#2C3854; --grid:rgba(227,232,241,.07);
+  --qr:#FF6B61; --qg:#4FD07F; --qb:#6E97FF;
+  --phase-l:60%; --phase-s:75%; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#0C111B; --panel:#131A27; --plot:#0D121D; --ink:#E3E8F1; --muted:#8C97AC; --line:#253046;
+  --accent:#7FA0FF; --accent-soft:rgba(127,160,255,.16);
+  --smooth:#6CC3D3; --quark:#FF9B5C; --pot-tint:#2C3854; --grid:rgba(227,232,241,.07);
+  --qr:#FF6B61; --qg:#4FD07F; --qb:#6E97FF;
+  --phase-l:60%; --phase-s:75%; color-scheme:dark }
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-sans);font-size:14px;line-height:1.45;margin:0;padding-block:20px 32px;padding-inline:16px}
+@media (min-width:700px){body{padding-inline:24px}}
+.wrap{max-width:1360px;margin:0 auto;display:grid;gap:16px}
+header{display:grid;gap:4px}
+h1{font-size:22px;font-weight:600;margin:0;letter-spacing:-.01em;text-wrap:balance}
+.sub{color:var(--muted);margin:0;max-width:72ch}
+.app{display:grid;gap:16px;grid-template-columns:minmax(0,1fr)}
+@media (min-width:1080px){.app{grid-template-columns:minmax(0,1fr) 320px}}
+.bench{align-self:start;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;display:grid;gap:12px;min-width:0}
+.topbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 14px}
+.readout{flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:4px 16px;font-family:var(--f-mono);font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.readout b{color:var(--ink);font-weight:500}
+.tbtns{display:flex;gap:6px}
+.chambers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;max-width:min(100%,128vh)}
+figure{margin:0;display:grid;gap:6px;min-width:0}
+figcaption{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:500;min-width:0}
+figcaption .sw{width:10px;height:10px;border-radius:50%;flex:0 0 auto}
+figcaption small{color:var(--muted);font-weight:400;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+canvas{display:block;border-radius:6px;background:var(--plot)}
+.field{width:100%;aspect-ratio:1;max-width:100%;cursor:pointer;touch-action:manipulation}
+.detector{display:grid;gap:8px;min-width:0}
+.dhead{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 16px}
+.dhead h2{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin:0}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12.5px;font-variant-numeric:tabular-nums}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{display:inline-block;width:16px;height:2.5px;border-radius:2px}
+.legend b{font-family:var(--f-mono);font-weight:500}
+#plot{width:100%;height:230px;touch-action:none}
+.verdict{margin:0;font-size:13px;color:var(--muted);max-width:80ch}
+.verdict b{color:var(--ink);font-weight:500}
+.rail{display:grid;gap:14px;align-content:start;min-width:0}
+.group{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;display:grid;gap:10px}
+.group h2{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin:0}
+.lbl{font-size:12px;color:var(--muted);margin:0 0 -4px}
+.seg{display:flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.seg button{flex:1;min-width:0;border:0;background:transparent;color:var(--ink);font:inherit;font-size:13px;padding:7px 4px;cursor:pointer;border-left:1px solid var(--line)}
+.seg button:first-child{border-left:0}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--panel);font-weight:500}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.row{display:flex;align-items:center;gap:10px}
+.row label{flex:0 0 auto;font-size:13px;min-width:62px}
+.row input[type=range]{flex:1;min-width:0;accent-color:var(--accent)}
+.row input:disabled{opacity:.4}
+.val{font-family:var(--f-mono);font-size:12.5px;min-width:44px;text-align:right;font-variant-numeric:tabular-nums}
+.check{display:flex;gap:8px;align-items:center;font-size:13px;cursor:pointer}
+.check input{accent-color:var(--accent);margin:0}
+.btn{border:1px solid var(--line);background:transparent;color:var(--ink);font:inherit;font-size:13px;padding:6px 12px;border-radius:7px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--panel);font-weight:500}
+.btn[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.btn svg{display:block}
+.note{font-size:12.5px;color:var(--muted);margin:0}
+.note b{color:var(--ink);font-weight:500}
+.meter{position:relative;height:30px;border-radius:6px;background:var(--plot);border:1px solid var(--line);overflow:hidden}
+.mkey{font-size:12px;color:var(--muted);margin-top:-4px}
+.meter canvas{width:100%;height:100%;background:transparent;border-radius:0}
+.math{font-family:var(--f-math);font-style:italic}
+.tabs{display:none;gap:4px;border-bottom:1px solid var(--line)}
+.tabs button{flex:1;border:0;background:transparent;color:var(--muted);font:inherit;font-size:13.5px;font-weight:500;padding:10px 4px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button[aria-pressed="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+@media (max-width:1079px){
+  .tabs{display:flex}
+  .rail{gap:10px}
+  .group{display:none}
+  .group.active{display:grid}
+  .group h2{display:none}
+}
+@media (max-width:760px){
+  body{padding-top:14px}
+  .sub{font-size:13px}
+  .bench{padding:10px;gap:10px}
+  .chambers{gap:8px}
+  figcaption{font-size:12px}
+  figcaption small{display:none}
+  #plot{height:190px}
+  .readout{font-size:11.5px;gap:2px 12px}
+  .tbtns .btn span{display:none}
+  .tbtns .btn{min-width:42px;min-height:36px;padding:4px 10px}
+  .seg button{min-height:40px}
+  .btn{min-height:38px}
+  .row{min-height:34px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a href="../index.html" style="display:table;flex-basis:100%;margin-bottom:6px;font-size:13px;color:#d0457f;font-weight:500;text-decoration:none">← All widgets</a>
+    <h1>Inside the Proton</h1>
+    <p class="sub">The same quantum beam hits two targets with equal total charge and equal size. One is a smooth blob of charge, the other is quarks. Turn the beam momentum up and watch the large-angle scattering separate them.</p>
+  </header>
+
+  <div class="app">
+    <section class="bench" aria-label="Experiment">
+      <div class="topbar">
+        <div class="readout">
+          <span>k <b id="r-k">6.0</b></span>
+          <span>λ <b id="r-l">1.05</b></span>
+          <span>quark spacing <b id="r-d">1.20</b></span>
+          <span>shots <b id="r-s">0</b></span>
+          <span id="r-st">Ready</span>
+        </div>
+        <div class="tbtns">
+          <button type="button" class="btn primary" id="fire" title="Fire one shot (Space)"><svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M3 10h10.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M11 5.5l5 4.5-5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Fire</span></button>
+          <button type="button" class="btn" id="auto" aria-pressed="true" title="Keep firing shots"><svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M15.5 10a5.5 5.5 0 1 1-1.8-4.1" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M14.4 2.6v3.7h-3.7" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Auto-fire</span></button>
+          <button type="button" class="btn" id="clear" title="Empty the detector"><svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg><span>Clear</span></button>
+        </div>
+      </div>
+
+      <div class="chambers">
+        <figure>
+          <figcaption><span class="sw" style="background:var(--smooth)"></span>Smooth proton <small>uniform charge</small></figcaption>
+          <canvas class="field" id="fS" aria-label="Wave scattering off a smooth, uniform proton. Tap to fire."></canvas>
+        </figure>
+        <figure>
+          <figcaption><span class="sw" style="background:var(--quark)"></span><span id="qcap">Quark proton</span> <small id="qsub">three point-like quarks</small></figcaption>
+          <canvas class="field" id="fQ" aria-label="Wave scattering off point-like quarks. Tap to fire."></canvas>
+        </figure>
+      </div>
+
+      <div class="detector">
+        <div class="dhead">
+          <h2>Detector · how often the beam scatters to each angle</h2>
+          <div class="legend">
+            <span><i style="background:var(--smooth)"></i>Smooth <b id="pS">–</b></span>
+            <span><i style="background:var(--quark)"></i>Quarks <b id="pQ">–</b></span>
+            <span class="note">beyond 45°</span>
+          </div>
+        </div>
+        <canvas id="plot" aria-label="Differential cross-section against scattering angle, log scale"></canvas>
+        <p class="verdict" id="verdict"></p>
+      </div>
+    </section>
+
+    <aside class="rail">
+      <nav class="tabs" id="tabs" aria-label="Control panels">
+        <button type="button" data-tab="g-beam">Beam</button>
+        <button type="button" data-tab="g-target">Target</button>
+        <button type="button" data-tab="g-view">View</button>
+      </nav>
+
+      <div class="group" id="g-beam">
+        <h2>Beam</h2>
+        <div class="row"><label for="k">Momentum <span class="math">k</span></label><input type="range" id="k" min="1.5" max="8.5" step="0.1" value="6"><span class="val" id="kVal">6.0</span></div>
+        <p class="lbl">Wavelength against the target</p>
+        <div class="meter"><canvas id="meter" aria-hidden="true"></canvas></div>
+        <div class="legend mkey"><span><i style="background:var(--accent)"></i>wavelength <b id="mL">1.05</b></span><span><i style="background:var(--quark);opacity:.6;height:9px"></i>quark spacing <b id="mD">1.20</b></span></div>
+        <p class="note" id="resNote"></p>
+      </div>
+
+      <div class="group" id="g-target">
+        <h2>Target</h2>
+        <div class="seg" id="nq">
+          <button type="button" id="nq3" data-v="3">3 quarks · proton</button>
+          <button type="button" id="nq2" data-v="2">2 quarks · meson</button>
+        </div>
+        <div class="row"><label for="d">Spacing</label><input type="range" id="d" min="0.8" max="2" step="0.05" value="1.2"><span class="val" id="dVal">1.20</span></div>
+        <div class="row"><label for="Q">Charge</label><input type="range" id="Q" min="0.5" max="6" step="0.1" value="2.5"><span class="val" id="QVal">2.5</span></div>
+        <label class="check"><input type="checkbox" id="rand" checked> New random orientation each shot</label>
+        <div class="row"><label for="rot">Orientation</label><input type="range" id="rot" min="0" max="360" step="1" value="0" disabled><span class="val" id="rotVal">0°</span></div>
+        <p class="note">The smooth proton always gets the same total charge as the quarks, spread evenly over a disk with the same mean-square radius. A slow beam can't tell them apart.</p>
+      </div>
+
+      <div class="group" id="g-view">
+        <h2>View</h2>
+        <div class="seg" id="show">
+          <button type="button" id="sh-sc" data-v="scat">Scattered wave</button>
+          <button type="button" id="sh-full" data-v="full">Full wave</button>
+        </div>
+        <div class="seg" id="mode">
+          <button type="button" id="m-phase" data-v="phase">ψ + phase</button>
+          <button type="button" id="m-prob" data-v="prob">|ψ|²</button>
+        </div>
+        <label class="check"><input type="checkbox" id="born"> Show first-order theory (Born approximation)</label>
+        <div class="row"><label for="speed">Speed</label><input type="range" id="speed" min="1" max="12" step="1" value="4"><span class="val" id="speedVal">4×</span></div>
+        <p class="note" id="viewNote"></p>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+// ---------- physics core: split-step Schrödinger scattering, ħ = m = 1 ----------
+// Exact far-field cross-section from the T-matrix: the time-Fourier transform of ψ at E0 = k0²/2
+// is the stationary scattering state; f(θ) ∝ ∫ e^{-i k_out·x} V(x) Ψ̃(x) d²x  (only needs the target region).
+function makeEngine(n, L) {
+  const N2 = n * n, DX = L / n, H = L / 2, XMIN = -H;
+  const XC = new Float64Array(n); for (let i = 0; i < n; i++) XC[i] = XMIN + (i + 0.5) * DX;
+  const K1 = new Float64Array(n); for (let i = 0; i < n; i++) K1[i] = 2 * Math.PI / L * (i < n / 2 ? i : i - n);
+  const KNYQ = Math.PI / DX;
+
+  // FFT
+  const BITS = Math.round(Math.log2(n)), rev = new Uint32Array(n), cosT = new Float64Array(n / 2), sinT = new Float64Array(n / 2);
+  for (let i = 0; i < n; i++) { let r = 0; for (let b = 0; b < BITS; b++) r |= ((i >> b) & 1) << (BITS - 1 - b); rev[i] = r; }
+  for (let i = 0; i < n / 2; i++) { cosT[i] = Math.cos(2 * Math.PI * i / n); sinT[i] = Math.sin(2 * Math.PI * i / n); }
+  const br = new Float64Array(n), bi = new Float64Array(n);
+  function fft1(re, im, inv) {
+    for (let i = 0; i < n; i++) { const j = rev[i]; if (j > i) { let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; } }
+    for (let size = 2; size <= n; size <<= 1) {
+      const half = size >> 1, step = n / size;
+      for (let j = 0; j < half; j++) {
+        const wr = cosT[j * step], wi = inv ? sinT[j * step] : -sinT[j * step];
+        for (let a = j; a < n; a += size) {
+          const b = a + half, tr = wr * re[b] - wi * im[b], ti = wr * im[b] + wi * re[b];
+          re[b] = re[a] - tr; im[b] = im[a] - ti; re[a] += tr; im[a] += ti;
+        }
+      }
+    }
+  }
+  function fft2(re, im, inv) {
+    for (let r = 0; r < n; r++) { const o = r * n; for (let i = 0; i < n; i++) { br[i] = re[o + i]; bi[i] = im[o + i]; } fft1(br, bi, inv); for (let i = 0; i < n; i++) { re[o + i] = br[i]; im[o + i] = bi[i]; } }
+    for (let c = 0; c < n; c++) { for (let i = 0; i < n; i++) { br[i] = re[i * n + c]; bi[i] = im[i * n + c]; } fft1(br, bi, inv); for (let i = 0; i < n; i++) { re[i * n + c] = br[i]; im[i * n + c] = bi[i]; } }
+    if (inv) { const s = 1 / N2; for (let i = 0; i < N2; i++) { re[i] *= s; im[i] *= s; } }
+  }
+
+  // ---- targets ----
+  // Quarks: narrow Gaussians on a ring.  Smooth: uniform disk with a soft edge whose mean-square radius matches the quarks.
+  const QW = Math.max(0.15, 1.3 * DX), EDGE = Math.max(0.2, 1.3 * DX);
+  function quarkSites(nq, d, rot) {
+    const r = nq === 3 ? d / Math.sqrt(3) : d / 2, out = [];
+    for (let a = 0; a < nq; a++) { const ang = rot + a * 2 * Math.PI / nq + Math.PI / 2; out.push([r * Math.cos(ang), r * Math.sin(ang)]); }
+    return out;
+  }
+  function smoothRadius(nq, d) {
+    const r = nq === 3 ? d / Math.sqrt(3) : d / 2, ms = r * r + 2 * QW * QW;   // ⟨r²⟩ of the quark cloud
+    // uniform disk ⟨r²⟩ = R²/2 (the soft edge adds ≈ π²a²/3·… small; correct numerically below)
+    let R = Math.sqrt(2 * ms);
+    for (let it = 0; it < 30; it++) { // match ⟨r²⟩ of the soft disk numerically (radial integral)
+      let m0 = 0, m2 = 0; for (let s = 0; s < 4000; s++) { const rr = (s + 0.5) * 0.002, w = rr / (1 + Math.exp((rr - R) / EDGE)); m0 += w; m2 += w * rr * rr; }
+      R *= Math.sqrt(ms / (m2 / m0)) ** 0.8;
+    }
+    return R;
+  }
+  function buildTarget(kind, opts) {
+    const V = new Float64Array(N2); const { nq, d, rot, Q } = opts;
+    if (kind === "smooth") {
+      const R = smoothRadius(nq, d);
+      for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const r = Math.hypot(XC[i], XC[j]); V[j * n + i] = 1 / (1 + Math.exp((r - R) / EDGE)); }
+    } else {
+      const sites = quarkSites(nq, d, rot), f = 1 / (2 * QW * QW);
+      for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { let v = 0; for (const [sx, sy] of sites) { const dx = XC[i] - sx, dy = XC[j] - sy; v += Math.exp(-(dx * dx + dy * dy) * f); } V[j * n + i] = v; }
+    }
+    let s = 0, mx = 0; for (let q = 0; q < N2; q++) { s += V[q]; if (V[q] > mx) mx = V[q]; }
+    const sc = Q / (s * DX * DX); for (let q = 0; q < N2; q++) V[q] *= sc;
+    // bounding box of the target (where V matters)
+    const th = mx * sc * 1e-9; let i0 = n, i1 = -1, j0 = n, j1 = -1;
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) if (V[j * n + i] > th) { if (i < i0) i0 = i; if (i > i1) i1 = i; if (j < j0) j0 = j; if (j > j1) j1 = j; }
+    return { V, box: [i0, i1, j0, j1], vmax: mx * sc };
+  }
+
+  // ---- beam (analytic free packet) ----
+  // ψ_free(x,y,t) = X(x,t) Y(y,t)
+  function beamFactors(b, t, outXr, outXi, outYr, outYi) {
+    const { x0, k, sx, sy } = b;
+    // X
+    { const tau = t / (2 * sx * sx), N = Math.pow(2 * Math.PI * sx * sx, -0.25);
+      // 1/sqrt(1+iτ)
+      const m = Math.pow(1 + tau * tau, -0.25), ph0 = -0.5 * Math.atan(tau);
+      // 1/(1+iτ) = (1 - iτ)/(1+τ²)
+      const ar = 1 / (1 + tau * tau), ai = -tau / (1 + tau * tau), c = 1 / (4 * sx * sx);
+      for (let i = 0; i < n; i++) {
+        const u = XC[i] - x0 - k * t, u2 = u * u * c;
+        const er = -u2 * ar, ei = -u2 * ai + k * XC[i] - 0.5 * k * k * t + ph0;
+        const amp = N * m * Math.exp(er); outXr[i] = amp * Math.cos(ei); outXi[i] = amp * Math.sin(ei);
+      }
+    }
+    { const tau = t / (2 * sy * sy), N = Math.pow(2 * Math.PI * sy * sy, -0.25);
+      const m = Math.pow(1 + tau * tau, -0.25), ph0 = -0.5 * Math.atan(tau);
+      const ar = 1 / (1 + tau * tau), ai = -tau / (1 + tau * tau), c = 1 / (4 * sy * sy);
+      for (let j = 0; j < n; j++) {
+        const u2 = XC[j] * XC[j] * c, er = -u2 * ar, ei = -u2 * ai + ph0;
+        const amp = N * m * Math.exp(er); outYr[j] = amp * Math.cos(ei); outYi[j] = amp * Math.sin(ei);
+      }
+    }
+  }
+  // ψ_free at a single point (complex)
+  function beamAt(b, t, x, y) {
+    const { x0, k, sx, sy } = b;
+    let tau = t / (2 * sx * sx), u = x - x0 - k * t, c = u * u / (4 * sx * sx), d = 1 + tau * tau;
+    let lr = -c / d + (-0.25) * Math.log(d) - 0.25 * Math.log(2 * Math.PI * sx * sx);
+    let li = c * tau / d + k * x - 0.5 * k * k * t - 0.5 * Math.atan(tau);
+    tau = t / (2 * sy * sy); c = y * y / (4 * sy * sy); d = 1 + tau * tau;
+    lr += -c / d - 0.25 * Math.log(d) - 0.25 * Math.log(2 * Math.PI * sy * sy);
+    li += c * tau / d - 0.5 * Math.atan(tau);
+    const a = Math.exp(lr); return [a * Math.cos(li), a * Math.sin(li)];
+  }
+
+  // ---- a simulation (one target) ----
+  function makeSim() {
+    return { pr: new Float64Array(N2), pi: new Float64Array(N2), vc: new Float64Array(N2), vs: new Float64Array(N2),
+             V: null, box: null, accR: null, accI: null, vmax: 0 };
+  }
+  const tc = new Float64Array(N2), ts = new Float64Array(N2), G = new Float64Array(N2);
+  let shot = null;
+  const WABS = 2;
+
+  function setupShot(sims, beam) {
+    const k0 = beam.k, dt = Math.min(0.025, 0.05 / k0);
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const q = j * n + i, T = 0.5 * (K1[i] * K1[i] + K1[j] * K1[j]); tc[q] = Math.cos(-T * dt); ts[q] = Math.sin(-T * dt); }
+    const gmax = 7 * Math.max(k0, 1.5);
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const dd = H - Math.max(Math.abs(XC[i]), Math.abs(XC[j])); G[j * n + i] = dd < WABS ? gmax * ((WABS - dd) / WABS) ** 2 : 0; }
+    const Xr = new Float64Array(n), Xi = new Float64Array(n), Yr = new Float64Array(n), Yi = new Float64Array(n);
+    beamFactors(beam, 0, Xr, Xi, Yr, Yi);
+    for (const s of sims) {
+      for (let q = 0; q < N2; q++) { const amp = Math.exp(-G[q] * dt / 2), ph = -s.V[q] * dt / 2; s.vc[q] = amp * Math.cos(ph); s.vs[q] = amp * Math.sin(ph); }
+      for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const q = j * n + i; s.pr[q] = Xr[i] * Yr[j] - Xi[i] * Yi[j]; s.pi[q] = Xr[i] * Yi[j] + Xi[i] * Yr[j]; }
+      const [i0, i1, j0, j1] = s.box, nb = (i1 - i0 + 1) * (j1 - j0 + 1);
+      s.accR = new Float64Array(nb); s.accI = new Float64Array(nb); s.pt = 0; s.ptMax = 0;
+    }
+    shot = { beam, dt, t: 0, E: 0.5 * k0 * k0, AR: 0, AI: 0 };
+    return shot;
+  }
+
+  function stepSim(s) {
+    const pr = s.pr, pi = s.pi, vc = s.vc, vs = s.vs;
+    for (let i = 0; i < N2; i++) { const a = pr[i], b = pi[i]; pr[i] = a * vc[i] - b * vs[i]; pi[i] = a * vs[i] + b * vc[i]; }
+    fft2(pr, pi, false);
+    for (let i = 0; i < N2; i++) { const a = pr[i], b = pi[i]; pr[i] = a * tc[i] - b * ts[i]; pi[i] = a * ts[i] + b * tc[i]; }
+    fft2(pr, pi, true);
+    for (let i = 0; i < N2; i++) { const a = pr[i], b = pi[i]; pr[i] = a * vc[i] - b * vs[i]; pi[i] = a * vs[i] + b * vc[i]; }
+  }
+  // advance every sim one step and accumulate the time-Fourier transforms
+  function step(sims) {
+    const S = shot; for (const s of sims) stepSim(s);
+    S.t += S.dt;
+    const c = Math.cos(S.E * S.t) * S.dt, sn = Math.sin(S.E * S.t) * S.dt;
+    for (const s of sims) {
+      const [i0, i1, j0, j1] = s.box, w = i1 - i0 + 1; let p = 0, idx = 0;
+      for (let j = j0; j <= j1; j++) { const o = j * n; for (let i = i0; i <= i1; i++, idx++) {
+        const a = s.pr[o + i], b = s.pi[o + i]; s.accR[idx] += a * c - b * sn; s.accI[idx] += a * sn + b * c; p += a * a + b * b; } }
+      s.pt = p * DX * DX; if (s.pt > s.ptMax) s.ptMax = s.pt;
+    }
+    const [fr, fi] = beamAt(S.beam, S.t, 0, 0);
+    S.AR += fr * c - fi * sn; S.AI += fr * sn + fi * c;
+  }
+
+  // far-field |f(θ)|² for NA angles over the full circle (θ measured from +x, counterclockwise)
+  // born=true uses the incident plane wave in place of Ψ̃/A.
+  function crossSection(s, NA, born) {
+    const S = shot, k = S.beam.k, [i0, i1, j0, j1] = s.box, w = i1 - i0 + 1, h = j1 - j0 + 1;
+    const Fr = new Float64Array(w * h), Fi = new Float64Array(w * h);
+    const A2 = S.AR * S.AR + S.AI * S.AI;
+    for (let jj = 0; jj < h; jj++) for (let ii = 0; ii < w; ii++) {
+      const q = (j0 + jj) * n + (i0 + ii), v = s.V[q], idx = jj * w + ii;
+      if (born) { const ph = k * XC[i0 + ii]; Fr[idx] = v * Math.cos(ph); Fi[idx] = v * Math.sin(ph); }
+      else { // V Ψ̃ / A
+        const a = s.accR[idx], b = s.accI[idx]; Fr[idx] = v * (a * S.AR + b * S.AI) / A2; Fi[idx] = v * (b * S.AR - a * S.AI) / A2;
+      }
+    }
+    const out = new Float64Array(NA), exr = new Float64Array(w), exi = new Float64Array(w);
+    for (let a = 0; a < NA; a++) {
+      const th = 2 * Math.PI * a / NA, kx = k * Math.cos(th), ky = k * Math.sin(th);
+      for (let ii = 0; ii < w; ii++) { const ph = -kx * XC[i0 + ii]; exr[ii] = Math.cos(ph); exi[ii] = Math.sin(ph); }
+      let Tr = 0, Ti = 0;
+      for (let jj = 0; jj < h; jj++) {
+        let rr = 0, ri = 0; const o = jj * w;
+        for (let ii = 0; ii < w; ii++) { const fr = Fr[o + ii], fi = Fi[o + ii]; rr += fr * exr[ii] - fi * exi[ii]; ri += fr * exi[ii] + fi * exr[ii]; }
+        const ph = -ky * XC[j0 + jj], cy = Math.cos(ph), sy = Math.sin(ph);
+        Tr += rr * cy - ri * sy; Ti += rr * sy + ri * cy;
+      }
+      Tr *= DX * DX; Ti *= DX * DX;
+      out[a] = (Tr * Tr + Ti * Ti) / (2 * Math.PI * k);
+    }
+    return out;
+  }
+
+  function norm(s) { let p = 0; for (let q = 0; q < N2; q++) p += s.pr[q] * s.pr[q] + s.pi[q] * s.pi[q]; return p * DX * DX; }
+
+  return { n, N2, L, DX, H, XC, KNYQ, QW, EDGE, WABS, makeSim, buildTarget, quarkSites, smoothRadius, setupShot, step, crossSection, beamFactors, beamAt, norm, get shot() { return shot; } };
+}
+if (typeof module !== "undefined") module.exports = { makeEngine };
+
+</script>
+<script>
+(() => {
+"use strict";
+const $ = id => document.getElementById(id);
+const E = makeEngine(128, 20), n = E.n, XC = E.XC, DX = E.DX;
+const VIEW = 7.4;
+let iv0 = 0; while (XC[iv0] < -VIEW) iv0++; let iv1 = n - 1; while (XC[iv1] > VIEW) iv1--;
+const m = iv1 - iv0 + 1, VX0 = XC[iv0] - DX / 2, VSPAN = m * DX;
+
+// ---------- state ----------
+const S = { k: 6, nq: 3, d: 1.2, Q: 2.5, rand: true, rot: 0, auto: true, show: "scat", mode: "phase", born: false, speed: 4 };
+const BEAM = () => ({ x0: -4.6, k: S.k, sx: 1.0, sy: 2.4 });
+const sims = [E.makeSim(), E.makeSim()]; sims[0].kind = "smooth"; sims[1].kind = "quark";
+const NA = 360;
+let acc = null;           // accumulated cross-sections
+function clearAcc() { acc = { n: 0, ex: [new Float64Array(NA), new Float64Array(NA)], bo: [new Float64Array(NA), new Float64Array(NA)], k: S.k }; }
+clearAcc();
+let shot = null;          // { phase: "run" | "out", rot, measured }
+let sites = [], smoothR = 1, pauseUntil = 0, dirty = false, smoothKey = "";
+
+function buildTargets(rot) {
+  const key = `${S.nq}|${S.d}|${S.Q}`;
+  if (key !== smoothKey) { Object.assign(sims[0], E.buildTarget("smooth", { nq: S.nq, d: S.d, rot: 0, Q: S.Q })); smoothKey = key; smoothR = E.smoothRadius(S.nq, S.d); sims[0].tint = null; }
+  Object.assign(sims[1], E.buildTarget("quark", { nq: S.nq, d: S.d, rot, Q: S.Q })); sims[1].tint = null;
+  sites = E.quarkSites(S.nq, S.d, rot);
+}
+function fire() {
+  const rot = S.rand ? Math.random() * 2 * Math.PI : S.rot * Math.PI / 180;
+  buildTargets(rot);
+  E.setupShot(sims, BEAM());
+  shot = { phase: "run", rot, peak: 0 };
+  resetScale = true;
+}
+const tEnd = () => (4.6 + 1.2) / S.k;
+function finishMeasure() {
+  for (let a = 0; a < 2; a++) {
+    const ex = E.crossSection(sims[a], NA, false), bo = E.crossSection(sims[a], NA, true);
+    for (let i = 0; i < NA; i++) { acc.ex[a][i] += ex[i]; acc.bo[a][i] += bo[i]; }
+  }
+  acc.n++; shot.phase = "out"; plotDirty = true; updateVerdict();
+}
+
+// ---------- colour ----------
+let C = {}; const HUE = new Uint8ClampedArray(360 * 3);
+function hexRGB(h) { h = h.replace("#", ""); if (h.length === 3) h = h.split("").map(c => c + c).join(""); const v = parseInt(h, 16); return [(v >> 16) & 255, (v >> 8) & 255, v & 255]; }
+function hslRGB(h, s, l) { s /= 100; l /= 100; const k = m => (m + h / 30) % 12, a = s * Math.min(l, 1 - l), f = m => l - a * Math.max(-1, Math.min(k(m) - 3, Math.min(9 - k(m), 1))); return [255 * f(0), 255 * f(8), 255 * f(4)]; }
+let themeKey = "";
+function readTokens() {
+  const cs = getComputedStyle(document.documentElement), g = v => cs.getPropertyValue(v).trim();
+  const key = g("--plot") + g("--ink");
+  if (key === themeKey) return; themeKey = key;
+  C = { plot: g("--plot"), ink: g("--ink"), muted: g("--muted"), line: g("--line"), grid: g("--grid"), accent: g("--accent"), smooth: g("--smooth"), quark: g("--quark"),
+        qcol: [g("--qr"), g("--qg"), g("--qb")], rPlot: hexRGB(g("--plot")), rTint: hexRGB(g("--pot-tint")), rAcc: hexRGB(g("--accent")), rInk: hexRGB(g("--ink")),
+        L: parseFloat(g("--phase-l")), Sa: parseFloat(g("--phase-s")), mono: g("--f-mono") || "monospace" };
+  for (let h = 0; h < 360; h++) { const c = hslRGB(h, C.Sa, C.L); HUE[h * 3] = c[0]; HUE[h * 3 + 1] = c[1]; HUE[h * 3 + 2] = c[2]; }
+  sims[0].tint = sims[1].tint = null; plotDirty = true; meterDirty = true;
+}
+
+// ---------- canvases ----------
+const cvS = $("fS"), cvQ = $("fQ"), cvP = $("plot"), cvM = $("meter");
+const fields = [{ cv: cvS, ctx: cvS.getContext("2d"), w: 0 }, { cv: cvQ, ctx: cvQ.getContext("2d"), w: 0 }];
+const ctxP = cvP.getContext("2d"), ctxM = cvM.getContext("2d");
+let PW = 0, PH = 0, MW = 0, MH = 0, plotDirty = true, meterDirty = true;
+function fit() {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  for (const f of fields) { const r = f.cv.getBoundingClientRect(); f.cv.width = Math.max(1, Math.round(r.width * dpr)); f.cv.height = Math.max(1, Math.round(r.height * dpr)); f.ctx.setTransform(dpr, 0, 0, dpr, 0, 0); f.w = r.width; }
+  let r = cvP.getBoundingClientRect(); cvP.width = Math.max(1, Math.round(r.width * dpr)); cvP.height = Math.max(1, Math.round(r.height * dpr)); ctxP.setTransform(dpr, 0, 0, dpr, 0, 0); PW = r.width; PH = r.height;
+  r = cvM.getBoundingClientRect(); cvM.width = Math.max(1, Math.round(r.width * dpr)); cvM.height = Math.max(1, Math.round(r.height * dpr)); ctxM.setTransform(dpr, 0, 0, dpr, 0, 0); MW = r.width; MH = r.height;
+  plotDirty = meterDirty = true;
+}
+new ResizeObserver(fit).observe(document.querySelector(".wrap"));
+
+const off = document.createElement("canvas"); off.width = m; off.height = m;
+const offCtx = off.getContext("2d"), img = offCtx.createImageData(m, m);
+const Xr = new Float64Array(n), Xi = new Float64Array(n), Yr = new Float64Array(n), Yi = new Float64Array(n);
+let ref = 1, resetScale = true;
+
+function buildTint(s) {
+  const t = new Float32Array(m * m * 3), vm = s.vmax || 1;
+  for (let jj = 0; jj < m; jj++) for (let ii = 0; ii < m; ii++) {
+    const q = (iv0 + jj) * n + iv0 + ii, a = Math.min(1, s.V[q] / vm) * 0.9, o = (jj * m + ii) * 3;
+    for (let c = 0; c < 3; c++) t[o + c] = C.rPlot[c] + (C.rTint[c] - C.rPlot[c]) * a;
+  }
+  s.tint = t;
+}
+function drawFields() {
+  const live = !!E.shot && !!shot, scat = S.show === "scat" && live;
+  if (live && scat) E.beamFactors(E.shot.beam, E.shot.t, Xr, Xi, Yr, Yi);
+  // shared brightness scale across both chambers
+  let cur = 0;
+  if (live) for (const s of sims) for (let j = iv0; j <= iv1; j++) for (let i = iv0; i <= iv1; i++) {
+    const q = j * n + i; let a = s.pr[q], b = s.pi[q];
+    if (scat) { a -= Xr[i] * Yr[j] - Xi[i] * Yi[j]; b -= Xr[i] * Yi[j] + Xi[i] * Yr[j]; }
+    const v = a * a + b * b; if (v > cur) cur = v;
+  }
+  cur = Math.sqrt(cur);
+  const floor = 0.025 * 0.23;  // ≈ 2.5% of the beam's peak amplitude
+  if (S.mode === "prob") cur = cur * cur;
+  const fl = S.mode === "prob" ? floor * floor : floor;
+  if (resetScale) { ref = Math.max(cur, fl); resetScale = false; } else ref = cur > ref ? cur : Math.max(fl, ref + (cur - ref) * 0.04);
+  const inv = 1 / ref;
+  for (let f = 0; f < 2; f++) {
+    const s = sims[f], F = fields[f], c = F.ctx, W = F.w; if (!W) continue;
+    if (!s.V) { c.clearRect(0, 0, W, W); continue; }
+    if (!s.tint) buildTint(s);
+    const d = img.data, t = s.tint;
+    for (let jj = 0; jj < m; jj++) {
+      const j = iv0 + jj, row = (m - 1 - jj) * m;
+      for (let ii = 0; ii < m; ii++) {
+        const i = iv0 + ii, q = j * n + i, o = (row + ii) * 4, tb = (jj * m + ii) * 3;
+        let al = 0, c0 = 0, c1 = 0, c2 = 0;
+        if (live) {
+          let a = s.pr[q], b = s.pi[q];
+          if (scat) { a -= Xr[i] * Yr[j] - Xi[i] * Yi[j]; b -= Xr[i] * Yi[j] + Xi[i] * Yr[j]; }
+          const p = a * a + b * b;
+          if (S.mode === "phase") {
+            al = Math.min(1, Math.pow(Math.sqrt(p) * inv, 0.65));
+            let h = Math.round(Math.atan2(b, a) * 57.29578); if (h < 0) h += 360; if (h >= 360) h -= 360;
+            c0 = HUE[h * 3]; c1 = HUE[h * 3 + 1]; c2 = HUE[h * 3 + 2];
+          } else {
+            al = Math.min(1, Math.pow(p * inv, 0.6)); const tt = Math.max(0, (al - 0.6) / 0.4) * 0.5;
+            c0 = C.rAcc[0] + (C.rInk[0] - C.rAcc[0]) * tt; c1 = C.rAcc[1] + (C.rInk[1] - C.rAcc[1]) * tt; c2 = C.rAcc[2] + (C.rInk[2] - C.rAcc[2]) * tt;
+          }
+        }
+        d[o] = t[tb] + (c0 - t[tb]) * al; d[o + 1] = t[tb + 1] + (c1 - t[tb + 1]) * al; d[o + 2] = t[tb + 2] + (c2 - t[tb + 2]) * al; d[o + 3] = 255;
+      }
+    }
+    offCtx.putImageData(img, 0, 0);
+    c.imageSmoothingEnabled = true; c.imageSmoothingQuality = "high";
+    c.clearRect(0, 0, W, W); c.drawImage(off, 0, 0, W, W);
+    overlay(c, W, f);
+  }
+}
+const w2p = (x, W) => (x - VX0) / VSPAN * W, w2py = (y, W) => (1 - (y - VX0) / VSPAN) * W;
+function overlay(c, W, f) {
+  const cx = w2p(0, W), cy = w2py(0, W), sc = W / VSPAN;
+  // detector ring
+  const R = 6.6 * sc;
+  c.strokeStyle = C.grid; c.lineWidth = 1; c.setLineDash([3, 4]); c.beginPath(); c.arc(cx, cy, R, 0, Math.PI * 2); c.stroke(); c.setLineDash([]);
+  c.font = `${W < 220 ? 9.5 : 11}px ${C.mono}`; c.fillStyle = C.muted; c.textBaseline = "middle";
+  const ticks = W < 220 ? [0, 90, 180] : [0, 45, 90, 135, 180];
+  for (const a of ticks) {
+    const th = a * Math.PI / 180, x = cx + Math.cos(th) * R, y = cy - Math.sin(th) * R;
+    c.strokeStyle = C.muted; c.globalAlpha = 0.6; c.beginPath(); c.moveTo(cx + Math.cos(th) * (R - 4), cy - Math.sin(th) * (R - 4)); c.lineTo(cx + Math.cos(th) * (R + 4), cy - Math.sin(th) * (R + 4)); c.stroke(); c.globalAlpha = 1;
+    const lx = cx + Math.cos(th) * (R - 12), ly = cy - Math.sin(th) * (R - 12);
+    c.textAlign = a === 0 ? "right" : a === 180 ? "left" : "center"; c.fillText(a + "°", a === 0 ? lx + 2 : a === 180 ? lx - 2 : lx, a === 90 ? ly + 3 : ly);
+  }
+  // beam arrow
+  c.fillStyle = C.muted; c.textAlign = "left"; c.textBaseline = "alphabetic";
+  c.fillText("beam →", 6, W - 7);
+  // target outline
+  if (f === 0) {
+    c.strokeStyle = C.smooth; c.lineWidth = 1.5; c.setLineDash([4, 3]);
+    c.beginPath(); c.arc(cx, cy, smoothR * sc, 0, Math.PI * 2); c.stroke(); c.setLineDash([]);
+  } else {
+    const r = Math.max(2.5, E.QW * sc * 1.1);
+    sites.forEach(([x, y], a) => {
+      const px = w2p(x, W), py = w2py(y, W);
+      c.fillStyle = C.qcol[a % 3]; c.beginPath(); c.arc(px, py, r, 0, Math.PI * 2); c.fill();
+      c.strokeStyle = C.plot; c.lineWidth = 1; c.stroke();
+    });
+  }
+}
+
+// ---------- detector plot ----------
+const PM = { l: 50, r: 12, t: 10, b: 34 };
+let hoverTh = -1;
+function folded(arr) {
+  const out = new Float64Array(181);
+  for (let a = 0; a <= 180; a++) out[a] = 0.5 * (arr[a % NA] + arr[(NA - a) % NA]) / Math.max(1, acc.n);
+  return out;
+}
+const SUP = { "-": "⁻", 0: "⁰", 1: "¹", 2: "²", 3: "³", 4: "⁴", 5: "⁵", 6: "⁶", 7: "⁷", 8: "⁸", 9: "⁹" };
+const pow10 = e => e === 0 ? "1" : e === 1 ? "10" : "10" + String(e).split("").map(ch => SUP[ch]).join("");
+function drawPlot() {
+  const c = ctxP, W = PW, H = PH; if (!W) return;
+  c.clearRect(0, 0, W, H); c.fillStyle = C.plot; c.fillRect(0, 0, W, H);
+  const x0 = PM.l, x1 = W - PM.r, y0 = PM.t, y1 = H - PM.b;
+  const th2x = th => x0 + th / 180 * (x1 - x0);
+  c.font = `11px ${C.mono}`;
+  // x axis
+  c.fillStyle = C.muted; c.textAlign = "center"; c.textBaseline = "top";
+  for (let th = 0; th <= 180; th += 30) { const x = th2x(th); c.fillStyle = C.grid; c.fillRect(Math.round(x), y0, 1, y1 - y0); c.fillStyle = C.muted; c.fillText(th + "°", x, y1 + 5); }
+  c.textAlign = "left"; c.fillText("forward", x0, y1 + 19); c.textAlign = "right"; c.fillText("straight back", x1, y1 + 19);
+  if (W > 520) { c.textAlign = "center"; c.fillText("scattering angle θ", (x0 + x1) / 2, y1 + 19); }
+  if (!acc.n) {
+    c.fillStyle = C.muted; c.textAlign = "center"; c.textBaseline = "middle"; c.font = `12px ${C.mono}`;
+    c.fillText(shot ? "Measuring the first shot…" : "Fire a shot to start measuring", (x0 + x1) / 2, (y0 + y1) / 2);
+    return;
+  }
+  const curves = [folded(acc.ex[0]), folded(acc.ex[1])], borns = [folded(acc.bo[0]), folded(acc.bo[1])];
+  let mx = 0; for (const cu of curves) for (const v of cu) if (v > mx) mx = v;
+  const top = Math.ceil(Math.log10(mx) + 0.15), bot = top - 9;
+  const v2y = v => { const l = Math.log10(Math.max(v, 1e-300)); return y0 + (top - Math.max(bot - 1, l)) / (top - bot) * (y1 - y0); };
+  c.textAlign = "right"; c.textBaseline = "middle";
+  for (let e = bot; e <= top; e++) { const y = v2y(Math.pow(10, e)); c.fillStyle = C.grid; c.fillRect(x0, Math.round(y), x1 - x0, 1); if ((top - e) % (H < 210 ? 3 : 2) === 0) { c.fillStyle = C.muted; c.fillText(pow10(e), x0 - 6, y); } }
+  c.save(); c.translate(12, (y0 + y1) / 2); c.rotate(-Math.PI / 2); c.textAlign = "center"; c.fillStyle = C.muted; c.fillText("dσ/dθ", 0, 0); c.restore();
+  c.save(); c.beginPath(); c.rect(x0, y0 - 1, x1 - x0, y1 - y0 + 2); c.clip();
+  const cols = [C.smooth, C.quark];
+  // fill under the quark curve
+  c.globalAlpha = 0.12; c.fillStyle = C.quark; c.beginPath(); c.moveTo(th2x(0), y1);
+  for (let a = 0; a <= 180; a++) c.lineTo(th2x(a), v2y(curves[1][a])); c.lineTo(th2x(180), y1); c.closePath(); c.fill(); c.globalAlpha = 1;
+  if (S.born) for (let f = 0; f < 2; f++) {
+    c.strokeStyle = cols[f]; c.lineWidth = 1.3; c.setLineDash([5, 4]); c.globalAlpha = 0.85; c.beginPath();
+    for (let a = 0; a <= 180; a++) { const x = th2x(a), y = v2y(borns[f][a]); a ? c.lineTo(x, y) : c.moveTo(x, y); } c.stroke(); c.setLineDash([]); c.globalAlpha = 1;
+  }
+  for (let f = 0; f < 2; f++) {
+    c.strokeStyle = cols[f]; c.lineWidth = 2.2; c.lineJoin = "round"; c.beginPath();
+    for (let a = 0; a <= 180; a++) { const x = th2x(a), y = v2y(curves[f][a]); a ? c.lineTo(x, y) : c.moveTo(x, y); } c.stroke();
+  }
+  c.restore();
+  if (hoverTh >= 0) {
+    const a = Math.round(hoverTh), x = th2x(a);
+    c.strokeStyle = C.ink; c.globalAlpha = 0.35; c.lineWidth = 1; c.beginPath(); c.moveTo(x + 0.5, y0); c.lineTo(x + 0.5, y1); c.stroke(); c.globalAlpha = 1;
+    for (let f = 0; f < 2; f++) { c.fillStyle = cols[f]; c.beginPath(); c.arc(x, v2y(curves[f][a]), 3.5, 0, Math.PI * 2); c.fill(); }
+    const ratio = curves[1][a] / Math.max(curves[0][a], 1e-300);
+    const txt = `θ ${a}°   quarks ÷ smooth ${ratio >= 100 ? "×" + fmtBig(ratio) : ratio >= 1 ? "×" + ratio.toFixed(ratio < 10 ? 2 : 0) : "×" + ratio.toFixed(2)}`;
+    c.font = `500 12px ${C.mono}`; const tw = c.measureText(txt).width;
+    const bx = Math.min(Math.max(x - tw / 2 - 6, x0), x1 - tw - 12);
+    c.fillStyle = C.plot; c.globalAlpha = 0.9; c.fillRect(bx, y0 + 4, tw + 12, 20); c.globalAlpha = 1;
+    c.fillStyle = C.ink; c.textAlign = "left"; c.textBaseline = "middle"; c.fillText(txt, bx + 6, y0 + 14);
+  }
+}
+const fmtBig = v => v >= 1e6 ? (v / Math.pow(10, Math.floor(Math.log10(v)))).toFixed(1) + "e" + Math.floor(Math.log10(v)) : Math.round(v).toLocaleString("en-US");
+cvP.addEventListener("pointermove", e => { const r = cvP.getBoundingClientRect(), x = e.clientX - r.left; const t = (x - PM.l) / (PW - PM.l - PM.r) * 180; hoverTh = t < 0 || t > 180 ? -1 : t; plotDirty = true; });
+cvP.addEventListener("pointerdown", e => { const r = cvP.getBoundingClientRect(), x = e.clientX - r.left; const t = (x - PM.l) / (PW - PM.l - PM.r) * 180; hoverTh = Math.max(0, Math.min(180, t)); plotDirty = true; });
+cvP.addEventListener("pointerleave", e => { if (e.pointerType === "mouse") { hoverTh = -1; plotDirty = true; } });
+
+function largeAngleShare(arr) {
+  let tot = 0, big = 0; for (let a = 0; a < NA; a++) { const th = Math.min(a, NA - a); tot += arr[a]; if (th > 45) big += arr[a]; }
+  return tot > 0 ? big / tot : 0;
+}
+const pct = v => v >= 0.1 ? (100 * v).toFixed(0) + "%" : v >= 0.001 ? (100 * v).toFixed(1) + "%" : v >= 1e-5 ? (100 * v).toFixed(3) + "%" : "<0.001%";
+function updateVerdict() {
+  if (!acc.n) { $("pS").textContent = $("pQ").textContent = "–"; $("verdict").textContent = "Each shot is one wave packet. The plot averages every shot fired at this momentum."; return; }
+  const sS = largeAngleShare(acc.ex[0]), sQ = largeAngleShare(acc.ex[1]);
+  $("pS").textContent = pct(sS); $("pQ").textContent = pct(sQ);
+  const lam = 2 * Math.PI / S.k, r = sQ / Math.max(sS, 1e-12);
+  let msg;
+  if (r < 2) msg = `<b>Indistinguishable.</b> At λ = ${lam.toFixed(2)} the beam is too coarse to see inside the proton. Both targets scatter almost the same way. Raise the momentum.`;
+  else if (r < 30) msg = `<b>Structure starting to show.</b> The quark target sends ${r.toFixed(0)}× more of its scattering past 45°. Shorter wavelengths will widen the gap.`;
+  else msg = `<b>Quarks resolved.</b> Past 45°, the quark target scatters ${fmtBig(r)}× more than the smooth one. Hard knocks off point-like charges are what the 1968 SLAC experiment saw.`;
+  $("verdict").innerHTML = msg + ` <span>Averaged over ${acc.n} shot${acc.n > 1 ? "s" : ""}.</span>`;
+}
+
+// ---------- wavelength meter ----------
+function drawMeter() {
+  const c = ctxM, W = MW, H = MH; if (!W) return;
+  c.clearRect(0, 0, W, H);
+  const span = 7, s = W / span, lam = 2 * Math.PI / S.k, mid = H / 2;
+  // quark spacing marker
+  c.fillStyle = C.quark; c.globalAlpha = 0.2; c.fillRect(8, 3, S.d * s, H - 6); c.globalAlpha = 1;
+  c.fillRect(8, 3, 1.5, H - 6); c.fillRect(8 + S.d * s - 1.5, 3, 1.5, H - 6);
+  // wave
+  c.strokeStyle = C.accent; c.lineWidth = 1.8; c.beginPath();
+  for (let px = 0; px <= W; px++) { const x = px / s, y = mid - Math.sin(2 * Math.PI * x / lam) * (H * 0.3); px ? c.lineTo(px, y) : c.moveTo(px, y); } c.stroke();
+}
+function updateResNote() {
+  const lam = 2 * Math.PI / S.k, ratio = lam / S.d;
+  $("resNote").innerHTML = ratio > 1.6 ? `The wavelength is <b>${ratio.toFixed(1)}× the quark spacing</b>. The beam is too blurry to see individual quarks.`
+    : ratio > 0.8 ? `The wavelength is <b>about the quark spacing</b>. The beam is starting to resolve the quarks.`
+    : `The wavelength is <b>shorter than the quark spacing</b>. The beam can pick out individual quarks.`;
+  $("r-k").textContent = S.k.toFixed(1); $("r-l").textContent = lam.toFixed(2); $("r-d").textContent = S.d.toFixed(2);
+  $("mL").textContent = lam.toFixed(2); $("mD").textContent = S.d.toFixed(2);
+  meterDirty = true;
+}
+
+// ---------- loop ----------
+let stepCost = 4, frame = 0;
+function loop() {
+  if (frame++ % 30 === 0) readTokens();
+  const now = performance.now();
+  if (dirty) { dirty = false; clearAcc(); updateVerdict(); plotDirty = true; fire(); }
+  if (!shot && S.auto && now > pauseUntil) fire();
+  if (shot && E.shot) {
+    const budget = 13, want = S.speed, steps = Math.max(1, Math.min(want, Math.floor(budget / Math.max(0.3, stepCost))));
+    const t0 = performance.now();
+    for (let i = 0; i < steps; i++) E.step(sims);
+    stepCost = stepCost * 0.8 + 0.2 * (performance.now() - t0) / steps;
+    const sh = E.shot;
+    if (shot.phase === "run" && sh.t > tEnd() && sims.every(s => s.pt < 1e-5 * s.ptMax)) finishMeasure();
+    if (shot.phase === "out" && (frame % 6 === 0)) {
+      const left = Math.max(E.norm(sims[0]), E.norm(sims[1]));
+      if (left < 2e-3 || sh.t * S.k > 28) { shot = null; pauseUntil = now + 350; }
+    }
+    if (shot && shot.phase === "run" && sh.t * S.k > 60) finishMeasure(); // safety cap
+  }
+  drawFields();
+  if (plotDirty) { drawPlot(); plotDirty = false; }
+  if (meterDirty) { drawMeter(); meterDirty = false; }
+  $("r-s").textContent = acc.n;
+  $("r-st").textContent = !shot ? (S.auto ? "Reloading" : "Ready") : shot.phase === "run" ? "Colliding" : "Measured";
+  requestAnimationFrame(loop);
+}
+
+// ---------- controls ----------
+function seg(id, key, conv, after) {
+  const el = $(id);
+  const sync = () => el.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(conv(b.dataset.v) === S[key])));
+  el.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; S[key] = conv(b.dataset.v); sync(); after && after(); });
+  sync();
+}
+const id = v => v;
+seg("nq", "nq", v => +v, () => { syncNq(); updateResNote(); dirty = true; });
+seg("show", "show", id, () => { resetScale = true; syncViewNote(); });
+seg("mode", "mode", id, () => { resetScale = true; });
+function syncNq() { $("qcap").textContent = S.nq === 3 ? "Quark proton" : "Quark meson"; $("qsub").textContent = S.nq === 3 ? "three point-like quarks" : "quark and antiquark"; }
+function syncViewNote() { $("viewNote").textContent = S.show === "scat" ? "Shows only what the target adds: the full wave minus the beam that would have passed through an empty chamber." : "Shows the whole wave: the incoming beam plus everything the target scatters."; }
+
+$("k").addEventListener("input", e => { S.k = +e.target.value; $("kVal").textContent = S.k.toFixed(1); updateResNote(); dirty = true; });
+$("d").addEventListener("input", e => { S.d = +e.target.value; $("dVal").textContent = S.d.toFixed(2); updateResNote(); dirty = true; });
+$("Q").addEventListener("input", e => { S.Q = +e.target.value; $("QVal").textContent = S.Q.toFixed(1); dirty = true; });
+$("rand").addEventListener("change", e => { S.rand = e.target.checked; $("rot").disabled = S.rand; dirty = true; });
+$("rot").addEventListener("input", e => { S.rot = +e.target.value; $("rotVal").textContent = S.rot + "°"; dirty = true; });
+$("born").addEventListener("change", e => { S.born = e.target.checked; plotDirty = true; });
+$("speed").addEventListener("input", e => { S.speed = +e.target.value; $("speedVal").textContent = S.speed + "×"; });
+function syncAuto() { $("auto").setAttribute("aria-pressed", String(S.auto)); }
+$("auto").addEventListener("click", () => { S.auto = !S.auto; syncAuto(); });
+$("fire").addEventListener("click", () => fire());
+$("clear").addEventListener("click", () => { clearAcc(); updateVerdict(); plotDirty = true; });
+cvS.addEventListener("click", () => fire()); cvQ.addEventListener("click", () => fire());
+addEventListener("keydown", e => { if (e.code === "Space" && (e.target === document.body || e.target.tagName === "CANVAS")) { e.preventDefault(); fire(); } });
+
+let tab = "g-beam";
+try { tab = localStorage.getItem("itp-tab") || tab; } catch (e) {}
+function syncTabs() {
+  document.querySelectorAll("#tabs button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.tab === tab)));
+  document.querySelectorAll(".group").forEach(g => g.classList.toggle("active", g.id === tab));
+}
+$("tabs").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; tab = b.dataset.tab; syncTabs(); try { localStorage.setItem("itp-tab", tab); } catch (e) {} });
+
+syncTabs(); syncNq(); syncViewNote(); syncAuto(); updateResNote(); updateVerdict();
+readTokens(); fit();
+buildTargets(0);
+requestAnimationFrame(loop);
+})();
+</script>
+
+</body>
+</html>
