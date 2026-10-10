@@ -121,9 +121,35 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
 .stage{display:grid;gap:12px;width:100%;max-width:min(100%,82vh);margin-inline:auto;min-width:0}
 .afield{width:100%;aspect-ratio:1;max-width:100%;touch-action:manipulation}
 .afield.drag{cursor:grab;touch-action:pan-y}
-@media (min-width:1080px){.stage{max-width:min(100%,max(340px,calc(100vh - 500px)))}}
+.pm{display:grid;gap:10px;min-width:0}
+.lmcol{display:grid;gap:6px;min-width:0}
+.lmwrap{position:relative;height:180px;background:var(--plot);border-radius:6px}
+#aLad{position:absolute;inset:0;width:100%;height:100%}
+#jLive{font-size:12px;line-height:1.35;min-height:2.7em}
+@media (min-width:1080px){   /* the stage is the picture plus a 244px map column; picture + map + spectrum strip fit in one laptop screen, the radial plot may fall below it */
+  .stage{max-width:min(100%,calc(max(340px,100vh - 380px) + 244px))}
+  .pm{grid-template-columns:minmax(0,1fr) 232px;gap:12px}
+  .lmcol{contain:size;grid-template-rows:minmax(0,1fr) auto}
+  .lmwrap{height:auto}
+  #jLive{height:5.4em;overflow:hidden}
+}
+@media (min-width:1080px) and (max-height:920px){.stage #aPlot{height:120px}}
 .afield.drag:active{cursor:grabbing}
 #aPlot{width:100%;height:170px}
+#aSpec{width:100%;height:64px;cursor:ew-resize;touch-action:pan-y}
+#aSpec:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.dctl{display:flex;align-items:center;gap:12px}
+.lmb{position:absolute;width:32px;height:32px;margin:-16px 0 0 -16px;padding:0;border:0;border-radius:50%;background:none;cursor:pointer}
+.lmb::before{content:"";position:absolute;left:50%;top:50%;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;border-radius:50%;background:var(--panel);border:1.5px solid var(--muted)}
+.lmb:disabled{cursor:default}
+.lmb:disabled::before{opacity:.3}
+.lmb.ok::before{width:13px;height:13px;margin:-6.5px 0 0 -6.5px;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft),0 0 9px var(--accent)}
+.lmb.ok:hover::before,.lmb.ok:focus-visible::before{background:var(--accent);box-shadow:0 0 0 4px var(--accent-soft),0 0 12px var(--accent)}
+.lmb.cur::before,.lmb.tgt::before{opacity:1}
+.lmb.cur::before{width:11px;height:11px;margin:-5.5px 0 0 -5.5px;background:var(--accent);border-color:var(--accent);box-shadow:0 0 0 2px var(--plot),0 0 0 3.5px var(--accent)}
+.lmb.tgt::before{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.lnk{border:0;background:none;color:var(--accent);font:inherit;font-size:12.5px;text-decoration:underline;cursor:pointer;padding:2px 0}
+.btn:disabled{opacity:.4;cursor:default}
 .seg.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(60px,1fr))}
 .seg.grid button{border:1px solid var(--line);border-width:1px 0 0 1px;margin:-1px 0 0 -1px;font-size:12.5px;overflow-wrap:anywhere}
 .seg button:disabled{opacity:.35;cursor:default}
@@ -161,7 +187,17 @@ sub{font-size:.75em;line-height:0}
         </div>
       </div>
       <div class="stage">
-        <div class="afwrap"><canvas class="afield" id="aCv" role="img" aria-label="Hydrogen orbital"></canvas><canvas id="aGl" aria-hidden="true" hidden></canvas></div>
+        <div class="pm">
+          <div class="afwrap"><canvas class="afield" id="aCv" role="img" aria-label="Hydrogen orbital"></canvas><canvas id="aGl" aria-hidden="true" hidden></canvas></div>
+          <div class="lmcol">
+            <div class="lmwrap" id="lmWrap" role="group" aria-label="Energy-level map of hydrogen. Pick a glowing level to make the electron jump there."><canvas id="aLad" role="img" aria-label="Energy levels of hydrogen"></canvas></div>
+            <p class="note" id="jLive" aria-live="polite"></p>
+          </div>
+        </div>
+        <div class="detector">
+          <div class="dhead" style="row-gap:4px"><h2>Hydrogen's spectrum · lines you've made</h2><span class="dctl"><span class="note"><span id="aSpecN">0 of 10 lines found</span> · <button type="button" class="lnk" id="aSpecReset">Reset</button></span><button type="button" class="btn primary" id="sFire" title="Fire the aimed photon (Enter)"><svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><path d="M3 10h10.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M11 5.5l5 4.5-5 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Fire</button></span></div>
+          <canvas id="aSpec" role="slider" tabindex="0" aria-orientation="horizontal" aria-valuemin="90" aria-valuemax="4100" aria-label="Photon colour"></canvas>
+        </div>
         <div class="detector">
           <div class="dhead"><h2>Radial probability · how far from the nucleus</h2></div>
           <canvas id="aPlot" role="img" aria-label="Radial probability against distance from the nucleus"></canvas>
@@ -174,6 +210,7 @@ sub{font-size:.75em;line-height:0}
       <nav class="tabs" id="atabs" aria-label="Control panels">
         <button type="button" data-tab="ag-orb">Orbital</button>
         <button type="button" data-tab="ag-view">View</button>
+        <button type="button" data-tab="ag-light">Light</button>
       </nav>
 
       <div class="group" id="ag-orb">
@@ -225,6 +262,16 @@ sub{font-size:.75em;line-height:0}
           <div class="row"><label for="a-tilt">Tilt</label><input type="range" id="a-tilt" min="-90" max="90" step="1" value="0"><span class="val" id="a-tiltVal">0°</span></div>
         </div>
         <p class="note" id="a-vnote"></p>
+      </div>
+
+      <div class="group" id="ag-light">
+        <h2>Light</h2>
+        <p class="note">A jump is the electron moving to another energy level. Dropping to a lower level gives off a photon; taking in a photon of exactly the right colour lifts it to a higher one.</p>
+        <p class="note">Light carries away one unit of angular momentum, so l must change by exactly 1.</p>
+        <p class="note"><b>How to use:</b> Tap a glowing level to jump. Tap the spectrum to aim a photon, then Fire.</p>
+        <p class="lbl">Latest jump</p>
+        <p class="note" id="jNote"></p>
+        <div><button type="button" class="lnk" id="aSpecReset2">Reset found lines</button></div>
       </div>
     </aside>
   </div>
@@ -957,7 +1004,7 @@ window.itpNucleus = { show(on) { active = on; if (!on) return; readTokens(); fit
 const $ = id => document.getElementById(id);
 const H = makeHydrogen();
 const A = { n: 3, l: 1, m: 0, style: "chem", mode: "surface", plane: "xz", tilt: 0, lev: 90, cut: false, grid: true };
-let info = H.radial(A.n, A.l), active = false, sliceDirty = true, cloudDirty = true, plotDirty = true, raf = 0, last = 0, themeTimer = 0;
+let info = H.radial(A.n, A.l), Rd = 0, active = false, sliceDirty = true, cloudDirty = true, plotDirty = true, raf = 0, last = 0, themeTimer = 0;
 let dragging = false, idleAt = 0, pts = null, groups = null, lx = 0, ly = 0, snap = null;
 // ---------- camera: V is a rotation whose rows are screen-right, depth (away from the viewer) and screen-up, in world coordinates ----------
 const viewFrom = (yw, pt) => { const yc = Math.cos(yw), ys = Math.sin(yw), pc = Math.cos(pt), ps = Math.sin(pt); return [yc, -ys, 0, pc * ys, pc * yc, -ps, ps * ys, ps * yc, pc]; };
@@ -1002,7 +1049,7 @@ function readTokens() {
   C.dark = C.rPlot[0] * 0.299 + C.rPlot[1] * 0.587 + C.rPlot[2] * 0.114 < 110;
   for (let h = 0; h < 360; h++) { const c = hslRGB(h, C.Sa, C.L); HUE[h * 3] = c[0]; HUE[h * 3 + 1] = c[1]; HUE[h * 3 + 2] = c[2]; }
   for (let b = 0; b < 36; b++) BK[b] = `rgba(${Math.round(HUE[b * 30])},${Math.round(HUE[b * 30 + 1])},${Math.round(HUE[b * 30 + 2])},${C.dark ? 0.4 : 0.34})`;
-  sliceDirty = plotDirty = true; schedule();
+  sliceDirty = plotDirty = ladDirty = specDirty = true; schedule();
 }
 
 // ---------- canvases ----------
@@ -1016,7 +1063,8 @@ function size(c, g) {
 function fit() {
   if (!active) return;
   let r = size(cv, ctx); W = r.width; r = size(cvR, ctxR); RW = r.width; RH = r.height;
-  sliceDirty = plotDirty = true; schedule();
+  r = size(cvS, ctxS); SW = r.width; SH = r.height; fitLad();
+  sliceDirty = plotDirty = specDirty = true; schedule();
 }
 new ResizeObserver(fit).observe(document.querySelector(".wrap"));
 
@@ -1029,15 +1077,31 @@ function basis() {   // screen-right and screen-up vectors; tilt turns "up" towa
   const nm = [e[1] * u[2] - e[2] * u[1], e[2] * u[0] - e[0] * u[2], e[0] * u[1] - e[1] * u[0]];
   return [e, u.map((v, i) => v * c + nm[i] * s)];
 }
-function renderSlice() {
-  sliceDirty = false; if (!W) return;
-  const [e, u] = basis(), Rv = info.rview, Rf = H.Rfn(A.n, A.l), Y = H.Yfn(A.l, A.m, A.style), o = [0, 0]; let mx = 0;
+// ψ of one state on the slice grid, kept for the two most recent (state, plane, radius) keys so a jump only blends per frame
+const fieldCache = [];
+function field(s, style, Rv) {
+  const [e, u] = basis(), key = `${s.n},${s.l},${s.m},${style},${A.plane},${A.tilt},${Rv}`;
+  const hit = fieldCache.find(f => f.key === key); if (hit) return hit;
+  const Rf = H.Rfn(s.n, s.l), Y = H.Yfn(s.l, s.m, style), o = [0, 0], re = new Float32Array(G * G), im = new Float32Array(G * G);
   for (let j = 0; j < G; j++) for (let i = 0; i < G; i++) {
     const a = ((i + 0.5) / G * 2 - 1) * Rv, b = (1 - (j + 0.5) / G * 2) * Rv;
     const x = a * e[0] + b * u[0], y = a * e[1] + b * u[1], z = a * e[2] + b * u[2], r = Math.hypot(x, y, z);
     Y(r > 0 ? z / r : 0, Math.atan2(y, x), o);
-    const f = Rf(r), re = f * o[0], im = f * o[1], p = re * re + im * im, q = j * G + i;
-    PP[q] = p; if (p > mx) mx = p;
+    const f = Rf(r), q = j * G + i; re[q] = f * o[0]; im[q] = f * o[1];
+  }
+  let pk = 0; for (let q = 0; q < G * G; q++) pk = Math.max(pk, Math.hypot(re[q], im[q]));
+  const out = { key, re, im, pk: pk || 1 }; fieldCache.unshift(out); fieldCache.length = Math.min(fieldCache.length, 2); return out;
+}
+function renderSlice() {
+  sliceDirty = false; if (!W) return;
+  // during a jump the electron is in c0·ψ_from + c1·ψ_to·e^{−iφ}: the two parts interfere, and the beat makes the cloud slosh
+  const jm = J ? jumpMix(tNow) : null, F0 = field(jm ? jm.from : A, jm ? jm.style : A.style, Rd), F1 = jm ? field(jm.to, jm.style, Rd) : null;
+  // each state is scaled to its own peak first: a compact 1s is hundreds of times denser than a 4p, and would otherwise hide it
+  const c0 = jm ? jm.c0 / F0.pk : 1, c1 = jm ? jm.c1 / F1.pk : 0, cp = Math.cos(jm ? jm.ph : 0), sp = Math.sin(jm ? jm.ph : 0); let mx = 0;
+  for (let q = 0; q < G * G; q++) {
+    let re = c0 * F0.re[q], im = c0 * F0.im[q];
+    if (F1) { const a = F1.re[q], b = F1.im[q]; re += c1 * (a * cp + b * sp); im += c1 * (b * cp - a * sp); }
+    const p = re * re + im * im; PP[q] = p; if (p > mx) mx = p;
     let h = Math.round(Math.atan2(im, re) * 57.29578); if (h < 0) h += 360; if (h >= 360) h -= 360; HH[q] = h;
   }
   const inv = mx > 0 ? 1 / mx : 0, d = img.data, bg = C.rPlot;
@@ -1051,7 +1115,7 @@ function renderSlice() {
   overlay();
 }
 function overlay() {
-  const c = ctx, cx = W / 2, ppa = W / (2 * info.rview), [ax, ay] = AXN[A.plane];
+  const c = ctx, cx = W / 2, ppa = W / (2 * Rd), [ax, ay] = AXN[A.plane];
   c.strokeStyle = C.grid; c.lineWidth = 1; c.beginPath(); c.moveTo(0, cx + 0.5); c.lineTo(W, cx + 0.5); c.moveTo(cx + 0.5, 0); c.lineTo(cx + 0.5, W); c.stroke();
   c.fillStyle = C.ink; c.strokeStyle = C.plot; c.lineWidth = 1.5; c.beginPath(); c.arc(cx, cx, 3, 0, Math.PI * 2); c.fill(); c.stroke();
   c.font = `${W < 300 ? 10 : 11.5}px ${C.mono}`; c.fillStyle = C.muted; c.textBaseline = "middle";
@@ -1073,7 +1137,7 @@ function resample() {
 }
 function draw3D() {
   if (!W || (!pts && A.mode === "cloud")) return;
-  const c = ctx, Rv = info.rview, sc = W * 0.46 / Rv, D = 5 * Rv, [r0, r1, r2, d0, d1, d2, u0, u1, u2] = V, surf = A.mode === "surface";
+  const c = ctx, Rv = Rd, sc = W * 0.46 / Rv, D = 5 * Rv, [r0, r1, r2, d0, d1, d2, u0, u1, u2] = V, surf = A.mode === "surface";
   const proj = (x, y, z) => { const p = D / (D + d0 * x + d1 * y + d2 * z); return [W / 2 + (r0 * x + r1 * y + r2 * z) * sc * p, W / 2 - (u0 * x + u1 * y + u2 * z) * sc * p, p]; };
   c.globalCompositeOperation = "source-over"; c.clearRect(0, 0, W, W);
   if (!surf) {   // in surface mode this canvas is a transparent layer over the WebGL scene, carrying only the labels
@@ -1110,10 +1174,11 @@ function draw3D() {
 const glc = $("aGl"); let gl = null, GP = null, GU = {}, surfLev = 0, surfDirty = true, gres = 1, slow = 0;
 const GFS = `precision highp float;
 varying vec2 v;
-uniform mat3 M; uniform float D, Rb, scc, lev, nn, nl, nm, chem, NR, NY, cut, steps, Sa, La, wpp, grid, gsp; uniform vec3 AC, GC;
+uniform mat3 M; uniform float D, Rb, scc, lev, chem, c0, c1, ph, cut, steps, Sa, La, wpp, grid, gsp; uniform vec3 AC, GC, S0, S1; uniform vec2 K0, K1;
 float lag(float k, float a, float x) { if (k < .5) return 1.; float p = 1., c = 1. + a - x;
   for (int j = 1; j < 5; j++) { float fj = float(j); if (fj > k - .5) break; float t = ((2. * fj + 1. + a - x) * c - (fj + a) * p) / (fj + 1.); p = c; c = t; } return c; }
-vec2 psi(vec3 q) {
+vec2 psiS(vec3 q, vec3 S, vec2 K) {   // one state: S = (n, l, m), K = (radial norm, angular norm)
+  float nn = S.x, nl = S.y, nm = S.z, NR = K.x, NY = K.y;
   float r = max(length(q), 1e-5), x = 2. * r / nn, rl = 1.;
   for (int i = 0; i < 4; i++) { if (float(i) > nl - .5) break; rl *= x; }
   float ct = q.z / r, am = abs(nm), pm = 1.;   // P_l^m / sinᵐθ by the usual recurrence; sinᵐθ·e^{imφ} = ((x+iy)/r)ᵐ
@@ -1126,6 +1191,12 @@ vec2 psi(vec3 q) {
   float Y = NY * P * NR * exp(-r / nn) * rl * lag(nn - nl - 1., 2. * nl + 1., x);
   if (chem > .5) return vec2(nm < -.5 ? Y * e.y : Y * e.x, 0.);
   return vec2(Y * e.x, (nm < 0. ? -1. : 1.) * Y * e.y);
+}
+// during a jump: c0·ψ₀ + c1·ψ₁·e^{−iφ}; otherwise c1 = 0 and only the first state is evaluated
+vec2 psi(vec3 q) {
+  vec2 z = c0 * psiS(q, S0, K0);
+  if (c1 > 0.) { vec2 w = psiS(q, S1, K1); z += c1 * vec2(w.x * cos(ph) + w.y * sin(ph), w.y * cos(ph) - w.x * sin(ph)); }
+  return z;
 }
 float F(vec3 q) { return length(psi(q)) - lev; }
 vec3 hue(vec2 z) { float h = degrees(atan(z.y, z.x)); if (h < 0.) h += 360.;
@@ -1201,27 +1272,35 @@ function initGL() {
   gl.useProgram(GP);
   gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer()); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
   const ap = gl.getAttribLocation(GP, "p"); gl.enableVertexAttribArray(ap); gl.vertexAttribPointer(ap, 2, gl.FLOAT, false, 0, 0);
-  for (const k of ["M", "D", "Rb", "scc", "lev", "nn", "nl", "nm", "chem", "NR", "NY", "cut", "steps", "Sa", "La", "wpp", "grid", "gsp", "AC", "GC"]) GU[k] = gl.getUniformLocation(GP, k);
+  for (const k of ["M", "D", "Rb", "scc", "lev", "chem", "c0", "c1", "ph", "cut", "steps", "Sa", "La", "wpp", "grid", "gsp", "AC", "GC", "S0", "S1", "K0", "K1"]) GU[k] = gl.getUniformLocation(GP, k);
   glc.addEventListener("webglcontextlost", e => { e.preventDefault(); gl = null; $("a-surfBtn").hidden = true; if (A.mode === "surface") { A.mode = "cloud"; sync(); schedule(); } });
   return true;
 }
-function surfLevel() {   // |ψ| at the (1 − share) quantile of |ψ|² over |ψ|²-distributed samples
-  surfDirty = false;
-  const s = H.cloud(A.n, A.l, A.m, A.style, 30000), o = [0, 0], v = new Float64Array(s.count);
-  for (let i = 0; i < s.count; i++) { const r = s.r[i]; H.psi(A.n, A.l, A.m, A.style, r, r > 0 ? s.z[i] / r : 0, Math.atan2(s.y[i], s.x[i]), o); v[i] = o[0] * o[0] + o[1] * o[1]; }
-  v.sort(); surfLev = Math.sqrt(v[Math.floor((1 - A.lev / 100) * v.length)]);
+const levCache = new Map();
+function levelOf(s, style, share) {   // |ψ| at the (1 − share) quantile of |ψ|² over |ψ|²-distributed samples
+  const key = `${s.n},${s.l},${s.m},${style},${share}`; if (levCache.has(key)) return levCache.get(key);
+  const c = H.cloud(s.n, s.l, s.m, style, 30000), o = [0, 0], v = new Float64Array(c.count);
+  for (let i = 0; i < c.count; i++) { const r = c.r[i]; H.psi(s.n, s.l, s.m, style, r, r > 0 ? c.z[i] / r : 0, Math.atan2(c.y[i], c.x[i]), o); v[i] = o[0] * o[0] + o[1] * o[1]; }
+  v.sort(); const L = Math.sqrt(v[Math.floor((1 - share / 100) * v.length)]); levCache.set(key, L); return L;
 }
+function surfLevel() { surfDirty = false; surfLev = levelOf(A, A.style, A.lev); }
+const stateU = (s, style) => [[s.n, s.l, s.m], [Math.sqrt(Math.pow(2 / s.n, 3) * fact(s.n - s.l - 1) / (2 * s.n * fact(s.n + s.l))), H.Nlm(s.l, Math.abs(s.m)) * (style === "chem" && s.m ? Math.SQRT2 : 1)]];
 function drawSurface(now) {
   if (!gl || !W) return;
   if (surfDirty) surfLevel();
   const dpr = Math.min(2, window.devicePixelRatio || 1), px = Math.max(64, Math.round(W * dpr * gres));
   if (glc.width !== px) glc.width = glc.height = px;
   gl.viewport(0, 0, px, px); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
-  const Rv = info.rview, a = Math.abs(A.m);
+  const Rv = Rd, jm = J ? jumpMix(tNow) : null, st = jm ? jm.style : A.style, s0 = jm ? jm.from : A, s1 = jm ? jm.to : A;
   gl.uniformMatrix3fv(GU.M, false, V);   // column-major, so the columns are V's rows: view → world
-  const N = Math.sqrt(Math.pow(2 / A.n, 3) * fact(A.n - A.l - 1) / (2 * A.n * fact(A.n + A.l)));
-  const u = { D: 5 * Rv, Rb: Rv, scc: 0.92 / Rv, lev: surfLev, nn: A.n, nl: A.l, nm: A.m, chem: A.style === "chem" ? 1 : 0, NR: N,
-              NY: H.Nlm(A.l, a) * (A.style === "chem" && A.m ? Math.SQRT2 : 1), cut: A.cut ? 1 : 0, steps: COARSE.matches ? 140 : 220, Sa: C.Sa / 100, La: C.L / 100,
+  // during a jump the skin level slides between the two states' levels, geometrically by weight: compact states (1s) have levels
+  // hundreds of times higher than spread-out ones (4p), and a plain average would hide the larger state until the very end
+  const l0 = jm ? levelOf(s0, st, A.lev) : surfLev, l1 = jm ? levelOf(s1, st, A.lev) : 1, c0 = jm ? jm.c0 : 1, c1 = jm ? jm.c1 : 0;
+  const [S0, K0] = stateU(s0, st), [S1, K1] = stateU(s1, st);
+  gl.uniform3fv(GU.S0, S0); gl.uniform2fv(GU.K0, K0); gl.uniform3fv(GU.S1, S1); gl.uniform2fv(GU.K1, K1);
+  const u = { D: 5 * Rv, Rb: jm ? Math.max(Rv, H.radial(s0.n, s0.l).rview, H.radial(s1.n, s1.l).rview) : Math.max(Rv, info.rview), scc: 0.92 / Rv,
+              lev: Math.pow(l0, c0 * c0) * Math.pow(l1, c1 * c1), chem: st === "chem" ? 1 : 0, c0, c1, ph: jm ? jm.ph % (2 * Math.PI) : 0,
+              cut: A.cut ? 1 : 0, steps: COARSE.matches ? 140 : 220, Sa: C.Sa / 100, La: C.L / 100,
               wpp: 2 / (0.92 / Rv * W), grid: A.grid ? 1 : 0, gsp: [0.5, 1, 2, 5, 10, 20].find(s => Rv / s <= 6) || 20 };
   for (const k in u) gl.uniform1f(GU[k], u[k]);
   gl.uniform3fv(GU.AC, C.rMuted.map(v => v / 255)); gl.uniform3fv(GU.GC, C.rInk.map(v => v / 255));
@@ -1262,17 +1341,29 @@ function drawRadial() {
 
 // ---------- frame ----------
 function schedule() { if (active && !raf) raf = requestAnimationFrame(frame); }
+// the displayed view radius glides to its target: during a jump, room for both orbitals; afterwards, the new orbital's own size
+function glide(dt) {
+  const t = J ? Math.max(H.radial(J.from.n, J.from.l).rview, H.radial(J.to.n, J.to.l).rview) : info.rview;
+  if (!Rd || RM.matches) Rd = t; else { Rd += (t - Rd) * Math.min(1, dt * 5); if (Math.abs(t - Rd) < t * 0.003) Rd = t; }
+  return Rd !== t;
+}
 function frame(now) {
   raf = 0; if (!active) return;
-  const dt = last ? Math.min(0.05, (now - last) / 1000) : 0; last = now;
-  if (A.mode === "slice") { if (sliceDirty) renderSlice(); }
+  const dt = last ? Math.min(0.05, (now - last) / 1000) : 0; last = now; tNow = now;
+  if (J && now >= J.t0 + J.dur) finishJump();
+  const moving = glide(dt); if (moving) sliceDirty = true;
+  if (PT && now >= PT.t0 + PT.dur) { PT = null; sliceDirty = true; }
+  if (A.mode === "slice") { if (sliceDirty || J || PT) { renderSlice(); drawPhoton(now); } }
   else {
     if (A.mode === "cloud" && (cloudDirty || !pts)) resample();
     if (snap) stepSnap(now); else if (!RM.matches && !dragging && now > idleAt) spin(dt * 0.22);
-    draw3D(); if (A.mode === "surface") drawSurface(now);
+    draw3D(); drawPhoton(now); if (A.mode === "surface") drawSurface(now);
   }
   if (plotDirty) drawRadial();
-  if (A.mode !== "slice" && !RM.matches) schedule(); else last = 0;
+  const fl = !RM.matches && newest && now - newest.t < SPEC_T;
+  if (ladDirty || J) drawLadder(now);
+  if (specDirty || fl) drawSpec(now);
+  if ((A.mode !== "slice" && !RM.matches) || J || PT || fl || moving) schedule(); else last = 0;
 }
 
 // ---------- controls ----------
@@ -1285,9 +1376,10 @@ $("a-picks").innerHTML = PICKS.map(([n, l]) => `<button type="button" class="btn
 function sync() {
   const { n, l, m, style, mode } = A, lab = H.label(n, l, m, style), rn = n - l - 1;
   press("a-n", v => +v === n);
-  press("a-l", v => +v === l); $("a-l").querySelectorAll("button").forEach(b => { b.disabled = +b.dataset.v >= n; });
+  press("a-l", v => +v === l);
   $("a-m").innerHTML = Array.from({ length: 2 * l + 1 }, (_, i) => i - l).map(q => `<button type="button" data-v="${q}">${H.label(n, l, q, style).shortHtml}</button>`).join("");
   press("a-m", v => +v === m);
+  for (const id of LK) $(id).querySelectorAll("button").forEach(b => { b.disabled = !!J || (id === "a-l" && +b.dataset.v >= n); });   // the pickers lock while an electron is mid-jump
   $("a-picks").querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.n === n && +b.dataset.l === l)));
   press("a-style", v => v === style); press("a-mode", v => v === mode); press("a-plane", v => v === A.plane);
   $("a-slice").hidden = mode !== "slice"; $("a-surf").hidden = glc.hidden = mode !== "surface"; $("a-cams").hidden = mode === "slice"; cv.classList.toggle("surf", mode === "surface");
@@ -1304,12 +1396,14 @@ function sync() {
   cv.setAttribute("aria-label", `Hydrogen ${lab.text} orbital, ${mode === "slice" ? `slice through the ${A.plane} plane` : mode === "cloud" ? "3D probability cloud, drag to rotate" : `3D surface enclosing ${A.lev}% of the probability${A.cut ? ", front half cut away" : ""}, drag to rotate`}`);
   cvR.setAttribute("aria-label", `Radial probability for the ${n}${H.LET[l]} state, from 0 to ${info.rview} Bohr radii; average distance ${info.rmean} Bohr radii`);
   cv.classList.toggle("drag", mode !== "slice"); if (mode !== "slice") cv.setAttribute("tabindex", "0"); else cv.removeAttribute("tabindex");
+  syncLight();
 }
 function setOrb(p) {
+  J = null;   // choosing an orbital by any other route cancels a jump cleanly
   Object.assign(A, p); A.l = Math.min(A.l, A.n - 1); A.m = Math.max(-A.l, Math.min(A.l, A.m));
   info = H.radial(A.n, A.l); sliceDirty = cloudDirty = surfDirty = plotDirty = true; sync(); schedule();
 }
-const hit = (id, fn) => $(id).addEventListener("click", e => { const b = e.target.closest("button"); if (b && !b.disabled) fn(b); });
+const hit = (id, fn) => $(id).addEventListener("click", e => { const b = e.target.closest("button"); if (b && !b.disabled && !(J && LK.includes(id))) fn(b); });
 hit("a-n", b => setOrb({ n: +b.dataset.v }));
 hit("a-l", b => setOrb({ l: +b.dataset.v }));
 hit("a-m", b => setOrb({ m: +b.dataset.v }));
@@ -1340,6 +1434,290 @@ cv.addEventListener("keydown", e => {
   e.preventDefault(); snap = null; turn(k[0] * 0.12, k[1] * 0.12); idleAt = performance.now() + 3000; schedule();
 });
 
+// ---------- light: electron jumps, the dipole selection rule, hydrogen's spectrum ----------
+const RYD = 1.096776e7, E1 = 13.6057, LMIN = 90, LMAX = 4100, NMAX = 5, SPEC_T = 1500, LK = ["a-n", "a-l", "a-m", "a-picks", "a-style"];
+const GRK = ["α", "β", "γ", "δ"], SER = { 1: ["Lyman", "Ly"], 2: ["Balmer", "H"], 3: ["Paschen", "P"], 4: ["Brackett", "B"] };
+let tNow = 0, J = null, PT = null, PS = null, newest = null, ladDirty = true, specDirty = true, SW = 0, SH = 0, LW = 0, LH = 0;
+// J = { from:{n,l,m}, to:{n,l,m}, style, kind:"emit"|"absorb", t0, dur, lam, mix0, mix1 }   (ms; t0 on the performance.now() clock)
+// PT: a photon passing straight through. PS: the static photon shown under reduced motion.
+const lamNm = (hi, lo) => 1e9 / (RYD * (1 / (lo * lo) - 1 / (hi * hi))), phE = (hi, lo) => E1 * (1 / (lo * lo) - 1 / (hi * hi));
+const lamCls = l => l < 380 ? "uv" : l > 750 ? "ir" : "vis", nmTxt = l => l < 200 ? l.toFixed(1) : String(Math.round(l));
+const colName = l => l < 430 ? "violet" : l < 470 ? "blue" : l < 500 ? "cyan" : l < 565 ? "green" : l < 590 ? "yellow" : l < 625 ? "orange" : "red";
+const lineSym = (hi, lo) => SER[lo][1] + GRK[hi - lo - 1], lineName = (hi, lo) => SER[lo][0] + " " + GRK[hi - lo - 1];
+const PAIRS = []; for (let lo = 1; lo < NMAX; lo++) for (let hi = lo + 1; hi <= NMAX; hi++) PAIRS.push([hi, lo]);
+const found = new Set(); try { for (const k of JSON.parse(localStorage.getItem("ita-lines") || "[]")) if (/^[2-5]-[1-4]$/.test(k) && +k[0] > +k[2]) found.add(k); } catch (e) {}
+const saveLines = () => { try { localStorage.setItem("ita-lines", JSON.stringify([...found])); } catch (e) {} };
+function bruton(l) {   // the standard piecewise wavelength → RGB approximation, with the dimming and 0.8 gamma at the edges of vision
+  let r = 0, g = 0, b = 0; l = Math.max(380, Math.min(750, l));
+  if (l < 440) { r = (440 - l) / 60; b = 1; } else if (l < 490) { g = (l - 440) / 50; b = 1; } else if (l < 510) { g = 1; b = (510 - l) / 20; }
+  else if (l < 580) { r = (l - 510) / 70; g = 1; } else if (l < 645) { r = 1; g = (645 - l) / 65; } else r = 1;
+  const f = l < 420 ? 0.3 + 0.7 * (l - 380) / 40 : l > 700 ? 0.3 + 0.7 * (750 - l) / 50 : 1;
+  return [r, g, b].map(v => Math.pow(v * f, 0.8));
+}
+function lineCol(l) {   // visible colour, nudged for legibility: light yellows/greens pulled toward the ink, dark violets/blues pushed toward white
+  const c = bruton(l).map(v => v * 255), lum = (0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]) / 255;
+  const tg = C.dark ? [255, 255, 255] : C.rInk, t = Math.min(0.6, C.dark ? Math.max(0, 0.45 - lum) * 1.2 : Math.max(0, lum - 0.4));
+  return `rgb(${c.map((v, i) => Math.round(v + (tg[i] - v) * t)).join(",")})`;
+}
+const photCol = l => lamCls(l) === "vis" ? lineCol(l) : C.muted;
+// selection rule: the dipole integral ∫ conj(Y_f) (sinθcosφ, sinθsinφ, cosθ) Y_i dΩ on a 90×180 midpoint grid, for the current shape style
+const NT = 90, NP = 180; let GRD = null; const YT = {}, DC = {};
+function ytab(l, m, st) {
+  const k = st + l + "," + m; if (YT[k]) return YT[k];
+  if (!GRD) {
+    GRD = { ct: new Float64Array(NT), st: new Float64Array(NT), w: new Float64Array(NT), ph: new Float64Array(NP), cp: new Float64Array(NP), sp: new Float64Array(NP) };
+    for (let t = 0; t < NT; t++) { const th = (t + 0.5) * Math.PI / NT; GRD.ct[t] = Math.cos(th); GRD.st[t] = Math.sin(th); GRD.w[t] = Math.sin(th) * Math.PI / NT * 2 * Math.PI / NP; }
+    for (let p = 0; p < NP; p++) { GRD.ph[p] = (p + 0.5) * 2 * Math.PI / NP; GRD.cp[p] = Math.cos(GRD.ph[p]); GRD.sp[p] = Math.sin(GRD.ph[p]); }
+  }
+  const Y = H.Yfn(l, m, st), o = [0, 0], re = new Float64Array(NT * NP), im = new Float64Array(NT * NP);
+  for (let t = 0; t < NT; t++) for (let p = 0; p < NP; p++) { Y(GRD.ct[t], GRD.ph[p], o); re[t * NP + p] = o[0]; im[t * NP + p] = o[1]; }
+  return YT[k] = { re, im };
+}
+function dip(i, f, st) {   // |⟨f| r̂ |i⟩|, the length of the complex vector of dipole integrals
+  const k = st + i.l + "," + i.m + ">" + f.l + "," + f.m; if (k in DC) return DC[k];
+  const a = ytab(i.l, i.m, st), b = ytab(f.l, f.m, st); let xr = 0, xi = 0, yr = 0, yi = 0, zr = 0, zi = 0;
+  for (let t = 0; t < NT; t++) {
+    const w = GRD.w[t], s = GRD.st[t] * w, z = GRD.ct[t] * w;
+    for (let p = 0; p < NP; p++) {
+      const q = t * NP + p, pr = b.re[q] * a.re[q] + b.im[q] * a.im[q], pi = b.re[q] * a.im[q] - b.im[q] * a.re[q], sx = s * GRD.cp[p], sy = s * GRD.sp[p];
+      xr += sx * pr; xi += sx * pi; yr += sy * pr; yi += sy * pi; zr += z * pr; zi += z * pi;
+    }
+  }
+  return DC[k] = Math.hypot(xr, xi, yr, yi, zr, zi);
+}
+const okJump = (i, f, st) => i.n !== f.n && dip(i, f, st) > 0.01;   // allowed integrals are >= 0.089; grid error on forbidden ones is <= 3e-4
+function pickM(from, n, l) {   // the orientation of (n, l) that the current state can jump to: the same m if allowed, else the nearest allowed m
+  let best = null;
+  for (let m = -l; m <= l; m++) {
+    if (!okJump(from, { n, l, m }, A.style)) continue;
+    if (best === null || Math.abs(m - from.m) < Math.abs(best - from.m) || (Math.abs(m - from.m) === Math.abs(best - from.m) && (Math.abs(m) < Math.abs(best) || (Math.abs(m) === Math.abs(best) && m > best)))) best = m;
+  }
+  return best;
+}
+const noteHTML = (hi, lo, lab, slow) => {
+  const l = lamNm(hi, lo), cl = lamCls(l), cn = cl === "vis" ? colName(l) : cl === "uv" ? "ultraviolet (invisible to us)" : "infrared (invisible to us)";
+  return `<b>${lab}</b> · ${lineName(hi, lo)} · ${nmTxt(l)} nm, ${cn} · photon energy ${phE(hi, lo).toFixed(2)} eV.` + (slow ? " The real jump takes about a billionth of a second; it's slowed down here." : "");
+};
+const orbTxt = s => s.n + H.LET[s.l];
+// ---- the jump timeline ----
+const smooth = u => { u = Math.max(0, Math.min(1, u)); return u * u * (3 - 2 * u); };
+function jumpMix(now) {   // null when idle; otherwise the blend of the two orbitals. A call at or after t0 + dur ends the jump (setOrb(to), line recorded, J = null) and returns null.
+  if (!J) return null;
+  if (now >= J.t0 + J.dur) { finishJump(); return null; }
+  const th = Math.PI / 2 * smooth((now - J.t0 - J.mix0) / (J.mix1 - J.mix0)), dE = phE(Math.max(J.from.n, J.to.n), Math.min(J.from.n, J.to.n)), w = 2 * Math.PI * (0.6 + 1.4 * dE / 13.06);
+  return { from: J.from, to: J.to, style: J.style, c0: Math.cos(th), c1: Math.sin(th), ph: w * Math.max(0, now - J.t0) / 1000 };
+}
+function record(r) {
+  const k = r.hi + "-" + r.lo; found.add(k); saveLines(); newest = { key: k, t: performance.now() };
+  jumps.push({ a: r.from, b: r.to, lam: r.lam, fs: r.fs, ts: r.ts }); if (jumps.length > 8) jumps.shift();
+  setTimeout(() => { specDirty = true; schedule(); }, SPEC_T + 60); syncSpec(); ladDirty = true; schedule();
+}
+const jumps = [];
+function finishJump() { const j = J; J = null; setOrb(j.to); record(j.rec); }
+function flushPS() { if (!PS) return; clearTimeout(PS.timer); const p = PS; PS = null; if (p.rec) record(p.rec); sliceDirty = true; schedule(); }
+function startJump(to, kind) {
+  if (J) return null;
+  const from = { n: A.n, l: A.l, m: A.m }; to = { n: to.n, l: to.l, m: to.m }; kind = kind || (to.n < from.n ? "emit" : "absorb");
+  if (!(to.n >= 1 && to.n <= NMAX && to.l >= 0 && to.l < to.n && Math.abs(to.m) <= to.l) || (kind === "emit") !== (to.n < from.n) || !okJump(from, to, A.style)) return null;
+  flushPS(); PT = null;
+  const hi = Math.max(from.n, to.n), lo = Math.min(from.n, to.n), lam = lamNm(hi, lo), rec = { hi, lo, lam, from: from.n, to: to.n, fs: from, ts: to };
+  say(hi, lo, orbTxt(from) + " → " + orbTxt(to), true);
+  if (RM.matches) {   // no animation: swap now, show the photon still for a moment, then log the line
+    setOrb(to); PS = { k: kind, lam, rec, timer: setTimeout(flushPS, 1000) }; sliceDirty = true; schedule(); return PS;
+  }
+  const emit = kind === "emit";
+  J = { from, to, style: A.style, kind, t0: performance.now(), dur: 3600, lam, mix0: emit ? 300 : 1000, mix1: emit ? 2600 : 3300, rec };
+  sync(); schedule(); return J;
+}
+// ---- the photon on the main canvas ----
+function photonAt(now) {
+  if (J) {
+    const e = now - J.t0;
+    if (J.kind === "absorb") { const p = e / 1000; return p < 1 ? { k: "absorb", p: Math.max(0, p), lam: J.lam } : null; }
+    const tm = (J.mix0 + J.mix1) / 2, p = (e - tm) / (J.dur - tm); return p > 0 && p < 1 ? { k: "emit", p, lam: J.lam } : null;
+  }
+  if (PT) { const p = (now - PT.t0) / PT.dur; return p < 1 ? { k: "pass", p: Math.max(0, p), lam: PT.lam } : null; }
+  return PS ? { k: PS.k, p: -1, lam: PS.lam } : null;
+}
+function drawPhoton(now) {   // a sine wave in a Gaussian envelope, about 5.5 wiggles long; the wiggle length is a stylised log map of the wavelength
+  const s = photonAt(now); if (!s || !W) return;
+  const c = ctx, cls = lamCls(s.lam), col = photCol(s.lam), O = W / 2, wl = Math.max(6, Math.min(26, 6 + 20 * Math.log(s.lam / LMIN) / Math.log(LMAX / LMIN))), len = 5.5 * wl, sg = len / 5, amp = Math.min(7 + W / 120, 3 + wl * 0.7);
+  const em = s.k === "emit", an = 35 * Math.PI / 180, dx = em ? Math.cos(an) : 1, dy = em ? -Math.sin(an) : 0, nx = -dy, ny = dx;   // distance along the path is measured from the nucleus
+  const tc = s.p < 0 ? (em ? 0.3 * W : s.k === "pass" ? -0.1 * W : -0.25 * W)
+    : em ? -len / 2 + s.p * (O / dx + len + 4) : s.k === "absorb" ? -O - len / 2 + s.p * (O + len) : -O - len / 2 + s.p * (W + len);
+  const pts = [];
+  for (let u = -len / 2; u <= len / 2; u += 1.5) {
+    const t = tc + u; if ((em && t < 0) || (s.k === "absorb" && t > 0)) continue;   // it appears out of the nucleus, or is swallowed by it
+    const w = amp * Math.exp(-0.5 * (u / sg) * (u / sg)) * Math.sin(2 * Math.PI * u / wl - now * 0.012);
+    pts.push([O + dx * t + nx * w, O + dy * t + ny * w]);
+  }
+  if (pts.length < 2) return;
+  const path = () => { c.beginPath(); pts.forEach((q, i) => i ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1])); };
+  c.save(); c.globalCompositeOperation = "source-over"; c.lineJoin = c.lineCap = "round";
+  path(); c.strokeStyle = C.plot; c.globalAlpha = 0.6; c.lineWidth = 5; c.stroke();
+  path(); c.globalAlpha = 1; c.strokeStyle = col; c.lineWidth = 2.2; if (cls !== "vis") c.setLineDash([3, 3]); c.stroke(); c.setLineDash([]);
+  const m = pts[pts.length >> 1], tx = nmTxt(s.lam) + " nm" + (cls === "uv" ? " · UV" : cls === "ir" ? " · IR" : "");
+  c.font = `11px ${C.mono}`; c.textAlign = "center"; c.textBaseline = "alphabetic";
+  const hw = c.measureText(tx).width / 2, x = Math.max(hw + 4, Math.min(W - hw - 4, m[0])), y = Math.max(14, Math.min(W - 6, m[1] - amp - 8));
+  c.lineWidth = 3; c.strokeStyle = C.plot; c.strokeText(tx, x, y); c.fillStyle = C.ink; c.fillText(tx, x, y);
+  c.restore();
+}
+// ---- the Light panel: the level map (a clickable Grotrian diagram) and the photon gun ----
+const cvS = $("aSpec"), ctxS = cvS.getContext("2d"), cvL = $("aLad"), ctxL = cvL.getContext("2d"), lmW = $("lmWrap"), DOTS = [];
+const cName = l => { const c = lamCls(l); return c === "vis" ? colName(l) : c === "uv" ? "ultraviolet" : "infrared"; };
+let liveBase = "Tap a glowing level to jump, or aim a photon at the spectrum below and press Fire.", LP = null, aim = 500;
+const live = h => { liveBase = $("jLive").innerHTML = h; };
+const liveHTML = (hi, lo, lab) => { const l = lamNm(hi, lo); return `<b>${lab}</b> · ${lineName(hi, lo)} · ${nmTxt(l)} nm, ${cName(l)} · ${phE(hi, lo).toFixed(2)} eV`; };
+function say(hi, lo, lab, slow) { $("jNote").innerHTML = noteHTML(hi, lo, lab, slow); live(liveHTML(hi, lo, lab)); }
+function sayText(t) { $("jNote").textContent = t; live(t); }
+live(liveBase);
+for (let n = 1; n <= NMAX; n++) for (let l = 0; l < n; l++) { const b = document.createElement("button"); b.type = "button"; b.className = "lmb"; b.dataset.n = n; b.dataset.l = l; lmW.appendChild(b); DOTS.push(b); }
+function fitLad() {   // the map's geometry: columns l = s p d f g, rows n = 1..5. Row height blends the true -1/n scale with an even spread so no two rows sit closer than a 32px hit target.
+  const r = size(cvL, ctxL); LW = r.width; LH = r.height; if (LW < 60) return;
+  const lw = LW > 300 ? 88 : 52, cw = Math.max(20, Math.min(84, (LW - lw - 8) / 5)), L0 = (LW - lw - 5 * cw) / 2, x0 = L0 + lw + cw / 2, top = 28, bot = LH - 18, span = Math.max(40, bot - top);
+  const al = Math.max(0, Math.min(1, (0.25 - 33 / span) / 0.1875));
+  LP = { L0, lw, cw, X: l => x0 + l * cw, Y: n => bot - span * (al * (1 - 1 / n) / 0.8 + (1 - al) * (n - 1) / 4) };
+  for (const b of DOTS) { b.style.left = LP.X(+b.dataset.l) + "px"; b.style.top = LP.Y(+b.dataset.n) + "px"; }
+  ladDirty = true; schedule();
+}
+function syncLight() {
+  const lk = !!J, from = { n: A.n, l: A.l, m: A.m };
+  for (const b of DOTS) {
+    const n = +b.dataset.n, l = +b.dataset.l, nm = n + H.LET[l], cur = n === A.n && l === A.l, m = cur || n === A.n ? null : pickM(from, n, l);
+    let st = "ok", lab, why = "";
+    if (cur) { st = "cur"; lab = `${nm}, current level`; }
+    else if (n === A.n) { st = "same"; why = "same energy level (n must change)"; }
+    else if (m === null) { st = "no"; why = Math.abs(l - A.l) !== 1 ? "l must change by 1" : "no orientation of that level can take part in a one-photon jump from this state"; }
+    else { const lam = lamNm(Math.max(n, A.n), Math.min(n, A.n)); lab = `${nm}, ${n < A.n ? "drop: gives off" : "excite: absorbs"} ${nmTxt(lam)} nm ${cName(lam)}`; }
+    if (why) { lab = `${nm}, not allowed: ${why}`; b.title = "Not allowed: " + why; } else b.removeAttribute("title");
+    b.className = "lmb " + (lk ? (J.to.n === n && J.to.l === l ? "tgt" : st === "cur" ? "cur" : "no") : st); b.dataset.m = m === null ? "" : m;
+    b.disabled = lk || st !== "ok"; b.setAttribute("aria-label", lab);
+  }
+  $("sFire").disabled = lk; ladDirty = true;
+  if (!$("jNote").innerHTML) $("jNote").textContent = "Tap a glowing level, or fire a photon at the spectrum, and each jump is described here. Each colour of light it makes is added to the spectrum.";
+}
+lmW.addEventListener("click", e => {
+  const b = e.target.closest(".lmb"); if (!b || b.disabled || J) return;
+  const n = +b.dataset.n; startJump({ n, l: +b.dataset.l, m: +b.dataset.m }, n < A.n ? "emit" : "absorb");
+});
+function preview(b) {   // hovering or focusing an allowed level previews the jump in the status line
+  if (!b || J || !b.classList.contains("ok")) { $("jLive").innerHTML = liveBase; return; }
+  const n = +b.dataset.n, hi = Math.max(n, A.n), lo = Math.min(n, A.n), l = lamNm(hi, lo);
+  $("jLive").innerHTML = `→ <b>${n + H.LET[+b.dataset.l]}</b>: ${lineName(hi, lo)}, ${nmTxt(l)} nm, ${cName(l)}`;
+}
+for (const t of ["pointerover", "focusin"]) lmW.addEventListener(t, e => preview(e.target.closest(".lmb")));
+for (const t of ["pointerleave", "focusout"]) lmW.addEventListener(t, () => preview(null));
+// ---- the photon gun: the spectrum strip aims, Fire shoots ----
+const specX = l => 12 + Math.log(l / LMIN) / Math.log(LMAX / LMIN) * (SW - 24), specL = x => LMIN * Math.pow(LMAX / LMIN, Math.max(0, Math.min(1, (x - 12) / (SW - 24))));
+function setAim(l) {
+  aim = Math.max(LMIN, Math.min(LMAX, l)); specDirty = true; schedule();
+  cvS.setAttribute("aria-valuenow", String(Math.round(aim))); cvS.setAttribute("aria-valuetext", `${nmTxt(aim)} nanometres, ${cName(aim)}`);
+}
+function aimAt(x) {   // x in strip pixels; a found line within 6px captures the aim and shows its details
+  let b = null;
+  for (const s of specHits) if (Math.abs(s.x - x) <= 6 && (!b || Math.abs(s.x - x) < Math.abs(b.x - x))) b = s;
+  if (b) { setAim(lamNm(b.hi, b.lo)); if (!J) say(b.hi, b.lo, `n = ${b.hi} → ${b.lo}`, false); return; }
+  // real lines are far narrower than a pixel, so any of hydrogen's lines also catches the aim nearby, quietly: no name, not marked found
+  let q = null, d = 7;
+  for (let hi = 2; hi <= 5; hi++) for (let lo = 1; lo < hi; lo++) { const l = lamNm(hi, lo), e = Math.abs(specX(l) - x); if (e < d) { d = e; q = l; } }
+  setAim(q || specL(x)); if (!J) live(`Photon aimed at <b>${nmTxt(aim)} nm</b>, ${cName(aim)}. Press Fire.`);
+}
+let aimPtr = null;
+const aimX = e => aimAt(e.clientX - cvS.getBoundingClientRect().left);
+cvS.addEventListener("pointerdown", e => { aimPtr = e.pointerId; try { cvS.setPointerCapture(e.pointerId); } catch (x) {} aimX(e); });
+cvS.addEventListener("pointermove", e => { if (aimPtr === e.pointerId) aimX(e); });
+for (const t of ["pointerup", "pointercancel"]) cvS.addEventListener(t, e => { if (aimPtr === e.pointerId) aimPtr = null; });
+cvS.addEventListener("keydown", e => {
+  if (e.key === "Enter") { e.preventDefault(); fire(); return; }
+  const k = { ArrowLeft: -1, ArrowRight: 1, PageDown: -10, PageUp: 10 }[e.key]; if (!k && e.key !== "Home" && e.key !== "End") return;
+  e.preventDefault(); setAim(e.key === "Home" ? LMIN : e.key === "End" ? LMAX : aim * Math.exp(k * (e.shiftKey ? 10 : 1) * Math.log(LMAX / LMIN) / 1000));
+  if (!J) live(`Photon aimed at <b>${nmTxt(aim)} nm</b>, ${cName(aim)}. Press Fire.`);
+});
+function fire() {
+  if (J) return;
+  const lam = aim, from = { n: A.n, l: A.l, m: A.m }, cands = [];
+  for (let n = A.n + 1; n <= NMAX; n++) if (Math.abs(lam / lamNm(n, A.n) - 1) <= 0.006) for (let l = 0; l < n; l++) { const m = pickM(from, n, l); if (m !== null) cands.push({ n, l, m }); }
+  cands.sort((a, b) => a.l - b.l || a.n - b.n);
+  if (cands.length) { startJump(cands[0], "absorb"); return; }
+  flushPS(); sayText(`No allowed level is exactly that far above ${orbTxt(from)}, so the photon passes straight through.`);
+  if (RM.matches) { PS = { k: "pass", lam, rec: null, timer: setTimeout(flushPS, 1000) }; } else PT = { t0: performance.now(), dur: 2200, lam };
+  sliceDirty = true; schedule();
+}
+$("sFire").addEventListener("click", fire);
+// ---- the level map canvas: grid, row labels and the jumps made this session ----
+function drawLadder(now) {
+  ladDirty = false; const c = ctxL, w = LW, h = LH; if (w < 60 || !LP) return;
+  const { L0, lw, cw, X, Y } = LP, E = n => -E1 / (n * n);
+  c.clearRect(0, 0, w, h); c.fillStyle = C.plot; c.fillRect(0, 0, w, h);
+  c.font = `10px ${C.mono}`; c.textBaseline = "middle"; c.textAlign = "center"; c.fillStyle = C.muted;
+  for (let l = 0; l < NMAX; l++) {
+    c.fillText(H.LET[l], X(l), 11);
+    c.fillStyle = C.grid; c.fillRect(Math.round(X(l)), Y(NMAX), 1, Y(l + 1) - Y(NMAX)); c.fillStyle = C.muted;
+  }
+  c.textAlign = "left";
+  for (let n = 1; n <= NMAX; n++) {
+    const y = Y(n), cur = n === A.n, one = lw > 60, et = minus(E(n).toFixed(n === 1 ? 1 : 2));
+    c.fillStyle = C.line; c.fillRect(Math.round(X(0) - cw / 2), Math.round(y), Math.round((n - 1) * cw + cw), 1);
+    c.fillStyle = cur ? C.ink : C.muted;
+    if (one) c.fillText(`n=${n}  ${et} eV`, L0 + 2, y); else { c.fillText(`n=${n}`, L0 + 2, y - 6); c.font = `9px ${C.mono}`; c.fillText(`${et} eV`, L0 + 2, y + 6); c.font = `10px ${C.mono}`; }
+  }
+  c.font = `9px ${C.mono}`; c.textAlign = "right"; c.fillStyle = C.muted; c.fillText("(spacing compressed)", w - 6, h - 6);
+  const arr = jumps.filter(j => j.fs).map(j => ({ a: j.fs, b: j.ts, lam: j.lam, p: 1 }));
+  if (J) arr.push({ a: J.from, b: J.to, lam: J.lam, p: smooth((now - J.t0 - J.mix0) / (J.mix1 - J.mix0)) });
+  c.lineJoin = "round";
+  arr.forEach((r, i) => {
+    const newest_ = i === arr.length - 1, ax = X(r.a.l), ay = Y(r.a.n), dx = X(r.b.l) - ax, dy = Y(r.b.n) - ay, d = Math.hypot(dx, dy), ux = dx / d, uy = dy / d, s0 = 9, e = s0 + (d - s0 - 10) * r.p, hs = newest_ ? 9 : 7;
+    c.strokeStyle = c.fillStyle = photCol(r.lam); c.lineWidth = newest_ ? 3 : 1.5; c.globalAlpha = newest_ ? 1 : 0.75;
+    if (lamCls(r.lam) !== "vis") c.setLineDash([4, 3]);
+    c.beginPath(); c.moveTo(ax + ux * s0, ay + uy * s0); c.lineTo(ax + ux * Math.max(s0, e - hs * 0.6), ay + uy * Math.max(s0, e - hs * 0.6)); c.stroke(); c.setLineDash([]);
+    if (r.p > 0.03) { const tx = ax + ux * e, ty = ay + uy * e; c.beginPath(); c.moveTo(tx, ty); c.lineTo(tx - ux * hs - uy * hs * 0.5, ty - uy * hs + ux * hs * 0.5); c.lineTo(tx - ux * hs + uy * hs * 0.5, ty - uy * hs - ux * hs * 0.5); c.closePath(); c.fill(); }
+    c.globalAlpha = 1;
+  });
+  cvL.setAttribute("aria-label", `Energy levels of hydrogen, n = 1 at −13.6 eV up to n = 5, with arrows for the ${arr.length} jump${arr.length === 1 ? "" : "s"} made this session. The electron is in ${orbTxt(A)}.`);
+}
+// ---- the spectrum strip ----
+function syncSpec() {
+  $("aSpecN").textContent = `${found.size} of ${PAIRS.length} lines found`; specDirty = true;
+  cvS.setAttribute("aria-label", "Photon colour, to aim and fire. " + (found.size ? `Hydrogen's spectrum with ${found.size} of ${PAIRS.length} lines found: ${PAIRS.filter(([h, l]) => found.has(h + "-" + l)).map(([h, l]) => `${lineName(h, l)} ${nmTxt(lamNm(h, l))} nanometres`).join(", ")}` : "Hydrogen's spectrum: no lines found yet"));
+}
+let specHits = [];
+function drawSpec(now) {
+  specDirty = false; const c = ctxS, w = SW, h = SH; if (w < 40) return;
+  c.clearRect(0, 0, w, h); c.fillStyle = C.plot; c.fillRect(0, 0, w, h);
+  const x0 = 12, x1 = w - 12, X = l => x0 + Math.log(l / LMIN) / Math.log(LMAX / LMIN) * (x1 - x0), yT = 16, yB = 38, xa = X(380), xb = X(750);
+  const gr = c.createLinearGradient(xa, 0, xb, 0); for (let l = 380; l <= 750; l += 10) gr.addColorStop((X(l) - xa) / (xb - xa), `rgb(${bruton(l).map(v => Math.round(v * 255)).join(",")})`);
+  c.globalAlpha = C.dark ? 0.3 : 0.24; c.fillStyle = gr; c.fillRect(xa, yT, xb - xa, yB - yT); c.globalAlpha = 1;
+  c.fillStyle = C.muted; c.fillRect(x0, yB, x1 - x0, 1); c.fillStyle = C.grid; c.fillRect(Math.round(xa), yT, 1, yB - yT); c.fillRect(Math.round(xb), yT, 1, yB - yT);
+  c.font = `10px ${C.mono}`; c.textAlign = "center"; c.textBaseline = "alphabetic"; c.fillStyle = C.muted;
+  let right = -9; for (const t of [100, 200, 400, 700, 1000, 2000, 4000]) {
+    const x = X(t), s = t === 100 ? "100 nm" : String(t), tw = c.measureText(s).width / 2; c.fillRect(Math.round(x), yB, 1, 4);
+    if (x - tw > right + 4 && x + tw < w - 2) { c.fillText(s, x, yB + 11); right = x + tw; }
+  }
+  c.textAlign = "center"; c.fillText("ultraviolet", (x0 + xa) / 2, h - 2); c.fillText("visible", (xa + xb) / 2, h - 2); c.fillText("infrared", (xb + x1) / 2, h - 2);
+  const fl = !RM.matches && newest ? Math.max(0, 1 - (now - newest.t) / SPEC_T) : 0, got = PAIRS.filter(([hi, lo]) => found.has(hi + "-" + lo)).map(([hi, lo]) => ({ hi, lo, l: lamNm(hi, lo), x: X(lamNm(hi, lo)) })).sort((p, q) => p.x - q.x);
+  specHits = got.map(g => ({ x: g.x, hi: g.hi, lo: g.lo }));
+  if (!got.length) { c.fillStyle = C.muted; c.font = `11px ${C.mono}`; c.fillText("make a jump to light up a line", w / 2, yT + 15); }
+  for (const g of got) {
+    const col = photCol(g.l), isNew = newest && newest.key === g.hi + "-" + g.lo;
+    if (isNew && fl > 0) { c.strokeStyle = col; c.globalAlpha = 0.45 * fl; c.lineWidth = 4 + 10 * fl; c.beginPath(); c.moveTo(g.x, yT - 4); c.lineTo(g.x, yB); c.stroke(); c.globalAlpha = 1; }
+    c.strokeStyle = col; c.lineWidth = lamCls(g.l) === "vis" ? 2.5 : 2; c.beginPath(); c.moveTo(g.x, yT - 4); c.lineTo(g.x, yB); c.stroke();
+  }
+  c.font = `10px ${C.mono}`; c.textAlign = "center"; c.fillStyle = C.ink; let edge = -9;
+  for (const g of got) {
+    const tx = `${lineSym(g.hi, g.lo)} ${Math.round(g.l)}`, hw = c.measureText(tx).width / 2, x = Math.max(hw + 2, Math.min(w - hw - 2, g.x));
+    if (x - hw > edge + 3) { c.fillText(tx, x, 10); edge = x + hw; }
+  }
+  // the aim cursor, in the colour of the photon, with a readout beside it
+  const ax = X(aim), ac = photCol(aim), rt = `${nmTxt(aim)} nm · ${cName(aim)}`, rw = c.measureText(rt).width, right_ = ax + 8 + rw < w - 2;
+  c.save(); c.lineCap = "round"; if (lamCls(aim) !== "vis") c.setLineDash([4, 3]);
+  c.strokeStyle = C.plot; c.globalAlpha = 0.7; c.lineWidth = 5; c.beginPath(); c.moveTo(ax, yT - 6); c.lineTo(ax, yB + 5); c.stroke();
+  c.globalAlpha = 1; c.strokeStyle = ac; c.lineWidth = 2.2; c.stroke(); c.setLineDash([]);
+  c.textAlign = right_ ? "left" : "right"; c.textBaseline = "middle"; c.lineWidth = 3; c.strokeStyle = C.plot; c.lineJoin = "round";
+  const tx_ = right_ ? ax + 7 : ax - 7; c.strokeText(rt, tx_, (yT + yB) / 2); c.fillStyle = C.ink; c.fillText(rt, tx_, (yT + yB) / 2); c.restore();
+}
+for (const id of ["aSpecReset", "aSpecReset2"]) $(id).addEventListener("click", () => { found.clear(); newest = null; saveLines(); syncSpec(); schedule(); });
+syncSpec(); setAim(aim);
+
 let tab = "ag-orb";
 try { tab = localStorage.getItem("ita-atom-tab") || tab; } catch (e) {}
 function syncTabs() {
@@ -1354,7 +1732,7 @@ RM.addEventListener("change", () => { last = 0; schedule(); });
 
 if (!initGL()) { $("a-surfBtn").hidden = true; A.mode = "cloud"; }
 sync(); syncTabs(); readTokens();
-window.itaAtom = { show(on) {
+window.itaAtom = { jumpMix, startJump, aim: setAim, fire, getAim: () => aim, lamNm, dipole: (i, f, st) => dip(i, f, st || A.style), lines: () => [...found], state: () => ({ J, ...A }), show(on) {
   active = on; clearInterval(themeTimer); themeTimer = 0;
   if (on) { readTokens(); themeTimer = setInterval(readTokens, 1000); fit(); sliceDirty = plotDirty = true; schedule(); }
   else if (raf) { cancelAnimationFrame(raf); raf = 0; last = 0; }
