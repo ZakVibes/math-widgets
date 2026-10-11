@@ -6,6 +6,14 @@
   <title>Zak's Math Widgets</title>
   <meta name="description" content="Interactive math and physics widgets: fractals, symmetry, gravity, chaos, quantum mechanics and waves.">
 
+  <!-- App version: lets phones install the site to their home screen and use it offline -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <meta name="apple-mobile-web-app-title" content="Math Widgets">
+  <meta name="theme-color" content="#fbf1f5" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1d1219" media="(prefers-color-scheme: dark)">
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@1,500&display=swap" rel="stylesheet">
@@ -155,6 +163,40 @@
       font-size: 0.9rem;
     }
 
+    /* "Install the app" hint: a small bar at the bottom, only on phones that aren't using the app yet */
+    #install {
+      position: fixed;
+      left: 12px;
+      right: 12px;
+      bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+      max-width: 520px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 10px 10px 12px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: 0 10px 30px var(--shadow);
+      font-size: 0.92rem;
+    }
+    #install[hidden] { display: none; }
+    #install img { width: 40px; height: 40px; border-radius: 10px; flex: none; }
+    #install p { margin: 0; flex: 1; color: var(--muted); line-height: 1.35; }
+    #install b { color: var(--text); font-weight: 600; }
+    #install svg { width: 15px; height: 15px; vertical-align: -2px; color: var(--rose); }
+    #install button {
+      font: inherit;
+      border: 0;
+      border-radius: 999px;
+      cursor: pointer;
+      flex: none;
+    }
+    #install .go { background: var(--rose); color: var(--card); font-weight: 600; padding: 8px 16px; }
+    #install .x { background: none; color: var(--muted); font-size: 1.3rem; line-height: 1; padding: 6px 8px; }
+    body.has-install main { padding-bottom: 150px; }
+
     @media (prefers-reduced-motion: reduce) {
       .card, .thumb { transition: none; }
       .card:hover .thumb { transform: none; }
@@ -302,5 +344,57 @@
 
     <footer>Made by Zak · 2026</footer>
   </main>
+
+  <aside id="install" hidden aria-label="Install the app">
+    <img src="icons/icon-192.png" alt="">
+    <p id="install-text"></p>
+    <button class="go" id="install-go" hidden>Install</button>
+    <button class="x" id="install-x" aria-label="Hide this">×</button>
+  </aside>
+
+  <script>
+    // The offline helper (sw.js) saves the site on the device so the installed app works without internet.
+    if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("sw.js"));
+
+    // Install hint. Android offers its own Install button; on iPhone it's hidden in the Share menu, so we explain.
+    (() => {
+      const KEY = "mw-install-hidden";
+      const bar = document.getElementById("install"), text = document.getElementById("install-text"), go = document.getElementById("install-go");
+      const installed = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+      const phone = matchMedia("(pointer: coarse)").matches;
+      let dismissed = false;
+      try { dismissed = localStorage.getItem(KEY) === "1"; } catch (e) {}
+      if (installed || !phone || dismissed) return;
+
+      const show = html => { text.innerHTML = html; bar.hidden = false; document.body.classList.add("has-install"); };
+      const hide = () => { bar.hidden = true; document.body.classList.remove("has-install"); };
+      document.getElementById("install-x").addEventListener("click", () => {
+        hide();
+        try { localStorage.setItem(KEY, "1"); } catch (e) {}
+      });
+
+      const iOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+      const shareIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Share"><path d="M12 3v12M7 8l5-5 5 5M5 12v8h14v-8"/></svg>';
+      if (iOS) {
+        show(`<b>Get the app:</b> tap ${shareIcon} Share, then <b>Add to Home Screen</b>. It works offline too.`);
+        return;
+      }
+      let prompt = null;
+      addEventListener("beforeinstallprompt", e => {
+        e.preventDefault();
+        prompt = e;
+        go.hidden = false;
+        show("<b>Get the app</b> on your home screen. It works offline too.");
+      });
+      go.addEventListener("click", async () => {
+        if (!prompt) return;
+        prompt.prompt();
+        const { outcome } = await prompt.userChoice;
+        prompt = null;
+        if (outcome === "accepted") hide();
+      });
+      addEventListener("appinstalled", hide);
+    })();
+  </script>
 </body>
 </html>
