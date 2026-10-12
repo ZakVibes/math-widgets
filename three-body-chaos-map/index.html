@@ -1,0 +1,1910 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Three-Body Chaos Map</title>
+<link rel="manifest" href="../manifest.json"><link rel="icon" href="../icons/icon-192.png"><link rel="apple-touch-icon" href="../icons/icon-180.png"><meta name="apple-mobile-web-app-title" content="Math Widgets"><script>if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("../sw.js"));</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@1,6..96,500&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: full-bleed map instrument on the left, a narrow observing log on the right (stacks below the map on phones). */
+:root {
+  --bg: #090d19;
+  --panel: #0f1526;
+  --raise: #161e33;
+  --line: #242e48;
+  --fg: #e4e8f3;
+  --muted: #8b95b2;
+  --faint: #5b6585;
+  --body-a: #e8a33d;
+  --body-b: #3fb6c4;
+  --body-c: #dc6a85;
+  --f-display: "Bodoni Moda", "Didot", "Bodoni 72", Georgia, serif;
+  --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 14px; line-height: 1.5; }
+.app { height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 380px; }
+.map-wrap { position: relative; min-height: 0; min-width: 0; overflow: hidden; background: var(--bg); }
+#map { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: crosshair; display: block; background: transparent; }
+#tl { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; transform-origin: 0 0; image-rendering: auto; pointer-events: none; }
+.hud { position: absolute; left: 12px; right: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+.timebar { pointer-events: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; background: rgba(15, 21, 38, 0.86); border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px 6px 6px; max-width: 760px; }
+.timebar input[type="range"] { flex: 1 1 140px; min-width: 120px; width: auto; grid-column: auto; accent-color: var(--fg); }
+.timebar .icon-btn { width: 32px; height: 32px; }
+.timebar .icon-btn svg { width: 14px; height: 14px; fill: currentColor; }
+.tlabel { font: 500 12px var(--f-mono); color: var(--fg); font-variant-numeric: tabular-nums; min-width: 6.5ch; white-space: nowrap; }
+.lead { margin: 0; font-size: 13px; color: var(--muted); }
+.wheel { width: 44px; height: 44px; border-radius: 50%; flex: none; }
+.wheel-row { display: flex; gap: 12px; align-items: center; font-size: 12.5px; color: var(--muted); }
+#map:focus-visible { outline: 2px solid var(--body-b); outline-offset: -2px; }
+.title-card { position: absolute; left: 12px; top: 12px; max-width: calc(100% - 76px); pointer-events: none; background: rgba(9, 13, 25, 0.72); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); border-radius: 10px; padding: 8px 12px 9px; }
+.title-card h1 { margin: 0; font-family: var(--f-display); font-style: italic; font-weight: 500; font-size: 28px; line-height: 1.1; letter-spacing: 0.005em; text-wrap: balance; }
+.title-card p { margin: 4px 0 0; font-family: var(--f-mono); font-size: 11px; color: var(--muted); letter-spacing: 0.04em; }
+.zoom-ctl { position: absolute; right: 16px; top: 16px; display: flex; flex-direction: column; gap: 6px; }
+.icon-btn { width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--line); background: rgba(15, 21, 38, 0.86); color: var(--fg); font: 500 18px/1 var(--f-mono); cursor: pointer; display: grid; place-items: center; padding: 0; }
+.icon-btn:hover { background: var(--raise); }
+.icon-btn:focus-visible, .seg button:focus-visible, .btn:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--body-b); outline-offset: 2px; }
+.icon-btn.small { font-size: 11px; letter-spacing: 0.04em; }
+.readout { pointer-events: none; align-self: flex-start; max-width: 100%; background: rgba(9, 13, 25, 0.72); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); border-radius: 8px; padding: 6px 10px; font-family: var(--f-mono); font-size: 11px; color: var(--muted); display: flex; flex-direction: column; gap: 6px; text-shadow: 0 1px 6px rgba(9, 13, 25, 0.95); }
+.readout .row { display: flex; flex-wrap: wrap; gap: 2px 14px; font-variant-numeric: tabular-nums; }
+.readout b { color: var(--fg); font-weight: 500; }
+#hoverRow:empty, #hoverRow.blank { display: none; }
+.bar { height: 2px; width: min(220px, 60%); background: var(--line); border-radius: 2px; overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; background: var(--fg); transition: width 0.25s; }
+
+.panel { overflow-y: auto; border-left: 1px solid var(--line); background: var(--panel); padding-block: 18px 28px; padding-inline: 20px; display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.panel section { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.eyebrow { margin: 0; font-family: var(--f-mono); font-weight: 500; font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); }
+.orbit-box { position: relative; aspect-ratio: 1 / 1; max-width: 100%; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); overflow: hidden; }
+#orbit { width: 100%; height: 100%; display: block; }
+.orbit-time { position: absolute; left: 10px; top: 8px; font: 11px var(--f-mono); color: var(--muted); font-variant-numeric: tabular-nums; pointer-events: none; }
+.outcome { font-size: 14px; line-height: 1.45; min-height: 3em; }
+.outcome .chip { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: 0; }
+.outcome .coords { font-family: var(--f-mono); font-size: 12px; color: var(--muted); }
+.note { font-size: 12.5px; color: var(--muted); border-left: 2px solid var(--line); padding-left: 10px; }
+.controls-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn { border: 1px solid var(--line); background: var(--raise); color: var(--fg); font: 500 13px var(--f-body); padding: 7px 12px; border-radius: 8px; cursor: pointer; }
+.btn:hover { border-color: var(--faint); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; background: transparent; color: var(--muted); font: 500 12.5px var(--f-body); padding: 7px 11px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--raise); color: var(--fg); }
+.seg.wide { display: flex; }
+.seg.wide button { flex: 1; }
+#tlModeSeg { display: grid; grid-template-columns: 1fr 1fr; }
+#tlModeSeg button + button { border-left: 0; }
+#tlModeSeg button:nth-child(even) { border-left: 1px solid var(--line); }
+#tlModeSeg button:nth-child(n+3) { border-top: 1px solid var(--line); }
+.legend { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; font-size: 12.5px; color: var(--muted); }
+.legend span { display: flex; align-items: center; gap: 7px; }
+.legend i { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+.ramp { height: 10px; border-radius: 3px; }
+.ramp-labels { display: flex; justify-content: space-between; font: 11px var(--f-mono); color: var(--faint); }
+.field { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 6px 12px; }
+.field label { font-size: 13px; color: var(--fg); }
+.field .hint { grid-column: 1 / -1; font-size: 12px; color: var(--faint); margin-top: -4px; }
+select { background: var(--raise); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font: 13px var(--f-body); }
+input[type="range"] { width: 100%; grid-column: 1 / -1; accent-color: var(--body-c); }
+.val { font: 12px var(--f-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.places { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.places .btn { text-align: left; font-weight: 400; font-size: 12.5px; }
+.about p { margin: 0; font-size: 13px; color: var(--muted); max-width: 65ch; }
+.about p b { color: var(--fg); font-weight: 500; }
+.engine { font: 11px var(--f-mono); color: var(--faint); }
+
+@media (max-width: 820px) {
+  .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: 62svh auto; height: auto; min-height: 100%; }
+  .map-wrap { min-height: 320px; }
+  .panel { border-left: 0; border-top: 1px solid var(--line); overflow: visible; padding-inline: 16px; }
+  .title-card h1 { font-size: 23px; }
+  .orbit-box { width: min(100%, 420px); align-self: center; }
+}
+@media (max-width: 560px) {
+  .title-card p, .readout { display: none; }
+  .title-card { padding: 6px 10px; }
+  .title-card h1 { font-size: 20px; }
+  .timebar { gap: 6px; padding: 5px 6px; flex-wrap: wrap; }
+  .timebar .seg { flex: 1 1 100%; display: flex; }
+  .timebar .seg button { flex: 1; }
+  .timebar input[type="range"] { flex: 1 1 50px; min-width: 50px; }
+  .timebar .seg button { padding: 6px 7px; font-size: 12px; }
+  .tlabel { min-width: 0; font-size: 11px; }
+}
+@media (prefers-reduced-motion: reduce) { .bar i { transition: none; } }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="map-wrap" id="mapWrap">
+    <canvas id="tl" aria-hidden="true"></canvas>
+    <canvas id="map" tabindex="0" aria-label="Chaos map. Drag to pan, scroll or pinch to zoom, tap a point to launch its orbit. Space plays or pauses."></canvas>
+    <div class="title-card">
+      <a href="../index.html" style="display:table;pointer-events:auto;margin-bottom:6px;font-size:13px;color:#d0457f;font-weight:500;text-decoration:none">← All widgets</a>
+      <h1>Three-Body Chaos Map</h1>
+      <p>FREE FALL · A, B START ONE UNIT APART · C STARTS AT EACH PIXEL</p>
+    </div>
+    <div class="zoom-ctl">
+      <button class="icon-btn" id="zin" aria-label="Zoom in">+</button>
+      <button class="icon-btn" id="zout" aria-label="Zoom out">−</button>
+      <button class="icon-btn small" id="zreset" aria-label="Reset view">1:1</button>
+    </div>
+    <div class="hud">
+      <div class="readout" aria-live="off">
+        <div class="row blank" id="hoverRow"></div>
+        <div class="row" id="viewRow"></div>
+        <div class="bar" id="progWrap"><i id="progBar"></i></div>
+      </div>
+      <div class="timebar">
+        <button class="icon-btn" id="playBtn" aria-label="Pause"></button>
+        <button class="icon-btn" id="restartBtn" aria-label="Back to t = 0"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2h2v12H2zM14 2v12L5 8z"/></svg></button>
+        <button class="icon-btn" id="orbitBtn" aria-label="Replay the orbit from t = 0" title="Replay the orbit"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 1 1-5.2 3.7l1.9.6A3.5 3.5 0 1 0 8 4.5V7L4 3.5 8 0z"/><circle cx="8" cy="8" r="1.6"/></svg></button>
+        <input type="range" id="clock" min="0" max="100" step="0.05" value="0" aria-label="Time">
+        <span class="tlabel" id="tLabel">t = 0.0</span>
+        <div class="seg" id="speedSeg" role="group" aria-label="Playback speed">
+          <button data-v="0.6" aria-pressed="false">Slow</button><button data-v="2" aria-pressed="true">Normal</button><button data-v="6" aria-pressed="false">Fast</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <aside class="panel">
+    <section aria-labelledby="h-view">
+      <h2 class="eyebrow" id="h-view">View</h2>
+      <div class="seg wide" id="viewSeg" role="group" aria-label="View">
+        <button data-v="tl" aria-pressed="true">Time-lapse</button><button data-v="map" aria-pressed="false">Escape map</button>
+      </div>
+      <p class="lead" id="viewHint"></p>
+    </section>
+
+    <section aria-labelledby="h-orbit">
+      <h2 class="eyebrow" id="h-orbit">Orbit</h2>
+      <div class="orbit-box"><canvas id="orbit" aria-label="Animated orbit of the selected start point and four close neighbours"></canvas><div class="orbit-time" id="orbitTime"></div></div>
+      <div class="outcome" id="outcome"></div>
+      <div class="controls-row"><button class="btn" id="replayBtn">Replay orbit</button><span class="engine">Tap the map to launch from a new point.</span></div>
+      <div class="note" id="mismatch" hidden></div>
+    </section>
+
+    <section aria-labelledby="h-colour">
+      <h2 class="eyebrow" id="h-colour">Colour by</h2>
+      <div id="tlColours">
+        <div class="seg wide" id="tlModeSeg" role="group" aria-label="Time-lapse colour mode">
+          <button data-v="0" aria-pressed="true">Who's alone</button><button data-v="3" aria-pressed="false">Stretching</button><button data-v="1" aria-pressed="false">Where C is</button><button data-v="2" aria-pressed="false">Close passes</button>
+        </div>
+      </div>
+      <div class="legend" id="legendAlone">
+        <span><i style="background:var(--body-a)"></i>A alone</span>
+        <span><i style="background:var(--body-b)"></i>B alone</span>
+        <span><i style="background:var(--body-c)"></i>C alone</span>
+        <span><i style="background:#1e2438;border:1px solid var(--line)"></i>All three close</span>
+      </div>
+      <div class="wheel-row" id="legendWhere" hidden>
+        <div class="wheel" id="wheel"></div>
+        <span>Hue is the direction from the centre of mass to C. Brighter means C is closer in.</span>
+      </div>
+      <div id="legendStretch" hidden>
+        <div class="ramp" id="rampStretch"></div>
+        <div class="ramp-labels"><span>held together</span><span>pulled apart fast</span></div>
+      </div>
+      <div id="legendPasses" hidden>
+        <div class="ramp" id="rampPasses"></div>
+        <div class="ramp-labels"><span>1</span><span>10</span><span>120+ passes</span></div>
+      </div>
+      <div class="seg wide" id="modeSeg" role="group" aria-label="Colour mode" hidden>
+        <button data-v="who" aria-pressed="true">Escaper + time</button><button data-v="flat" aria-pressed="false">Escaper</button><button data-v="time" aria-pressed="false">Escape time</button>
+      </div>
+      <div class="legend" id="legendWho" hidden>
+        <span><i style="background:var(--body-a)"></i>A escapes</span>
+        <span><i style="background:var(--body-b)"></i>B escapes</span>
+        <span><i style="background:var(--body-c)"></i>C escapes</span>
+        <span><i style="background:#1e2438;border:1px solid var(--line)"></i>No escape yet</span>
+      </div>
+      <div id="legendTime" hidden>
+        <div class="ramp" id="ramp"></div>
+        <div class="ramp-labels"><span>t = 0.5</span><span id="rampMid"></span><span id="rampMax"></span></div>
+      </div>
+      <p class="engine" id="shadeNote"></p>
+    </section>
+
+    <section aria-labelledby="h-sim">
+      <h2 class="eyebrow" id="h-sim">Simulation</h2>
+      <div class="field">
+        <label for="tmax">Time limit</label>
+        <select id="tmax"><option value="50">t = 50</option><option value="100" selected>t = 100</option><option value="200">t = 200</option><option value="400">t = 400</option></select>
+        <span class="hint">Pixels with no escape by then stay dark.</span>
+      </div>
+      <div class="field">
+        <label for="acc">Accuracy</label>
+        <select id="acc"><option value="0.04">Fast</option><option value="0.02" selected>Balanced</option><option value="0.01">Fine</option></select>
+      </div>
+      <div class="field">
+        <label for="res">Resolution</label>
+        <select id="res"><option value="0.5">Low</option><option value="1" selected>Normal</option><option value="2">Sharp</option></select>
+      </div>
+      <div class="field">
+        <label for="mass">Mass of C</label>
+        <span class="val" id="massVal">1.00</span>
+        <input type="range" id="mass" min="-2" max="2" step="0.05" value="0" aria-describedby="massHint">
+        <span class="hint" id="massHint">A and B always have mass 1.</span>
+      </div>
+    </section>
+
+    <section aria-labelledby="h-places">
+      <h2 class="eyebrow" id="h-places">Places</h2>
+      <div class="places">
+        <button class="btn" data-place="0,0.45,3.2">Overview</button>
+        <button class="btn" data-place="0,0.866,0.32">Equilateral point</button>
+        <button class="btn" data-place="-0.5,0.16,0.5">Close to A</button>
+        <button class="btn" data-place="0,1.3,9">Wide field</button>
+      </div>
+    </section>
+
+    <section class="about" aria-labelledby="h-about">
+      <h2 class="eyebrow" id="h-about">How to read it</h2>
+      <p>Bodies <b>A</b> and <b>B</b> start one unit apart. Body <b>C</b> starts at whichever point you pick. All three begin at rest and fall together under Newtonian gravity (G = 1). Sooner or later one body is flung away and the other two leave as a bound pair.</p>
+      <p>Every pixel is its own copy of that system. In the <b>time-lapse</b>, all of them run together on your GPU and are recoloured every frame from their live state. Nearby pixels start almost the same, so at first the picture is smooth. Chaos shows up as the field stretching and folding until neighbouring pixels have nothing in common.</p>
+      <p>The <b>escape map</b> shows only the ending: which body gets thrown out. Where colours keep switching at every zoom level, a tiny shift in where C starts changes the outcome.</p>
+      <p><b>Stretching</b> measures how quickly neighbouring starts are being pulled apart. Its bright ridges are where the fate of the system changes from one pixel to the next.</p>
+      <p>Tap anywhere to launch that start and four neighbours a couple of pixels away. Their bodies fly across the map from t = 0, and you can watch the neighbours stay together, then split. The map keeps its own time while they fly.</p>
+      <p>A body counts as escaped once it is at least 3 units and 4 pair-separations from the other two, moving away from them, and no longer bound to them. The ring above A and B marks the equilateral start, which falls straight into a triple collision.</p>
+      <p>The GPU works in single precision with a regularized leapfrog integrator (logarithmic Hamiltonian), which steps cleanly through close encounters. In chaotic zones single pixels are not reproducible, but the structure is. Tapped orbits are recomputed in double precision.</p>
+      <p class="engine" id="engineNote"></p>
+    </section>
+  </aside>
+</div>
+
+<script>
+"use strict";
+/* ------------------------------------------------------------------ *
+ * Double-precision core (used for the orbit replay and the CPU path). *
+ * Regularized leapfrog with the logarithmic-Hamiltonian time transform *
+ * (Mikkola & Tanikawa 1999; Preto & Tremaine 1999).                    *
+ * ------------------------------------------------------------------ */
+function makeCore() {
+  function escapeTest(i, P, V, m, M) {
+    const a = (i + 1) % 3, b = (i + 2) % 3;
+    const ma = m[a], mb = m[b], mab = ma + mb, mi = m[i];
+    const sx = P[2 * b] - P[2 * a], sy = P[2 * b + 1] - P[2 * a + 1];
+    const sep = Math.sqrt(sx * sx + sy * sy);
+    const Rx = P[2 * i] - (ma * P[2 * a] + mb * P[2 * b]) / mab;
+    const Ry = P[2 * i + 1] - (ma * P[2 * a + 1] + mb * P[2 * b + 1]) / mab;
+    const R = Math.sqrt(Rx * Rx + Ry * Ry);
+    if (R < 3 || R < 4 * sep) return false;
+    const Vx = V[2 * i] - (ma * V[2 * a] + mb * V[2 * b]) / mab;
+    const Vy = V[2 * i + 1] - (ma * V[2 * a + 1] + mb * V[2 * b + 1]) / mab;
+    if (Rx * Vx + Ry * Vy <= 0) return false;
+    const E = 0.5 * (mi * mab / M) * (Vx * Vx + Vy * Vy) - mi * mab / R;
+    if (E <= 0) return false;
+    const vx = V[2 * b] - V[2 * a], vy = V[2 * b + 1] - V[2 * a + 1];
+    const Eb = 0.5 * (ma * mb / mab) * (vx * vx + vy * vy) - ma * mb / sep;
+    return Eb < 0;
+  }
+  // Returns {status: 1..3 escaper, 4 time limit, 5 step cap; t; steps; dE}
+  // With rec(t, P) the run continues for a short tail after the escape.
+  function simulate(cx, cy, m2, Tmax, h0, cap, rec) {
+    const m = [1, 1, m2], M = 2 + m2;
+    const P = new Float64Array([-0.5, 0, 0.5, 0, cx, cy]);
+    const V = new Float64Array(6);
+    let t = 0, step = 0, status = 0, tEsc = 0, tEnd = Tmax;
+    const pot = () => {
+      let dx = P[2] - P[0], dy = P[3] - P[1]; const a = Math.sqrt(dx * dx + dy * dy);
+      dx = P[4] - P[0]; dy = P[5] - P[1]; const b = Math.sqrt(dx * dx + dy * dy);
+      dx = P[4] - P[2]; dy = P[5] - P[3]; const c = Math.sqrt(dx * dx + dy * dy);
+      return m[0] * m[1] / a + m[0] * m[2] / b + m[1] * m[2] / c;
+    };
+    const kin = () => 0.5 * (m[0] * (V[0] * V[0] + V[1] * V[1]) + m[1] * (V[2] * V[2] + V[3] * V[3]) + m[2] * (V[4] * V[4] + V[5] * V[5]));
+    const B = pot();
+    const h = h0 * Math.sqrt(3 / B);
+    if (rec) rec(t, P);
+    while (t < tEnd && step < cap) {
+      let dt = 0.5 * h / (kin() + B);
+      for (let k = 0; k < 6; k++) P[k] += V[k] * dt;
+      t += dt;
+      const ax01 = P[2] - P[0], ay01 = P[3] - P[1], ax02 = P[4] - P[0], ay02 = P[5] - P[1], ax12 = P[4] - P[2], ay12 = P[5] - P[3];
+      const i01 = 1 / Math.sqrt(ax01 * ax01 + ay01 * ay01), i02 = 1 / Math.sqrt(ax02 * ax02 + ay02 * ay02), i12 = 1 / Math.sqrt(ax12 * ax12 + ay12 * ay12);
+      const U = m[0] * m[1] * i01 + m[0] * m[2] * i02 + m[1] * m[2] * i12;
+      const kd = h / U;
+      const c01 = kd * i01 * i01 * i01, c02 = kd * i02 * i02 * i02, c12 = kd * i12 * i12 * i12;
+      V[0] += m[1] * c01 * ax01 + m[2] * c02 * ax02; V[1] += m[1] * c01 * ay01 + m[2] * c02 * ay02;
+      V[2] += -m[0] * c01 * ax01 + m[2] * c12 * ax12; V[3] += -m[0] * c01 * ay01 + m[2] * c12 * ay12;
+      V[4] += -m[0] * c02 * ax02 - m[1] * c12 * ax12; V[5] += -m[0] * c02 * ay02 - m[1] * c12 * ay12;
+      dt = 0.5 * h / (kin() + B);
+      for (let k = 0; k < 6; k++) P[k] += V[k] * dt;
+      t += dt;
+      step++;
+      if (rec) rec(t, P);
+      if (status === 0 && (step & 7) === 0) {
+        for (let i = 0; i < 3; i++) {
+          if (escapeTest(i, P, V, m, M)) {
+            status = i + 1; tEsc = t;
+            if (!rec) return { status, t, steps: step, dE: (kin() - pot() + B) / B };
+            tEnd = Math.min(Tmax * 1.5, t * 1.25 + 4);
+            break;
+          }
+        }
+      }
+    }
+    if (status) return { status, t: tEsc, steps: step, dE: (kin() - pot() + B) / B };
+    return { status: step >= cap ? 5 : 4, t, steps: step, dE: (kin() - pot() + B) / B };
+  }
+  return { simulate };
+}
+const CORE = makeCore();
+
+/* ------------------------------------------------------------------ *
+ * Tile geometry: level L tiles are 8/2^L world units wide, 64 px.     *
+ * ------------------------------------------------------------------ */
+const TILE = 64, WORLD0 = 8, MAX_LEVEL = 18;
+const tileSize = (L) => WORLD0 / Math.pow(2, L);
+
+/* ------------------------------------------------------------------ *
+ * GPU engine: WebGL2, a texture atlas of 64x64 slots, 4 RGBA32F       *
+ * state textures ping-ponged, async readback with PBOs and fences.    *
+ * ------------------------------------------------------------------ */
+const VS = `#version 300 es
+void main(){ vec2 p = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2)); gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0); }`;
+
+const FS_INIT = `#version 300 es
+precision highp float;
+uniform vec3 uJob;      // x0, yTop, pixel size
+uniform vec2 uOrigin;   // slot origin in atlas pixels
+uniform float uM2;
+layout(location=0) out vec4 o0; layout(location=1) out vec4 o1; layout(location=2) out vec4 o2; layout(location=3) out vec4 o3;
+void main(){
+  vec2 l = floor(gl_FragCoord.xy) - uOrigin;           // l.y counts up from the bottom row
+  float cx = uJob.x + (l.x + 0.5) * uJob.z;
+  float cy = uJob.y - (63.0 - l.y + 0.5) * uJob.z;
+  vec2 p2 = vec2(cx, cy);
+  float B = 1.0 + uM2 / length(p2 - vec2(-0.5, 0.0)) + uM2 / length(p2 - vec2(0.5, 0.0));
+  o0 = vec4(-0.5, 0.0, 0.5, 0.0);
+  o1 = vec4(p2, 0.0, 0.0);
+  o2 = vec4(0.0);
+  o3 = vec4(0.0, 0.0, B, 0.0);
+}`;
+
+const FS_STEP = `#version 300 es
+precision highp float;
+precision highp int;
+uniform highp sampler2D uS0, uS1, uS2, uS3;
+uniform float uM2, uH, uTmax, uCap;
+uniform int uSteps;
+layout(location=0) out vec4 o0; layout(location=1) out vec4 o1; layout(location=2) out vec4 o2; layout(location=3) out vec4 o3;
+bool escaped(vec2 pi, vec2 vi, float mi, vec2 pa, vec2 va, float ma, vec2 pb, vec2 vb, float mb, float M){
+  float mab = ma + mb;
+  float sep = length(pb - pa);
+  vec2 R = pi - (ma * pa + mb * pb) / mab;
+  float r = length(R);
+  if (r < 3.0 || r < 4.0 * sep) return false;
+  vec2 V = vi - (ma * va + mb * vb) / mab;
+  if (dot(R, V) <= 0.0) return false;
+  float E = 0.5 * (mi * mab / M) * dot(V, V) - mi * mab / r;
+  if (E <= 0.0) return false;
+  vec2 dv = vb - va;
+  float Eb = 0.5 * (ma * mb / mab) * dot(dv, dv) - ma * mb / sep;
+  return Eb < 0.0;
+}
+void main(){
+  ivec2 c = ivec2(gl_FragCoord.xy);
+  vec4 s0 = texelFetch(uS0, c, 0), s1 = texelFetch(uS1, c, 0), s2 = texelFetch(uS2, c, 0), s3 = texelFetch(uS3, c, 0);
+  if (s1.w != 0.0) { o0 = s0; o1 = s1; o2 = s2; o3 = s3; return; }
+  vec2 p0 = s0.xy, p1 = s0.zw, p2 = s1.xy, v0 = s2.xy, v1 = s2.zw, v2 = s3.xy;
+  float t = s1.z, B = s3.z, n = s3.w, st = 0.0;
+  float m2 = uM2, M = 2.0 + uM2;
+  float h = uH * sqrt(3.0 / B);
+  for (int i = 0; i < 4096; i++) {
+    if (i >= uSteps) break;
+    float T = 0.5 * (dot(v0, v0) + dot(v1, v1) + m2 * dot(v2, v2));
+    float dt = 0.5 * h / (T + B);
+    p0 += v0 * dt; p1 += v1 * dt; p2 += v2 * dt; t += dt;
+    vec2 d01 = p1 - p0, d02 = p2 - p0, d12 = p2 - p1;
+    float i01 = inversesqrt(dot(d01, d01)), i02 = inversesqrt(dot(d02, d02)), i12 = inversesqrt(dot(d12, d12));
+    float U = i01 + m2 * (i02 + i12);
+    float kd = h / U;
+    float c01 = kd * i01 * i01 * i01, c02 = kd * i02 * i02 * i02, c12 = kd * i12 * i12 * i12;
+    v0 += c01 * d01 + m2 * c02 * d02;
+    v1 += -c01 * d01 + m2 * c12 * d12;
+    v2 += -c02 * d02 - c12 * d12;
+    T = 0.5 * (dot(v0, v0) + dot(v1, v1) + m2 * dot(v2, v2));
+    dt = 0.5 * h / (T + B);
+    p0 += v0 * dt; p1 += v1 * dt; p2 += v2 * dt; t += dt;
+    n += 1.0;
+    if (mod(n, 8.0) == 0.0) {
+      if (escaped(p0, v0, 1.0, p1, v1, 1.0, p2, v2, m2, M)) st = 1.0;
+      else if (escaped(p1, v1, 1.0, p0, v0, 1.0, p2, v2, m2, M)) st = 2.0;
+      else if (escaped(p2, v2, m2, p0, v0, 1.0, p1, v1, 1.0, M)) st = 3.0;
+    }
+    if (st == 0.0 && t >= uTmax) st = 4.0;
+    if (st == 0.0 && n >= uCap) st = 5.0;
+    if (st != 0.0) break;
+  }
+  if (isnan(t) || isnan(p2.x)) st = 5.0;
+  o0 = vec4(p0, p1); o1 = vec4(p2, t, st); o2 = vec4(v0, v1); o3 = vec4(v2, B, n);
+}`;
+
+const FS_REDUCE = `#version 300 es
+precision highp float;
+uniform highp sampler2D uS1;
+out vec4 o;
+void main(){
+  ivec2 base = ivec2(gl_FragCoord.xy) * 64;
+  float running = 0.0;
+  for (int y = 0; y < 64; y++) for (int x = 0; x < 64; x++) {
+    if (texelFetch(uS1, base + ivec2(x, y), 0).w == 0.0) running += 1.0;
+  }
+  o = vec4(running, 0.0, 0.0, 1.0);
+}`;
+
+class GPUEngine {
+  constructor(atlas) {
+    const cv = document.createElement("canvas");
+    cv.width = cv.height = 1;
+    const gl = cv.getContext("webgl2", { antialias: false, depth: false, stencil: false, alpha: false, powerPreference: "high-performance" });
+    if (!gl) throw new Error("WebGL2 unavailable");
+    if (!gl.getExtension("EXT_color_buffer_float")) throw new Error("float render targets unavailable");
+    this.gl = gl; this.canvas = cv;
+    this.lost = false;
+    cv.addEventListener("webglcontextlost", (e) => { e.preventDefault(); this.lost = true; if (this.onLost) this.onLost(); });
+    this.A = atlas; this.G = atlas / TILE;
+    this.stepsPerPass = 48;
+    this.passes = 2;
+    const mk = (w, h) => {
+      const t = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, t);
+      gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32F, w, h);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      return t;
+    };
+    this.sets = [0, 1].map(() => [mk(atlas, atlas), mk(atlas, atlas), mk(atlas, atlas), mk(atlas, atlas)]);
+    this.fbs = this.sets.map((set) => {
+      const fb = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+      set.forEach((t, i) => gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + i, gl.TEXTURE_2D, t, 0));
+      gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1, gl.COLOR_ATTACHMENT2, gl.COLOR_ATTACHMENT3]);
+      if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error("incomplete framebuffer");
+      return fb;
+    });
+    this.readFbs = this.sets.map((set) => {
+      const fb = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, set[1], 0);
+      return fb;
+    });
+    this.redTex = mk(this.G, this.G);
+    this.redFb = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.redFb);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.redTex, 0);
+    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error("incomplete reduce framebuffer");
+    this.redPbo = gl.createBuffer();
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.redPbo);
+    gl.bufferData(gl.PIXEL_PACK_BUFFER, this.G * this.G * 16, gl.STREAM_READ);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    this.pboPool = [];
+    this.progInit = this.program(FS_INIT);
+    this.progStep = this.program(FS_STEP);
+    this.progRed = this.program(FS_REDUCE);
+    this.vao = gl.createVertexArray();
+    this.u = {};
+    for (const [name, p] of [["init", this.progInit], ["step", this.progStep], ["red", this.progRed]]) {
+      const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS), o = {};
+      for (let i = 0; i < n; i++) { const a = gl.getActiveUniform(p, i); o[a.name] = gl.getUniformLocation(p, a.name); }
+      this.u[name] = o;
+    }
+    gl.useProgram(this.progStep);
+    ["uS0", "uS1", "uS2", "uS3"].forEach((n, i) => gl.uniform1i(this.u.step[n], i));
+    gl.useProgram(this.progRed);
+    gl.uniform1i(this.u.red.uS1, 0);
+    this.cur = 0;
+    this.slots = new Array(this.G * this.G).fill(null);
+    this.redPending = null;
+    this.reads = [];
+    this.snapPbo = gl.createBuffer();
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.snapPbo);
+    gl.bufferData(gl.PIXEL_PACK_BUFFER, atlas * atlas * 16, gl.STREAM_READ);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    this.snapPending = null;
+    this.lastSnap = 0;
+    this.params = { Tmax: 100, h: 0.02, m2: 1, cap: 2e5 };
+    this.clearAll();
+  }
+  program(fs) {
+    const gl = this.gl;
+    const sh = (type, src) => {
+      const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+      return s;
+    };
+    const p = gl.createProgram();
+    gl.attachShader(p, sh(gl.VERTEX_SHADER, VS));
+    gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fs));
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    return p;
+  }
+  clearAll() {
+    const gl = this.gl;
+    for (const fb of this.fbs) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+      gl.viewport(0, 0, this.A, this.A);
+      for (let i = 0; i < 4; i++) gl.clearBufferfv(gl.COLOR, i, i === 1 ? [0, 0, 0, 9] : [0, 0, 0, 0]);
+    }
+  }
+  get label() { return "GPU · " + this.G * this.G + " tiles in flight"; }
+  free() { if (this.lost) return 0; let n = 0; for (const s of this.slots) if (!s) n++; return n; }
+  busy() { return this.slots.some((s) => s); }
+  setParams(p) {
+    this.params = p;
+    this.slots.fill(null);
+    this.reads.forEach((r) => this.pboPool.push(r.pbo));
+    this.reads = [];
+    this.redPending = null;
+    this.snapPending = null;
+    if (!this.lost) this.clearAll();
+  }
+  submit(job) {
+    const gl = this.gl;
+    const idx = this.slots.indexOf(null);
+    if (idx < 0) return false;
+    this.slots[idx] = { job, state: "run" };
+    const sx = (idx % this.G) * TILE, sy = Math.floor(idx / this.G) * TILE;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbs[this.cur]);
+    gl.viewport(0, 0, this.A, this.A);
+    gl.enable(gl.SCISSOR_TEST);
+    gl.scissor(sx, sy, TILE, TILE);
+    gl.useProgram(this.progInit);
+    gl.uniform3f(this.u.init.uJob, job.x0, job.yTop, job.pix);
+    gl.uniform2f(this.u.init.uOrigin, sx, sy);
+    gl.uniform1f(this.u.init.uM2, this.params.m2);
+    gl.bindVertexArray(this.vao);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.disable(gl.SCISSOR_TEST);
+    return true;
+  }
+  cancel(keep) {
+    // Stop work on slots whose tile is no longer wanted.
+    const gl = this.gl;
+    let any = false;
+    this.slots.forEach((s, idx) => {
+      if (!s || s.state !== "run" || keep.has(s.job.key)) return;
+      if (!any) { gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbs[this.cur]); gl.enable(gl.SCISSOR_TEST); any = true; }
+      gl.scissor((idx % this.G) * TILE, Math.floor(idx / this.G) * TILE, TILE, TILE);
+      gl.clearBufferfv(gl.COLOR, 1, [0, 0, 0, 9]);
+      this.slots[idx] = null;
+      if (this.onCancel) this.onCancel(s.job);
+    });
+    if (any) gl.disable(gl.SCISSOR_TEST);
+  }
+  getPbo() {
+    const gl = this.gl;
+    let b = this.pboPool.pop();
+    if (!b) { b = gl.createBuffer(); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, b); gl.bufferData(gl.PIXEL_PACK_BUFFER, TILE * TILE * 16, gl.STREAM_READ); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null); }
+    return b;
+  }
+  unpack(buf, stride, ox, oy) {
+    const st = new Uint8Array(TILE * TILE), tt = new Float32Array(TILE * TILE);
+    for (let row = 0; row < TILE; row++) {
+      const dst = (TILE - 1 - row) * TILE;    // GL rows run bottom-up
+      for (let c = 0; c < TILE; c++) {
+        const s = ((oy + row) * stride + ox + c) * 4;
+        st[dst + c] = buf[s + 3];
+        tt[dst + c] = buf[s + 2];
+      }
+    }
+    return [st, tt];
+  }
+  tick() {
+    if (this.lost) return;
+    const gl = this.gl;
+    this.poll();
+    if (!this.slots.some((s) => s && s.state === "run")) return;
+    const p = this.params;
+    gl.useProgram(this.progStep);
+    gl.uniform1f(this.u.step.uM2, p.m2);
+    gl.uniform1f(this.u.step.uH, p.h);
+    gl.uniform1f(this.u.step.uTmax, p.Tmax);
+    gl.uniform1f(this.u.step.uCap, p.cap);
+    gl.uniform1i(this.u.step.uSteps, this.stepsPerPass);
+    gl.bindVertexArray(this.vao);
+    gl.viewport(0, 0, this.A, this.A);
+    for (let k = 0; k < this.passes; k++) {
+      const src = this.sets[this.cur];
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbs[1 - this.cur]);
+      for (let i = 0; i < 4; i++) { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, src[i]); }
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      for (let i = 0; i < 4; i++) { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, null); }
+      this.cur = 1 - this.cur;
+    }
+    if (!this.redPending) {
+      gl.useProgram(this.progRed);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.redFb);
+      gl.viewport(0, 0, this.G, this.G);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, this.sets[this.cur][1]);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      gl.bindTexture(gl.TEXTURE_2D, null);
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.redPbo);
+      gl.readPixels(0, 0, this.G, this.G, gl.RGBA, gl.FLOAT, 0);
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+      this.redPending = { fence: gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0), snap: this.slots.map((s) => (s && s.state === "run" ? s.job : null)) };
+    }
+    // Every so often, read the whole atlas so unfinished tiles can show their finished pixels.
+    const now = performance.now();
+    if (!this.snapPending && now - this.lastSnap > 600) {
+      this.lastSnap = now;
+      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.readFbs[this.cur]);
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.snapPbo);
+      gl.readPixels(0, 0, this.A, this.A, gl.RGBA, gl.FLOAT, 0);
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
+      this.snapPending = { fence: gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0), snap: this.slots.map((s) => (s && s.state === "run" ? s.job : null)) };
+    }
+    gl.flush();
+  }
+  ready(fence) {
+    const gl = this.gl;
+    const r = gl.clientWaitSync(fence, 0, 0);
+    if (r === gl.ALREADY_SIGNALED || r === gl.CONDITION_SATISFIED) { gl.deleteSync(fence); return true; }
+    if (r === gl.WAIT_FAILED) { gl.deleteSync(fence); return true; }
+    return false;
+  }
+  poll() {
+    const gl = this.gl;
+    if (this.redPending && this.ready(this.redPending.fence)) {
+      const counts = new Float32Array(this.G * this.G * 4);
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.redPbo);
+      gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, counts);
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+      const snap = this.redPending.snap;
+      this.redPending = null;
+      this.slots.forEach((s, idx) => {
+        if (!s || s.state !== "run" || snap[idx] !== s.job) return;
+        if (counts[idx * 4] > 0) return;
+        const pbo = this.getPbo();
+        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.readFbs[this.cur]);
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbo);
+        gl.readPixels((idx % this.G) * TILE, Math.floor(idx / this.G) * TILE, TILE, TILE, gl.RGBA, gl.FLOAT, 0);
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
+        s.state = "read";
+        this.reads.push({ idx, job: s.job, pbo, fence: gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0) });
+      });
+    }
+    if (this.snapPending && this.ready(this.snapPending.fence)) {
+      const snap = this.snapPending.snap;
+      this.snapPending = null;
+      const buf = new Float32Array(this.A * this.A * 4);
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.snapPbo);
+      gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, buf);
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+      snap.forEach((job, idx) => {
+        const s = this.slots[idx];
+        if (!job || !s || s.job !== job || s.state !== "run") return;
+        this.onPartial(job, ...this.unpack(buf, this.A, (idx % this.G) * TILE, Math.floor(idx / this.G) * TILE));
+      });
+    }
+    if (this.reads.length) {
+      const keep = [];
+      for (const r of this.reads) {
+        if (!this.ready(r.fence)) { keep.push(r); continue; }
+        const buf = new Float32Array(TILE * TILE * 4);
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, r.pbo);
+        gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, buf);
+        gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+        this.pboPool.push(r.pbo);
+        if (this.slots[r.idx] && this.slots[r.idx].job === r.job) this.slots[r.idx] = null;
+        this.onResult(r.job, ...this.unpack(buf, TILE, 0, 0));
+      }
+      this.reads = keep;
+    }
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * CPU fallback: Web Workers running the double-precision core.        *
+ * ------------------------------------------------------------------ */
+class CPUEngine {
+  constructor() {
+    const n = Math.max(1, Math.min(6, (navigator.hardwareConcurrency || 2) - 1));
+    const src = makeCore.toString() + `
+      const CORE = makeCore();
+      onmessage = (e) => {
+        const j = e.data, N = ${TILE};
+        const st = new Uint8Array(N * N), tt = new Float32Array(N * N);
+        for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+          const res = CORE.simulate(j.x0 + (c + 0.5) * j.pix, j.yTop - (r + 0.5) * j.pix, j.m2, j.Tmax, j.h, j.cap, null);
+          st[r * N + c] = res.status; tt[r * N + c] = res.t;
+        }
+        postMessage({ id: j.id, st, tt }, [st.buffer, tt.buffer]);
+      };`;
+    this.url = URL.createObjectURL(new Blob([src], { type: "text/javascript" }));
+    this.workers = Array.from({ length: n }, () => this.spawn());
+    this.params = { Tmax: 100, h: 0.02, m2: 1, cap: 2e5 };
+    this.nextId = 1;
+    this.passes = 1;
+  }
+  spawn() {
+    const w = new Worker(this.url);
+    w.job = null;
+    w.onmessage = (e) => { const job = w.job; w.job = null; if (job && job.id === e.data.id) this.onResult(job, e.data.st, e.data.tt); };
+    return w;
+  }
+  get label() { return "CPU · " + this.workers.length + " worker" + (this.workers.length > 1 ? "s" : "") + " (WebGL2 unavailable, slower)"; }
+  free() { return this.workers.filter((w) => !w.job).length; }
+  busy() { return this.workers.some((w) => w.job); }
+  setParams(p) {
+    this.params = p;
+    // a busy worker can't be reused: its stale result would desync the job slot
+    this.workers = this.workers.map((w) => { if (!w.job) return w; w.terminate(); return this.spawn(); });
+  }
+  submit(job) {
+    const w = this.workers.find((x) => !x.job);
+    if (!w) return false;
+    job.id = this.nextId++;
+    w.job = job;
+    w.postMessage({ id: job.id, x0: job.x0, yTop: job.yTop, pix: job.pix, ...this.params });
+    return true;
+  }
+  cancel() {}
+  tick() {}
+}
+
+/* ------------------------------------------------------------------ *
+ * Time-lapse: one system per screen pixel, all advanced to a shared   *
+ * physical time and coloured by their live state every frame.         *
+ * State: o0 = pA,pB  o1 = pC,t,status  o2 = vA,vB  o3 = vC,passes,n   *
+ * ------------------------------------------------------------------ */
+const ESC_GLSL = `
+bool escaped(vec2 pi, vec2 vi, float mi, vec2 pa, vec2 va, float ma, vec2 pb, vec2 vb, float mb, float M){
+  float mab = ma + mb;
+  float sep = length(pb - pa);
+  vec2 R = pi - (ma * pa + mb * pb) / mab;
+  float r = length(R);
+  if (r < 3.0 || r < 4.0 * sep) return false;
+  vec2 V = vi - (ma * va + mb * vb) / mab;
+  if (dot(R, V) <= 0.0) return false;
+  float E = 0.5 * (mi * mab / M) * dot(V, V) - mi * mab / r;
+  if (E <= 0.0) return false;
+  vec2 dv = vb - va;
+  return 0.5 * (ma * mb / mab) * dot(dv, dv) - ma * mb / sep < 0.0;
+}`;
+
+const FS_TL_INIT = `#version 300 es
+precision highp float;
+precision highp int;
+uniform highp sampler2D uO0, uO1, uO2, uO3;
+uniform vec4 uView;   // cx, cy, world units per sim pixel
+uniform vec2 uSize;
+uniform ivec2 uShift; // new texel c continues old texel c + uShift
+uniform int uHasOld;
+layout(location=0) out vec4 o0; layout(location=1) out vec4 o1; layout(location=2) out vec4 o2; layout(location=3) out vec4 o3;
+void main(){
+  ivec2 c = ivec2(gl_FragCoord.xy);
+  ivec2 src = c + uShift;
+  if (uHasOld == 1 && src.x >= 0 && src.y >= 0 && src.x < int(uSize.x) && src.y < int(uSize.y)) {
+    o0 = texelFetch(uO0, src, 0); o1 = texelFetch(uO1, src, 0); o2 = texelFetch(uO2, src, 0); o3 = texelFetch(uO3, src, 0);
+    return;
+  }
+  vec2 p2 = uView.xy + (vec2(c) + 0.5 - 0.5 * uSize) * uView.z;
+  o0 = vec4(-0.5, 0.0, 0.5, 0.0); o1 = vec4(p2, 0.0, 0.0); o2 = vec4(0.0); o3 = vec4(0.0);
+}`;
+
+const FS_TL_STEP = `#version 300 es
+precision highp float;
+precision highp int;
+uniform highp sampler2D uS0, uS1, uS2, uS3;
+uniform vec4 uView;
+uniform vec2 uSize;
+uniform float uM2, uH, uTarget;
+uniform int uSteps;
+layout(location=0) out vec4 o0; layout(location=1) out vec4 o1; layout(location=2) out vec4 o2; layout(location=3) out vec4 o3;
+${ESC_GLSL}
+void main(){
+  ivec2 c = ivec2(gl_FragCoord.xy);
+  vec4 s0 = texelFetch(uS0, c, 0), s1 = texelFetch(uS1, c, 0), s2 = texelFetch(uS2, c, 0), s3 = texelFetch(uS3, c, 0);
+  if (s1.w != 0.0 || s1.z >= uTarget) { o0 = s0; o1 = s1; o2 = s2; o3 = s3; return; }
+  vec2 start = uView.xy + (vec2(c) + 0.5 - 0.5 * uSize) * uView.z;
+  float m2 = uM2, M = 2.0 + uM2;
+  float B = 1.0 + m2 / length(start - vec2(-0.5, 0.0)) + m2 / length(start - vec2(0.5, 0.0));
+  float h = uH * sqrt(3.0 / B);
+  vec2 p0 = s0.xy, p1 = s0.zw, p2 = s1.xy, v0 = s2.xy, v1 = s2.zw, v2 = s3.xy;
+  float t = s1.z, e = s3.z, n = s3.w, st = 0.0;
+  for (int i = 0; i < 8192; i++) {
+    if (i >= uSteps || t >= uTarget) break;
+    float T = 0.5 * (dot(v0, v0) + dot(v1, v1) + m2 * dot(v2, v2));
+    float dt = 0.5 * h / (T + B);
+    p0 += v0 * dt; p1 += v1 * dt; p2 += v2 * dt; t += dt;
+    vec2 d01 = p1 - p0, d02 = p2 - p0, d12 = p2 - p1;
+    float i01 = inversesqrt(dot(d01, d01)), i02 = inversesqrt(dot(d02, d02)), i12 = inversesqrt(dot(d12, d12));
+    float kd = h / (i01 + m2 * (i02 + i12));
+    float c01 = kd * i01 * i01 * i01, c02 = kd * i02 * i02 * i02, c12 = kd * i12 * i12 * i12;
+    v0 += c01 * d01 + m2 * c02 * d02;
+    v1 += -c01 * d01 + m2 * c12 * d12;
+    v2 += -c02 * d02 - c12 * d12;
+    T = 0.5 * (dot(v0, v0) + dot(v1, v1) + m2 * dot(v2, v2));
+    dt = 0.5 * h / (T + B);
+    p0 += v0 * dt; p1 += v1 * dt; p2 += v2 * dt; t += dt;
+    n += 1.0;
+    // close passes, with hysteresis: e = count + 0.5 while inside
+    float dmin = 1.0 / max(i01, max(i02, i12));
+    bool inside = fract(e) > 0.25;
+    if (!inside && dmin < 0.1) e = floor(e) + 1.5;
+    else if (inside && dmin > 0.25) e = floor(e);
+    if (mod(n, 8.0) == 0.0) {
+      if (escaped(p0, v0, 1.0, p1, v1, 1.0, p2, v2, m2, M)) st = 1.0;
+      else if (escaped(p1, v1, 1.0, p0, v0, 1.0, p2, v2, m2, M)) st = 2.0;
+      else if (escaped(p2, v2, m2, p0, v0, 1.0, p1, v1, 1.0, M)) st = 3.0;
+      if (st != 0.0) break;
+    }
+  }
+  if (isnan(t) || isnan(p2.x) || isnan(v0.x)) st = 5.0;
+  o0 = vec4(p0, p1); o1 = vec4(p2, t, st); o2 = vec4(v0, v1); o3 = vec4(v2, e, n);
+}`;
+
+const FS_TL_SHOW = `#version 300 es
+precision highp float;
+precision highp int;
+uniform highp sampler2D uS0, uS1, uS3;
+uniform sampler2D uBd;
+uniform int uMode, uBdOn;
+uniform float uM2, uTarget;
+uniform vec4 uView;    // sim grid: cx, cy, wpp
+uniform vec2 uSize;
+uniform vec4 uBdView;  // backdrop grid: cx, cy, wpp
+uniform vec2 uBdSize;
+out vec4 o;
+const vec3 CA = vec3(0.910, 0.639, 0.239), CB = vec3(0.247, 0.714, 0.769), CC = vec3(0.863, 0.416, 0.522);
+const vec3 BGc = vec3(0.035, 0.051, 0.098);
+vec3 ramp(float x){
+  vec3 s[6] = vec3[6](vec3(16,20,44), vec3(64,36,112), vec3(150,56,128), vec3(226,102,96), vec3(246,186,112), vec3(252,240,206));
+  x = clamp(x, 0.0, 1.0) * 5.0;
+  int i = min(4, int(floor(x)));
+  return mix(s[i], s[i + 1], x - float(i)) / 255.0;
+}
+// a running neighbour whose clock differs from ours (a freshly exposed strip) can't be compared fairly
+bool otherAge(ivec2 p, vec4 me){
+  vec4 q = texelFetch(uS1, p, 0);
+  return q.w == 0.0 && me.w == 0.0 && abs(q.z - me.z) > 0.2;
+}
+vec3 cyc(float a){
+  a = fract(a) * 3.0;
+  float f = smoothstep(0.0, 1.0, fract(a));
+  if (a < 1.0) return mix(CA, CB, f);
+  if (a < 2.0) return mix(CB, CC, f);
+  return mix(CC, CA, f);
+}
+void main(){
+  ivec2 c = ivec2(gl_FragCoord.xy);
+  vec4 s0 = texelFetch(uS0, c, 0), s1 = texelFetch(uS1, c, 0), s3 = texelFetch(uS3, c, 0);
+  vec2 p0 = s0.xy, p1 = s0.zw, p2 = s1.xy;
+  float st = s1.w;
+  vec3 col;
+  if (st > 4.5) { col = vec3(0.12, 0.14, 0.22); }
+  else if (uMode == 0) {
+    float d01 = length(p1 - p0), d02 = length(p2 - p0), d12 = length(p2 - p1);
+    vec3 w = vec3(1.0 / (d12 * d12 * d12), 1.0 / (d02 * d02 * d02), 1.0 / (d01 * d01 * d01));
+    if (st > 0.5) w = vec3(st < 1.5 ? 1.0 : 0.0, (st > 1.5 && st < 2.5) ? 1.0 : 0.0, st > 2.5 ? 1.0 : 0.0);
+    w /= (w.x + w.y + w.z);
+    float dom = max(w.x, max(w.y, w.z));
+    col = w.x * CA + w.y * CB + w.z * CC;
+    col = mix(BGc, col, 0.12 + 0.88 * smoothstep(0.38, 0.9, dom));
+  } else if (uMode == 1) {
+    vec2 com = (p0 + p1 + uM2 * p2) / (2.0 + uM2);
+    vec2 r = p2 - com;
+    col = cyc(atan(r.y, r.x) / 6.2831853 + 0.5);
+    col = mix(BGc, col, 0.25 + 0.75 * exp(-0.45 * max(length(r) - 0.25, 0.0)));
+  } else if (uMode == 2) {
+    float n = floor(s3.z);
+    col = n < 0.5 ? BGc : ramp(0.1 + 0.86 * log(1.0 + n) / log(121.0)) * (mod(n, 2.0) < 0.5 ? 1.0 : 0.72);
+  } else {
+    // Stretching: finite-time Lyapunov exponent from the flow-map gradient,
+    // estimated by central differences of the three positions across neighbouring pixels.
+    ivec2 mx = ivec2(uSize) - 1;
+    ivec2 cl = clamp(c - ivec2(1, 0), ivec2(0), mx), cr = clamp(c + ivec2(1, 0), ivec2(0), mx);
+    ivec2 cd = clamp(c - ivec2(0, 1), ivec2(0), mx), cu = clamp(c + ivec2(0, 1), ivec2(0), mx);
+    // neighbours still catching up are skipped (one-sided difference instead)
+    if (otherAge(cl, s1)) cl = c; if (otherAge(cr, s1)) cr = c; if (otherAge(cd, s1)) cd = c; if (otherAge(cu, s1)) cu = c;
+    float hx = max(1.0, float(cr.x - cl.x)) * uView.z, hy = max(1.0, float(cu.y - cd.y)) * uView.z;
+    vec4 jx0 = (texelFetch(uS0, cr, 0) - texelFetch(uS0, cl, 0)) / hx;
+    vec2 jx1 = (texelFetch(uS1, cr, 0).xy - texelFetch(uS1, cl, 0).xy) / hx;
+    vec4 jy0 = (texelFetch(uS0, cu, 0) - texelFetch(uS0, cd, 0)) / hy;
+    vec2 jy1 = (texelFetch(uS1, cu, 0).xy - texelFetch(uS1, cd, 0).xy) / hy;
+    float a = dot(jx0, jx0) + dot(jx1, jx1), b = dot(jx0, jy0) + dot(jx1, jy1), d = dot(jy0, jy0) + dot(jy1, jy1);
+    float lam = 0.5 * (a + d) + sqrt(max(0.0, 0.25 * (a - d) * (a - d) + b * b));
+    float v = 0.5 * log(max(lam, 1e-12));          // log of the largest stretch factor
+    float sig = max(v, 0.0) / max(uTarget, 3.0);    // stretch rate per unit time
+    float x = clamp(sig / 1.6, 0.0, 1.0);
+    col = mix(BGc, ramp(0.06 + 0.94 * x), smoothstep(0.0, 0.1, x));
+  }
+  float lag = st == 0.0 ? uTarget - s1.z : 0.0;
+  if (uBdOn == 1 && lag > 0.2) {
+    // still catching up after a zoom: show the previous frame, stretched to fit, until this pixel is current
+    vec2 world = uView.xy + (vec2(c) + 0.5 - 0.5 * uSize) * uView.z;
+    vec2 uv = ((world - uBdView.xy) / uBdView.z + 0.5 * uBdSize) / uBdSize;
+    if (uv.x >= 0.0 && uv.y >= 0.0 && uv.x <= 1.0 && uv.y <= 1.0) col = mix(col, texture(uBd, uv).rgb, smoothstep(0.2, 0.6, lag));
+  }
+  o = vec4(col, 1.0);
+}`;
+
+function compileProgram(gl, fs) {
+  const sh = (type, src) => {
+    const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    return s;
+  };
+  const p = gl.createProgram();
+  gl.attachShader(p, sh(gl.VERTEX_SHADER, VS));
+  gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+  const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS), u = {};
+  for (let i = 0; i < n; i++) { const a = gl.getActiveUniform(p, i); u[a.name] = gl.getUniformLocation(p, a.name); }
+  return { p, u };
+}
+
+class TimeLapse {
+  constructor(canvas) {
+    const gl = canvas.getContext("webgl2", { antialias: false, depth: false, stencil: false, alpha: false, preserveDrawingBuffer: false, powerPreference: "high-performance" });
+    if (!gl) throw new Error("WebGL2 unavailable");
+    if (!gl.getExtension("EXT_color_buffer_float")) throw new Error("float render targets unavailable");
+    this.gl = gl; this.canvas = canvas;
+    this.lost = false;
+    canvas.addEventListener("webglcontextlost", (e) => { e.preventDefault(); this.lost = true; if (this.onLost) this.onLost(); });
+    this.init = compileProgram(gl, FS_TL_INIT);
+    this.step = compileProgram(gl, FS_TL_STEP);
+    this.show = compileProgram(gl, FS_TL_SHOW);
+    gl.useProgram(this.init.p);
+    ["uO0", "uO1", "uO2", "uO3"].forEach((n, i) => gl.uniform1i(this.init.u[n], i));
+    gl.useProgram(this.step.p);
+    ["uS0", "uS1", "uS2", "uS3"].forEach((n, i) => gl.uniform1i(this.step.u[n], i));
+    gl.useProgram(this.show.p);
+    gl.uniform1i(this.show.u.uS0, 0); gl.uniform1i(this.show.u.uS1, 1); gl.uniform1i(this.show.u.uS3, 2); gl.uniform1i(this.show.u.uBd, 3);
+    this.vao = gl.createVertexArray();
+    this.w = 0; this.h = 0; this.sets = null; this.fbs = null; this.cur = 0;
+    this.steps = 64;
+    this.lastTarget = 0;
+    this.grid = null;        // { cx, cy, wpp } of the sim grid in world units per sim pixel
+    this.m2 = 1;
+    this.bd = null;          // backdrop: { tex, fb, cx, cy, wpp, w, h, until }
+  }
+  alloc(w, h) {
+    const gl = this.gl;
+    if (this.sets) { this.sets.flat().forEach((t) => gl.deleteTexture(t)); this.fbs.forEach((f) => gl.deleteFramebuffer(f)); }
+    const mk = () => {
+      const t = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, t);
+      gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32F, w, h);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      return t;
+    };
+    this.sets = [0, 1].map(() => [mk(), mk(), mk(), mk()]);
+    this.fbs = this.sets.map((set) => {
+      const fb = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+      set.forEach((t, i) => gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + i, gl.TEXTURE_2D, t, 0));
+      gl.drawBuffers([gl.COLOR_ATTACHMENT0, gl.COLOR_ATTACHMENT1, gl.COLOR_ATTACHMENT2, gl.COLOR_ATTACHMENT3]);
+      if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error("incomplete framebuffer");
+      return fb;
+    });
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    this.w = w; this.h = h;
+    if (this.canvas.width !== w) this.canvas.width = w;
+    if (this.canvas.height !== h) this.canvas.height = h;
+  }
+  bindSet(set) {
+    const gl = this.gl;
+    for (let i = 0; i < 4; i++) { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, set ? set[i] : null); }
+  }
+  // Write a new state into the other buffer: either continue old texels shifted by (dx, dy) or start fresh.
+  writeInit(hasOld, dx, dy) {
+    const gl = this.gl;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbs[1 - this.cur]);
+    gl.viewport(0, 0, this.w, this.h);
+    gl.useProgram(this.init.p);
+    gl.uniform4f(this.init.u.uView, this.grid.cx, this.grid.cy, this.grid.wpp, 0);
+    gl.uniform2f(this.init.u.uSize, this.w, this.h);
+    gl.uniform2i(this.init.u.uShift, dx, dy);
+    gl.uniform1i(this.init.u.uHasOld, hasOld ? 1 : 0);
+    this.bindSet(hasOld ? this.sets[this.cur] : null);
+    gl.bindVertexArray(this.vao);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    this.bindSet(null);
+    this.cur = 1 - this.cur;
+  }
+  // Start every pixel over on a new grid. keepBackdrop: show the current frame under catching-up pixels.
+  reset(grid, m2, w, h, keepBackdrop, mode, now) {
+    if (this.lost) return;
+    if (keepBackdrop && this.sets && this.grid) this.snapshot(mode, now); else this.dropBackdrop();
+    if (w !== this.w || h !== this.h || !this.sets) this.alloc(w, h);
+    this.grid = { ...grid };
+    this.m2 = m2;
+    this.writeInit(false, 0, 0);
+    this.lastTarget = 0;
+  }
+  // Pan by whole sim pixels: existing systems keep running, only the newly exposed strip starts from t = 0.
+  shift(dx, dy) {
+    if (this.lost || !this.sets) return;
+    this.grid.cx += dx * this.grid.wpp;
+    this.grid.cy += dy * this.grid.wpp;
+    this.writeInit(true, dx, dy);
+  }
+  snapshot(mode, now) {
+    const gl = this.gl;
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA8, this.w, this.h);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    const fb = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+    this.draw(mode, fb, now);           // samples any older backdrop, so quick repeated zooms stay covered
+    this.dropBackdrop();
+    this.bd = { tex, fb, cx: this.grid.cx, cy: this.grid.cy, wpp: this.grid.wpp, w: this.w, h: this.h, until: now + 15000 };
+  }
+  dropBackdrop() {
+    if (!this.bd) return;
+    this.gl.deleteTexture(this.bd.tex); this.gl.deleteFramebuffer(this.bd.fb);
+    this.bd = null;
+  }
+  advance(target, h) {
+    if (this.lost || !this.sets) return;
+    const gl = this.gl;
+    gl.useProgram(this.step.p);
+    gl.uniform4f(this.step.u.uView, this.grid.cx, this.grid.cy, this.grid.wpp, 0);
+    gl.uniform2f(this.step.u.uSize, this.w, this.h);
+    gl.uniform1f(this.step.u.uM2, this.m2);
+    gl.uniform1f(this.step.u.uH, h);
+    gl.uniform1f(this.step.u.uTarget, target);
+    gl.uniform1i(this.step.u.uSteps, Math.round(this.steps));
+    gl.bindVertexArray(this.vao);
+    gl.viewport(0, 0, this.w, this.h);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbs[1 - this.cur]);
+    this.bindSet(this.sets[this.cur]);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    this.bindSet(null);
+    this.cur = 1 - this.cur;
+    this.lastTarget = target;
+  }
+  draw(mode, fb, now) {
+    const gl = this.gl;
+    const s = this.sets[this.cur];
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    gl.viewport(0, 0, this.w, this.h);
+    gl.useProgram(this.show.p);
+    const u = this.show.u;
+    gl.uniform1i(u.uMode, mode);
+    gl.uniform1f(u.uM2, this.m2);
+    gl.uniform1f(u.uTarget, this.lastTarget);
+    gl.uniform4f(u.uView, this.grid.cx, this.grid.cy, this.grid.wpp, 0);
+    gl.uniform2f(u.uSize, this.w, this.h);
+    const bdOn = this.bd && now < this.bd.until;
+    if (this.bd && !bdOn) this.dropBackdrop();
+    gl.uniform1i(u.uBdOn, bdOn ? 1 : 0);
+    if (bdOn) {
+      gl.uniform4f(u.uBdView, this.bd.cx, this.bd.cy, this.bd.wpp, 0);
+      gl.uniform2f(u.uBdSize, this.bd.w, this.bd.h);
+    }
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, s[0]);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, s[1]);
+    gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, s[3]);
+    gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, bdOn ? this.bd.tex : null);
+    gl.bindVertexArray(this.vao);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    for (let i = 0; i < 4; i++) { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, null); }
+  }
+  render(mode, now) {
+    if (this.lost || !this.sets) return;
+    this.draw(mode, null, now);
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * App state                                                            *
+ * ------------------------------------------------------------------ */
+const $ = (id) => document.getElementById(id);
+const mapCv = $("map"), mctx = mapCv.getContext("2d");
+const isSmall = matchMedia("(pointer: coarse)").matches || Math.min(screen.width, screen.height) < 700;
+const COLORS = { 1: [232, 163, 61], 2: [63, 182, 196], 3: [220, 106, 133] };
+const BG = [9, 13, 25], NOESC = [30, 36, 56];
+const TIME_STOPS = [[16, 20, 44], [64, 36, 112], [150, 56, 128], [226, 102, 96], [246, 186, 112], [252, 240, 206]];
+const DEFAULT_VIEW = { cx: 0, cy: 0.45, span: 3.2 };
+
+const settings = { Tmax: 100, h: 0.02, m2: 1, res: 1, mode: "who" };
+const view = { cx: 0, cy: 0.45, wpp: 0.01 };
+let W = 0, H = 0, DPR = 1;
+let sig = "";
+const cache = new Map();         // key -> {st, tt, bmp}
+const inflight = new Map();      // key -> job
+const partial = new Map();       // key -> unfinished tile, running pixels transparent
+let queue = [];
+let needed = new Set();
+let targetKeys = [];
+let dirty = true, queueDirty = true;
+let selected = { x: 0.05, y: 0.65 };
+let hover = null;
+const MAX_CACHE = isSmall ? 500 : 1100;
+
+let engine;
+function createEngine() {
+  try {
+    engine = new GPUEngine(isSmall ? 256 : 512);
+    engine.onLost = () => { engineNote("GPU context lost, switching to CPU workers"); switchToCPU(); };
+  } catch (err) {
+    engine = new CPUEngine();
+    settings.res = 0.5; $("res").value = "0.5";
+  }
+  engine.onResult = onResult;
+  engine.onPartial = onPartial;
+  engine.onCancel = (job) => { inflight.delete(job.key); dropPartial(job.key); };
+  engineNote();
+}
+function switchToCPU() {
+  inflight.clear();
+  engine = new CPUEngine();
+  engine.onResult = onResult;
+  engine.onPartial = onPartial;
+  settings.res = 0.5; $("res").value = "0.5";
+  applyParams();
+  queueDirty = true;
+}
+function engineNote(extra) { $("engineNote").textContent = "Escape map renderer: " + engine.label + (extra ? " · " + extra : ""); }
+
+function capFor(Tmax, h) { return Math.round(40 * Tmax / h); }
+function applyParams() {
+  const p = { Tmax: settings.Tmax, h: settings.h, m2: settings.m2, cap: capFor(settings.Tmax, settings.h) };
+  sig = [p.Tmax, p.h, p.m2].join("|");
+  engine.setParams(p);
+  inflight.clear();
+  for (const k of [...partial.keys()]) dropPartial(k);
+  for (const e of cache.values()) if (e.bmp && e.bmp.close) e.bmp.close();
+  cache.clear();
+  queueDirty = true; dirty = true;
+}
+
+/* ---------------- colouring ---------------- */
+function rampColor(s) {
+  const x = Math.min(1, Math.max(0, s)) * (TIME_STOPS.length - 1);
+  const i = Math.min(TIME_STOPS.length - 2, Math.floor(x)), f = x - i;
+  const a = TIME_STOPS[i], b = TIME_STOPS[i + 1];
+  return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f];
+}
+function timeFrac(t) { return Math.log(Math.max(t, 0.5) / 0.5) / Math.log(settings.Tmax / 0.5); }
+function pixelColor(st, t) {
+  const mode = settings.mode;
+  if (mode === "time") return st === 0 ? null : st >= 4 ? TIME_STOPS[TIME_STOPS.length - 1] : rampColor(timeFrac(t) * 0.94);
+  if (st === 0) return null;
+  if (st < 1 || st > 3) return NOESC;
+  const c = COLORS[st];
+  if (mode === "flat") return c;
+  const f = 1 - 0.55 * Math.pow(timeFrac(t), 1.1);
+  return [BG[0] + (c[0] - BG[0]) * f, BG[1] + (c[1] - BG[1]) * f, BG[2] + (c[2] - BG[2]) * f];
+}
+function colorize(entry) {
+  const img = new ImageData(TILE, TILE);
+  const d = img.data;
+  for (let i = 0; i < TILE * TILE; i++) {
+    const c = pixelColor(entry.st[i], entry.tt[i]);
+    if (!c) continue;   // still running: leave transparent so the coarser level shows through
+    d[i * 4] = c[0]; d[i * 4 + 1] = c[1]; d[i * 4 + 2] = c[2]; d[i * 4 + 3] = 255;
+  }
+  return img;
+}
+function toBitmap(img) {
+  if (window.createImageBitmap) return createImageBitmap(img);
+  const c = document.createElement("canvas"); c.width = c.height = TILE; c.getContext("2d").putImageData(img, 0, 0);
+  return Promise.resolve(c);
+}
+let recolorGen = 0;
+function recolorAll() {
+  const gen = ++recolorGen;
+  for (const [key, e] of [...cache, ...partial]) {
+    toBitmap(colorize(e)).then((bmp) => {
+      if (gen !== recolorGen || (cache.get(key) !== e && partial.get(key) !== e)) return;
+      if (e.bmp && e.bmp.close) e.bmp.close();
+      e.bmp = bmp; dirty = true;
+    });
+  }
+}
+function dropPartial(key) { const e = partial.get(key); if (e && e.bmp && e.bmp.close) e.bmp.close(); partial.delete(key); }
+function onPartial(job, st, tt) {
+  if (job.sig !== sig || !inflight.has(job.key)) return;
+  const entry = { st, tt, bmp: null, L: job.L, partial: true };
+  toBitmap(colorize(entry)).then((bmp) => {
+    if (job.sig !== sig || !inflight.has(job.key) || cache.has(job.key)) { if (bmp.close) bmp.close(); return; }
+    dropPartial(job.key);
+    entry.bmp = bmp;
+    partial.set(job.key, entry);
+    dirty = true;
+  });
+}
+function onResult(job, st, tt) {
+  if (job.sig !== sig) { inflight.delete(job.key); return; }
+  const entry = { st, tt, bmp: null, L: job.L };
+  toBitmap(colorize(entry)).then((bmp) => {
+    inflight.delete(job.key);
+    if (job.sig !== sig) return;
+    entry.bmp = bmp;
+    dropPartial(job.key);
+    cache.set(job.key, entry);
+    if (cache.size > MAX_CACHE) {
+      for (const [k, e] of cache) {
+        if (cache.size <= MAX_CACHE * 0.9) break;
+        if (needed.has(k)) continue;
+        if (e.bmp && e.bmp.close) e.bmp.close();
+        cache.delete(k);
+      }
+    }
+    dirty = true;
+    if (hover) updateHover();
+    if (replay.data) {
+      const S = tileSize(job.L), sx = replay.data.x, sy = replay.data.y;
+      if (sx >= job.x0 && sx < job.x0 + S && sy <= job.yTop && sy > job.yTop - S) writeOutcome();
+    }
+  });
+}
+
+/* ---------------- view & tiles ---------------- */
+function resize() {
+  const r = mapCv.getBoundingClientRect();
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  const nw = Math.max(1, Math.round(r.width)), nh = Math.max(1, Math.round(r.height));
+  if (W && nw !== W) view.wpp *= W / nw;
+  W = nw; H = nh;
+  mapCv.width = Math.round(W * DPR); mapCv.height = Math.round(H * DPR);
+  sizeOrbit();
+  queueDirty = true; dirty = true;
+}
+function fitView(cx, cy, span) {
+  view.cx = cx; view.cy = cy;
+  view.wpp = Math.max(span / W, (span * 0.72) / H);
+  clampView();
+  queueDirty = true; dirty = true;
+}
+const MIN_WPP = 2.5e-7, MAX_WPP = 0.08;
+function clampView() { view.wpp = Math.min(MAX_WPP, Math.max(MIN_WPP, view.wpp)); }
+function targetLevel() {
+  const res = settings.res === 2 ? Math.min(2, window.devicePixelRatio || 1) : settings.res;
+  const L = Math.round(Math.log2(WORLD0 * res / (TILE * view.wpp)));
+  return Math.max(0, Math.min(MAX_LEVEL, L));
+}
+const toSX = (x) => (x - view.cx) / view.wpp + W / 2;
+const toSY = (y) => H / 2 - (y - view.cy) / view.wpp;
+const toWX = (sx) => view.cx + (sx - W / 2) * view.wpp;
+const toWY = (sy) => view.cy - (sy - H / 2) * view.wpp;
+function visibleTiles(L, margin) {
+  const S = tileSize(L);
+  const x0 = Math.floor(toWX(0) / S) - margin, x1 = Math.floor(toWX(W) / S) + margin;
+  const y0 = Math.floor(toWY(H) / S) - margin, y1 = Math.floor(toWY(0) / S) + margin;
+  const out = [];
+  for (let iy = y0; iy <= y1; iy++) for (let ix = x0; ix <= x1; ix++) out.push({ L, ix, iy, key: L + "/" + ix + "/" + iy });
+  return out;
+}
+function rebuildQueue() {
+  queueDirty = false;
+  const L = targetLevel();
+  const levels = L >= 3 ? [L - 3, L] : [L];
+  queue = []; needed = new Set();
+  const cxW = view.cx, cyW = view.cy;
+  for (const lv of levels) {
+    const S = tileSize(lv);
+    const tiles = visibleTiles(lv, lv === L ? 0 : 1);
+    tiles.forEach((t) => { t.d = Math.hypot((t.ix + 0.5) * S - cxW, (t.iy + 0.5) * S - cyW); needed.add(t.key); });
+    if (lv === L) targetKeys = tiles.map((t) => t.key);
+    tiles.sort((a, b) => a.d - b.d);
+    for (const t of tiles) if (!cache.has(t.key) && !inflight.has(t.key)) queue.push(t);
+  }
+  engine.cancel(needed);
+}
+function pump() {
+  if (queueDirty) rebuildQueue();
+  while (queue.length && engine.free() > 0) {
+    const t = queue.shift();
+    if (cache.has(t.key) || inflight.has(t.key)) continue;
+    const S = tileSize(t.L);
+    const job = { key: t.key, L: t.L, x0: t.ix * S, yTop: (t.iy + 1) * S, pix: S / TILE, sig };
+    inflight.set(t.key, job);
+    if (!engine.submit(job)) { inflight.delete(t.key); queue.unshift(t); break; }
+  }
+}
+
+/* ---------------- drawing the map ---------------- */
+function draw() {
+  dirty = false;
+  const c = mctx;
+  c.setTransform(DPR, 0, 0, DPR, 0, 0);
+  if (viewMode === "tl") {
+    c.clearRect(0, 0, W, H);
+  } else {
+    c.fillStyle = "#090d19";
+    c.fillRect(0, 0, W, H);
+    const L = targetLevel();
+    c.imageSmoothingEnabled = true;
+    for (let lv = Math.max(0, L - 6); lv <= Math.min(MAX_LEVEL, L + 1); lv++) {
+      const S = tileSize(lv), sz = S / view.wpp;
+      c.globalAlpha = lv < L - 1 ? 0.55 : 1;   // coarse previews sit back until the sharp tiles arrive
+      for (const t of visibleTiles(lv, 0)) {
+        const e = cache.get(t.key) || partial.get(t.key);
+        if (!e || !e.bmp) continue;
+        const x = toSX(t.ix * S), y = toSY((t.iy + 1) * S);
+        const xi = Math.floor(x), yi = Math.floor(y);
+        c.drawImage(e.bmp, xi, yi, Math.ceil(x + sz) - xi, Math.ceil(y + sz) - yi);
+      }
+    }
+    c.globalAlpha = 1;
+  }
+  // symmetry axis
+  const ay = toSY(0);
+  if (ay > -2 && ay < H + 2) {
+    c.strokeStyle = "rgba(228,232,243,0.14)"; c.lineWidth = 1; c.setLineDash([3, 5]);
+    c.beginPath(); c.moveTo(0, Math.round(ay) + 0.5); c.lineTo(W, Math.round(ay) + 0.5); c.stroke(); c.setLineDash([]);
+  }
+  // equilateral starts
+  for (const sy of [Math.sqrt(3) / 2, -Math.sqrt(3) / 2]) {
+    const x = toSX(0), y = toSY(sy);
+    if (x < -20 || x > W + 20 || y < -20 || y > H + 20) continue;
+    c.strokeStyle = "rgba(228,232,243,0.6)"; c.lineWidth = 1; c.setLineDash([2, 3]);
+    c.beginPath(); c.arc(x, y, 7, 0, Math.PI * 2); c.stroke(); c.setLineDash([]);
+  }
+  // starting points of A and B
+  [[-0.5, 0, 1, "A"], [0.5, 0, 2, "B"]].forEach(([wx, wy, k, lab]) => {
+    const x = toSX(wx), y = toSY(wy);
+    if (x < -30 || x > W + 30 || y < -30 || y > H + 30) return;
+    const col = COLORS[k];
+    c.strokeStyle = `rgb(${col})`; c.lineWidth = 2;
+    c.beginPath(); c.arc(x, y, 4.5, 0, Math.PI * 2); c.stroke();
+    c.font = "500 12px 'IBM Plex Mono', monospace"; c.fillStyle = "#e4e8f3";
+    c.lineWidth = 3; c.strokeStyle = "rgba(9,13,25,0.85)";
+    c.strokeText(lab, x + 8, y - 7); c.fillText(lab, x + 8, y - 7);
+  });
+  // selected start for C
+  if (selected) {
+    const x = toSX(selected.x), y = toSY(selected.y);
+    c.strokeStyle = "rgba(9,13,25,0.9)"; c.lineWidth = 4;
+    c.beginPath(); c.arc(x, y, 9, 0, Math.PI * 2); c.stroke();
+    c.strokeStyle = "#ffffff"; c.lineWidth = 1.5;
+    c.beginPath(); c.arc(x, y, 9, 0, Math.PI * 2); c.stroke();
+    c.beginPath(); c.moveTo(x - 15, y); c.lineTo(x - 11, y); c.moveTo(x + 11, y); c.lineTo(x + 15, y);
+    c.moveTo(x, y - 15); c.lineTo(x, y - 11); c.moveTo(x, y + 11); c.lineTo(x, y + 15); c.stroke();
+  }
+  drawComets(c, toSX, toSY, 1);
+}
+
+/* Moving bodies with fading tails, for the selected start and its neighbours. */
+function drawTail(c, sys, b, tc, len, X, Y, rgb, width, alpha) {
+  const i1 = bsearch(sys.T, tc), i0 = bsearch(sys.T, Math.max(0, tc - len));
+  if (i1 <= i0) return;
+  const stride = Math.max(1, Math.floor((i1 - i0) / 160));
+  const pts = [];
+  for (let i = i0; i < i1; i += stride) pts.push([X(sys.P[i * 6 + b * 2]), Y(sys.P[i * 6 + b * 2 + 1])]);
+  pts.push([X(sys.P[i1 * 6 + b * 2]), Y(sys.P[i1 * 6 + b * 2 + 1])]);
+  const chunks = 5, n = pts.length;
+  c.lineWidth = width; c.lineCap = "round"; c.lineJoin = "round";
+  for (let k = 0; k < chunks; k++) {
+    const a = Math.floor((k * (n - 1)) / chunks), z = Math.floor(((k + 1) * (n - 1)) / chunks);
+    if (z <= a) continue;
+    c.strokeStyle = `rgba(${rgb},${(alpha * (k + 1)) / chunks})`;
+    c.beginPath(); c.moveTo(pts[a][0], pts[a][1]);
+    for (let j = a + 1; j <= z; j++) c.lineTo(pts[j][0], pts[j][1]);
+    c.stroke();
+  }
+}
+function bodyAt(sys, tc, b) {
+  const i = bsearch(sys.T, tc);
+  return [sys.P[i * 6 + b * 2], sys.P[i * 6 + b * 2 + 1]];
+}
+function drawComets(c, X, Y, unitPx) {
+  const d = replay.data;
+  if (!d) return;
+  for (const sys of [...d.ghosts, d]) {
+    const tEnd = sys.T[sys.T.length - 1];
+    const ot = orbitTime();
+    const fade = Math.max(0, Math.min(1, 1 - (ot - tEnd) / 2));
+    if (fade <= 0) continue;
+    const tc = Math.min(ot, tEnd);
+    const main = sys === d;
+    for (let b = 0; b < 3; b++) {
+      const rgb = COLORS[b + 1];
+      drawTail(c, sys, b, tc, main ? 3 : 2, X, Y, rgb, main ? 2 * unitPx : 1.2 * unitPx, (main ? 0.9 : 0.55) * fade);
+    }
+    for (let b = 0; b < 3; b++) {
+      const rgb = COLORS[b + 1];
+      const [wx, wy] = bodyAt(sys, tc, b);
+      const x = X(wx), y = Y(wy);
+      const r = (main ? 4 : 2.4) * unitPx * Math.cbrt(b === 2 ? d.m2 : 1);
+      if (main) {
+        c.fillStyle = `rgba(${rgb},${0.25 * fade})`; c.beginPath(); c.arc(x, y, r * 2.6, 0, Math.PI * 2); c.fill();
+      }
+      c.fillStyle = `rgba(${rgb},${(main ? 1 : 0.8) * fade})`;
+      c.strokeStyle = `rgba(9,13,25,${0.8 * fade})`; c.lineWidth = 1.5 * unitPx;
+      c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill(); if (main) c.stroke();
+    }
+  }
+}
+
+function fmt(v, d) { return (v >= 0 ? " " : "") + v.toFixed(d); }
+function updateViewRow() {
+  const zoom = (DEFAULT_VIEW.span / W) / view.wpp;
+  const dig = Math.max(3, Math.ceil(-Math.log10(view.wpp)) + 1);
+  const z = `<span>centre <b>${fmt(view.cx, dig)}, ${fmt(view.cy, dig)}</b></span><span>zoom <b>×${zoom < 10 ? zoom.toFixed(1) : Math.round(zoom).toLocaleString()}</b></span>`;
+  if (viewMode === "tl") {
+    $("viewRow").innerHTML = z + `<span><b>${tl ? (tl.w * tl.h).toLocaleString() : 0}</b> systems running</span>`;
+    $("progWrap").hidden = true;
+    return;
+  }
+  const done = targetKeys.filter((k) => cache.has(k)).length;
+  $("viewRow").innerHTML = z + `<span>${done < targetKeys.length ? "rendering " + done + " / " + targetKeys.length + " tiles" : "done"}</span>`;
+  $("progWrap").hidden = false;
+  $("progBar").style.width = (targetKeys.length ? (100 * done) / targetKeys.length : 100) + "%";
+}
+function sampleAt(x, y) {
+  const L = targetLevel();
+  for (let lv = Math.min(MAX_LEVEL, L + 1); lv >= Math.max(0, L - 6); lv--) {
+    const S = tileSize(lv), ix = Math.floor(x / S), iy = Math.floor(y / S);
+    const key = lv + "/" + ix + "/" + iy;
+    const e = cache.get(key) || partial.get(key);
+    if (!e) continue;
+    const c = Math.min(TILE - 1, Math.floor((x - ix * S) / S * TILE));
+    const r = Math.min(TILE - 1, Math.floor(((iy + 1) * S - y) / S * TILE));
+    const st = e.st[r * TILE + c];
+    if (st === 0) continue;
+    return { st, t: e.tt[r * TILE + c], L: lv, exact: lv >= L && !e.partial };
+  }
+  return null;
+}
+function describe(s) {
+  if (!s) return "not rendered yet";
+  if (s.st >= 1 && s.st <= 3) return "ABC"[s.st - 1] + " escapes at t = " + s.t.toFixed(1);
+  return s.st === 5 ? "step limit reached" : "no escape by t = " + settings.Tmax;
+}
+function updateHover() {
+  $("hoverRow").classList.toggle("blank", !hover);
+  if (!hover) return;
+  const dig = Math.max(3, Math.ceil(-Math.log10(view.wpp)) + 1);
+  const x = toWX(hover.sx), y = toWY(hover.sy);
+  $("hoverRow").innerHTML = `<span>C starts at <b>${fmt(x, dig)}, ${fmt(y, dig)}</b></span>` + (viewMode === "map" ? `<span>${describe(sampleAt(x, y))}</span>` : "");
+}
+
+/* ---------------- interaction ---------------- */
+const pointers = new Map();
+let gesture = null;
+function zoomAt(sx, sy, factor) {
+  const wx = toWX(sx), wy = toWY(sy);
+  view.wpp *= factor; clampView();
+  view.cx = wx - (sx - W / 2) * view.wpp;
+  view.cy = wy + (sy - H / 2) * view.wpp;
+  queueDirty = true; dirty = true;
+}
+function localXY(e) { const r = mapCv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+mapCv.addEventListener("pointerdown", (e) => {
+  mapCv.setPointerCapture(e.pointerId);
+  const p = localXY(e);
+  pointers.set(e.pointerId, p);
+  if (pointers.size === 1) gesture = { kind: "pan", start: p, last: p, moved: 0, t0: performance.now() };
+  else if (pointers.size === 2) {
+    const [a, b] = [...pointers.values()];
+    gesture = { kind: "pinch", dist: Math.hypot(a.x - b.x, a.y - b.y), mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } };
+  }
+});
+mapCv.addEventListener("pointermove", (e) => {
+  const p = localXY(e);
+  if (e.pointerType === "mouse") { hover = { sx: p.x, sy: p.y }; updateHover(); }
+  if (!pointers.has(e.pointerId)) return;
+  pointers.set(e.pointerId, p);
+  if (gesture && gesture.kind === "pan" && pointers.size === 1) {
+    const dx = p.x - gesture.last.x, dy = p.y - gesture.last.y;
+    gesture.moved += Math.abs(dx) + Math.abs(dy);
+    gesture.last = p;
+    view.cx -= dx * view.wpp; view.cy += dy * view.wpp;
+    queueDirty = true; dirty = true;
+  } else if (gesture && gesture.kind === "pinch" && pointers.size === 2) {
+    const [a, b] = [...pointers.values()];
+    const dist = Math.hypot(a.x - b.x, a.y - b.y), mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    view.cx -= (mid.x - gesture.mid.x) * view.wpp; view.cy += (mid.y - gesture.mid.y) * view.wpp;
+    if (dist > 0 && gesture.dist > 0) zoomAt(mid.x, mid.y, gesture.dist / dist);
+    gesture.dist = dist; gesture.mid = mid;
+    queueDirty = true; dirty = true;
+  }
+});
+function endPointer(e) {
+  if (!pointers.has(e.pointerId)) return;
+  pointers.delete(e.pointerId);
+  if (gesture && gesture.kind === "pan" && pointers.size === 0 && e.type === "pointerup") {
+    if (gesture.moved < 6 && performance.now() - gesture.t0 < 500) {
+      const p = localXY(e);
+      selectPoint(toWX(p.x), toWY(p.y));
+    }
+  }
+  if (pointers.size === 1) { const p = [...pointers.values()][0]; gesture = { kind: "pan", start: p, last: p, moved: 99, t0: 0 }; }
+  else if (pointers.size === 0) gesture = null;
+}
+mapCv.addEventListener("pointerup", endPointer);
+mapCv.addEventListener("pointercancel", endPointer);
+mapCv.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse") { hover = null; updateHover(); } });
+mapCv.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  const p = localXY(e);
+  const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+  zoomAt(p.x, p.y, Math.exp(dy * 0.0016));
+}, { passive: false });
+mapCv.addEventListener("dblclick", (e) => { const p = localXY(e); zoomAt(p.x, p.y, 0.5); });
+mapCv.addEventListener("keydown", (e) => {
+  const step = 60 * view.wpp;
+  const k = e.key;
+  if (k === "ArrowLeft") view.cx -= step; else if (k === "ArrowRight") view.cx += step;
+  else if (k === "ArrowUp") view.cy += step; else if (k === "ArrowDown") view.cy -= step;
+  else if (k === "+" || k === "=") zoomAt(W / 2, H / 2, 0.6); else if (k === "-" || k === "_") zoomAt(W / 2, H / 2, 1 / 0.6);
+  else if (k === " ") togglePlay();
+  else if (k === "Enter") selectPoint(view.cx, view.cy);
+  else return;
+  e.preventDefault(); queueDirty = true; dirty = true;
+});
+$("zin").onclick = () => zoomAt(W / 2, H / 2, 0.5);
+$("zout").onclick = () => zoomAt(W / 2, H / 2, 2);
+$("zreset").onclick = () => fitView(DEFAULT_VIEW.cx, DEFAULT_VIEW.cy, DEFAULT_VIEW.span);
+document.querySelectorAll("[data-place]").forEach((b) => {
+  b.onclick = () => { const [x, y, s] = b.dataset.place.split(",").map(Number); fitView(x, y, s); };
+});
+function bindSeg(id, fn) {
+  const seg = $(id);
+  seg.querySelectorAll("button").forEach((b) => {
+    b.onclick = () => {
+      seg.querySelectorAll("button").forEach((o) => o.setAttribute("aria-pressed", String(o === b)));
+      fn(b.dataset.v);
+    };
+  });
+}
+function pressSeg(id, v) { $(id).querySelectorAll("button").forEach((o) => o.setAttribute("aria-pressed", String(o.dataset.v === v))); }
+
+const MAP_NOTES = { who: "Brighter means the body was thrown out sooner.", flat: "Flat colour by the body that escapes.", time: "Log scale. The palest pixels did not resolve within the time limit." };
+const TL_NOTES = {
+  3: "How fast neighbouring starts are being pulled apart (a finite-time Lyapunov exponent, measured between adjacent pixels). The glowing ridges are the hidden fault lines that separate different fates, and they fold and multiply as time runs.",
+  0:
+  "Colour shows which body is the odd one out while the other two pair up. Dark seams are where all three are about equally close. Once a body escapes, its pixel locks to that body's colour.",
+  1: "A smooth field at t = 0 that gets stretched and folded as the systems mix.",
+  2: "Counts the times any two bodies pass closer than 0.1 units. Bands alternate light and dark, so every new band is one more close encounter.",
+};
+function syncColourUI() {
+  const tlm = viewMode === "tl";
+  $("tlColours").hidden = !tlm;
+  $("modeSeg").hidden = tlm;
+  $("legendAlone").hidden = !(tlm && tlColour === 0);
+  $("legendWhere").hidden = !(tlm && tlColour === 1);
+  $("legendPasses").hidden = !(tlm && tlColour === 2);
+  $("legendStretch").hidden = !(tlm && tlColour === 3);
+  $("legendWho").hidden = tlm || settings.mode === "time";
+  $("legendTime").hidden = tlm || settings.mode !== "time";
+  $("shadeNote").textContent = tlm ? TL_NOTES[tlColour] : MAP_NOTES[settings.mode];
+  $("viewHint").textContent = tlm
+    ? "Every pixel is a whole three-body system, and they all run at once. At t = 0 the picture is smooth. Press play and watch it stretch, fold and shatter."
+    : "The final verdict for every start: which body gets thrown out, and how soon. Zoom into the boundaries to find the fractal structure.";
+}
+bindSeg("modeSeg", (v) => { settings.mode = v; syncColourUI(); recolorAll(); });
+bindSeg("tlModeSeg", (v) => { tlColour = +v; syncColourUI(); });
+bindSeg("viewSeg", (v) => setViewMode(v));
+function setViewMode(v) {
+  if (v === "tl" && !tl) v = "map";
+  viewMode = v;
+  pressSeg("viewSeg", v);
+  $("tl").hidden = v !== "tl";
+  if (v === "map") clock.t = Math.min(clock.t, clockEnd());
+  else orbit.t = Math.min(clock.t, orbitEnd());
+  syncColourUI();
+  syncClockUI();
+  queueDirty = true; dirty = true;
+  updateViewRow(); updateHover();
+}
+$("tmax").onchange = (e) => { settings.Tmax = +e.target.value; updateRamp(); applyParams(); computeReplay(); clock.t = Math.min(clock.t, clockEnd()); syncClockUI(); };
+$("acc").onchange = (e) => { settings.h = +e.target.value; applyParams(); computeReplay(); };
+$("res").onchange = (e) => { settings.res = +e.target.value; queueDirty = true; dirty = true; };
+$("mass").oninput = (e) => { $("massVal").textContent = Math.pow(2, +e.target.value).toFixed(2); };
+$("mass").onchange = (e) => { settings.m2 = Math.pow(2, +e.target.value); applyParams(); tlNeedsInit = true; computeReplay(); };
+function rampCSS(fn) {
+  const stops = Array.from({ length: 12 }, (_, i) => { const c = fn(i / 11); return `rgb(${c.map(Math.round)}) ${(i / 11) * 100}%`; });
+  return `linear-gradient(90deg, ${stops.join(",")})`;
+}
+function updateRamp() {
+  $("ramp").style.background = rampCSS((s) => rampColor(s * 0.94));
+  $("rampPasses").style.background = rampCSS((s) => rampColor(0.1 + 0.86 * s));
+  $("rampStretch").style.background = rampCSS((s) => s < 0.04 ? BG : rampColor(0.06 + 0.94 * s));
+  const mid = Math.sqrt(0.5 * settings.Tmax);
+  $("rampMid").textContent = "t = " + (mid < 10 ? mid.toFixed(1) : Math.round(mid));
+  $("rampMax").textContent = "t = " + settings.Tmax + "+";
+  const [a, b, c] = [COLORS[1], COLORS[2], COLORS[3]];
+  // atan2 angle 0 points left of the centre (hue wraps at ±180°), so start the wheel there
+  $("wheel").style.background = `radial-gradient(circle, #090d19 0 28%, transparent 30%), conic-gradient(from 270deg, rgb(${a}), rgb(${b}) 120deg, rgb(${c}) 240deg, rgb(${a}) 360deg)`;
+}
+
+/* ---------------- the clock ---------------- */
+const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const clock = { t: 0, playing: !reducedMotion, speed: 2 };
+const ICON_PLAY = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2l10 6-10 6z"/></svg>';
+const ICON_PAUSE = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2h4v12H3zM9 2h4v12H9z"/></svg>';
+// In the time-lapse the tapped orbit runs on its own clock, so it can replay without disturbing the map.
+const orbit = { t: 0, playing: false };
+function orbitTime() { return viewMode === "tl" ? orbit.t : clock.t; }
+function orbitEnd() {
+  const d = replay.data;
+  if (!d) return 0;
+  return Math.max(d.T[d.T.length - 1], ...d.ghosts.map((g) => g.T[g.T.length - 1])) + 2;  // +2 lets the comets fade out
+}
+function replayOrbit() {
+  if (viewMode === "tl") { orbit.t = 0; orbit.playing = true; }
+  else { clock.t = 0; setPlaying(true); syncClockUI(); }
+}
+function clockEnd() {
+  if (viewMode === "tl" || !replay.data) return settings.Tmax;
+  const d = replay.data;
+  return Math.max(d.T[d.T.length - 1], ...d.ghosts.map((g) => g.T[g.T.length - 1]));
+}
+function setPlaying(p) {
+  clock.playing = p;
+  $("playBtn").innerHTML = p ? ICON_PAUSE : ICON_PLAY;
+  $("playBtn").setAttribute("aria-label", p ? "Pause" : "Play");
+}
+function togglePlay() {
+  if (!clock.playing && clock.t >= clockEnd() - 1e-9) clock.t = 0;
+  setPlaying(!clock.playing);
+}
+function syncClockUI() {
+  const end = clockEnd();
+  const s = $("clock");
+  if (+s.max !== end) s.max = String(end);
+  if (document.activeElement !== s || clock.playing) s.value = String(clock.t);
+  $("tLabel").textContent = "t = " + clock.t.toFixed(1);
+}
+$("playBtn").onclick = togglePlay;
+$("restartBtn").onclick = () => { clock.t = 0; orbit.t = 0; orbit.playing = true; setPlaying(true); syncClockUI(); };
+$("replayBtn").onclick = replayOrbit;
+$("orbitBtn").onclick = replayOrbit;
+$("clock").oninput = (e) => { clock.t = +e.target.value; syncClockUI(); };
+bindSeg("speedSeg", (v) => { clock.speed = +v; });
+
+/* ---------------- orbit replay ---------------- */
+const orbCv = $("orbit"), octx = orbCv.getContext("2d");
+let OW = 300, ODPR = 1;
+const replay = { data: null };
+function sizeOrbit() {
+  const r = orbCv.getBoundingClientRect();
+  ODPR = Math.min(window.devicePixelRatio || 1, 2);
+  OW = Math.max(100, Math.round(r.width));
+  orbCv.width = orbCv.height = Math.round(OW * ODPR);
+  if (replay.data) prepTrails();
+  drawOrbit();
+}
+function selectPoint(x, y) {
+  selected = { x, y };
+  dirty = true;
+  computeReplay();
+  if (viewMode === "map") {
+    clock.t = 0;
+    setPlaying(!reducedMotion);
+  } else {
+    orbit.t = 0;
+    orbit.playing = !reducedMotion;
+  }
+  syncClockUI();
+}
+function runOrbit(x, y) {
+  const ts = [], ps = [];
+  const res = CORE.simulate(x, y, settings.m2, settings.Tmax, Math.min(settings.h, 0.01), capFor(settings.Tmax, 0.01) * 2, (t, P) => { ts.push(t); ps.push(P[0], P[1], P[2], P[3], P[4], P[5]); });
+  return { T: Float64Array.from(ts), P: Float64Array.from(ps), res, x, y };
+}
+function computeReplay() {
+  const { x, y } = selected;
+  const main = runOrbit(x, y);
+  // four neighbours a couple of pixels away
+  const px = viewMode === "tl" && tl && tl.grid ? tl.grid.wpp : view.wpp;
+  const eps = 2 * px;
+  const ghosts = [[eps, 0], [-eps, 0], [0, eps], [0, -eps]].map(([dx, dy]) => runOrbit(x + dx, y + dy));
+  // frame the panel on the centre of mass, covering most of the motion before the escape
+  const { T, P: Pp, res } = main;
+  const tCut = res.status <= 3 ? res.t : Infinity;
+  const Mt = 2 + settings.m2;
+  const gx = (settings.m2 * x) / Mt, gy = (settings.m2 * y) / Mt;
+  const dists = [];
+  const stride = Math.max(1, Math.floor(T.length / 4000));
+  for (let i = 0; i < T.length && T[i] <= tCut; i += stride) for (let b = 0; b < 3; b++) {
+    dists.push(Math.hypot(Pp[i * 6 + b * 2] - gx, Pp[i * 6 + b * 2 + 1] - gy));
+  }
+  dists.sort((a, b) => a - b);
+  const rFit = Math.max(0.8, dists.length ? dists[Math.floor(dists.length * 0.97)] : 1);
+  replay.data = { ...main, ghosts, eps, cx: gx, cy: gy, span: rFit * 2.3, m2: settings.m2 };
+  prepTrails();
+  writeOutcome();
+  drawOrbit();
+}
+function prepTrails() {
+  const d = replay.data; if (!d) return;
+  const s = OW / d.span, minStep = 0.6 / s;
+  d.trails = [0, 1, 2].map((b) => {
+    const tt = [], xs = [], ys = [];
+    let lx = Infinity, ly = Infinity;
+    for (let i = 0; i < d.T.length; i++) {
+      const x = d.P[i * 6 + b * 2], y = d.P[i * 6 + b * 2 + 1];
+      if (Math.abs(x - lx) + Math.abs(y - ly) >= minStep || i === d.T.length - 1) { tt.push(d.T[i]); xs.push(x); ys.push(y); lx = x; ly = y; }
+    }
+    return { t: Float64Array.from(tt), x: Float64Array.from(xs), y: Float64Array.from(ys) };
+  });
+}
+function bsearch(arr, v) { let lo = 0, hi = arr.length - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (arr[m] <= v) lo = m; else hi = m - 1; } return lo; }
+function writeOutcome() {
+  const d = replay.data, r = d.res;
+  const name = (k) => "ABC"[k - 1];
+  const chip = (k) => `<span class="chip" style="background:rgb(${COLORS[k]})"></span>`;
+  let txt;
+  if (r.status <= 3) {
+    const pair = [1, 2, 3].filter((k) => k !== r.status).map(name).join(" and ");
+    txt = `${chip(r.status)}<b>${name(r.status)}</b> is thrown out at t = ${r.t.toFixed(1)}, leaving ${pair} as a bound pair.`;
+  } else {
+    txt = `No body escapes before t = ${settings.Tmax}. The three are still tangled together.`;
+  }
+  const same = d.ghosts.filter((g) => g.res.status === r.status).length;
+  const nb = same === 4 ? "All 4 neighbours end the same way, so this start sits in a calm region."
+    : same === 0 ? "None of the 4 neighbours end the same way. This start is deep in the chaos."
+    : `${same} of 4 neighbours end the same way.`;
+  const dig = Math.max(3, Math.ceil(-Math.log10(view.wpp)) + 1);
+  $("outcome").innerHTML = `${txt} ${nb}<br><span class="coords">C starts at (${d.x.toFixed(dig)}, ${d.y.toFixed(dig)}) · neighbours ${d.eps.toPrecision(2)} away · energy drift ${Math.abs(r.dE).toExponential(0)}</span>`;
+  const s = viewMode === "map" ? sampleAt(d.x, d.y) : null;
+  const mm = $("mismatch");
+  if (s && s.exact && s.st !== r.status && !(s.st >= 4 && r.status >= 4)) {
+    mm.hidden = false;
+    mm.textContent = `The map pixel here says ${describe(s).replace(/^./, (c) => c.toLowerCase())}. This replay runs in double precision with a smaller step and ends differently, which happens in chaotic zones: tiny rounding differences grow until they change the outcome.`;
+  } else mm.hidden = true;
+}
+function drawOrbit() {
+  const c = octx, d = replay.data;
+  c.setTransform(ODPR, 0, 0, ODPR, 0, 0);
+  c.fillStyle = "#090d19"; c.fillRect(0, 0, OW, OW);
+  if (!d || !d.trails) return;
+  const s = OW / d.span;
+  const X = (x) => (x - d.cx) * s + OW / 2, Y = (y) => OW / 2 - (y - d.cy) * s;
+  c.strokeStyle = "rgba(228,232,243,0.35)"; c.lineWidth = 1;
+  [[-0.5, 0], [0.5, 0], [d.x, d.y]].forEach(([x, y]) => { const px = X(x), py = Y(y); c.beginPath(); c.moveTo(px - 4, py - 4); c.lineTo(px + 4, py + 4); c.moveTo(px + 4, py - 4); c.lineTo(px - 4, py + 4); c.stroke(); });
+  const tEnd = d.T[d.T.length - 1];
+  const tNow = Math.min(orbitTime(), tEnd);
+  for (let b = 0; b < 3; b++) {
+    const tr = d.trails[b], k = bsearch(tr.t, tNow);
+    const [cx, cy] = bodyAt(d, tNow, b);
+    c.strokeStyle = `rgba(${COLORS[b + 1]},0.4)`; c.lineWidth = 1.1; c.lineJoin = "round";
+    c.beginPath(); c.moveTo(X(tr.x[0]), Y(tr.y[0]));
+    for (let j = 1; j <= k; j++) c.lineTo(X(tr.x[j]), Y(tr.y[j]));
+    c.lineTo(X(cx), Y(cy));
+    c.stroke();
+  }
+  drawComets(c, X, Y, 1);
+  for (let b = 0; b < 3; b++) {
+    const [wx, wy] = bodyAt(d, tNow, b);
+    const r = 4 * Math.cbrt(b === 2 ? d.m2 : 1);
+    c.font = "500 11px 'IBM Plex Mono', monospace"; c.fillStyle = "#e4e8f3";
+    c.fillText("ABC"[b], X(wx) + r + 4, Y(wy) - r - 2);
+  }
+  const unit = s;
+  if (unit > 20 && unit < OW * 0.6) {
+    c.strokeStyle = "rgba(228,232,243,0.5)"; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(OW - 12 - unit, OW - 14); c.lineTo(OW - 12, OW - 14);
+    c.moveTo(OW - 12 - unit, OW - 18); c.lineTo(OW - 12 - unit, OW - 10); c.moveTo(OW - 12, OW - 18); c.lineTo(OW - 12, OW - 10); c.stroke();
+    c.font = "11px 'IBM Plex Mono', monospace"; c.fillStyle = "rgba(228,232,243,0.6)"; c.textAlign = "right";
+    c.fillText("1 unit", OW - 12, OW - 22); c.textAlign = "left";
+  }
+  $("orbitTime").textContent = "t = " + tNow.toFixed(1) + (d.res.status <= 3 ? "   escape at " + d.res.t.toFixed(1) : "");
+}
+
+/* ---------------- time-lapse driver ---------------- */
+let tl = null, tlColour = 0, tlNeedsInit = true, tlFresh = false, viewMode = "tl";
+const tlCv = $("tl");
+function tlScale() {
+  const base = ({ 0.5: 0.4, 1: 0.6, 2: 1 })[settings.res] || 0.6;
+  // narrow screens get at least ~320 systems across, so phones stay sharp
+  return Math.min(1, Math.max(base, (settings.res === 0.5 ? 240 : 320) / Math.max(1, W)));
+}
+function createTimeLapse() {
+  try {
+    tl = new TimeLapse(tlCv);
+    tl.onLost = () => { tl = null; setViewMode("map"); engineNote("time-lapse lost its GPU context"); };
+  } catch (err) {
+    tl = null;
+    $("viewSeg").querySelector('[data-v="tl"]').disabled = true;
+  }
+}
+let prevViewKey = "", lastViewChange = 0;
+function tlFrame(now, fdt) {
+  const scale = tlScale();
+  const w = Math.max(1, Math.round(W * scale)), h = Math.max(1, Math.round(H * scale));
+  const simWpp = view.wpp * W / w;
+  const g = tl.grid;
+  const settled = pointers.size === 0 && now - lastViewChange > 160;
+  if (tlNeedsInit || !g) {
+    // fresh start: first load, mass change, or scrubbing back in time
+    tl.reset({ cx: view.cx, cy: view.cy, wpp: simWpp }, settings.m2, w, h, false, tlColour, now);
+    tlNeedsInit = false;
+    updateViewRow();
+  } else if (clock.t < tl.lastTarget - 1e-9) {
+    tl.reset({ cx: g.cx, cy: g.cy, wpp: g.wpp }, settings.m2, tl.w, tl.h, false, tlColour, now);
+  } else {
+    const sameScale = Math.abs(g.wpp - simWpp) <= 1e-12 * simWpp && w === tl.w && h === tl.h;
+    if (sameScale) {
+      // pan: slide the running systems over by whole pixels; only the new strip starts from t = 0
+      const dx = Math.round((view.cx - g.cx) / g.wpp), dy = Math.round((view.cy - g.cy) / g.wpp);
+      if (dx || dy) {
+        if (Math.abs(dx) >= w || Math.abs(dy) >= h) tl.reset({ cx: view.cx, cy: view.cy, wpp: simWpp }, settings.m2, w, h, false, tlColour, now);
+        else tl.shift(dx, dy);
+      }
+    } else if (settled) {
+      // zoom or resize: start a new grid, keeping the old picture underneath until each pixel catches up
+      tl.reset({ cx: view.cx, cy: view.cy, wpp: simWpp }, settings.m2, w, h, true, tlColour, now);
+      updateViewRow();
+    }
+  }
+  // place the sim grid on screen: sub-pixel pan offsets, and a stretched preview while a zoom is in progress
+  const gg = tl.grid, screenWpp = gg.wpp * tl.w / W;
+  const k = screenWpp / view.wpp;
+  const tx = W / 2 - k * W / 2 + (gg.cx - view.cx) / view.wpp;
+  const ty = H / 2 - k * H / 2 - (gg.cy - view.cy) / view.wpp;
+  const tf = Math.abs(k - 1) < 1e-9 && Math.abs(tx) < 1e-3 && Math.abs(ty) < 1e-3 ? "" : `translate(${tx}px, ${ty}px) scale(${k})`;
+  if (tlCv.style.transform !== tf) tlCv.style.transform = tf;
+  if (fdt > 34) tl.steps = Math.max(8, tl.steps * 0.7);
+  else if (fdt < 21) tl.steps = Math.min(4096, tl.steps * 1.12 + 1);
+  tl.advance(clock.t, settings.h);
+  tl.render(tlColour, now);
+}
+
+/* ---------------- main loop ---------------- */
+let lastFrame = 0, lastRow = 0;
+function frame(now) {
+  const fdt = lastFrame ? now - lastFrame : 16;
+  lastFrame = now;
+  if (clock.playing) {
+    const end = clockEnd();
+    clock.t = Math.min(end, clock.t + Math.min(0.1, fdt / 1000) * clock.speed);
+    if (clock.t >= end) setPlaying(false);
+    syncClockUI();
+  }
+  if (viewMode === "tl" && orbit.playing) {
+    orbit.t = Math.min(orbitEnd(), orbit.t + Math.min(0.1, fdt / 1000) * clock.speed);
+    if (orbit.t >= orbitEnd()) orbit.playing = false;
+  }
+  const vk = view.cx + "," + view.cy + "," + view.wpp;
+  if (vk !== prevViewKey) { prevViewKey = vk; lastViewChange = now; }
+  if (viewMode === "tl" && tl) {
+    tlFrame(now, fdt);
+  } else {
+    if (engine.busy && engine.busy() && engine instanceof GPUEngine) {
+      if (fdt > 34) engine.passes = Math.max(1, Math.floor(engine.passes * 0.75));
+      else if (fdt < 22) engine.passes = Math.min(96, engine.passes + 1);
+    }
+    engine.tick();
+    pump();
+  }
+  draw();
+  drawOrbit();
+  if (now - lastRow > 250) { lastRow = now; updateViewRow(); }
+  requestAnimationFrame(frame);
+}
+
+createEngine();
+createTimeLapse();
+updateRamp();
+new ResizeObserver(() => resize()).observe(mapCv);
+new ResizeObserver(() => sizeOrbit()).observe(orbCv);
+resize();
+fitView(DEFAULT_VIEW.cx, DEFAULT_VIEW.cy, DEFAULT_VIEW.span);
+applyParams();
+setViewMode(tl ? "tl" : "map");
+computeReplay();
+setPlaying(clock.playing);
+syncClockUI();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
