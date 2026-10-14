@@ -1,0 +1,1212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>p-adic Warp</title>
+<link rel="manifest" href="../manifest.json"><link rel="icon" href="../icons/icon-192.png"><link rel="apple-touch-icon" href="../icons/icon-180.png"><meta name="apple-mobile-web-app-title" content="Math Widgets"><script>if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("../sw.js"));</script>
+<style>:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one square "tree of balls" stage beside a quiet instrument panel; stacks to one column on phones. Dark-first. */
+:root{
+  --bg:#0d1120; --panel:#141a2d; --raise:#1b2238; --line:#2a3252; --fg:#e8e5dc; --muted:#8f95ad;
+  --accent:#e3a25f; --accent-ink:#1a1206; --sel:#ffffff; --dot-l:66%; --dot-s:74%; --is-dark:1;
+  --display:"Instrument Serif", "Iowan Old Style", Georgia, serif;
+  --body:"Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){ :root:not([data-theme="dark"]){
+  --bg:#eceef4; --panel:#f8f9fc; --raise:#ffffff; --line:#cdd2e0; --fg:#161a2a; --muted:#5a6079;
+  --accent:#a8541a; --accent-ink:#fff7ef; --sel:#0d1120; --dot-l:45%; --dot-s:72%; --is-dark:0; color-scheme:light }}
+:root[data-theme="light"]{
+  --bg:#eceef4; --panel:#f8f9fc; --raise:#ffffff; --line:#cdd2e0; --fg:#161a2a; --muted:#5a6079;
+  --accent:#a8541a; --accent-ink:#fff7ef; --sel:#0d1120; --dot-l:45%; --dot-s:72%; --is-dark:0; color-scheme:light }
+html,body{background:var(--bg);color:var(--fg)}
+body{font-family:var(--body);font-size:15px;line-height:1.5;padding-inline:16px;padding-block:20px 40px}
+.wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+header{display:flex;flex-direction:column;gap:6px}
+h1{font-family:var(--display);font-weight:400;font-size:clamp(34px,6vw,52px);line-height:1;margin:0;letter-spacing:-.01em}
+h1 i{color:var(--accent)}
+.lede{color:var(--muted);margin:0;max-width:64ch;text-wrap:pretty}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:20px;align-items:start}
+@media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
+.stage{display:flex;flex-direction:column;gap:12px;min-width:0}
+.canvasbox{position:relative;width:100%;aspect-ratio:1/1;max-width:100%;background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;touch-action:none}
+canvas{display:block;width:100%;height:100%;cursor:crosshair}
+.badge{position:absolute;left:12px;top:10px;right:118px;font-family:var(--mono);font-size:12px;color:var(--muted);pointer-events:none}
+.zoombtns{position:absolute;right:10px;top:8px;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.pill{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);max-width:calc(100% - 24px);box-sizing:border-box;padding:6px 14px;border-radius:999px;background:color-mix(in srgb,var(--panel) 90%,transparent);border:1px solid var(--line);color:var(--accent);font:500 12px/1.35 var(--mono);text-align:center;pointer-events:none}
+.legend{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted);flex-wrap:wrap}
+.legend .bar{flex:1 1 140px;height:10px;border-radius:5px;min-width:0}
+.legend .sw{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:5px}
+.transport{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px}
+.scrub{flex:1 1 220px;display:flex;align-items:center;gap:10px;min-width:0;font-family:var(--mono);font-size:13px;color:var(--muted)}
+.scrub input{flex:1;min-width:0}
+input[type=range]{accent-color:var(--accent)}
+button,.chip{font:500 14px var(--body);color:var(--fg);background:var(--raise);border:1px solid var(--line);border-radius:999px;padding:7px 14px;cursor:pointer}
+button:hover:not(:disabled),.chip:hover{border-color:var(--muted)}
+button:disabled{opacity:.45;cursor:default}
+button:focus-visible,.chip:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600;min-width:88px}
+.zoombtns button{padding:4px 10px;font-size:12px;background:color-mix(in srgb,var(--raise) 85%,transparent)}
+label.tog{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:14px;cursor:pointer}
+label.tog input{accent-color:var(--accent);width:16px;height:16px}
+.step{font-family:var(--mono);font-size:13px;color:var(--muted)}
+aside{display:flex;flex-direction:column;gap:16px;min-width:0}
+.sect{display:flex;flex-direction:column;gap:8px}
+.lab{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.chip.mono{font-family:var(--mono);min-width:42px}
+.chip.mode{font-family:var(--display);font-size:20px;line-height:1;padding:6px 16px}
+select,input[type=text]{width:100%;font:15px var(--body);color:var(--fg);background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:9px 10px}
+input[type=text]{font-family:var(--mono);font-size:14px}
+.desc{color:var(--fg);font-size:14px;margin:0;text-wrap:pretty;opacity:.9}
+.row{display:flex;gap:10px;align-items:center}
+.row .lab{flex:0 0 auto}
+.err{color:var(--accent);font-size:13px;margin:0}
+.readout{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;font-size:14px;transition:border-color .3s}
+.readout.nudge{border-color:var(--accent)}
+.readout p{margin:0;text-wrap:pretty}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.dig{font-family:var(--mono);font-size:13px;word-break:break-all;color:var(--fg)}
+.muted{color:var(--muted)}
+.hint{color:var(--muted);font-size:13px;margin:0;text-wrap:pretty}
+.readout .sep{border-top:1px solid var(--line);padding-top:10px;margin-top:2px}
+.ctab{display:grid;grid-template-columns:auto auto;gap:2px 18px;justify-content:start;font-family:var(--mono);font-size:13px;font-variant-numeric:tabular-nums}
+.ctab .h{color:var(--muted);font-family:var(--body);font-size:12px}
+.ctab .bad{color:var(--accent)}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <a href="../index.html" style="display:table;margin-bottom:6px;font-size:13px;color:#d0457f;font-weight:500;text-decoration:none">← All widgets</a>
+    <h1>p-adic <i>Warp</i></h1>
+    <p class="lede">Every dot is a p-adic number. Numbers that share their last k digits sit in the same disk, so close in the picture means close p-adically. Pick a function and watch it rebuild the picture one digit at a time, starting from the last digit.</p>
+  </header>
+
+  <div class="grid">
+    <div class="stage">
+      <div class="canvasbox" id="box">
+        <canvas id="cv" aria-label="p-adic numbers drawn as nested disks"></canvas>
+        <div class="badge" id="badge"></div>
+        <div class="pill" id="pill" hidden></div>
+        <div class="zoombtns">
+          <button id="diveBtn" type="button">Dive</button>
+          <button id="zoomBall" type="button" hidden>Zoom to ball</button>
+          <button id="zoomFit" type="button" hidden>Fit all</button>
+        </div>
+      </div>
+      <div class="legend" id="legend" hidden></div>
+      <div class="transport">
+        <button class="primary" id="apply" type="button">Apply f</button>
+        <button id="reset" type="button">Reset</button>
+        <label class="tog"><input type="checkbox" id="loop"> Keep iterating</label>
+        <span class="step" id="stepLbl">step 0</span>
+        <div class="scrub"><span>x</span><input type="range" id="morph" min="0" max="1000" value="0" aria-label="Morph from x to f(x)"><span>f(x)</span></div>
+      </div>
+      <p class="hint" id="hint"></p>
+    </div>
+
+    <aside>
+      <div class="sect">
+        <span class="lab">Numbers</span>
+        <div class="chips" id="modes"></div>
+      </div>
+      <div class="sect" id="viewSect" hidden>
+        <span class="lab">View</span>
+        <div class="chips" id="views"></div>
+      </div>
+      <div class="sect">
+        <span class="lab">Prime</span>
+        <div class="chips" id="primes"></div>
+      </div>
+      <div class="sect">
+        <span class="lab">Detail</span>
+        <div class="chips" id="detail"></div>
+      </div>
+      <div class="sect">
+        <span class="lab">Function</span>
+        <select id="fn"></select>
+        <p class="desc" id="fdesc"></p>
+        <div id="cWrap" class="sect">
+          <div class="row"><span class="lab">c =</span><input type="text" id="cIn" value="-1" aria-label="Parameter c" spellcheck="false"></div>
+          <p class="err" id="cErr" hidden></p>
+        </div>
+        <div id="customRow" class="sect" hidden>
+          <input type="text" id="poly" value="x^3 - x + p" aria-label="Custom function" spellcheck="false">
+          <p class="err" id="polyErr" hidden></p>
+        </div>
+      </div>
+      <div class="sect">
+        <span class="lab">Tap selects a ball of radius</span>
+        <div class="chips" id="depths"></div>
+      </div>
+      <div class="sect">
+        <div class="row"><span class="lab">Twist</span><input type="range" id="twist" min="0" max="100" value="0" style="flex:1" aria-label="Twist the layout"></div>
+        <label class="tog"><input type="checkbox" id="disks" checked> Show disk outlines</label>
+        <label class="tog"><input type="checkbox" id="labels" checked> Show number labels</label>
+      </div>
+      <div class="readout" id="stats"></div>
+      <div class="readout" id="selOut"><p class="muted">No ball selected. Tap a dot.</p></div>
+    </aside>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+// ===== Pure ℚ_p engine. These four functions are also shipped to a Web Worker, so they use nothing from outside. =====
+function makeQ(p, R){
+  const QP = BigInt(p), QPOW = [1n]; for (let k = 1; k <= R; k++) QPOW.push(QPOW[k-1]*QP);
+  const QPR = QPOW[R], BIG = 1e8, QZERO = {v:1e9, u:0n}, QINF = {v:-1e9, u:1n};
+  const qz = a => a.v >= BIG, qinf = a => a.v <= -BIG;
+  function qnorm(U, v){ U %= QPR; if (U < 0n) U += QPR; if (U === 0n) return QZERO; while (U % QP === 0n){ U /= QP; v++; } if (v < -1e6) return QINF; if (v > 1e6) return QZERO; return {v, u:U}; }
+  function qadd(a, b){ if (!a || !b) return null; if (qinf(a) || qinf(b)) return QINF; if (qz(a)) return b; if (qz(b)) return a;
+    const v = Math.min(a.v, b.v), da = a.v - v, db = b.v - v; return qnorm((da >= R ? 0n : a.u*QPOW[da]) + (db >= R ? 0n : b.u*QPOW[db]), v); }
+  const qneg = a => !a ? null : (qz(a) || qinf(a)) ? a : {v:a.v, u:QPR - a.u};
+  const qsub = (a, b) => qadd(a, qneg(b));
+  function qmul(a, b){ if (!a || !b) return null; if (qinf(a) || qinf(b)) return (qz(a) || qz(b)) ? null : QINF; if (qz(a) || qz(b)) return QZERO;
+    const v = a.v + b.v; if (v < -1e6) return QINF; if (v > 1e6) return QZERO; return {v, u:(a.u*b.u) % QPR}; }
+  function binv(a){ let r0 = QPR, r1 = a, s0 = 0n, s1 = 1n; while (r1){ const q = r0/r1; [r0, r1] = [r1, r0 - q*r1]; [s0, s1] = [s1, s0 - q*s1]; } return ((s0 % QPR) + QPR) % QPR; }
+  function qinv(a){ if (!a) return null; if (qz(a)) return QINF; if (qinf(a)) return QZERO; return {v:-a.v, u:binv(a.u)}; }
+  function qpow(a, e){ let r = qnorm(1n, 0), b = a; while (e > 0){ if (e & 1) r = qmul(r, b); e = Math.floor(e/2); if (e) b = qmul(b, b); } return r; }
+  const qdiv = (a, b) => qmul(a, qinv(b));
+  return {p, R, QPOW, QPR, QZERO, QINF, qz, qinf, qnorm, qadd, qneg, qsub, qmul, qinv, qpow, qdiv, PV:qnorm(QP, 0), ONE:qnorm(1n, 0), TWO:qnorm(2n, 0)};
+}
+function parseExpr(src){
+  const toks = src.replace(/\s+/g, '').replace(/[×·]/g, '*').replace(/÷/g, '/').replace(/[−–]/g, '-').match(/\d+|[xcp]|[-+*/^()]|./g) || [];
+  let i = 0; const peek = () => toks[i];
+  function expr(){ let a = term(); while (peek() === '+' || peek() === '-'){ const op = toks[i++]; a = {t:op, a, b:term()}; } return a; }
+  function term(){ let a = unary();
+    for (;;){ const k = peek();
+      if (k === '*' || k === '/'){ i++; a = {t:k, a, b:unary()}; continue; }
+      if (k && /^(\d+|[xcp(])$/.test(k)){ a = {t:'*', a, b:unary()}; continue; }
+      break; }
+    return a; }
+  function unary(){ if (peek() === '-'){ i++; return {t:'neg', a:unary()}; } if (peek() === '+'){ i++; return unary(); } return power(); }
+  function power(){ const a = atom(); if (peek() === '^'){ i++; let neg = false; if (peek() === '-'){ neg = true; i++; }
+      const e = toks[i++]; if (!/^\d+$/.test(e || '')) throw Error('Exponents must be whole numbers');
+      return {t:'^', a, e:Math.min(+e, 100000), neg}; } return a; }
+  function atom(){ const k = toks[i++];
+    if (k === undefined) throw Error('The formula ends too early');
+    if (/^\d+$/.test(k)) return {t:'n', s:k};
+    if (k === 'x' || k === 'c' || k === 'p') return {t:k};
+    if (k === '('){ const e = expr(); if (toks[i++] !== ')') throw Error('Missing a closing bracket'); return e; }
+    throw Error('Unexpected "' + k + '"'); }
+  if (!toks.length) throw Error('Type a formula');
+  const e = expr(); if (i < toks.length) throw Error('Unexpected "' + toks[i] + '"'); return e;
+}
+function compileQ(a, Q, getC){
+  const C = b => compileQ(b, Q, getC);
+  switch (a.t){
+    case 'n': { const v = Q.qnorm(BigInt(a.s), 0); return () => v; }
+    case 'x': return x => x;
+    case 'c': return () => getC();
+    case 'p': return () => Q.PV;
+    case '+': { const f = C(a.a), g = C(a.b); return x => Q.qadd(f(x), g(x)); }
+    case '-': { const f = C(a.a), g = C(a.b); return x => Q.qsub(f(x), g(x)); }
+    case '*': { const f = C(a.a), g = C(a.b); return x => Q.qmul(f(x), g(x)); }
+    case '/': { const f = C(a.a), g = C(a.b); return x => Q.qdiv(f(x), g(x)); }
+    case 'neg': { const f = C(a.a); return x => Q.qneg(f(x)); }
+    case '^': { const f = C(a.a); return a.neg ? x => Q.qinv(Q.qpow(f(x), a.e)) : x => Q.qpow(f(x), a.e); }
+  }
+}
+function qFns(Q, getC, getCustom){
+  return {
+    julia: x => Q.qadd(Q.qmul(x, x), getC()),
+    jcube: x => Q.qadd(Q.qmul(Q.qmul(x, x), x), getC()),
+    sq: x => Q.qmul(x, x),
+    xp: x => Q.qpow(x, Q.p),
+    px: x => Q.qmul(x, Q.PV),
+    divp: x => Q.qdiv(x, Q.PV),
+    add1: x => Q.qadd(x, Q.ONE),
+    neg: x => Q.qneg(x),
+    cx: x => Q.qmul(getC(), x),
+    inv: x => Q.qinv(x),
+    mob: x => Q.qinv(Q.qsub(Q.ONE, x)),
+    newton: x => Q.qz(x) ? null : Q.qdiv(Q.qadd(x, Q.qdiv(getC(), x)), Q.TWO),
+    custom: x => { const f = getCustom(); return f ? f(x) : null; },
+  };
+}
+const WORKER_SRC = [makeQ, parseExpr, compileQ, qFns].map(f => f.toString()).join('\n') + `
+onmessage = e => {
+  const {id, p, m, R, n, fnId, cText, polyText, maxIt} = e.data;
+  const Q = makeQ(p, R); let CQ = Q.QZERO, custom = null;
+  try { CQ = compileQ(parseExpr(cText), Q, () => Q.QZERO)(Q.QZERO) || Q.QZERO; } catch(err){}
+  try { custom = compileQ(parseExpr(polyText), Q, () => CQ); } catch(err){}
+  const f = qFns(Q, () => CQ, () => custom)[fnId];
+  const esc = new Uint16Array(n);
+  for (let i = 0; i < n; i++){
+    let x = Q.qnorm(BigInt(i), -m), k = 1;
+    for (; k <= maxIt; k++){ try { x = f(x); } catch(err){ x = null; } if (!x || Q.qinf(x) || (!Q.qz(x) && x.v < -m)) break; }
+    esc[i] = k > maxIt ? 0 : k;
+  }
+  postMessage({id, esc}, [esc.buffer]);
+};`;
+
+// ===== Widget =====
+const SUP = s => String(s).replace(/[0-9-]/g, d => d === '-' ? '⁻' : '⁰¹²³⁴⁵⁶⁷⁸⁹'[+d]);
+const SUB = s => String(s).replace(/[0-9]/g, d => '₀₁₂₃₄₅₆₇₈₉'[+d]);
+const ZCFG = {2:[0,13], 3:[0,8], 5:[0,6], 7:[0,5]};    // [m, N]
+const QCFG = {2:[2,10], 3:[2,6], 5:[1,4], 7:[1,3]};     // window p^-m ℤ_p, digits down to p^(N-1)
+const lotsOK = (md, q) => { const [mm, N0] = (md === 'Z' ? ZCFG : QCFG)[q]; let k = N0; while (Math.pow(q, mm + k + 1) <= 70000) k++; return Math.pow(q, mm + Math.max(k, N0 + 1) + 1) <= 300000; };
+function cfgFor(md, q, d){
+  const [mm, N0] = (md === 'Z' ? ZCFG : QCFG)[q], mx = lim => { let k = N0; while (Math.pow(q, mm + k + 1) <= lim) k++; return k; };
+  const N1 = Math.max(mx(70000), N0 + 1); if (d <= 0) return [mm, N0]; if (d === 1 || !lotsOK(md, q)) return [mm, N1];
+  return [mm, Math.max(mx(250000), N1 + 1)];
+}
+const RREL = {2:160, 3:100, 5:69, 7:57};
+const EXTRA = 3, MAXIT = 30;
+const COLOR_DIGITS = {2:6, 3:4, 5:3, 7:2};
+
+let mode = 'Z', qview = 'warp', p = 3, m, N, KL, KH, L, n, E0, detail = 0, nStd = 1;
+let P = [], Mod, Q = null;
+let curZ, nxtZ, curQ, nxtQ, curD, nxtD, curF, nxtF;
+let posX, posY, alph, homeX, homeY;
+let ANG, COSK, SINK, SK, S;
+let t = 0, playing = false, loopTimer = null, step = 0;
+let fn, C = -1, CQ = null, custom = null;
+let view = {x:0, y:0, r:1}, viewT = null, fitView = {x:0, y:0, r:1};
+let palette = [], bucketOf, order, sel = null, selPoint = -1, selInfo = null, selDepth = 1;
+let diving = false, dive = null, dv = null, demo = null, diveCols = [], colPanel;
+let esc = null, escOrder = null, escMax = 0, mapDirty = true, mapJob = 0, worker = null;
+
+// ---------- ℤ/p^N arithmetic ----------
+const md = a => ((a % Mod) + Mod) % Mod;
+const mul = (a, b) => (a * b) % Mod;
+function pw(a, e){ let r = 1 % Mod, b = md(a); while (e > 0){ if (e & 1) r = mul(r, b); b = mul(b, b); e = Math.floor(e/2); } return r; }
+function inv(a){ let r0 = Mod, r1 = md(a), s0 = 0, s1 = 1; while (r1){ const q = Math.floor(r0 / r1); [r0, r1] = [r1, r0 - q*r1]; [s0, s1] = [s1, s0 - q*s1]; } return md(s0); }
+function vp(x){ if (x === 0) return N; let v = 0; while (x % p === 0){ x /= p; v++; } return v; }
+const hash = x => (Math.imul(x + 0x9e37, 0x85ebca6b) >>> 13) % p;
+const isUnit = x => x % p !== 0;
+const rnd = (x, k) => (((Math.imul(x ^ 0x5bd1e995, 0x27d4eb2d) >>> 0) ^ (Math.imul(x + 7, 0x165667b1) >>> 9)) >>> 0) % P[k];
+function digitsMap(x, g){ let r = 0, w = x, pk = 1; for (let k = 0; k < N; k++){ const d = w % p; r += g(d, k)*pk; w = (w - d)/p; pk *= p; } return r; }
+function expD(x){
+  if (x === 0) return 1 % Mod;
+  const vd = p === 2 ? 2 : 1, vx = vp(x), u = x / P[vx];
+  let sum = 1, fU = 1, fV = 0;
+  for (let k = 1; k <= 6*N + 8; k++){
+    let q = k, v = 0; while (q % p === 0){ q /= p; v++; } fV += v; fU = mul(fU, q % Mod);
+    const e = k*(vd + vx) - fV; if (e >= N) continue;
+    sum = (sum + mul(mul(pw(u, k), inv(fU)), P[e])) % Mod;
+  }
+  return sum;
+}
+function logD(x){
+  if (x === 0) return 0;
+  const vd = p === 2 ? 2 : 1, vx = vp(x), u = x / P[vx];
+  let sum = 0;
+  for (let k = 1; k <= 6*N + 8; k++){
+    let q = k, v = 0; while (q % p === 0){ q /= p; v++; }
+    const e = (k-1)*vd + k*vx - v; if (e >= N) continue;
+    const term = mul(mul(pw(u, k), inv(q % Mod)), P[e]);
+    sum = (k % 2 ? sum + term : sum - term + Mod) % Mod;
+  }
+  return sum;
+}
+const astUses = (ast, v) => JSON.stringify(ast).includes('"t":"' + v + '"');
+function compileZ(a){
+  switch (a.t){
+    case 'n': { let r = 0; for (const ch of a.s) r = (r*10 + +ch) % Mod; return () => r; }
+    case 'x': return x => x;
+    case 'c': return () => md(C);
+    case 'p': return () => p % Mod;
+    case '+': { const f = compileZ(a.a), g = compileZ(a.b); return x => (f(x) + g(x)) % Mod; }
+    case '-': { const f = compileZ(a.a), g = compileZ(a.b); return x => md(f(x) - g(x)); }
+    case '*': { const f = compileZ(a.a), g = compileZ(a.b); return x => mul(f(x), g(x)); }
+    case 'neg': { const f = compileZ(a.a); return x => md(-f(x)); }
+    case '^': { if (a.neg) throw Error('Negative powers need ℚ_p'); const f = compileZ(a.a); return x => pw(f(x), a.e); }
+    case '/': throw Error('Division needs ℚ_p: switch Numbers to ℚ_p');
+  }
+}
+
+// ---------- function menus ----------
+const ZFNS = [
+  {g:'Powers', id:'sq', nm:()=>'x²', f:x=>mul(x,x),
+   d:()=>'Folds ℤ'+SUB(p)+' 2-to-1, since x and −x land together. Only some balls get hit, and '+(p===2?'for p = 2 Hensel\'s lemma needs extra digits: every odd square is ≡ 1 (mod 8), so some balls that get hit are only partly filled.':'Hensel\'s lemma fills every one that does.')+' Near 0 distances get squared.'},
+  {g:'Powers', id:'cube', nm:()=>'x³', f:x=>mul(mul(x,x),x),
+   d:()=>p===3 ? 'For p = 3, cubing is 1-to-1 on units but squeezes each unit ball by a factor of 3. Watch distances shrink.' : (p%3===1 ? 'For p ≡ 1 (mod 3) there are cube roots of unity, so cubing is 3-to-1 on units.' : 'For this p, cubing permutes the units: a bijection that scrambles balls without merging them.')},
+  {g:'Powers', id:'xp', nm:()=>'x'+SUP(p), f:x=>pw(x,p),
+   d:()=>'Fermat\'s little theorem made visible: each top-level ball contracts toward a single point. Turn on Keep iterating and it converges to the Teichmüller digits.'},
+  {g:'Powers', id:'sqc', nm:()=>'x² + c', cd:()=>'-1', f:x=>md(mul(x,x)+C),
+   d:()=>'Inside ℤ'+SUB(p)+' nothing can escape, so iterating just shuffles balls into cycles. Switch Numbers to ℚ'+SUB(p)+' for real Julia sets.'},
+  {g:'Isometries', id:'add1', nm:()=>'x + 1', f:x=>(x+1)%Mod,
+   d:()=>'The odometer. A rigid isometry: every ball lands on a ball of exactly the same size, and digits carry like a car odometer. Iterate it.'},
+  {g:'Isometries', id:'neg', nm:()=>'−x', f:x=>(Mod-x)%Mod, d:()=>'An isometry that swaps every ball with its mirror image.'},
+  {g:'Isometries', id:'cx', nm:()=>'c · x', cd:()=>p===2?'3':'2', f:x=>mul(md(C),x),
+   d:()=>'Multiplying by a unit c is an isometry that shuffles balls. If c is divisible by p the whole space shrinks instead.'},
+  {g:'Isometries', id:'log', nm:()=>p===2?'log(1+4x)/4':'log(1+'+p+'x)/'+p, f:x=>logD(x),
+   d:()=>'The p-adic logarithm, rescaled. It keeps every distance exactly yet rearranges the picture, a hidden symmetry of ℤ'+SUB(p)+'.'},
+  {g:'Contractions', id:'px', nm:()=>p+'x', f:x=>mul(p,x), d:()=>'Shifts every digit up one place. The whole space shrinks into the ball around 0.'},
+  {g:'Contractions', id:'exp', nm:()=>p===2?'exp(4x)':'exp('+p+'x)', f:x=>expD(x),
+   d:()=>'The p-adic exponential. It maps ℤ'+SUB(p)+' onto the small ball around 1 and shrinks every distance by exactly a factor of '+(p===2?4:p)+'.'},
+  {g:'Contractions', id:'teich', nm:()=>'Teichmüller ω(x)', f:x=>{let v=x; for(let k=0;k<N;k++) v=pw(v,p); return v;},
+   d:()=>'Collapses each top-level ball onto one point, a root of unity (or 0). It is the limit of iterating x'+SUP(p)+'.'},
+  {g:'Contractions', id:'newton', nm:()=>'Newton step for x² = c', only:()=>p>2, cd:()=>({3:'-2',5:'-1',7:'2'})[p],
+   f:x=>isUnit(x) ? mul(md(x+mul(md(C),inv(x))), inv(2)) : -1,
+   d:()=>'Hensel\'s lemma as a dynamical system. Balls that contain a square root of c snap onto ±√c, doubling their correct digits each step. Non-units are undefined.'},
+  {g:'Expanding', id:'shift', nm:()=>'shift (x − x₀)/'+p, f:x=>(x - x%p)/p + hash(x)*P[N-1],
+   d:()=>'Deletes the last digit, so it is '+p+'-to-1 and expanding: every ball blows up to all of ℤ'+SUB(p)+'. The new leading digit is unknown at this precision, so it is filled at random.'},
+  {g:'Expanding', id:'collatz', nm:()=>'Collatz 3x+1', only:()=>p===2,
+   f:x=>{ const y = x%2 ? (3*x+1)%Mod : x; return (y>>1) + hash(x)*P[N-1]; },
+   d:()=>'x/2 on evens, (3x+1)/2 on odds. On ℤ₂ it is continuous, 2-to-1 and measure-preserving, the same shape as the shift. The leading digit is filled at random.'},
+  {g:'Partial', id:'inv', nm:()=>'1/x', f:x=>isUnit(x)?inv(x):-1, d:()=>'Defined on units only; non-units fade out. On the units it is an isometry.'},
+  {g:'Partial', id:'mob', nm:()=>'1/(1 − x)', f:x=>isUnit(md(1-x))?inv(md(1-x)):-1,
+   d:()=>'A Möbius map with order 3. It is undefined where x ≡ 1 (mod '+p+'). Iterate three times and every surviving point comes home.'},
+  {g:'Torn at 0', id:'unit', nm:()=>'unit part u(x)',
+   f:x=>{ if (x === 0) return -1; const v = vp(x); return x/P[v] + (v ? rnd(x, v)*P[N-v] : 0); },
+   d:()=>'Strips the trailing zeros: x = p'+'ᵛ·u goes to u. Continuous everywhere except at 0, where it tears: every ball around 0, however small, gets spread over all the units. Select the ball at 0 and watch it explode. The top digits of u are beyond the precision, so they are filled at random.'},
+  {g:'Torn at 0', id:'val', nm:()=>'valuation v(x)', f:x=>x === 0 ? -1 : vp(x),
+   d:()=>'Sends x to its number of trailing zeros, as a p-adic integer. Each sphere |x| = '+p+'⁻ᵏ collapses to the single point k, so it is continuous away from 0. Near 0 the values k, k+1, k+2, … never settle down, so 0 tears.'},
+  {g:'Torn everywhere', id:'reverse', nm:()=>'reverse the digits', f:x=>{ let r = 0, w = x; for (let k = 0; k < N; k++){ const d = w % p; r = r*p + d; w = (w - d)/p; } return r; },
+   d:()=>'Digit k swaps with digit '+(N-1)+'−k. Numbers sharing their last digits end up sharing their first digits, which says nothing about p-adic closeness, so every ball is shredded and the colours turn to confetti. It only exists at a fixed precision: true ℤ'+SUB(p)+' has no last digit to swap with. Apply it twice to undo it.'},
+  {g:'Torn everywhere', id:'collatzOdd', nm:()=>'Collatz with ordinary parity', only:()=>p>2, f:x=>x % 2 === 0 ? x/2 : ((3*x + 1)/2) % Mod,
+   d:()=>'n/2 for even n, (3n+1)/2 for odd n, using the ordinary integer 0 ≤ n < '+p+SUP(N)+'. For odd p, being even depends on every digit (it is the digit sum mod 2), so p-adic neighbours land far apart. Compare p = 2, where parity is just the last digit and Collatz is continuous.'},
+  {g:'Torn everywhere', id:'rsqrt', nm:()=>'real square root ⌊√n⌋', f:x=>Math.floor(Math.sqrt(x)),
+   d:()=>'The ordinary square root of the integer 0 ≤ n < '+p+SUP(N)+', rounded down. It only cares about real size, so p-adic neighbours scatter, and everything is crushed onto the integers below √('+p+SUP(N)+').'},
+  {g:'Wild but continuous', id:'digitplus', nm:()=>'add 1 to every digit, no carries', f:x=>digitsMap(x, d => (d + 1) % p),
+   d:()=>'Looks like it should scramble everything, but each output digit depends only on the same input digit, so it is an isometry: perfectly continuous. Compare it with reversing the digits.'},
+  {g:'Wild but continuous', id:'digitsq', nm:()=>'square every digit mod '+p, only:()=>p>2, f:x=>digitsMap(x, d => (d*d) % p),
+   d:()=>'Each digit d becomes d² mod '+p+', with no carries. Digit k of the output depends only on digit k of the input, so balls stay together even though the map is far from a polynomial.'},
+  {g:'Your own', id:'custom', nm:()=>'Custom polynomial', f:x=>custom?custom(x):-1, ex:'x^3 - x + p',
+   d:()=>'Any polynomial in x with integer coefficients; you can also use c and p. Polynomials never stretch distances, so balls always land inside balls.'},
+];
+const QFNS = [
+  {g:'Julia sets', id:'julia', nm:()=>'x² + c', cd:()=>p===2?'1/4':'(p-1)/p^2',
+   d:()=>p===2 ? 'Points that get too big run off to infinity. For p = 2 and c = 1/4 the survivors fill whole balls rather than dust; try c = 3/16 or 1/16.'
+     : 'Points that get too big run off to infinity. The ones that survive longest sit on the Julia set, a Cantor dust. With c = (p−1)/p² the point 1/p is fixed. Try c = 1/p² too.'},
+  {g:'Julia sets', id:'jcube', nm:()=>'x³ + c', cd:()=>'(p-1)/p^3', d:()=>'The cubic family. Escapes are faster, |x³| = |x|³, so the surviving dust is thinner.'},
+  {g:'Powers', id:'sq', nm:()=>'x²', d:()=>'|x²| = |x|². Everything outside ℤ'+SUB(p)+' escapes, everything inside stays: ℤ'+SUB(p)+' is the filled Julia set.'},
+  {g:'Powers', id:'xp', nm:()=>'x'+SUP(p), d:()=>'Units contract toward the Teichmüller points, numbers outside ℤ'+SUB(p)+' fly away.'},
+  {g:'Zooms', id:'px', nm:()=>p+'x', d:()=>'Multiplying by p shrinks every distance by p. The whole picture slides one level deeper and looks the same.'},
+  {g:'Zooms', id:'divp', nm:()=>'x / '+p, d:()=>'The shift map, now invertible. Everything grows by a factor of p and the outermost ring of balls leaves the window.'},
+  {g:'Isometries', id:'add1', nm:()=>'x + 1', d:()=>'The odometer: a rigid isometry that carries digits like a car odometer.'},
+  {g:'Isometries', id:'neg', nm:()=>'−x', d:()=>'An isometry that swaps every ball with its mirror image.'},
+  {g:'Isometries', id:'cx', nm:()=>'c · x', cd:()=>'2', d:()=>'Scales every distance by |c|. A unit c shuffles balls rigidly; c = 1/p or p zooms.'},
+  {g:'Inside out', id:'inv', nm:()=>'1/x', d:()=>'Turns ℚ'+SUB(p)+' inside out, since |1/x| = 1/|x|. The ball around 0 and the region outside trade places.'},
+  {g:'Inside out', id:'mob', nm:()=>'1/(1 − x)', d:()=>'A Möbius map of order 3: 1 → ∞ → 0 → 1. Every point returns after three steps, even after a trip through infinity.'},
+  {g:'Inside out', id:'newton', nm:()=>'Newton step for x² = c', cd:()=>({2:'-7',3:'-2',5:'-1',7:'2'})[p],
+   d:()=>'Hensel\'s lemma on all of ℚ'+SUB(p)+'. Balls holding ±√c snap onto them; the rest wander, sometimes far outside.'},
+  {g:'Your own', id:'custom', nm:()=>'Custom rational function', ex:'1/(x^2 - p)',
+   d:()=>'Any rational function of x built from + − × ÷ and powers, with c and p available. Dividing by 0 sends a point to infinity.'},
+];
+let FNS = ZFNS, qf = null;
+
+// ---------- setup ----------
+function setup(newMode, q){
+  stop(); mode = newMode; p = q; FNS = mode === 'Z' ? ZFNS : QFNS;
+  if (detail === 2 && !lotsOK(mode, p)) detail = 1;
+  [m, N] = cfgFor(mode, p, detail); nStd = Math.pow(p, m + cfgFor(mode, p, 0)[1]);
+  KH = N; KL = mode === 'Z' ? 0 : -m - EXTRA; L = KH - KL; E0 = -m - KL; n = Math.pow(p, m + N);
+  P = [1]; for (let k = 1; k <= m + N + 1; k++) P[k] = P[k-1]*p; Mod = P[N];
+  if (mode === 'Q'){ Q = makeQ(p, RREL[p]); qf = qFns(Q, () => CQ, () => custom); }
+  curD = new Uint8Array(n*L); nxtD = new Uint8Array(n*L); curF = new Uint8Array(n); nxtF = new Uint8Array(n);
+  posX = new Float32Array(n); posY = new Float32Array(n); alph = new Float32Array(n);
+  homeX = new Float32Array(n); homeY = new Float32Array(n);
+  moves = new Uint8Array(n); pcX = new Float32Array(n); pcY = new Float32Array(n); pnX = new Float32Array(n); pnY = new Float32Array(n); posDirty = true;
+  curZ = mode === 'Z' ? new Int32Array(n) : null; nxtZ = mode === 'Z' ? new Int32Array(n) : null;
+  const B = P[COLOR_DIGITS[p]];
+  bucketOf = new Int32Array(n); for (let i = 0; i < n; i++) bucketOf[i] = i % B;
+  order = Array.from({length:n}, (_, i) => i).sort((a, b) => bucketOf[a] - bucketOf[b]);
+  sel = null; selPoint = -1; esc = null; escOrder = null;
+  buildPalette(); buildLayout();
+  renderModes(); renderViews(); renderPrimes(); renderDetail(); renderDepths(); renderFnMenu();
+  resetState(); view = {...fitView}; viewT = null; mapDirty = true;
+  updateLegend(); requestMap();
+}
+function slotsZ(arr, i, val){
+  const o = i*L; if (val < 0){ arr.fill(0, o, o+L); return 3; }
+  let w = val; for (let k = 0; k < L; k++){ const d = w % p; arr[o+k] = d; w = (w - d)/p; } return 0;
+}
+// flags: 0 in window, 1 just outside, 2 far away or ∞, 3 undefined
+function slotsQ(arr, i, x){
+  const o = i*L;
+  if (!x){ arr.fill(0, o, o+L); return 3; }
+  if (Q.qz(x) || x.v >= KH){ arr.fill(0, o, o+L); return 0; }
+  if (Q.qinf(x) || x.v < KL){ arr.fill(0, o, o+L); return 2; }
+  let w = Number(x.u % Q.QPOW[Math.min(KH - x.v, Q.R)]);
+  for (let s = 0; s < L; s++){ const k = KL + s; if (k < x.v){ arr[o+s] = 0; continue; } const d = w % p; arr[o+s] = d; w = (w-d)/p; }
+  return x.v < -m ? 1 : 0;
+}
+function resetState(){
+  stop(); step = 0; t = 0; morphIn.value = 0;
+  if (mode === 'Z'){ for (let i = 0; i < n; i++){ curZ[i] = i; curF[i] = slotsZ(curD, i, i); } }
+  else { curQ = new Array(n); for (let i = 0; i < n; i++){ curQ[i] = Q.qnorm(BigInt(i), -m); curF[i] = slotsQ(curD, i, curQ[i]); } }
+  computeHome();
+  computeNext();
+}
+function computeNext(){
+  posDirty = true;
+  if (mode === 'Z'){
+    const f = fn.f;
+    for (let i = 0; i < n; i++){ let v = curZ[i] < 0 ? -1 : f(curZ[i]); if (v === undefined || Number.isNaN(v)) v = -1; nxtZ[i] = v; nxtF[i] = slotsZ(nxtD, i, v); }
+  } else {
+    const f = qf[fn.id]; nxtQ = new Array(n);
+    // in the escape map only the selected ball moves, so only those points need computing
+    const only = qview === 'map' ? sel : null;
+    for (let i = 0; i < n; i++){
+      let v = null; const x = curQ[i];
+      if (x && (!only || only[i])){ try { v = f(x); } catch(e){ v = null; } }
+      else if (x) v = x;
+      nxtQ[i] = v || null; nxtF[i] = slotsQ(nxtD, i, nxtQ[i]);
+    }
+  }
+  updateStats(); updateSel(); updateApply(); draw();
+}
+function commit(){
+  if (mode === 'Z') curZ.set(nxtZ); else curQ = nxtQ.slice();
+  curD.set(nxtD); curF.set(nxtF); step++; t = 0; morphIn.value = 0;
+  computeNext();
+}
+
+// ---------- escape map (ℚ_p), computed in a background worker ----------
+function requestMap(){
+  if (mode !== 'Q') return;
+  esc = null; escOrder = null; mapDirty = true; const id = ++mapJob;
+  updateLegend(); updateStats(); draw();
+  const msg = {id, p, m, R:RREL[p], n, fnId:fn.id, cText:cIn.value, polyText:polyIn.value, maxIt:MAXIT};
+  if (!worker){ try { worker = new Worker(URL.createObjectURL(new Blob([WORKER_SRC], {type:'text/javascript'}))); worker.onmessage = onMap; } catch(e){ worker = false; } }
+  if (worker) worker.postMessage(msg);
+  else setTimeout(() => { // fallback: compute here
+    const Qw = makeQ(p, RREL[p]); let cw = Qw.QZERO, cu = null;
+    try { cw = compileQ(parseExpr(msg.cText), Qw, () => Qw.QZERO)(Qw.QZERO) || Qw.QZERO; } catch(e){}
+    try { cu = compileQ(parseExpr(msg.polyText), Qw, () => cw); } catch(e){}
+    const f = qFns(Qw, () => cw, () => cu)[msg.fnId], out = new Uint16Array(n);
+    for (let i = 0; i < n; i++){ let x = Qw.qnorm(BigInt(i), -m), k = 1; for (; k <= MAXIT; k++){ try { x = f(x); } catch(e){ x = null; } if (!x || Qw.qinf(x) || (!Qw.qz(x) && x.v < -m)) break; } out[i] = k > MAXIT ? 0 : k; }
+    onMap({data:{id, esc:out}});
+  }, 30);
+}
+function onMap(e){
+  if (e.data.id !== mapJob || mode !== 'Q') return;
+  esc = e.data.esc; escMax = 0; for (let i = 0; i < n; i++) if (esc[i] > escMax) escMax = esc[i];
+  escOrder = Array.from({length:n}, (_, i) => i).sort((a, b) => (esc[a] || 999) - (esc[b] || 999));
+  mapDirty = true; updateLegend(); updateStats(); draw();
+}
+let escCols = [];
+function escColor(e){
+  if (e === 0) return isDark ? 'hsl(44 96% 86%)' : 'hsl(24 85% 24%)';
+  const tt = escMax > 1 ? (e - 1)/(escMax - 1) : 1;
+  const h = 238 - 200*tt, s = 50 + 30*tt, l = isDark ? 20 + 44*tt : 88 - 42*tt;
+  return `hsl(${h.toFixed(0)} ${s.toFixed(0)}% ${l.toFixed(0)}%)`;
+}
+function updateLegend(){
+  const show = mode === 'Q' && qview === 'map';
+  legendEl.hidden = !show; if (!show) return;
+  if (!esc){ legendEl.innerHTML = '<span>Computing the escape map…</span>'; return; }
+  const never = esc.some(v => v === 0);
+  if (!escMax){ legendEl.innerHTML = `<span><span class="sw" style="background:${escColor(0)}"></span>Nothing leaves the window in ${MAXIT} steps. Switch View to Warp to watch it move.</span>`; return; }
+  const stops = []; for (let k = 0; k <= 8; k++) stops.push(escColor(1 + Math.round(k/8*(escMax - 1))));
+  legendEl.innerHTML = `<span>Leaves after 1 step</span><span class="bar" style="background:linear-gradient(90deg,${stops.join(',')})"></span><span>${escMax} steps</span>${never ? `<span><span class="sw" style="background:${escColor(0)}"></span>never (in ${MAXIT})</span>` : ''}`;
+}
+
+// ---------- layout ----------
+function buildLayout(){
+  const tw = +twistIn.value/100 * 0.9;
+  S = p === 2 ? 0.62 : 0.84*Math.sin(Math.PI/p)/(1 + Math.sin(Math.PI/p));
+  posDirty = true; IX = new Float64Array(L*p*p); IY = new Float64Array(L*p*p);
+  ANG = new Float64Array(L*p); COSK = new Float64Array(L*p); SINK = new Float64Array(L*p); SK = new Float64Array(L);
+  for (let s = 0; s < L; s++){
+    const k = KL + s, sk = Math.pow(S, k); SK[s] = sk;
+    for (let j = 0; j < p; j++){
+      const a = p === 2 ? (((k % 2) + 2) % 2 ? Math.PI/2 : 0) + (j ? 0 : Math.PI) + tw*k : -Math.PI/2 + 2*Math.PI*j/p + tw*k;
+      ANG[s*p+j] = a; COSK[s*p+j] = sk*Math.cos(a); SINK[s*p+j] = sk*Math.sin(a);
+    }
+  }
+  let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+  for (let v = 0; v < n; v++){ let x = 0, y = 0, w = v;
+    for (let s = 0; s < L; s++){ let d = 0; if (s >= E0){ d = w % p; w = (w-d)/p; } x += COSK[s*p+d]; y += SINK[s*p+d]; }
+    if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  fitView = {x:(x0+x1)/2, y:(y0+y1)/2, r:Math.max(x1-x0, y1-y0)/2*1.12};
+  mapDirty = true;
+}
+function computeHome(){
+  for (let i = 0; i < n; i++){ let x = 0, y = 0, w = i;
+    for (let s = 0; s < L; s++){ let d = 0; if (s >= E0){ d = w % p; w = (w-d)/p; } x += COSK[s*p+d]; y += SINK[s*p+d]; }
+    homeX[i] = x; homeY[i] = y; }
+  mapDirty = true;
+}
+function ballShape(k, digitAt){
+  let cx = 0, cy = 0;
+  for (let s = 0; s < k - KL && s < L; s++){ const d = digitAt(KL + s); cx += COSK[s*p+d]; cy += SINK[s*p+d]; }
+  const sk = Math.pow(S, k);
+  if (p === 2){ const s0 = k - KL, tw = +twistIn.value/100*0.9; const rot = s0 < L ? ANG[s0*p+1] : ((((k%2)+2)%2) ? Math.PI/2 : 0) + tw*k;
+    return {cx, cy, rx:sk/(1-S*S)*1.04, ry:sk*S/(1-S*S)*1.04, rot}; }
+  const r = sk/(1-S)*0.93; return {cx, cy, rx:r, ry:r, rot:0};
+}
+
+// ---------- positions ----------
+const smooth = u => u <= 0 ? 0 : u >= 1 ? 1 : u*u*(3 - 2*u);
+const W = new Float64Array(64), FA = [1, 0.5, 0, 0];
+let IX, IY, moves, pcX, pcY, pnX, pnY, posDirty = true;
+function rebuildPosCache(){
+  posDirty = false;
+  for (let i = 0; i < n; i++){
+    const o = i*L; let x = 0, y = 0, u = 0, v = 0, mv = 0;
+    for (let s = 0; s < L; s++){ const a = curD[o+s], b = nxtD[o+s]; x += COSK[s*p+a]; y += SINK[s*p+a]; u += COSK[s*p+b]; v += SINK[s*p+b]; if (a !== b) mv = 1; }
+    pcX[i] = x; pcY[i] = y; pnX[i] = u; pnY[i] = v; moves[i] = mv;
+  }
+}
+function computePositions(){
+  const span = 0.25 + 0.75/L, cx = fitView.x, cy = fitView.y, st = smooth(t);
+  if (posDirty) rebuildPosCache();
+  let all0 = true, all1 = true;
+  for (let s = 0; s < L; s++){
+    const w = W[s] = smooth((t - 0.75*s/L)/span); if (w !== 0) all0 = false; if (w !== 1) all1 = false;
+    if (w <= 0 || w >= 1) continue;
+    for (let a = 0; a < p; a++) for (let b = 0; b < p; b++){
+      const j = (s*p + a)*p + b;
+      if (a === b){ IX[j] = COSK[s*p+a]; IY[j] = SINK[s*p+a]; continue; }
+      let d = ANG[s*p+b] - ANG[s*p+a]; d = Math.atan2(Math.sin(d), Math.cos(d)); if (Math.abs(Math.abs(d) - Math.PI) < 1e-6) d = Math.PI;
+      const ang = ANG[s*p+a] + d*w; IX[j] = SK[s]*Math.cos(ang); IY[j] = SK[s]*Math.sin(ang);
+    }
+  }
+  for (let i = 0; i < n; i++){
+    const cf = curF[i], nf = nxtF[i], o = i*L;
+    if (cf >= 2 && nf >= 2){ alph[i] = 0; continue; }
+    if (cf === 3){ alph[i] = 0; continue; }
+    if (nf >= 2 || cf === 2){
+      // leaving for (or returning from) far away: slide radially instead of spinning digits
+      const x = cf === 2 ? pnX[i] : pcX[i], y = cf === 2 ? pnY[i] : pcY[i];
+      const out = cf === 2 ? 1 - st : st, k = 1 + 2.5*out;
+      posX[i] = cx + (x - cx)*k; posY[i] = cy + (y - cy)*k;
+      alph[i] = nf === 3 ? FA[cf]*(1 - st) : cf === 2 ? FA[nf]*st : FA[cf]*(1 - st)*(1 - st);
+      continue;
+    }
+    if (!moves[i] || all0){ posX[i] = pcX[i]; posY[i] = pcY[i]; }
+    else if (all1){ posX[i] = pnX[i]; posY[i] = pnY[i]; }
+    else {
+      let x = 0, y = 0;
+      for (let s = 0; s < L; s++){
+        const a = curD[o+s], b = nxtD[o+s], w = W[s];
+        if (w === 0){ x += COSK[s*p+a]; y += SINK[s*p+a]; continue; }
+        if (w === 1){ x += COSK[s*p+b]; y += SINK[s*p+b]; continue; }
+        const j = (s*p + a)*p + b; x += IX[j]; y += IY[j];
+      }
+      posX[i] = x; posY[i] = y;
+    }
+    alph[i] = FA[cf] + (FA[nf] - FA[cf])*st;
+  }
+}
+
+// ---------- drawing ----------
+const $ = id => document.getElementById(id);
+const cv = $('cv'), ctx = cv.getContext('2d'), box = $('box'), mapCv = document.createElement('canvas'), rmq = matchMedia('(prefers-reduced-motion: reduce)');
+let CW = 600, CH = 600, DPR = 1, colLine, colAccent, colSel, colMuted, isDark = true;
+const tok = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+function buildPalette(){
+  colLine = tok('--line'); colAccent = tok('--accent'); colSel = tok('--sel'); colMuted = tok('--muted'); colPanel = tok('--panel'); isDark = tok('--is-dark') !== '0';
+  const Lr = tok('--dot-l') || '66%', Sa = tok('--dot-s') || '74%', D = COLOR_DIGITS[p], B = P[D]; palette = [];
+  for (let b = 0; b < B; b++){ let h = 0, w = b, sc = 1/p; for (let k = 0; k < D; k++){ const d = w % p; w = (w-d)/p; h += d*sc; sc /= p; }
+    palette.push(`hsl(${(h*360+18).toFixed(1)} ${Sa} ${Lr})`); }
+  diveCols = Array.from({length:64}, (_, b) => `hsl(${(b/64*360 + 18).toFixed(1)} ${Sa} ${Lr})`);
+  mapDirty = true;
+}
+function resize(){
+  const r = box.getBoundingClientRect(); DPR = Math.min(window.devicePixelRatio || 1, 2); CW = r.width; CH = r.height;
+  cv.width = Math.round(CW*DPR); cv.height = Math.round(CH*DPR); mapCv.width = cv.width; mapCv.height = cv.height; mapDirty = true; draw();
+}
+const scaleK = () => Math.min(CW, CH)/2/view.r;
+const toSX = x => (x - view.x)*scaleK() + CW/2;
+const toSY = y => (y - view.y)*scaleK() + CH/2;
+function ellipse(sh, color, alpha, lw, dash){
+  const k = scaleK(); ctx.globalAlpha = alpha; ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.setLineDash(dash || []);
+  ctx.beginPath(); ctx.ellipse(toSX(sh.cx), toSY(sh.cy), Math.max(sh.rx*k, 1), Math.max(sh.ry*k, 1), sh.rot, 0, Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+}
+const zeroDigits = () => 0;
+const digitsFromIndex = (v, k0) => k => k < k0 ? 0 : Math.floor(v / Math.pow(p, k - k0)) % p;
+const dotSize = () => Math.max(0.9, Math.min(2.2*Math.pow(fitView.r/view.r, 0.35), 7)*Math.pow(nStd/n, 0.25));
+function drawMap(){
+  const g = mapCv.getContext('2d'); g.setTransform(DPR, 0, 0, DPR, 0, 0); g.clearRect(0, 0, CW, CH); mapDirty = false;
+  if (!esc) return;
+  const sz = dotSize()*1.25, h = sz/2, k = scaleK(); let last = -1;
+  for (const i of escOrder){
+    const e = esc[i]; if (e !== last){ if (last !== -1) g.fill(); g.fillStyle = escColor(e); g.beginPath(); last = e; }
+    const X = (homeX[i] - view.x)*k + CW/2, Y = (homeY[i] - view.y)*k + CH/2;
+    if (X < -h || Y < -h || X > CW + h || Y > CH + h) continue;
+    g.rect(X - h, Y - h, sz, sz);
+  }
+  if (last !== -1) g.fill();
+}
+function draw(force){
+  if (!palette.length || !curD || (diving && dive.ph === 2 && force !== true)) return;
+  computePositions();
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.clearRect(0, 0, cv.width, cv.height);
+  const mapMode = mode === 'Q' && qview === 'map';
+  if (mapMode){ if (mapDirty) drawMap(); ctx.drawImage(mapCv, 0, 0); }
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  if (disksIn.checked){
+    const top = -m;
+    for (let r = 1; r <= 2 && top + r < KH; r++){ const k = top + r; for (let v = 0; v < P[r]; v++) ellipse(ballShape(k, digitsFromIndex(v, top)), colLine, r === 1 ? 0.9 : 0.55, 1); }
+    if (mode === 'Q'){
+      const zp = ballShape(0, zeroDigits); ellipse(zp, colAccent, 0.8, 1.3, [5, 4]);
+      ctx.globalAlpha = 0.95; ctx.font = '12px "JetBrains Mono", monospace'; ctx.textAlign = 'center'; ctx.fillStyle = colAccent;
+      ctx.fillText('ℤ' + SUB(p), toSX(zp.cx), toSY(zp.cy) - zp.ry*scaleK() - 6);
+    }
+  }
+  const sz = dotSize(), hs = sz/2, k = scaleK(), cx0 = CW/2 - view.x*k, cy0 = CH/2 - view.y*k;
+  if (mapMode){
+    // only the selected ball travels across the map
+    if (sel){ ctx.fillStyle = colSel; const h = hs*1.5;
+      for (let i = 0; i < n; i++){ if (!sel[i]) continue; const a = alph[i]; if (a <= 0.01) continue;
+        const X = posX[i]*k + cx0, Y = posY[i]*k + cy0; if (X < -h || Y < -h || X > CW + h || Y > CH + h) continue;
+        ctx.globalAlpha = a; ctx.fillRect(X - h, Y - h, h*2, h*2); } }
+  } else {
+    const dim = sel ? 0.16 : 1; let last = -1, open = false;
+    for (let pass = 0; pass < (sel ? 2 : 1); pass++){
+      const h = pass ? hs*1.5 : hs;
+      for (const i of order){
+        const a = alph[i]; if (a <= 0.01) continue;
+        if (sel && (pass === 1) !== !!sel[i]) continue;
+        const X = posX[i]*k + cx0, Y = posY[i]*k + cy0; if (X < -h || Y < -h || X > CW + h || Y > CH + h) continue;
+        const b = bucketOf[i]; if (b !== last){ if (open){ ctx.fill(); open = false; } ctx.fillStyle = palette[b]; last = b; }
+        if (a === 1){ if (!open){ ctx.globalAlpha = pass ? 1 : dim; ctx.beginPath(); open = true; } ctx.rect(X - h, Y - h, h*2, h*2); }
+        else { if (open){ ctx.fill(); open = false; } ctx.globalAlpha = a*(pass ? 1 : dim); ctx.fillRect(X - h, Y - h, h*2, h*2); }
+      }
+      if (open){ ctx.fill(); open = false; } last = -1;
+    }
+  }
+  if (selInfo){
+    if (selInfo.k1 !== null) ellipse(ballShape(selInfo.k1, selInfo.d1), colSel, 0.85*(1 - t), 1.6);
+    if (selInfo.k2 !== null) ellipse(ballShape(selInfo.k2, selInfo.d2), colAccent, t, 2);
+  }
+  drawLabels();
+  ctx.globalAlpha = 1;
+}
+// labels on a few special numbers; they ride along with their dots
+function zLab(v){
+  if (v < 1000) return '' + v;
+  const q = Mod - v; if (q < 1000) return q === 1 ? `−1 = …${String(p-1).repeat(3)}${SUB(p)}` : '−' + q;
+  let s = '', w = v; for (let j = 0; j < 4; j++){ const d = w % p; s = d + s; w = (w-d)/p; } return '…' + s + SUB(p);
+}
+// the tapped dot's own number: decimal when small (or −small), plus its last base-p digits
+function ztxt(v){
+  const q = Mod - v, neg = v > q; let s = '', w = v; for (let j = 0; neg ? j < Math.min(8, N) : w > 0 || !j; j++){ const d = w % p; s = d + s; w = (w-d)/p; }
+  return neg ? `−${q} = …${s}${SUB(p)}` : `${v} = ${s}${SUB(p)}`;
+}
+function qtxt(x, bare){
+  if (!x) return null; if (Q.qz(x)) return '0'; if (Q.qinf(x)) return '∞'; if (x.v < KL) return 'far away';
+  const lo = Math.min(x.v, 0), hi = KH - 1, top = Math.min(lo + 5, hi); let w = Number(x.u % Q.QPOW[Math.min(hi - x.v + 1, Q.R)]); const dg = {};
+  for (let k = x.v; k <= hi; k++){ const d = w % p; dg[k] = d; w = (w-d)/p; }
+  let s = ''; for (let k = top; k >= lo; k--){ s += k < x.v ? 0 : dg[k]; if (k === 0 && lo < 0) s += '.'; }
+  const val = x.v >= 0 && x.u < 1000n ? Number(x.u)*P[x.v] : -1;
+  const body = '…' + (top < 0 ? '.' : '') + s + SUB(p), small = val >= 0 && val < 1000;
+  return bare ? (small ? '' + val : body) : (small ? val + ' = ' : '') + body;
+}
+// one pill with a leader line, anchored on screen point (X, Y); skip: drop it instead of stacking when it would overlap a placed pill
+function dotPill(placed, X, Y, txt, a, hi, skip){
+  if (a < 0.05 || X < 0 || Y < 0 || X > CW || Y > CH) return;
+  ctx.font = (hi ? '12px' : '11px') + ' "JetBrains Mono", ui-monospace, monospace'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.setLineDash([]);
+  const w = ctx.measureText(txt).width + 10, h = hi ? 18 : 16, bx = Math.min(X + 9, CW - w - 2), hit = y => placed.some(q => Math.abs(q.y - y) < 14 && bx < q.x + q.w + 2 && q.x < bx + w + 2); let by = Y - h - 5;
+  if (skip){ if (by < 2) by = Math.min(Y + 7, CH - h - 2); if (hit(by)) return; }
+  else { for (let r = 0; r < 6 && hit(by); r++) by -= 15; if (by < 2) by = Math.min(Y + 7, CH - h - 2); }
+  placed.push({x:bx, y:by, w});
+  ctx.globalAlpha = 0.6*a; ctx.strokeStyle = hi ? colAccent : colMuted; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X, Y); ctx.lineTo(bx + 3, by + (by > Y ? 0 : h)); ctx.stroke();
+  ctx.globalAlpha = hi ? 1 : 0.92*Math.min(1, a*1.5); ctx.fillStyle = colPanel; ctx.strokeStyle = hi ? colAccent : colLine; ctx.lineWidth = hi ? 1.5 : 1; ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(bx, by, w, h, h/2); else ctx.rect(bx, by, w, h); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = colSel; ctx.fillText(txt, bx + 5, by + h/2 + 0.5);
+}
+// digits of levels hi, hi−1, … (6 of them): `ov` overrides the first few, the rest come from the dive path
+function topTxt(hi, ov){
+  let s = '', lo = Math.max(KL, hi - 5); for (let k = hi, i = 0; k >= lo; k--, i++){ s += i < ov.length ? ov[i] : pd(k); if (k === 0 && lo < 0) s += '.'; }
+  return (hi < 0 ? '0.' : '…') + s + SUB(p);
+}
+// automatic labels: the top dot (smallest member) of each visible ball at the deepest level whose balls are >= 45px, plus the next coarser level while it fades
+function autoLabels(put, k, mapMode){
+  const half = Math.min(CW, CH)/2, co = p === 2 ? 1.04/(1 - S*S) : 0.93/(1 - S), D = t === 1 ? nxtD : curD, F = t === 1 ? nxtF : curF, lv = Math.min(KH, Math.floor(Math.log(45/(co*k))/Math.log(S)));
+  const fixed = mode === 'Z' ? [0, 1, 2, Mod-1] : [0, P[m], P[m-1]]; let left = 8;
+  for (let l = lv; l >= Math.max(-m + 2, lv - 1) && left > 0; l--){
+    const r = Math.pow(S, l)*co*k, a = smooth((r - 45)/25)*(1 - smooth((r - 1.2*half)/(0.6*half))); if (a < 0.03) continue;
+    const tops = new Map(), cx0 = CW/2 - view.x*k, cy0 = CH/2 - view.y*k;
+    for (let i = 0; i < n; i++){
+      if (F[i] > 1 || (!mapMode && alph[i] <= 0.05) || i === selPoint || fixed.includes(i)) continue;
+      const X = (mapMode ? homeX[i] : posX[i])*k + cx0, Y = (mapMode ? homeY[i] : posY[i])*k + cy0; if (X < 0 || Y < 0 || X > CW || Y > CH) continue;
+      let key = i, o = i*L, s = l - KL;
+      if (mapMode){ if (i >= P[l + m]) continue; }
+      else { while (s < L && !D[o + s]) s++; if (s < L) continue; key = 0; for (let q = l - KL - 1; q >= 0; q--) key = key*p + D[o + q]; }
+      if (!tops.has(key)) tops.set(key, {i, d:Math.hypot(X - CW/2, Y - CH/2)});
+    }
+    for (const c of [...tops.values()].sort((u, v) => u.d - v.d).slice(0, left)){
+      const i = c.i; let txt;
+      if (mode === 'Z'){ const v = t === 1 ? nxtZ[i] : curZ[i]; if (curZ[i] < 0 || v < 0) continue; txt = v <= Mod - v ? '' + v : '−' + (Mod - v); }
+      else if (!(txt = qtxt(t === 1 ? nxtQ[i] : curQ[i], true))) continue;
+      if (put(i, txt, false, true, a)) left--;
+    }
+  }
+}
+function drawLabels(){
+  const mapMode = mode === 'Q' && qview === 'map', k = scaleK(), cx0 = CW/2 - view.x*k, cy0 = CH/2 - view.y*k, placed = [];
+  const pos = i => mapMode && !(sel && sel[i]) ? [homeX[i], homeY[i], 1] : [posX[i], posY[i], alph[i]];
+  const L3 = {t:[], f:[], a:[]}, claimed = new Set();
+  const cand = w => (i, txt, hi, skip, am) => {   // at most one label per current value (ℤ) / screen spot (ℚ); false if already claimed
+    const [x, y] = pos(i), key = mode === 'Z' ? 'z' + (t >= 0.5 ? nxtZ[i] : curZ[i]) : Math.round(x*k + cx0) + '|' + Math.round(y*k + cy0);
+    if (claimed.has(key)) return false; claimed.add(key); L3[w].push([i, txt, hi, skip, am]); return true;
+  };
+  const put = (i, txt, hi, skip, am) => {   // one pill, riding on dot i
+    const [x, y, a] = pos(i);
+    dotPill(placed, x*k + cx0, y*k + cy0, txt, a*(am === undefined ? 1 : am), hi, skip);
+  };
+  if (selPoint >= 0 && sel){
+    const i = selPoint, txt = mode === 'Z' ? (() => { const v = t >= 0.5 ? nxtZ[i] : curZ[i]; return curZ[i] < 0 || v < 0 ? null : ztxt(v); })() : qtxt(t >= 0.5 ? nxtQ[i] : curQ[i]);
+    if (txt) cand('t')(i, txt, true);
+  }
+  if (labelsIn.checked) for (const i of (mode === 'Z' ? [0, 1, 2, Mod-1] : [0, P[m], P[m-1]])){
+    if (i === selPoint) continue;
+    let txt; if (mode === 'Z'){ const zv = t >= 0.5 ? nxtZ[i] : curZ[i]; if (curZ[i] < 0 || zv < 0) continue; txt = zLab(zv); } else txt = i === 0 ? '0' : i === P[m] ? '1' : '1/' + p;
+    cand('f')(i, txt, false);
+  }
+  if (labelsIn.checked && (t === 0 || t === 1)) autoLabels(cand('a'), k, mapMode);
+  for (const w of ['a', 'f', 't']) for (const c of L3[w]) put(...c);
+  ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'start'; ctx.globalAlpha = 1;
+}
+
+// ---------- animation ----------
+let lastTs = 0, raf = 0;
+function tick(ts){
+  raf = 0; const dt = Math.min(0.05, (ts - (lastTs || ts))/1000); lastTs = ts; let more = false;
+  if (playing){
+    t = Math.min(1, t + dt/2.2); morphIn.value = Math.round(t*1000); more = true;
+    if (t >= 1){ playing = false; applyBtn.textContent = 'Apply f'; more = false;
+      if (demo) demo.timer = setTimeout(() => { if (!demo) return; commit(); demoNext(); }, 900);
+      else if (loopIn.checked && liveCount(nxtF) > 0) loopTimer = setTimeout(() => { loopTimer = null; commit(); play(); }, 450); }
+  }
+  if (viewT){ const kk = 1 - Math.pow(0.0008, dt); for (const q of ['x', 'y', 'r']) view[q] += (viewT[q] - view[q])*kk; mapDirty = true;
+    if (Math.abs(view.r/viewT.r - 1) < 0.002 && Math.hypot(view.x - viewT.x, view.y - viewT.y) < viewT.r*0.002){ view = {...viewT}; viewT = null; } else more = true; }
+  draw(); updateZoomBtns();
+  if (more) kick(); else lastTs = 0;
+}
+const kick = () => { if (!raf) raf = requestAnimationFrame(tick); };
+function liveCount(F){ let c = 0; for (let i = 0; i < n; i++) if (F[i] <= 1 && (!sel || mode !== 'Q' || qview !== 'map' || sel[i])) c++; return c; }
+function play(){ stopDive(true); if (applyBtn.disabled || (mode === 'Q' && qview === 'map' && !sel)) return; if (t >= 1) commit(); playing = true; applyBtn.textContent = 'Pause'; kick(); }
+function stop(){ stopDive(true); playing = false; applyBtn.textContent = 'Apply f'; if (loopTimer){ clearTimeout(loopTimer); loopTimer = null; } }
+function updateApply(){ applyBtn.disabled = false; }
+
+// ---------- readouts ----------
+const absTxt = v => v === 0 ? '1' : p + SUP(-v);
+function fmtCenter(digitAt, k){
+  let lo = null; for (let lev = KL; lev < k && lev < KH; lev++) if (digitAt(lev)){ lo = lev; break; }
+  if (lo === null) return '0';
+  lo = Math.min(lo, 0); const hi = Math.min(k, KH) - 1; let s = '';
+  for (let lev = Math.max(hi, 0); lev >= lo; lev--){ s += lev > hi ? '0' : digitAt(lev); if (lev === 0 && lo < 0) s += '.'; }
+  return s.replace(/^0+(?=\d)/, '') + SUB(p);
+}
+function fmtZ(v){ let s = '', w = v; for (let k = 0; k < N; k++){ const d = w % p; s = d + s; w = (w-d)/p; } return '…' + s + SUB(p); }
+function fmtQ(x){
+  if (!x) return '<span class="muted">undefined</span>';
+  if (Q.qz(x)) return '0'; if (Q.qinf(x)) return '∞';
+  if (x.v < KL) return `far outside <span class="muted">(|x| = ${absTxt(x.v)})</span>`;
+  const lo = Math.min(x.v, 0), hi = KH - 1; let w = Number(x.u % Q.QPOW[Math.min(hi - x.v + 1, Q.R)]); const dg = {};
+  for (let k = x.v; k <= hi; k++){ const d = w % p; dg[k] = d; w = (w-d)/p; }
+  let s = ''; for (let k = hi; k >= lo; k--){ s += k < x.v ? 0 : dg[k]; if (k === 0 && lo < 0) s += '.'; }
+  return '…' + s + SUB(p) + ` <span class="muted">(|x| = ${absTxt(x.v)})</span>`;
+}
+// Continuity check: for each radius p^-k, how big can the image of one ball of that radius be?
+let contKey = '', contHTML = '';
+function continuityZ(){
+  const key = [p, fn.id, C, polyIn.value].join('|');
+  if (key === contKey) return contHTML;
+  contKey = key;
+  let g;
+  if (step === 0) g = nxtZ;
+  else { g = new Int32Array(Mod); for (let i = 0; i < Mod; i++){ let v = fn.f(i); if (v === undefined || Number.isNaN(v)) v = -1; g[i] = v; } }
+  let defined = 0; for (let i = 0; i < Mod; i++) if (g[i] >= 0) defined++;
+  if (!defined){ contHTML = ''; return contHTML; }
+  // the last digit level is at the edge of the precision, so judge at K = N - 2
+  const K = Math.max(1, N - 2), worst = new Int32Array(N), rep = new Int32Array(P[N-1]), spread = new Int32Array(P[N-1]);
+  const torn = []; let classes = 0;
+  for (let k = 1; k < N; k++){
+    const Pk = P[k]; rep.fill(-1, 0, Pk); spread.fill(N, 0, Pk); let w = N;
+    for (let i = 0; i < Mod; i++){
+      const gi = g[i]; if (gi < 0) continue; const c = i % Pk;
+      if (rep[c] < 0){ rep[c] = i; continue; }
+      const gr = g[rep[c]]; if (gi === gr) continue;
+      const d = vp(md(gi - gr)); if (d < spread[c]) spread[c] = d; if (d < w) w = d;
+    }
+    worst[k] = w;
+    if (k === K) for (let c = 0; c < Pk; c++){ if (rep[c] < 0) continue; classes++; spread[c] <= worst[1] && torn.push(c); }
+  }
+  const ks = []; for (let k = 1; k < N; k++) ks.push(k);
+  const lips = ks.every(k => worst[k] >= k), stretch = Math.max(...ks.map(k => k - worst[k]));
+  // continuous maps send smaller balls into smaller balls; a discontinuous one stops improving
+  const disc = worst[K] < N && worst[K] <= worst[1];
+  let verdict, tornTxt = '';
+  if (lips) verdict = 'Continuous, and it never stretches: every ball lands inside a ball of the same radius or smaller.';
+  else if (!disc) verdict = `Continuous, but it stretches some balls by up to ${p}${SUP(stretch)}. Smaller balls still land in smaller balls.`;
+  else {
+    verdict = `<b>Discontinuous.</b> Shrinking a ball doesn't help: balls of radius ${absTxt(K)} can still spread over radius ${absTxt(worst[K])}, just as far as balls of radius ${absTxt(1)}.`;
+    const res = c => { let s = '', w = c; for (let j = 0; j < K; j++){ const d = w % p; s = d + s; w = (w - d)/p; } return s + SUB(p); };
+    if (torn.length && torn.length <= 3)
+      tornTxt = `<p>At radius ${absTxt(K)}, only ${torn.length === 1 ? 'one' : torn.length} of the ${classes.toLocaleString()} balls tear${torn.length === 1 ? 's' : ''} apart: ${torn.map(c => c === 0 ? 'the one around 0' : `<span class="mono">x ≡ ${res(c)}</span>`).join(', ')}.</p>`;
+    else if (torn.length)
+      tornTxt = `<p>At radius ${absTxt(K)}, <b class="mono">${(100*torn.length/classes).toFixed(0)}%</b> of the ${classes.toLocaleString()} balls tear apart.</p>`;
+  }
+  const show = N - 1 > 7 ? [1, 2, 3, 4, 6, 8, 10, 12].filter(k => k < N) : ks;
+  const rows = show.map(k => `<span>${absTxt(k)}</span><span class="${worst[k] < k ? 'bad' : ''}">${worst[k] >= N ? 'one point' : absTxt(worst[k])}</span>`).join('');
+  contHTML = `<p class="sep"><span class="lab">Continuity</span></p><p>${verdict}</p>${tornTxt}<div class="ctab"><span class="h">ball radius</span><span class="h">largest image radius</span>${rows}</div>`;
+  return contHTML;
+}
+const baseBadge = () => mode === 'Z' ? `ℤ${SUB(p)} to ${N} digits · ${p}${SUP(N)} = ${n.toLocaleString()} points`
+  : `ℚ${SUB(p)} · window |x| ≤ ${p}${SUP(m)} · ${n.toLocaleString()} points`;
+function updateStats(){
+  let txt;
+  if (mode === 'Z'){
+    const hit = new Uint32Array(Mod); let live = 0, img = 0, maxF = 0, und = 0;
+    for (let i = 0; i < n; i++){ if (curZ[i] < 0) continue; live++; const v = nxtZ[i]; if (v < 0){ und++; continue; } if (!hit[v]) img++; hit[v]++; if (hit[v] > maxF) maxF = hit[v]; }
+    const pct = x => (100*x/Mod).toFixed(x === Mod ? 0 : 1) + '%';
+    txt = `<p><span class="lab">Image of f</span></p><p>Hits <b class="mono">${img.toLocaleString()}</b> of ${Mod.toLocaleString()} points (${pct(img)})${maxF > 1 ? `, up to <b class="mono">${maxF}</b>-to-1` : ', one-to-one'}.${und ? ` <span class="muted">${und.toLocaleString()} points have no image.</span>` : ''}${live < n ? ` <span class="muted">${(n - live).toLocaleString()} points dropped out in earlier steps.</span>` : ''}</p>` + continuityZ();
+  } else if (qview === 'map'){
+    if (!esc) txt = '<p><span class="lab">Escape map</span></p><p class="muted">Following every point for up to ' + MAXIT + ' steps…</p>';
+    else {
+      let first = 0, never = 0; for (let i = 0; i < n; i++){ if (esc[i] === 1) first++; if (!esc[i]) never++; }
+      const pc = x => (100*x/n).toFixed(x === n || x === 0 ? 0 : 1) + '%';
+      txt = `<p><span class="lab">Escape map</span></p><p>Each starting point is coloured by how many steps of f it takes to leave the window |x| ≤ ${p}${SUP(m)}.</p>
+        <p>${escMax ? `<b class="mono">${pc(first)}</b> leave on the first step; the longest survivors last <b class="mono">${escMax}</b> steps.` : 'Nothing leaves.'}${never ? ` <b class="mono">${never.toLocaleString()}</b> never leave in ${MAXIT} steps.` : ''}</p>
+        <p class="muted">Tap a ball to watch its journey across the map.</p>`;
+    }
+  } else {
+    let inW = 0, outW = 0, far = 0, und = 0, nIn = 0;
+    for (let i = 0; i < n; i++){ const f = curF[i]; if (f === 0) inW++; else if (f === 1) outW++; else if (f === 2) far++; else und++; if (nxtF[i] === 0) nIn++; }
+    const pc = x => (100*x/n).toFixed(x === n ? 0 : 1) + '%';
+    txt = `<p><span class="lab">After ${step} step${step === 1 ? '' : 's'}</span></p>
+      <p><b class="mono">${inW.toLocaleString()}</b> of ${n.toLocaleString()} points are in the window (${pc(inW)}).${outW ? ` ${outW.toLocaleString()} just outside it.` : ''}${far ? ` ${far.toLocaleString()} far away or at ∞.` : ''}${und ? ` <span class="muted">${und.toLocaleString()} undefined.</span>` : ''}</p>
+      <p class="muted">Applying f keeps ${nIn.toLocaleString()} in the window.</p>`;
+  }
+  statsEl.innerHTML = txt; stepLbl.textContent = 'step ' + step;
+  badge.textContent = baseBadge();
+  hintEl.textContent = mode === 'Q' && qview === 'map'
+    ? 'Tap a ball, then Apply f to watch it travel. Points in the brightest parts survive longest. Drag to pan, scroll or pinch to zoom.'
+    : 'Tap a dot to select its ball, then apply f to see where the ball goes. Colours stay tied to each starting number. Drag to pan, scroll or pinch to zoom.';
+}
+function ballOf(D, F, list){
+  const pts = list.filter(i => F[i] <= 1); if (!pts.length) return null;
+  let c = L; const o0 = pts[0]*L;
+  for (const i of pts){ const o = i*L; let j = 0; while (j < c && D[o+j] === D[o0+j]) j++; c = j; if (!c) break; }
+  const k = KL + c, digs = Array.from(D.subarray(o0, o0 + L)), digitAt = lev => (lev - KL < c) ? digs[lev - KL] : 0;
+  let cover = null;
+  if (k >= -m && k < KH){
+    const seen = new Set();
+    for (const i of pts) if (F[i] === 0){ let id = 0, mult = 1; for (let s = E0; s < L; s++){ id += D[i*L+s]*mult; mult *= p; } seen.add(id); }
+    cover = seen.size/Math.pow(p, KH - k);
+  }
+  return {k, digitAt, cover};
+}
+const ballTxt = b => mode === 'Z'
+  ? (b.k === 0 ? 'all of ℤ' + SUB(p) : `<span class="mono">x ≡ ${fmtCenter(b.digitAt, b.k)}</span> (mod ${p}${SUP(b.k)})`)
+  : `<span class="mono">${fmtCenter(b.digitAt, b.k)} + ${p}${SUP(b.k)}ℤ${SUB(p)}</span> <span class="muted">(radius ${absTxt(b.k)})</span>`;
+function updateSel(){
+  if (!sel){ selInfo = null; selOut.innerHTML = `<p class="muted">No ball selected. Tap ${mode === 'Q' && qview === 'map' ? 'the map' : 'a dot'}.</p>`; updateZoomBtns(); return; }
+  const list = []; for (let i = 0; i < n; i++) if (sel[i] && curF[i] <= 1) list.push(i);
+  if (!list.length){ selInfo = null; selOut.innerHTML = `<p>The selected ball has left the window.</p><div class="chips"><button type="button" id="clearSel">Clear selection</button></div>`; $('clearSel').onclick = clearSel; updateZoomBtns(); return; }
+  const A = ballOf(curD, curF, list), B = ballOf(nxtD, nxtF, list);
+  const lostN = list.filter(i => nxtF[i] >= 2).length;
+  selInfo = {k1:A ? A.k : null, d1:A ? A.digitAt : null, k2:B ? B.k : null, d2:B ? B.digitAt : null};
+  const pc = f => (f >= 0.9995 ? '100' : (100*f).toFixed(f < 0.1 ? 1 : 0)) + '%';
+  let line2;
+  if (!B) line2 = `<p>f sends all of it ${mode === 'Q' ? 'far outside the window or to ∞' : 'nowhere: f is undefined there'}.</p>`;
+  else {
+    const dk = B.k - A.k, deep = A.k >= KH || B.k >= KH;
+    const scale = deep ? '' : dk === 0 ? 'Same radius.' : dk > 0 ? `Radius shrinks by ${p}${SUP(dk)}.` : `Radius grows by ${p}${SUP(-dk)}.`;
+    line2 = `<p>f sends it into ${ballTxt(B)}${B.cover !== null ? `, covering <b class="mono">${pc(B.cover)}</b> of it` : ''}. ${scale}${lostN ? ` <span class="muted">${lostN.toLocaleString()} points head far away.</span>` : ''}</p>`;
+  }
+  let pt = '';
+  if (selPoint >= 0 && curF[selPoint] <= 1){
+    pt = mode === 'Z'
+      ? `<p class="dig">x = ${fmtZ(curZ[selPoint])}</p><p class="dig">f(x) = ${nxtZ[selPoint] >= 0 ? fmtZ(nxtZ[selPoint]) : '<span class="muted">undefined</span>'}</p>`
+      : `<p class="dig">x = ${fmtQ(curQ[selPoint])}</p><p class="dig">f(x) = ${fmtQ(nxtQ[selPoint])}</p>`;
+  }
+  const escTxt = (mode === 'Q' && esc && step === 0) ? (() => { let lo = 999, hi = 0; for (const i of list){ const e = esc[i] || 999; if (e < lo) lo = e; if (e > hi) hi = e; }
+    const f = e => e === 999 ? `never (in ${MAXIT})` : e + (e === 1 ? ' step' : ' steps');
+    return `<p class="muted">Leaves the window after ${lo === hi ? f(lo) : f(lo) + ' to ' + f(hi)}.</p>`; })() : '';
+  selOut.innerHTML = `<p><span class="lab">Selected · ${list.length.toLocaleString()} points</span></p>
+    <p>${A ? 'Lives in ' + ballTxt(A) + (A.cover !== null && A.cover < 0.9995 ? `, covering ${pc(A.cover)} of it` : '') + '.' : ''}</p>${escTxt}${line2}${pt}
+    <div class="chips"><button type="button" id="clearSel">Clear selection</button></div>`;
+  $('clearSel').onclick = clearSel;
+  updateZoomBtns();
+}
+function clearSel(){ sel = null; selPoint = -1; if (mode === 'Q' && qview === 'map') resetState(); else { updateSel(); updateApply(); draw(); } }
+function updateZoomBtns(){
+  zoomBallBtn.hidden = !sel;
+  const tg = viewT || view;
+  zoomFitBtn.hidden = Math.abs(tg.r/fitView.r - 1) < 0.02 && Math.hypot(tg.x - fitView.x, tg.y - fitView.y) < fitView.r*0.02;
+}
+
+// ---------- UI ----------
+const fnSel = $('fn'), fdesc = $('fdesc'), cWrap = $('cWrap'), cIn = $('cIn'), cErr = $('cErr'), customRow = $('customRow'), polyIn = $('poly'), polyErr = $('polyErr');
+const applyBtn = $('apply'), resetBtn = $('reset'), loopIn = $('loop'), morphIn = $('morph'), stepLbl = $('stepLbl');
+const twistIn = $('twist'), disksIn = $('disks'), statsEl = $('stats'), selOut = $('selOut'), badge = $('badge'), hintEl = $('hint'), legendEl = $('legend');
+const zoomBallBtn = $('zoomBall'), zoomFitBtn = $('zoomFit'), diveBtn = $('diveBtn'), pill = $('pill'), labelsIn = $('labels');
+
+function chipRow(el, items, current, onPick, cls){
+  el.innerHTML = items.map(([k, l]) => `<button type="button" class="chip ${cls}" aria-pressed="${k === current}" data-k="${k}">${l}</button>`).join('');
+  el.querySelectorAll('button').forEach(b => b.onclick = () => onPick(b.dataset.k));
+}
+function renderModes(){ chipRow($('modes'), [['Z', 'ℤ' + SUB(p)], ['Q', 'ℚ' + SUB(p)]], mode, k => { if (k !== mode){ if (k === 'Q') qview = 'warp'; setup(k, p); } }, 'mode'); }
+function renderViews(){
+  $('viewSect').hidden = mode !== 'Q';
+  chipRow($('views'), [['map', 'Escape map'], ['warp', 'Warp']], qview, k => { if (k === qview) return; qview = k; sel = null; selPoint = -1; renderViews(); resetState(); updateLegend(); }, '');
+}
+function renderPrimes(){ chipRow($('primes'), [2, 3, 5, 7].map(q => [String(q), String(q)]), String(p), k => { if (+k !== p) setup(mode, +k); }, 'mono'); }
+function renderDetail(){
+  chipRow($('detail'), [['0', 'Standard'], ['1', 'More'], ['2', 'Lots']], String(detail), k => { if (+k !== detail){ detail = +k; setup(mode, p); } }, '');
+  if (!lotsOK(mode, p)){ const b = $('detail').querySelector('[data-k="2"]'); b.disabled = true; b.title = 'Too many points for this prime'; }
+}
+function renderDepths(){
+  const opts = [1, 2, 3].filter(d => -m + d < KH);
+  if (!opts.includes(selDepth)) selDepth = 1;
+  chipRow($('depths'), opts.map(d => [String(d), absTxt(-m + d)]), String(selDepth), k => { selDepth = +k; renderDepths(); if (selPoint >= 0) selectAround(selPoint); }, 'mono');
+}
+function renderFnMenu(){
+  const prev = fn && fn.id, avail = FNS.filter(f => !f.only || f.only()), groups = [...new Set(avail.map(f => f.g))];
+  fnSel.innerHTML = groups.map(g => `<optgroup label="${g}">${avail.filter(f => f.g === g).map(f => `<option value="${f.id}">${f.nm()}</option>`).join('')}</optgroup>`).join('');
+  // keep the current function across a mode or prime switch when the new menu has it
+  // (x² + c is called 'sqc' in ℤ_p and 'julia' in ℚ_p); otherwise fall back to the default
+  const ALIAS = {sqc:'julia', julia:'sqc'};
+  const same = prev && (avail.find(f => f.id === prev) ? prev : avail.find(f => f.id === ALIAS[prev]) ? ALIAS[prev] : null);
+  const pick = same || (mode === 'Z' ? 'sq' : 'julia');
+  fnSel.value = pick; chooseFn(pick, !!same);
+}
+function chooseFn(id, keepC){
+  fn = FNS.find(f => f.id === id);
+  fdesc.textContent = fn.d();
+  customRow.hidden = fn.id !== 'custom';
+  if (fn.id === 'custom' && !polyIn.dataset.edited) polyIn.value = fn.ex;
+  const keep = keepC && cIn.dataset.edited;
+  if (fn.cd && !keep) cIn.value = fn.cd();
+  if (fn.id === 'custom') compileCustom();
+  updateCVisibility();
+  // a c typed in one mode may not make sense in the other (2/9 has no meaning in ℤ_p): fall back to the default
+  if (!parseC() && keep && fn.cd){ cIn.value = fn.cd(); delete cIn.dataset.edited; parseC(); }
+}
+function updateCVisibility(){
+  let uses = !!fn.cd;
+  if (fn.id === 'custom'){ try { uses = astUses(parseExpr(polyIn.value), 'c'); } catch(e){ uses = /c/.test(polyIn.value); } }
+  cWrap.hidden = !uses;
+}
+function parseC(){
+  try {
+    const ast = parseExpr(cIn.value); if (astUses(ast, 'c') || astUses(ast, 'x')) throw Error('c must be a number, like -1, 2/9 or (p-1)/p^2');
+    if (mode === 'Z') C = compileZ(ast)(0);
+    else { CQ = compileQ(ast, Q, () => Q.QZERO)(Q.QZERO); if (!CQ || Q.qinf(CQ)) { CQ = Q.QZERO; throw Error('c divides by zero'); } }
+    cErr.hidden = true; return true;
+  } catch(e){ cErr.textContent = e.message; cErr.hidden = false; if (mode === 'Q' && !CQ) CQ = Q.QZERO; return false; }
+}
+function compileCustom(){
+  try { const ast = parseExpr(polyIn.value); custom = mode === 'Z' ? compileZ(ast) : compileQ(ast, Q, () => CQ); polyErr.hidden = true; }
+  catch(e){ custom = null; polyErr.textContent = e.message + '. Example: ' + fn.ex; polyErr.hidden = false; }
+}
+let mapTimer = 0;
+const restart = () => { stop(); if (mode === 'Q' && qview === 'map') resetState(); else { t = 0; morphIn.value = 0; computeNext(); } clearTimeout(mapTimer); mapTimer = setTimeout(requestMap, 250); };
+fnSel.onchange = () => { delete cIn.dataset.edited; chooseFn(fnSel.value, false); restart(); };
+cIn.oninput = () => { cIn.dataset.edited = '1'; if (parseC()) restart(); };
+polyIn.oninput = () => { polyIn.dataset.edited = '1'; compileCustom(); updateCVisibility(); parseC(); restart(); };
+applyBtn.onclick = () => {
+  if (mode === 'Q' && qview === 'map' && !sel && !playing){ selOut.innerHTML = '<p>Tap a ball on the map first, then Apply f sends it on its journey.</p>'; selOut.classList.add('nudge'); setTimeout(() => selOut.classList.remove('nudge'), 1200); return; }
+  if (playing) stop(); else play(); updateApply();
+};
+resetBtn.onclick = () => { resetState(); };
+loopIn.onchange = () => { if (!loopIn.checked && loopTimer){ clearTimeout(loopTimer); loopTimer = null; } };
+morphIn.oninput = () => { stop(); t = morphIn.value/1000; draw(); };
+twistIn.oninput = () => { const fitted = Math.abs(view.r/fitView.r - 1) < 0.02; buildLayout(); computeHome(); if (fitted) view = {...fitView}; draw(); };
+disksIn.onchange = () => draw(); labelsIn.onchange = () => draw();
+zoomFitBtn.onclick = () => { viewT = {...fitView}; kick(); };
+zoomBallBtn.onclick = () => {
+  let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9, any = false;
+  for (let i = 0; i < n; i++) if (sel && sel[i] && alph[i] > 0.01){ any = true; const x = posX[i], y = posY[i]; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  if (!any) return;
+  viewT = {x:(x0+x1)/2, y:(y0+y1)/2, r:Math.max(Math.max(x1-x0, y1-y0)/2*1.35, fitView.r*Math.pow(S, L - 1)*3)}; kick();
+};
+function selectAround(i){
+  if (mode === 'Q' && qview === 'map' && step){ resetState(); }   // journeys always start from the map
+  if (curF[i] > 1) return;
+  selPoint = i; const slots = (-m + selDepth) - KL, o = i*L;
+  sel = new Uint8Array(n);
+  for (let j = 0; j < n; j++){ if (curF[j] > 1) continue; const q = j*L; let ok = true; for (let s = 0; s < slots; s++) if (curD[q+s] !== curD[o+s]){ ok = false; break; } if (ok) sel[j] = 1; }
+  if (mode === 'Q' && qview === 'map') computeNext(); else { updateSel(); updateApply(); draw(); }
+}
+
+// ---------- Dive: an endless zoom into the dot on screen. Phase 1 drives the normal view down the target dot's real digits; phase 2 (past the finest level) regenerates the self-similar picture each frame, continuing with seeded pseudo-random digits ----------
+const pd = k => { if (k < KH) return dive.tg[k - KL]; let h = Math.imul((k*374761393 + dive.seed*668265263 + p*1013904223) | 0, 0x85ebca6b); h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 16; return (h >>> 0) % p; };
+function diveInit(){
+  const M = ZCFG[p][1], np = Math.pow(p, M), o = {M, np, R:1, H:new Float64Array(np), G:new Uint8Array(np), DC:new Float64Array(M*p), DS:new Float64Array(M*p),
+    A:new Float64Array(np), B:new Float64Array(np), C:new Float64Array(np), E:new Float64Array(np), X:null, Y:null,
+    VX:new Float32Array(np), VY:new Float32Array(np), VB:new Uint8Array(np), idx:new Int32Array(np), cnt:new Int32Array(65)};
+  for (let v = 0; v < np; v++){ let h = 0, w = v, sc = 1/p; for (let j = 0; j < M; j++){ const d = w % p; w = (w-d)/p; h += d*sc; sc /= p; } o.H[v] = h; o.G[v] = v % p; }
+  dv = o; o.R = 1.1*(p === 2 ? S/(1 - S*S)*1.04 : S/(1 - S)*0.93);
+}
+// all p^M digit strings; positions in "level-D units" (relative level j is absolute level D+j). Returns the centre of the path of digits pd(k)
+function diveLayout(D){
+  const {M, DC, DS} = dv, tw = +twistIn.value/100*0.9; let ax = dv.A, ay = dv.B, bx = dv.C, by = dv.E, size = 1, cx = 0, cy = 0; ax[0] = 0; ay[0] = 0;
+  for (let j = 0; j < M; j++){ const k = D + j, sk = Math.pow(S, j);
+    for (let d = 0; d < p; d++){ const a = p === 2 ? (((k % 2) + 2) % 2 ? Math.PI/2 : 0) + (d ? 0 : Math.PI) + tw*k : -Math.PI/2 + 2*Math.PI*d/p + tw*k; DC[j*p+d] = sk*Math.cos(a); DS[j*p+d] = sk*Math.sin(a); }
+    cx += DC[j*p+pd(D+j)]; cy += DS[j*p+pd(D+j)]; }
+  for (let j = M - 1; j >= 0; j--){
+    for (let w = 0, ns = size*p; w < ns; w++){ const d = w % p, q = (w-d)/p; bx[w] = DC[j*p+d] + ax[q]; by[w] = DS[j*p+d] + ay[q]; }
+    [ax, bx] = [bx, ax]; [ay, by] = [by, ay]; size *= p; }
+  dv.X = ax; dv.Y = ay; return [cx, cy];
+}
+function diveDraw(aa){
+  const {M, np, H, G, VX, VY, VB, idx, cnt, DC, DS} = dv, D = Math.floor(dive.z), f = dive.z - D;
+  diveLayout(D); const b1x = DC[pd(D)], b1y = DS[pd(D)], b2x = b1x + DC[p+pd(D+1)], b2y = b1y + DS[p+pd(D+1)], sm = smooth(f), cx = b1x + sm*(b2x - b1x), cy = b1y + sm*(b2y - b1y), sc = Math.min(CW, CH)/2/dv.R*Math.pow(S, -f), hx = CW/2, hy = CH/2, xs = dv.X, ys = dv.Y;
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; ctx.setTransform(DPR, 0, 0, DPR, 0, 0); if (aa < 1){ ctx.globalAlpha = aa; ctx.fillStyle = colPanel; ctx.fillRect(0, 0, CW, CH); } else { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); ctx.setTransform(DPR, 0, 0, DPR, 0, 0); }
+  if (p > 2 && disksIn.checked){   // relative levels 1..3: each ball fades from "level l" to "level l-1" as we zoom in
+    ctx.strokeStyle = colLine; ctx.lineWidth = 1; ctx.setLineDash([]);
+    for (let l = 1; l <= 3; l++){
+      const al = l === 1 ? 0.9*(1 - f) : l === 2 ? 0.9*f + 0.55*(1 - f) : 0.55*f, rr = Math.pow(S, l)/(1 - S)*0.93*sc; if (al < 0.01 || rr < 1.5) continue;
+      ctx.globalAlpha = al*aa;
+      for (let q = 0, nq = Math.pow(p, l); q < nq; q++){ let x = 0, y = 0, w = q;
+        for (let j = 0; j < l; j++){ const d = w % p; w = (w-d)/p; x += DC[j*p+d]; y += DS[j*p+d]; }
+        const sx = (x - cx)*sc + hx, sy = (y - cy)*sc + hy; if (sx + rr < 0 || sy + rr < 0 || sx - rr > CW || sy - rr > CH) continue;
+        ctx.beginPath(); ctx.arc(sx, sy, rr, 0, Math.PI*2); ctx.stroke(); }
+    }
+  }
+  // colour blends from this level's hue to the next level's (the same point with its first digit dropped); points are drawn grouped by colour bucket
+  cnt.fill(0); let nv = 0, hp = 0; for (let j = 0, q = 1/p; j < M; j++, q /= p) hp += pd(D + j)*q;   // hue offset: the path point keeps the target dot's colour
+  const hoff = dive.th - (hp + f*(p*hp - pd(D) - hp));
+  for (let v = 0; v < np; v++){
+    const sx = (xs[v] - cx)*sc + hx, sy = (ys[v] - cy)*sc + hy; if (sx < -8 || sy < -8 || sx > CW + 8 || sy > CH + 8) continue;
+    let h = H[v] + f*(p*H[v] - G[v] - H[v]) + hoff; h -= Math.floor(h); const b = Math.min(63, (h*64) | 0);
+    VX[nv] = sx; VY[nv] = sy; VB[nv++] = b; cnt[b+1]++; }
+  for (let b = 0; b < 64; b++) cnt[b+1] += cnt[b];
+  const slot = cnt.slice(); for (let j = 0; j < nv; j++) idx[slot[VB[j]]++] = j;
+  const hs = 1.35, sz = hs*2; let last = -1; ctx.globalAlpha = 0.95*aa;
+  for (let j = 0; j < nv; j++){ const q = idx[j], b = VB[q]; if (b !== last){ if (last !== -1) ctx.fill(); ctx.fillStyle = diveCols[b]; ctx.beginPath(); last = b; } ctx.rect(VX[q] - hs, VY[q] - hs, sz, sz); }
+  if (last !== -1) ctx.fill();
+  if (isDark && !rmq.matches){ ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.04*aa; last = -1; const g = hs*2.6, gs = g*2;
+    for (let j = 0; j < nv; j++){ const q = idx[j], b = VB[q]; if (b !== last){ if (last !== -1) ctx.fill(); ctx.fillStyle = diveCols[b]; ctx.beginPath(); last = b; } ctx.rect(VX[q] - g, VY[q] - g, gs, gs); }
+    if (last !== -1) ctx.fill();
+    ctx.globalCompositeOperation = 'source-over'; }
+  if (labelsIn.checked){   // labels on the top dot of the visible relative level-1 balls, handing over to the level-2 balls inside the path ball as f passes 0.5
+    const pl = [], a2 = aa*smooth((f - 0.35)/0.3), a1 = aa - a2, pD = pd(D); let tx = 0, ty = 0, left = 8;
+    for (let j = 2; j < M; j++){ tx += DC[j*p]; ty += DS[j*p]; }
+    const put2 = (x, y, hi, ov, a) => { const sx = (x - cx)*sc + hx, sy = (y - cy)*sc + hy; if (left > 0 && a > 0.03 && sx >= 0 && sx <= CW && sy >= 0 && sy <= CH){ dotPill(pl, sx, sy, topTxt(hi, ov), a, false, true); left--; } };
+    if (a1 > 0.03) for (let d = 0; d < p; d++) put2(DC[d] + DC[p] + tx, DS[d] + DS[p] + ty, D + 1, [0, d], a1);
+    if (a2 > 0.03) for (let d = 0; d < p; d++) put2(DC[pD] + DC[p+d] + tx, DS[pD] + DS[p+d] + ty, D + 2, [0, d], a2);
+    ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'start';
+  }
+  ctx.globalAlpha = 1;
+}
+// phase 1 camera, in absolute units: partial sums of the target's digit vectors (the same sums ballShape uses), lerped between the level-(z+1) and level-(z+2) ball centres
+const diveVec = (k, d) => { const tw = +twistIn.value/100*0.9, a = p === 2 ? (((k % 2) + 2) % 2 ? Math.PI/2 : 0) + (d ? 0 : Math.PI) + tw*k : -Math.PI/2 + 2*Math.PI*d/p + tw*k, sk = Math.pow(S, k); return [sk*Math.cos(a), sk*Math.sin(a)]; };
+const ballCtr = k => { let x = 0, y = 0; for (let l = KL; l < k; l++){ const [a, b] = diveVec(l, pd(l)); x += a; y += b; } return [x, y]; };
+const diveR = z => 1.1*Math.pow(S, z + 1)*(p === 2 ? 1.04/(1 - S*S) : 0.93/(1 - S));
+function diveNum(hi){   // the target's digits down from level hi (most recent 8), written like the rest of the page
+  let s = '', lo = Math.max(KL, hi - 7); for (let k = hi; k >= lo; k--){ s += pd(k); if (k === 0 && lo < 0) s += '.'; }
+  return (hi < 0 ? '0.' : '…') + s + SUB(p);
+}
+function diveView(dt){   // drive the normal view along the camera path; the first 0.6 s glides in from where the view was
+  const z = dive.z, k0 = Math.floor(z), sm = smooth(z - k0), a = ballCtr(k0 + 1), b = ballCtr(k0 + 2), g = smooth(dive.el/0.6), v0 = dive.v0, r = diveR(z);
+  view.x = v0.x + g*(a[0] + sm*(b[0] - a[0]) - v0.x); view.y = v0.y + g*(a[1] + sm*(b[1] - a[1]) - v0.y); view.r = v0.r*Math.pow(r/v0.r, g); viewT = null; mapDirty = true;
+}
+function diveFrame(ts){
+  if (!diving) return; dive.raf = requestAnimationFrame(diveFrame);
+  const dt = dive.ts ? Math.min(0.05, (ts - dive.ts)/1000) : 0; dive.ts = ts; dive.z += 0.4*dt; dive.el += dt;
+  if (dive.ph === 1 && dive.z >= KH - 1){ dive.ph = 2; dive.xt = 0; dive.far = true; diveInit(); }   // real data runs out: hand over to the procedural renderer
+  if (dive.ph === 2 && dive.xt < 0.7){ dive.xt += dt; diveView(dt); draw(true); diveDraw(smooth(dive.xt/0.7)); }
+  else if (dive.ph === 2) diveDraw(1);
+  else diveView(dt), draw(), updateZoomBtns();
+  const hi = Math.floor(dive.z);
+  if (dive.D !== hi){ dive.D = hi; badge.textContent = `Diving into ${diveNum(hi)} · zoom ×${p}${SUP(Math.max(0, hi - dive.z0 | 0))}`; }
+}
+function startDive(){
+  stopDemo(); if (t > 0){ if (t >= 0.5) commit(); else { t = 0; morphIn.value = 0; } } stop(); viewT = null; computePositions();
+  const mapMode = mode === 'Q' && qview === 'map'; let tgt = -1, bd = 1e30;
+  if (selPoint >= 0 && alph[selPoint] > 0.05 && curF[selPoint] <= 1) tgt = selPoint;
+  else for (let i = 0; i < n; i++){ if (alph[i] <= 0.05 || curF[i] > 1) continue;
+    const home = mapMode && !(sel && sel[i]), dx = (home ? homeX[i] : posX[i]) - view.x, dy = (home ? homeY[i] : posY[i]) - view.y, d = dx*dx + dy*dy; if (d < bd){ bd = d; tgt = i; } }
+  if (tgt < 0) return;
+  let th = 0, w = bucketOf[tgt], sc = 1/p; for (let j = 0; j < COLOR_DIGITS[p]; j++){ const d = w % p; w = (w-d)/p; th += d*sc; sc /= p; }
+  const z0 = Math.max(KL, Math.min(KH - 1, Math.log(view.r/diveR(0))/Math.log(S)));   // diveR(z) ∝ S^(z+1): solve diveR(z) = view.r
+  dive = {seed:(Math.random()*1e9) | 0, tg:Array.from(curD.subarray(tgt*L, tgt*L + L)), th, z:z0, z0, ts:0, raf:0, D:-1, ph:1, xt:0, el:0, far:false, v0:{...view}};
+  diving = true; diveBtn.textContent = 'Stop dive'; diveBtn.setAttribute('aria-pressed', 'true'); dive.raf = requestAnimationFrame(diveFrame);
+}
+function stopDive(quiet){
+  if (!diving) return; diving = false; cancelAnimationFrame(dive.raf); diveBtn.textContent = 'Dive'; diveBtn.removeAttribute('aria-pressed'); badge.textContent = baseBadge();
+  if (dive.far) view = {...fitView};   // after the hand-over the old view is far too deep to return to
+  mapDirty = true; if (!quiet) draw();
+}
+diveBtn.onclick = () => diving ? stopDive() : startDive();
+box.addEventListener('pointerdown', e => { if (diving && !e.target.closest('.zoombtns')){ stopDive(); e.stopImmediatePropagation(); } }, true);
+box.addEventListener('wheel', e => { if (diving){ stopDive(); e.preventDefault(); e.stopImmediatePropagation(); } }, {capture:true, passive:false});
+document.addEventListener('keydown', e => { if (diving && e.key === 'Escape') stopDive(); });
+
+// ---------- Demo ("attract mode"): ℤ₃ plays a short script of functions until the visitor touches anything ----------
+const DEMO = [['add1', 'x + 1 — the odometer'], ['add1', 'x + 1 — digits carry'], ['add1', 'x + 1 — once more'], ['reverse', 'reverse digits — shred it'],
+  ['reverse', 'reverse again — put it back'], ['digitplus', 'add 1 to each digit'], ['log', 'p-adic log — hidden symmetry'], ['sq', 'x² — fold it in half'], ['teich', 'collapse to roots of unity']];
+const DEMO_EVS = ['pointerdown', 'wheel', 'keydown'];
+function startDemo(){
+  demo = {i:0, timer:setTimeout(demoStep, 700)}; pill.hidden = false; pill.textContent = 'Demo · tap anywhere to explore';
+  for (const ev of DEMO_EVS) document.addEventListener(ev, stopDemo, {capture:true, passive:true});
+}
+function demoStep(){
+  if (!demo) return; demo.timer = 0; const [id, cap] = DEMO[demo.i];
+  fnSel.value = id; delete cIn.dataset.edited; chooseFn(id, false); t = 0; morphIn.value = 0; computeNext();
+  pill.textContent = `Demo · ${cap} · tap anywhere to explore`; play();
+}
+function demoNext(){ demo.i++; if (demo.i >= DEMO.length){ demo.i = 0; resetState(); } demoStep(); }
+function stopDemo(){
+  if (!demo) return; clearTimeout(demo.timer); demo = null; pill.hidden = true; stop();
+  for (const ev of DEMO_EVS) document.removeEventListener(ev, stopDemo, {capture:true});
+  if (mode === 'Z' && p === 3){ fnSel.value = 'sq'; delete cIn.dataset.edited; chooseFn('sq', false); resetState(); selectAround(1); }
+}
+
+// pointer: tap selects, drag pans, wheel and pinch zoom
+const ptrs = new Map(); let downAt = null, pinch0 = null;
+const toWorld = (sx, sy) => ({x:(sx - CW/2)/scaleK() + view.x, y:(sy - CH/2)/scaleK() + view.y});
+function zoomAt(sx, sy, factor){
+  const w = toWorld(sx, sy); view.r = Math.min(Math.max(view.r*factor, fitView.r*Math.pow(S, L)*2), fitView.r*3);
+  const k = scaleK(); view.x = w.x - (sx - CW/2)/k; view.y = w.y - (sy - CH/2)/k; viewT = null; mapDirty = true; draw(); updateZoomBtns();
+}
+cv.addEventListener('pointerdown', e => {
+  try { cv.setPointerCapture(e.pointerId); } catch(err){}
+  const r = cv.getBoundingClientRect(); ptrs.set(e.pointerId, {x:e.clientX - r.left, y:e.clientY - r.top});
+  if (ptrs.size === 1) downAt = {x:e.clientX, y:e.clientY, moved:false};
+  else if (ptrs.size === 2){ const [a, b] = [...ptrs.values()]; pinch0 = {d:Math.hypot(a.x-b.x, a.y-b.y), r:view.r}; if (downAt) downAt.moved = true; }
+});
+let panRaf = 0;
+cv.addEventListener('pointermove', e => {
+  if (!ptrs.has(e.pointerId)) return;
+  const r = cv.getBoundingClientRect(), now = {x:e.clientX - r.left, y:e.clientY - r.top}, prev = ptrs.get(e.pointerId); ptrs.set(e.pointerId, now);
+  if (ptrs.size === 2 && pinch0){ const [a, b] = [...ptrs.values()]; const d = Math.hypot(a.x-b.x, a.y-b.y); if (d > 10) zoomAt((a.x+b.x)/2, (a.y+b.y)/2, (pinch0.r*pinch0.d/d)/view.r); return; }
+  if (!downAt) return;
+  if (!downAt.moved && Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > 7) downAt.moved = true;
+  if (downAt.moved && ptrs.size === 1){ const k = scaleK(); view.x -= (now.x - prev.x)/k; view.y -= (now.y - prev.y)/k; viewT = null; mapDirty = true;
+    if (!panRaf) panRaf = requestAnimationFrame(() => { panRaf = 0; draw(); updateZoomBtns(); }); }
+});
+function endPointer(e){
+  const had = ptrs.get(e.pointerId); ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch0 = null;
+  if (ptrs.size) return;
+  const wasTap = downAt && !downAt.moved; downAt = null;
+  if (!wasTap || !had || e.type === 'pointercancel') return;
+  const mapMode = mode === 'Q' && qview === 'map', k = scaleK(); let best = -1, bd = 1e9;
+  for (let i = 0; i < n; i++){
+    let x, y; if (mapMode){ if (curF[i] > 1 && !step) continue; x = homeX[i]; y = homeY[i]; } else { if (alph[i] <= 0.01) continue; x = posX[i]; y = posY[i]; }
+    const dx = (x - view.x)*k + CW/2 - had.x, dy = (y - view.y)*k + CH/2 - had.y, d = dx*dx + dy*dy; if (d < bd){ bd = d; best = i; } }
+  if (best < 0 || bd > 28*28){ if (sel) clearSel(); return; }
+  if (mapMode && step) resetState();
+  selectAround(best);
+}
+cv.addEventListener('pointerup', endPointer); cv.addEventListener('pointercancel', endPointer);
+cv.addEventListener('wheel', e => { e.preventDefault(); const r = cv.getBoundingClientRect(); zoomAt(e.clientX - r.left, e.clientY - r.top, Math.exp(e.deltaY*0.0015)); }, {passive:false});
+
+const mq = matchMedia('(prefers-color-scheme: dark)');
+const retheme = () => { buildPalette(); updateLegend(); draw(); };
+mq.addEventListener ? mq.addEventListener('change', retheme) : mq.addListener(retheme);
+new MutationObserver(retheme).observe(document.documentElement, {attributes:true, attributeFilter:['data-theme']});
+new ResizeObserver(resize).observe(box);
+
+// opening scene: ℤ₃ at rest, x² chosen, ball around x = 1 selected at the default depth
+setup('Z', 3);
+resize();
+if (rmq.matches) selectAround(1); else startDemo();
+document.fonts && document.fonts.ready.then(() => draw());
+})();
+</script>
+
+</body></html>
