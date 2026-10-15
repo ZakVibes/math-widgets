@@ -5,7 +5,7 @@
 // When you add a widget: add its folder name to WIDGETS below (it needs previews/<name>.jpg too)
 // and bump VERSION, so phones that already have the app download the new list.
 
-const VERSION = "v4";
+const VERSION = "v5";
 const CACHE = "math-widgets-" + VERSION;
 const FONTS = "math-widgets-fonts";
 const SLOW_MS = 4000;
@@ -27,7 +27,8 @@ self.addEventListener("install", e => {
   e.waitUntil((async () => {
     const cache = await caches.open(CACHE);
     await cache.addAll(FILES.map(u => new Request(u, { cache: "reload" })));
-    await saveFonts(cache); // best effort: never stops the install
+    // best effort, and never allowed to hold up an update for more than 8 seconds
+    await Promise.race([saveFonts(cache), new Promise(ok => setTimeout(ok, 8000))]);
     self.skipWaiting();
   })());
 });
@@ -57,7 +58,9 @@ async function lookup(cache, req) {
 
 async function networkFirst(req) {
   const cache = await caches.open(CACHE);
-  const net = fetch(req).then(res => {
+  // "no-cache": always ask GitHub whether the page changed (a quick check when it hasn't), instead of
+  // trusting the phone's own 10-minute copy, which kept the app on old versions after an update.
+  const net = fetch(req, { cache: "no-cache" }).then(res => {
     if (res.ok && res.type === "basic") cache.put(req, res.clone());
     return res;
   });
