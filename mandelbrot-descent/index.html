@@ -471,7 +471,7 @@ const $ = (id) => document.getElementById(id);
 const canvas = document.getElementById('c');
 const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, depth: false, stencil: false, premultipliedAlpha: false, powerPreference: 'high-performance', preserveDrawingBuffer: false });
 function fail(msg) { const e = document.getElementById('err'); e.textContent = msg; e.hidden = false; document.getElementById('veil').style.opacity = 0; throw new Error(msg); }
-if (!gl) fail('WebGL 2 is unavailable right now. If this page worked before, the browser has probably switched WebGL off after a graphics-driver reset; quitting and reopening the browser turns it back on.');
+if (!gl || gl.isContextLost()) fail('WebGL 2 is unavailable right now. If this page worked before, the browser has probably switched WebGL off after a graphics-driver reset; fully closing and reopening the browser (on iPhone or iPad, swipe it away in the app switcher) turns it back on.');
 // If the GPU drops the context (driver reset, or a phone reclaiming memory in the background), remember
 // where the descent was and reload as soon as the page can have a context again; it resumes there.
 let ctxLost = false;
@@ -860,6 +860,8 @@ function leadOf(J) {
 // ---------- GPU pacing ----------
 const tq = gl.getExtension('EXT_disjoint_timer_query_webgl2');
 const WORK_MIN = 1e6, WORK_MAX = 3e9;
+// phones/tablets with no timer (iPad Pro 10.5: ~20M work took ~100 ms and two stacked frames reset the GPU): small fixed ceiling
+const WORK_NT = MOBILE && !tq ? 6e6 : WORK_MAX; S.work = Math.min(S.work, WORK_NT);
 // rate: work units per GPU ms (timer queries); dispMs: GPU cost of drawing the screen; ceil: the work
 // level at which frames last dropped (used when no timer is available, so we stop re-overshooting)
 const gp = { pending: [], rate: 0, dispMs: 0, inflight: [], ceil: Infinity };
@@ -892,7 +894,7 @@ function gpuSchedule(dt) {
     // no timer (all iPhones/iPads): slow frames mean the GPU is behind, so back off, before the first picture
     // too; phones also get a hard cap so no single submission runs long enough to trip iOS's GPU watchdog
     if (shown ? dt * 1000 > S.refresh * 1.5 : dt > 0.05) { gp.ceil = S.work; S.work = Math.max(WORK_MIN, S.work * 0.7); }
-    else { S.work = Math.min(MOBILE ? 6e7 : WORK_MAX, S.work * (shown ? 1.03 : 1.15), shown ? gp.ceil * 0.85 : Infinity); gp.ceil *= 1.002; }
+    else { S.work = Math.min(WORK_NT, S.work * (shown ? 1.03 : 1.15), shown ? gp.ceil * 0.85 : Infinity); gp.ceil *= 1.002; }
   }
   if (DWORK) S.work = Math.min(S.work, DWORK);   // debug: hard cap on per-frame work
   if (gp.inflight.length >= 2) return;                              // never queue far ahead of the display
