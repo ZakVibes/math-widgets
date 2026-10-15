@@ -538,9 +538,12 @@ function ballShape(k, digitAt){
   for (let s = 0; s < k - KL && s < L; s++){ const d = digitAt(KL + s); cx += COSK[s*p+d]; cy += SINK[s*p+d]; }
   const sk = Math.pow(S, k);
   if (p === 2){ const s0 = k - KL, tw = +twistIn.value/100*0.9; const rot = s0 < L ? ANG[s0*p+1] : ((((k%2)+2)%2) ? Math.PI/2 : 0) + tw*k;
-    return {cx, cy, rx:sk/(1-S*S)*1.04, ry:sk*S/(1-S*S)*1.04, rot}; }
-  const r = sk/(1-S)*0.93; return {cx, cy, rx:r, ry:r, rot:0};
+    let hu = 0, hw = 0; for (let i = 0, f = 1; i < 40; i++, f *= S){ const a = (i % 2 ? Math.PI/2 : 0) + tw*i; hu += f*Math.abs(Math.cos(a)); hw += f*Math.abs(Math.sin(a)); }
+    return {cx, cy, rx:sk*hu*1.04*1.06, ry:sk*hw*1.04*1.06, rot, box:true}; }   // p=2: the dust fills a box (x and y digits vary independently); hu, hw = its half-widths, also when twisted
+  const r = sk/(1-S)*1.04; return {cx, cy, rx:r, ry:r, rot:0};   // 1.04: the dust reaches sk/(1−S); siblings still never touch
 }
+// a ball's size in units of S^k: long half-width of the p=2 box, circle radius for p ≥ 3 (label sizing and the Dive frame)
+const ballCo = () => p === 2 ? 1.04*1.06/(1 - S*S) : 1.04/(1 - S);
 
 // ---------- positions ----------
 const smooth = u => u <= 0 ? 0 : u >= 1 ? 1 : u*u*(3 - 2*u);
@@ -618,7 +621,10 @@ const toSX = x => (x - view.x)*scaleK() + CW/2;
 const toSY = y => (y - view.y)*scaleK() + CH/2;
 function ellipse(sh, color, alpha, lw, dash){
   const k = scaleK(); ctx.globalAlpha = alpha; ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.setLineDash(dash || []);
-  ctx.beginPath(); ctx.ellipse(toSX(sh.cx), toSY(sh.cy), Math.max(sh.rx*k, 1), Math.max(sh.ry*k, 1), sh.rot, 0, Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+  const X = toSX(sh.cx), Y = toSY(sh.cy), rx = Math.max(sh.rx*k, 1), ry = Math.max(sh.ry*k, 1); ctx.beginPath();
+  if (sh.box && ctx.roundRect){ ctx.save(); ctx.translate(X, Y); ctx.rotate(sh.rot); ctx.roundRect(-rx, -ry, 2*rx, 2*ry, 0.2*Math.min(rx, ry)); ctx.restore(); }
+  else ctx.ellipse(X, Y, rx, ry, sh.rot, 0, Math.PI*2);
+  ctx.stroke(); ctx.setLineDash([]);
 }
 const zeroDigits = () => 0;
 const digitsFromIndex = (v, k0) => k => k < k0 ? 0 : Math.floor(v / Math.pow(p, k - k0)) % p;
@@ -648,7 +654,7 @@ function draw(force){
     if (mode === 'Q'){
       const zp = ballShape(0, zeroDigits); ellipse(zp, colAccent, 0.8, 1.3, [5, 4]);
       ctx.globalAlpha = 0.95; ctx.font = '12px "JetBrains Mono", monospace'; ctx.textAlign = 'center'; ctx.fillStyle = colAccent;
-      ctx.fillText('ℤ' + SUB(p), toSX(zp.cx), toSY(zp.cy) - zp.ry*scaleK() - 6);
+      ctx.fillText('ℤ' + SUB(p), toSX(zp.cx), toSY(zp.cy) - (Math.abs(Math.sin(zp.rot))*zp.rx + Math.abs(Math.cos(zp.rot))*zp.ry)*scaleK() - 6);
     }
   }
   const sz = dotSize(), hs = sz/2, k = scaleK(), cx0 = CW/2 - view.x*k, cy0 = CH/2 - view.y*k;
@@ -720,7 +726,7 @@ function topTxt(hi, ov){
 }
 // automatic labels: the top dot (smallest member) of each visible ball at the deepest level whose balls are >= 45px, plus the next coarser level while it fades
 function autoLabels(put, k, mapMode){
-  const half = Math.min(CW, CH)/2, co = p === 2 ? 1.04/(1 - S*S) : 0.93/(1 - S), D = t === 1 ? nxtD : curD, F = t === 1 ? nxtF : curF, lv = Math.min(KH, Math.floor(Math.log(45/(co*k))/Math.log(S)));
+  const half = Math.min(CW, CH)/2, co = ballCo(), D = t === 1 ? nxtD : curD, F = t === 1 ? nxtF : curF, lv = Math.min(KH, Math.floor(Math.log(45/(co*k))/Math.log(S)));
   const fixed = mode === 'Z' ? [0, 1, 2, Mod-1] : [0, P[m], P[m-1]]; let left = 8;
   for (let l = lv; l >= Math.max(-m + 2, lv - 1) && left > 0; l--){
     const r = Math.pow(S, l)*co*k, a = smooth((r - 45)/25)*(1 - smooth((r - 1.2*half)/(0.6*half))); if (a < 0.03) continue;
@@ -1038,7 +1044,7 @@ function diveInit(){
     A:new Float64Array(np), B:new Float64Array(np), C:new Float64Array(np), E:new Float64Array(np), X:null, Y:null,
     VX:new Float32Array(np), VY:new Float32Array(np), VB:new Uint8Array(np), idx:new Int32Array(np), cnt:new Int32Array(65)};
   for (let v = 0; v < np; v++){ let h = 0, w = v, sc = 1/p; for (let j = 0; j < M; j++){ const d = w % p; w = (w-d)/p; h += d*sc; sc /= p; } o.H[v] = h; o.G[v] = v % p; }
-  dv = o; o.R = 1.1*(p === 2 ? S/(1 - S*S)*1.04 : S/(1 - S)*0.93);
+  dv = o; o.R = 1.1*S*ballCo();
 }
 // all p^M digit strings; positions in "level-D units" (relative level j is absolute level D+j). Returns the centre of the path of digits pd(k)
 function diveLayout(D){
@@ -1058,7 +1064,7 @@ function diveDraw(aa){
   if (p > 2 && disksIn.checked){   // relative levels 1..3: each ball fades from "level l" to "level l-1" as we zoom in
     ctx.strokeStyle = colLine; ctx.lineWidth = 1; ctx.setLineDash([]);
     for (let l = 1; l <= 3; l++){
-      const al = l === 1 ? 0.9*(1 - f) : l === 2 ? 0.9*f + 0.55*(1 - f) : 0.55*f, rr = Math.pow(S, l)/(1 - S)*0.93*sc; if (al < 0.01 || rr < 1.5) continue;
+      const al = l === 1 ? 0.9*(1 - f) : l === 2 ? 0.9*f + 0.55*(1 - f) : 0.55*f, rr = Math.pow(S, l)/(1 - S)*1.04*sc; if (al < 0.01 || rr < 1.5) continue;
       ctx.globalAlpha = al*aa;
       for (let q = 0, nq = Math.pow(p, l); q < nq; q++){ let x = 0, y = 0, w = q;
         for (let j = 0; j < l; j++){ const d = w % p; w = (w-d)/p; x += DC[j*p+d]; y += DS[j*p+d]; }
@@ -1095,7 +1101,7 @@ function diveDraw(aa){
 // phase 1 camera, in absolute units: partial sums of the target's digit vectors (the same sums ballShape uses), lerped between the level-(z+1) and level-(z+2) ball centres
 const diveVec = (k, d) => { const tw = +twistIn.value/100*0.9, a = p === 2 ? (((k % 2) + 2) % 2 ? Math.PI/2 : 0) + (d ? 0 : Math.PI) + tw*k : -Math.PI/2 + 2*Math.PI*d/p + tw*k, sk = Math.pow(S, k); return [sk*Math.cos(a), sk*Math.sin(a)]; };
 const ballCtr = k => { let x = 0, y = 0; for (let l = KL; l < k; l++){ const [a, b] = diveVec(l, pd(l)); x += a; y += b; } return [x, y]; };
-const diveR = z => 1.1*Math.pow(S, z + 1)*(p === 2 ? 1.04/(1 - S*S) : 0.93/(1 - S));
+const diveR = z => 1.1*Math.pow(S, z + 1)*ballCo();
 function diveNum(hi){   // the target's digits down from level hi (most recent 8), written like the rest of the page
   let s = '', lo = Math.max(KL, hi - 7); for (let k = hi; k >= lo; k--){ s += pd(k); if (k === 0 && lo < 0) s += '.'; }
   return (hi < 0 ? '0.' : '…') + s + SUB(p);
