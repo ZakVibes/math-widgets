@@ -1629,14 +1629,20 @@ function makeImpulse(ctx, secs) {                  // a generated room: two chan
   return buf;
 }
 function ensureAudio() {
-  if (audio) { if (audio.ctx.state === 'suspended') audio.ctx.resume(); return audio; }
+  if (audio) { if (audio.ctx.state !== 'running') audio.ctx.resume(); return audio; }   // 'interrupted' too (iOS, after a call)
   try {
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}   // iPhone/iPad: play even in Silent mode, like a video
     var AC = window.AudioContext || window.webkitAudioContext;
     var ctx = new AC(), master = ctx.createGain(), comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -10; comp.knee.value = 8; comp.ratio.value = 4; comp.attack.value = 0.004; comp.release.value = 0.25;
     master.gain.value = 0.9; master.connect(comp); comp.connect(ctx.destination);   // long overlapping rings never clip
     var verb = ctx.createConvolver(); verb.normalize = true; verb.buffer = makeImpulse(ctx, 3.2); verb.connect(master);
-    audio = { ctx: ctx, master: master, verb: verb };
+    audio = { ctx: ctx, master: master, verb: verb, pending: [] };
+    ctx.addEventListener('statechange', function () {   // sounds asked for before Safari let audio start play now, if still fresh
+      if (ctx.state !== 'running') return;
+      var p = audio.pending, now = performance.now(); audio.pending = [];
+      p.forEach(function (j) { if (now - j.t < 1500) playJob(j.job, j.delay, j.vol); });
+    });
     if (ctx.resume) ctx.resume();
   } catch (e) { audio = null; }
   return audio;
@@ -1698,6 +1704,7 @@ function renderSound(parts, sr, voice, maxDur) {   // whole sound at once (used 
 }
 function playJob(job, delay, vol) {                // play the head now, then compute the tail and butt it on sample-exactly
   if (!audio) return;
+  if (audio.ctx.state !== 'running') { audio.pending.push({ job: job, delay: delay, vol: vol, t: performance.now() }); return; }
   var ctx = audio.ctx, g = ctx.createGain(), send = ctx.createGain();
   g.gain.value = vol === undefined ? 1 : vol; send.gain.value = job.reverb; g.connect(audio.master); g.connect(send); send.connect(audio.verb);
   var t0 = ctx.currentTime + 0.02 + (delay || 0), nh = Math.min(job.n, Math.floor(HEAD_SECS * job.sr));
@@ -1938,6 +1945,13 @@ stageCv.addEventListener('keydown', function (ev) {
   strikeAt(c.x, c.y);
 });
 document.addEventListener('pointerdown', ensureAudio, true);   // first gesture unlocks sound
+function unlockAudio() {                          // iPhone/iPad Safari only starts sound on a finished tap, not on touch-down
+  var A = ensureAudio(); if (!A || A.unlocked) return;
+  var s = A.ctx.createBufferSource(); s.buffer = A.ctx.createBuffer(1, 1, A.ctx.sampleRate); s.connect(A.ctx.destination); s.start(0);
+  if (A.ctx.state === 'running') A.unlocked = true;
+}
+document.addEventListener('touchend', unlockAudio, true);
+document.addEventListener('click', unlockAudio, true);
 document.addEventListener('keydown', ensureAudio, true);
 
 function finishDrawing(pts) {
