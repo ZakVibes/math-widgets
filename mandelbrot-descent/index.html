@@ -94,6 +94,66 @@ body.idle #bar{backdrop-filter:none;-webkit-backdrop-filter:none}
 
 <script>
 "use strict";
+// ---------- ?debug diagnostics: everything below and every DEBUG && ... hook is inert unless the URL has ?debug ----------
+const DQ = new URLSearchParams(location.search), DEBUG = DQ.has('debug');
+// experiment switches (debug only; 0 = off): steps, probecap, ring, area (million px), probepx (px per probe draw), work (hard cap on S.work)
+const dnum = (k) => { const v = DEBUG && DQ.has(k) ? +DQ.get(k) : NaN; return v > 0 ? v : 0; };
+const DSTEPS = dnum('steps'), DPCAP = dnum('probecap'), DRING = Math.round(dnum('ring')), DAREA = dnum('area') * 1e6, DPX = Math.floor(dnum('probepx')), DWORK = dnum('work');
+const dLines = [], dTrail = [], dOnceSet = new Set(); let dStage = 'boot', dPrev = '', dSaveT = -1e9, dSaveTm = 0, dNoSave = false, dTxt = null, dStat = null;
+const dM = (x) => (x / 1e6).toFixed(1) + 'M', dMB = (b) => (b / 1048576).toFixed(1);
+function dsave(now) { // persist to localStorage, at most every 500 ms unless forced (so a killed tab still leaves a log)
+  if (dNoSave) return; const t = performance.now();
+  if (!now && t - dSaveT < 500) { if (!dSaveTm) dSaveTm = setTimeout(() => { dSaveTm = 0; dsave(true); }, 500 - (t - dSaveT)); return; }
+  dSaveT = t; try { localStorage.setItem('md-debug-log', dLines.join('\n')); } catch (_) {}
+}
+function dui() {
+  if (!dTxt) return; const atEnd = dTxt.scrollTop + dTxt.clientHeight >= dTxt.scrollHeight - 20;
+  dTxt.textContent = (dPrev ? '== PREVIOUS RUN ==\n' + dPrev + '\n== THIS RUN ==\n' : '') + dLines.join('\n');
+  if (atEnd) dTxt.scrollTop = dTxt.scrollHeight;
+}
+function dlog(m, now) { if (!DEBUG) return; dLines.push('+' + Math.round(performance.now()) + ' ' + m); if (dLines.length > 300) dLines.splice(30, 1); dui(); dsave(now); }
+function dstage(s, m) { dStage = s; dlog(s + (m ? ' ' + m : ''), true); }   // milestones are always persisted at once
+function donce(s, m) { if (!dOnceSet.has(s)) { dOnceSet.add(s); dstage(s, m); } }
+function dtrail(m) { dTrail.push('+' + Math.round(performance.now()) + ' ' + m); if (dTrail.length > 16) dTrail.shift(); }   // last GPU submissions
+function dstatus() {
+  if (!dStat) return;
+  try { const J = S.cur; dStat.textContent = `f=${frameCount} work=${dM(S.work)} stage=${dStage} lost=${gl.isContextLost()} veil="${document.getElementById('veil').firstElementChild.textContent}" probes ${J ? J.probes.filter(p => p && p.state === 2).length + '/' + probeCount(J) + ' (drawn ' + (J.probeNext || 0) + ')' : '-'} keys ${J ? J.keys.filter(k => k.state === 2).length + '/' + J.keys.length : '-'}`; } catch (_) {}
+}
+function dlost() { // context-loss handler body in debug mode: dump everything, never reload
+  let f = '?', w = '?'; try { f = frameCount; w = dM(S.work); } catch (_) {}
+  dlog(`CONTEXT LOST frame=${f} stage=${dStage} work=${w} t=${Math.round(performance.now())}ms`, true);
+  dlog('-- last submissions, oldest first --'); for (const t of dTrail) dlog('  ' + t);
+  dsave(true); dstatus(); if (dTxt) dTxt.scrollTop = dTxt.scrollHeight;
+  const el = document.getElementById('err'); el.hidden = false; el.textContent = 'Context lost (debug mode: not reloading). Screenshot the log.';
+}
+function dinfo1() { // right after context creation
+  const x = gl.getExtension('WEBGL_debug_renderer_info'), P = (k) => { try { return gl.getParameter(k); } catch (_) { return '?'; } };
+  dlog('UA ' + navigator.userAgent);
+  dlog(`screen ${screen.width}x${screen.height} inner ${innerWidth}x${innerHeight} dpr ${devicePixelRatio} standalone=${!!navigator.standalone || matchMedia('(display-mode: standalone)').matches} deviceMemory=${navigator.deviceMemory ?? 'n/a'}`);
+  dlog(`GL renderer=${P(x ? x.UNMASKED_RENDERER_WEBGL : gl.RENDERER)} vendor=${P(x ? x.UNMASKED_VENDOR_WEBGL : gl.VENDOR)} ${P(gl.VERSION)} maxTex=${P(gl.MAX_TEXTURE_SIZE)} maxRB=${P(gl.MAX_RENDERBUFFER_SIZE)} floatRT=${!!gl.getExtension('EXT_color_buffer_float')} worker=${!!refWorker}`);
+}
+function dinfo2() { // after resize(), when the tunable constants exist
+  const [rw, rh] = ringNeed();
+  dlog(`canvas ${canvas.width}x${canvas.height} (css ${canvas.clientWidth}x${canvas.clientHeight}) MOBILE=${MOBILE} timerQuery=${!!tq} RING_N=${RING_N} PROBE_CAP=${PROBE_CAP} MAX_STEPS=${MAX_STEPS} Q=${Q} capArea=${CAPAREA} ringNeed=${rw}x${rh} workStart=${dM(S.work)}`);
+}
+if (DEBUG) {
+  try { dPrev = localStorage.getItem('md-debug-log') || ''; } catch (_) {}   // only the previous run is kept
+  const el = document.createElement('div'), bar = document.createElement('div');
+  el.style.cssText = 'position:fixed;left:0;top:env(safe-area-inset-top,0px);z-index:99999;box-sizing:border-box;max-width:min(96vw,560px);max-height:70vh;overflow:auto;-webkit-overflow-scrolling:touch;pointer-events:auto;-webkit-user-select:text;user-select:text;background:rgba(0,0,0,.8);color:#e8e8e8;font:11px/1.35 ui-monospace,Menlo,monospace;padding:6px 8px;border-radius:0 0 8px 0';
+  const btn = (t, f) => { const b = document.createElement('button'); b.textContent = t; b.onclick = f; b.style.cssText = 'font:inherit;padding:5px 10px;margin:0 6px 4px 0;border-radius:6px;border:1px solid #888;background:#333;color:#fff'; bar.appendChild(b); return b; };
+  btn('Reload', () => location.reload());
+  btn('Clear log', () => { dNoSave = true; try { localStorage.removeItem('md-debug-log'); } catch (_) {} location.reload(); });
+  const hb = btn('Hide', () => { dTxt.hidden = !dTxt.hidden; hb.textContent = dTxt.hidden ? 'Show' : 'Hide'; });
+  dStat = document.createElement('div'); dStat.style.cssText = 'margin-bottom:4px;color:#9fd'; dStat.textContent = 'booting';
+  dTxt = document.createElement('pre'); dTxt.style.cssText = 'margin:0;white-space:pre-wrap;word-break:break-word;max-height:calc(70vh - 70px);overflow:auto;-webkit-overflow-scrolling:touch';
+  el.append(bar, dStat, dTxt); document.body.appendChild(el);
+  addEventListener('error', (e) => dlog(`ERROR ${e.message} @${(e.filename || '').split('/').pop()}:${e.lineno}:${e.colno}`, true));
+  addEventListener('unhandledrejection', (e) => dlog('UNHANDLED REJECTION ' + String((e.reason && (e.reason.stack || e.reason.message)) || e.reason).slice(0, 300), true));
+  addEventListener('pagehide', () => dlog('pagehide', true));
+  document.addEventListener('visibilitychange', () => dlog('visibilitychange ' + document.visibilityState, true));
+  dlog('debug mode on; search=' + (location.search || '-'));
+  dlog('experiments: ' + (['steps', 'probecap', 'ring', 'area', 'probepx', 'work'].filter(k => DQ.has(k)).map(k => k + '=' + DQ.get(k)).join(' ') || 'none'), true);
+}
 // ---------- curated palettes (cyclic; interpolated in OKLab) ----------
 const PALETTES = {
   tidewater: { stops: ['#0a1a2e', '#1d4e5f', '#5f9e96', '#d9e4cf', '#e7c27d', '#b0633a', '#4a2130'], ink: '#071019', void: '#05070c' },
@@ -420,26 +480,30 @@ function reloadSoon() { if (ctxLost && document.visibilityState === 'visible') s
 // Two resets within a minute means reloading would just loop (e.g. a GPU that can't keep up), so stop and let the viewer retry.
 function recentLosses() { try { return JSON.parse(sessionStorage.getItem('md-lost') || '[]').filter(t => Date.now() - t < 60000); } catch (_) { return []; } }
 canvas.addEventListener('webglcontextlost', (e) => {
-  e.preventDefault(); saveResume(); const el = document.getElementById('err'), lost = recentLosses(); el.hidden = false;
+  e.preventDefault(); if (DEBUG) return dlost();   // debug: log, dump the submission trail, never reload or record the loss
+  saveResume(); const el = document.getElementById('err'), lost = recentLosses(); el.hidden = false;
   if (lost.length >= 2) { el.textContent = 'The graphics driver keeps resetting on this device. Tap to try again.'; el.style.cursor = 'pointer'; el.onclick = () => { try { sessionStorage.removeItem('md-lost'); } catch (_) {} location.reload(); }; return; }
   try { sessionStorage.setItem('md-lost', JSON.stringify(lost.concat(Date.now()))); } catch (_) {}
   ctxLost = true; el.textContent = 'The graphics driver reset. Picking the descent back up…'; reloadSoon();
 });
-canvas.addEventListener('webglcontextrestored', () => location.reload());
+canvas.addEventListener('webglcontextrestored', () => { if (DEBUG) return dlog('webglcontextrestored (debug: not reloading)', true); location.reload(); });
 document.addEventListener('visibilitychange', reloadSoon);
+DEBUG && dinfo1();
 if (!gl.getExtension('EXT_color_buffer_float')) fail('This visualizer needs float render targets (EXT_color_buffer_float), which this GPU does not offer.');
 const MAXTEX = gl.getParameter(gl.MAX_TEXTURE_SIZE);
 const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
 
 function compile(type, src) { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { console.error(src); fail('Shader error: ' + gl.getShaderInfoLog(s)); } return s; }
-function program(fs) {
+function program(fs, nm) {
+  const t0 = DEBUG ? performance.now() : 0; DEBUG && dstage('shaders', 'compiling ' + nm);
   const p = gl.createProgram(); gl.attachShader(p, compile(gl.VERTEX_SHADER, VS)); gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(p);
   if (!gl.getProgramParameter(p, gl.LINK_STATUS)) fail('Link error: ' + gl.getProgramInfoLog(p));
   const u = {}; const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
   for (let i = 0; i < n; i++) { const info = gl.getActiveUniform(p, i); const nm = info.name.replace(/\[0\]$/, ''); u[nm] = gl.getUniformLocation(p, info.name); }
+  DEBUG && dlog(`program ${nm} ok ${Math.round(performance.now() - t0)} ms, ${n} uniforms, err=${gl.getError()}`);
   return { p, u };
 }
-const PROG_KEY = program(FS_FRACTAL(false)), PROG_PROBE = program(FS_FRACTAL(true)), PROG_DISP = program(FS_DISPLAY), PROG_DOWN = program(FS_DOWN);
+const PROG_KEY = program(FS_FRACTAL(false), 'key'), PROG_PROBE = program(FS_FRACTAL(true), 'probe'), PROG_DISP = program(FS_DISPLAY, 'disp'), PROG_DOWN = program(FS_DOWN, 'down');
 
 function tex2D(w, h, ifmt, fmt, type, data, filter = gl.NEAREST, wrap = gl.CLAMP_TO_EDGE) {
   const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
@@ -455,7 +519,7 @@ class BlaSet { // validity radii for one frame scale (coefficients live with the
   constructor() { this.r = null; this.key = ''; this.buf = null; }
   load(R, s, dcMax, key) {
     if (this.key === key) return; this.key = key; const st = R.bla;
-    if (!this.buf || this.buf.length !== st.W * st.H) { this.buf = new Float32Array(st.W * st.H); if (this.r) gl.deleteTexture(this.r); this.r = tex2D(st.W, st.H, gl.R32F, gl.RED, gl.FLOAT, null); this.rW = st.W; this.rH = st.H; }
+    if (!this.buf || this.buf.length !== st.W * st.H) { this.buf = new Float32Array(st.W * st.H); if (this.r) gl.deleteTexture(this.r); this.r = tex2D(st.W, st.H, gl.R32F, gl.RED, gl.FLOAT, null); this.rW = st.W; this.rH = st.H; DEBUG && dlog(`BlaSet radii tex ${st.W}x${st.H} R32F ${dMB(st.W * st.H * 4)} MB`); }
     blaRadii(st, s, dcMax, this.buf);
     gl.bindTexture(gl.TEXTURE_2D, this.r); gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, st.W, st.H, gl.RED, gl.FLOAT, this.buf);
   }
@@ -465,11 +529,12 @@ class BlaSet { // validity radii for one frame scale (coefficients live with the
 // start-up veil) and recycled forever. A keyframe rendered at lower resolution just uses the lower-left
 // part of its slot, so changing resolution never allocates or frees GPU memory mid-zoom.
 const MOBILE = matchMedia('(pointer: coarse)').matches || Math.min(screen.width, screen.height) < 700;
-let RING_N = MOBILE ? 8 : 9;
+let RING_N = DRING || (MOBILE ? 8 : 9);
+const CAPAREA = DAREA || (MOBILE ? 2.2e6 : 6.5e6);
 const ring = { W: 0, H: 0, gen: 0, free: [], count: 0 };
 function ringNeed() {
   let th = Q * MARGIN * S.keyH, tw = th * S.aspect;
-  const capW = Math.min(MAXTEX, 4096), capArea = MOBILE ? 2.2e6 : 6.5e6;
+  const capW = Math.min(MAXTEX, 4096), capArea = CAPAREA;
   const sc = Math.min(1, capW / tw, capW / th, Math.sqrt(capArea / (tw * th)));
   return [Math.round(tw * sc / 16) * 16, Math.round(th * sc / 16) * 16];
 }
@@ -477,6 +542,7 @@ function ensureRing() {
   const [w, h] = ringNeed();
   if (ring.W && w <= ring.W && h <= ring.H && w * h > 0.55 * ring.W * ring.H) return;  // fits (URL-bar wiggles don't reallocate)
   ring.gen++; ring.W = Math.min(MAXTEX, Math.round(w * 1.12 / 16) * 16); ring.H = Math.min(MAXTEX, Math.round(h * 1.12 / 16) * 16);
+  DEBUG && dstage('ring', `allocating ${ring.W}x${ring.H} x${RING_N} SRGB8_ALPHA8+mips ~${dMB(ring.W * ring.H * 16 / 3 * RING_N)} MB (need ${w}x${h}, gen ${ring.gen})`);
   for (const t of ring.free) gl.deleteTexture(t); ring.free = []; ring.count = 0;
   for (let i = 0; i < RING_N; i++) {
     const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
@@ -486,6 +552,7 @@ function ensureRing() {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     t._gen = ring.gen; t._W = ring.W; t._H = ring.H; ring.free.push(t); ring.count++;
   }
+  DEBUG && dlog(`ring allocated count=${ring.count} RING_N=${RING_N} ~${dMB(ring.W * ring.H * 16 / 3 * ring.count)} MB err=${gl.getError()}`, true);
 }
 function getKeyTex() { return ring.free.pop() || null; }
 function releaseKeyTex(t) { if (t._gen === ring.gen) ring.free.push(t); else gl.deleteTexture(t); }
@@ -501,7 +568,8 @@ class Journey {
   constructor(loc, aspect) {
     this.loc = loc; this.P = loc.p; this.aspect = aspect;
     this.target = null; this.refIds = 0;
-    workerCall({ type: 'target', re: loc.re, im: loc.im, P: loc.p, FB: 420 }).then(r => { this.target = this.makeRef(r); });
+    const tR = DEBUG ? performance.now() : 0;
+    workerCall({ type: 'target', re: loc.re, im: loc.im, P: loc.p, FB: 420 }).then(r => { DEBUG && dlog(`ref worker result loc=${loc.id} q=${r.q} after ${Math.round(performance.now() - tR)} ms`); this.target = this.makeRef(r); });
     const pal = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, pal);
     const N = 1024, rowA = paletteRow(PALETTES[loc.pal[0]].stops, N), rowB = paletteRow(PALETTES[loc.pal[1]].stops, N), px = new Uint8Array(N * 2 * 4);
     [rowA, rowB].forEach((row, r) => row.forEach((c, i) => { const o = (r * N + i) * 4; px[o] = Math.round(lin2srgb(c[0]) * 255); px[o + 1] = Math.round(lin2srgb(c[1]) * 255); px[o + 2] = Math.round(lin2srgb(c[2]) * 255); px[o + 3] = 255; }));
@@ -526,11 +594,15 @@ class Journey {
     this.keys.push({ u: this.Uend, state: 0 });
     this.probes = []; this.probeNext = 0;
     this.blaKey = new BlaSet(); this.blaProbe = new BlaSet();
+    DEBUG && dstage('journey', `created loc=${loc.id} P=${loc.p} Uend=${this.Uend.toFixed(2)} probeCount=${probeCount(this)} aspect=${aspect.toFixed(3)}`);
   }
   makeRef(r) {
     const W = 2048, H = Math.ceil(r.q / W), buf = new Float32Array(W * H * 2); buf.set(r.Z);
-    const bla = blaStatic(r.Z, r.q);
-    return { id: ++this.refIds, q: r.q, Z: r.Z, C: r.C, off: r.off, bla, tex: tex2D(W, H, gl.RG32F, gl.RG, gl.FLOAT, buf), abTex: tex2D(bla.W, bla.H, gl.RGBA32F, gl.RGBA, gl.FLOAT, bla.ab) };
+    const t0 = DEBUG ? performance.now() : 0, bla = blaStatic(r.Z, r.q);
+    DEBUG && dstage('ref', `loc=${this.loc.id} q=${r.q} blaStatic ${Math.round(performance.now() - t0)} ms; ref tex ${W}x${H} RG32F ${dMB(W * H * 8)} MB, BLA tex ${bla.W}x${bla.H} RGBA32F ${dMB(bla.W * bla.H * 16)} MB, levels=${bla.L}`);
+    const R = { id: ++this.refIds, q: r.q, Z: r.Z, C: r.C, off: r.off, bla, tex: tex2D(W, H, gl.RG32F, gl.RG, gl.FLOAT, buf), abTex: tex2D(bla.W, bla.H, gl.RGBA32F, gl.RGBA, gl.FLOAT, bla.ab) };
+    DEBUG && dlog(`ref textures created loc=${this.loc.id} err=${gl.getError()}`, true);
+    return R;
   }
   ref() { return this.target; } // the exact target nucleus: pixels shadow its orbit longest, so BLA skips most
   r(u) { return this.r0 * 2 ** -u; }
@@ -599,11 +671,11 @@ const probeTex = tex2D(PROBE_W, PROBE_H, gl.RGBA32F, gl.RGBA, gl.FLOAT, null);
 gl.bindFramebuffer(gl.FRAMEBUFFER, fboProbe); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, probeTex, 0);
 gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
-const S = { work: 2e7, vcap: 99, vcapT: 99, kTime: 0, quality: 0.8, keyH: 1, job: null, refresh: 16.7, dts: [], paused: false, speedIdx: 3, vs: 0, cur: null, next: null, fade: 0, hold: 0, advance: false, exporting: false, aspect: 1, devW: 1, devH: 1 };
+const S = { work: Math.min(2e7, DWORK || 2e7), vcap: 99, vcapT: 99, kTime: 0, quality: 0.8, keyH: 1, job: null, refresh: 16.7, dts: [], paused: false, speedIdx: 3, vs: 0, cur: null, next: null, fade: 0, hold: 0, advance: false, exporting: false, aspect: 1, devW: 1, devH: 1 };
 const SPEEDS = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4];
 
-const PROBE_CAP = MOBILE ? 400000 : 1500000;
-const MAX_STEPS = MOBILE ? 24000 : 60000;   // per-pixel loop cap (watchdog safety)
+const PROBE_CAP = DPCAP || (MOBILE ? 400000 : 1500000);
+const MAX_STEPS = DSTEPS || (MOBILE ? 24000 : 60000);  // per-pixel loop cap (watchdog safety)
 const pboPool = [];
 function probeCount(J) { return Math.ceil(J.Uend) + 2; }
 // Probes: tiny renders at every integer depth, independent of each other, read back asynchronously.
@@ -612,27 +684,30 @@ function probeSteps(J, j) { for (let k = j - 1; k >= 0; k--) { const p = J.probe
 // Draws part of the probe for the next depth; returns the work spent. Rows are spread over frames.
 function stepProbe(J, budget) {
   let pj = J.probeJob;
-  if (!pj) { const j = J.probeNext || 0, fp = frameParams(J, j, [J.aspect * MARGIN, MARGIN]); if (!fp) return 0; pj = J.probeJob = { j, fp, row: 0, steps: probeSteps(J, j) }; J.probeNext = j + 1; J.probes[j] = { j, state: 0 }; }
+  if (!pj) { const j = J.probeNext || 0, fp = frameParams(J, j, [J.aspect * MARGIN, MARGIN]); if (!fp) return 0; pj = J.probeJob = { j, fp, row: 0, steps: probeSteps(J, j), t0: performance.now() }; J.probeNext = j + 1; J.probes[j] = { j, state: 0 }; DEBUG && donce('probes', `first probe start loc=${J.loc.id} j=${j} est=${pj.steps}`); }
   gl.bindFramebuffer(gl.FRAMEBUFFER, fboProbe);
   bindFractal(PROG_PROBE, J, pj.fp, { maxIter: PROBE_CAP }, J.blaProbe, PROBE_W, PROBE_H);
   gl.viewport(0, 0, PROBE_W, PROBE_H); gl.enable(gl.SCISSOR_TEST);
   let spent = 0;
   pj.col = pj.col || 0;
   while (pj.row < PROBE_H && (spent === 0 || spent < budget)) {
-    if (pj.col > 0 || budget - spent < PROBE_W * pj.steps) {   // part of a row (keeps every piece small)
-      const n = clamp(Math.floor((budget - spent) / pj.steps), 16, PROBE_W - pj.col);
+    if (pj.col > 0 || budget - spent < PROBE_W * pj.steps || (DPX && DPX < PROBE_W)) {   // part of a row (keeps every piece small)
+      let n = clamp(Math.floor((budget - spent) / pj.steps), 16, PROBE_W - pj.col); if (DPX) n = Math.max(1, Math.min(n, DPX));
+      DEBUG && dtrail(`probe j=${pj.j} row ${pj.row} cols ${pj.col}+${n} px=${n} estSteps=${pj.steps | 0} budget=${dM(budget)}`);
       gl.scissor(pj.col, pj.row, n, 1); gl.drawArrays(gl.TRIANGLES, 0, 3); spent += n * pj.steps;
       pj.col += n; if (pj.col >= PROBE_W) { pj.col = 0; pj.row++; }
     } else {
-      const rows = clamp(Math.floor((budget - spent) / (PROBE_W * pj.steps)), 1, PROBE_H - pj.row);
+      let rows = clamp(Math.floor((budget - spent) / (PROBE_W * pj.steps)), 1, PROBE_H - pj.row); if (DPX) rows = Math.min(rows, Math.floor(DPX / PROBE_W));
+      DEBUG && dtrail(`probe j=${pj.j} rows ${pj.row}+${rows} px=${rows * PROBE_W} estSteps=${pj.steps | 0} budget=${dM(budget)}`);
       gl.scissor(0, pj.row, PROBE_W, rows); gl.drawArrays(gl.TRIANGLES, 0, 3); pj.row += rows; spent += rows * PROBE_W * pj.steps;
     }
   }
   gl.disable(gl.SCISSOR_TEST);
   if (pj.row >= PROBE_H) {
+    DEBUG && dtrail(`probe j=${pj.j} fully submitted, wall ${Math.round(performance.now() - pj.t0)} ms`);
     let pbo = pboPool.pop(); if (!pbo) { pbo = gl.createBuffer(); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbo); gl.bufferData(gl.PIXEL_PACK_BUFFER, PROBE_W * PROBE_H * 16, gl.STREAM_READ); }
     gl.bindBuffer(gl.PIXEL_PACK_BUFFER, pbo); gl.readPixels(0, 0, PROBE_W, PROBE_H, gl.RGBA, gl.FLOAT, 0); gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
-    J.probes[pj.j] = { j: pj.j, state: 1, pbo, fence: gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0) };
+    J.probes[pj.j] = { j: pj.j, state: 1, t0: pj.t0, pbo, fence: gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0) };
     J.probeJob = null;
   }
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -657,6 +732,7 @@ function rawStats(J, pr, data) {
     pr.rmax = Math.round(clamp(Math.exp(q(0.998)) * 2.5 + 2 * J.P, 1500, PROBE_CAP));
     if (pr.capFrac > 0.004) pr.rmax = PROBE_CAP;
   }
+  if (DEBUG) { let mx = 0; for (let i = 2; i < data.length; i += 4) mx = Math.max(mx, data[i]); dlog(`probe ${J.loc.id}:${pr.j} done avgSteps=${Math.round(pr.steps)} maxSteps=${Math.round(mx)} capFrac=${pr.capFrac.toFixed(3)} rmax=${pr.rmax} wall=${Math.round(performance.now() - pr.t0)} ms`); }
 }
 function finalizeProbes(J) {
   let prev = null;
@@ -682,6 +758,7 @@ function startKey(J, K) {
   const steps = Math.max(300, Math.max(pa.steps || 3000, pb.steps || 3000) * 1.3);
   let prev = null; for (const P of J.keys) if (P.state === 2 && P.tex && P.u < K.u - 0.2 && P.fp) prev = P;
   if (prev) prev.pin = (prev.pin || 0) + 1;
+  DEBUG && donce('key0-start', `first keyframe u=${K.u.toFixed(2)} ${tw}x${th} q=${q.toFixed(2)} estSteps=${Math.round(steps)} still=${!!K.still}`);
   return { kind: 'key', J, K, fp, col, w: tw, h: th, tiles, steps, prev, ty: 0, tx: 0, t0: performance.now() };
 }
 function drawTile(job, x, y, w, h) {
@@ -745,6 +822,7 @@ function pumpKeys(budget) {
     while (spent < budget && job.ty < job.h) {
       if (job.tx === 0) job.rowH = Math.min(tile, job.h - job.ty); // a row keeps one height even if the budget changes
       const w = Math.min(tile, job.w - job.tx), h = job.rowH;
+      DEBUG && dtrail(`key u=${job.K.u.toFixed(2)} tile ${w}x${h} @${job.tx},${job.ty} estSteps=${Math.round(job.steps)} budget=${dM(budget)}`);
       drawTile(job, job.tx, job.ty, w, h); spent += w * h * job.steps;
       job.tx += w; if (job.tx >= job.w) { job.tx = 0; job.ty += job.rowH; }
     }
@@ -752,7 +830,9 @@ function pumpKeys(budget) {
     if (job.ty >= job.h) {
       const mipCost = job.w * job.h * 40;   // building the mip chain is real GPU work too
       if (spent > 0 && spent + mipCost > budget) break;
+      DEBUG && dtrail(`key u=${job.K.u.toFixed(2)} generateMipmap ${job.w}x${job.h}`);
       gl.bindTexture(gl.TEXTURE_2D, job.K.tex); gl.generateMipmap(gl.TEXTURE_2D); spent += mipCost;
+      DEBUG && donce('key0-done', `first keyframe u=${job.K.u.toFixed(2)} took ${Math.round(performance.now() - job.t0)} ms`);
       job.K.state = 2; job.K.readyAt = performance.now(); S.job = null; if (job.prev) job.prev.pin--; if (window.LOGKEY) console.log('KEY', job.K.u, Math.round(performance.now() - job.t0));
       if (job.K.u < job.J.u - 1.5 && !job.K.still) { releaseKeyTex(job.K.tex); job.K.tex = null; job.K.state = 3; }
       if (!job.K.still && job.J === S.cur && S.cur.shown && !S.paused) adaptPace((performance.now() - job.t0) / 1000);
@@ -814,8 +894,10 @@ function gpuSchedule(dt) {
     if (shown ? dt * 1000 > S.refresh * 1.5 : dt > 0.05) { gp.ceil = S.work; S.work = Math.max(WORK_MIN, S.work * 0.7); }
     else { S.work = Math.min(MOBILE ? 6e7 : WORK_MAX, S.work * (shown ? 1.03 : 1.15), shown ? gp.ceil * 0.85 : Infinity); gp.ceil *= 1.002; }
   }
+  if (DWORK) S.work = Math.min(S.work, DWORK);   // debug: hard cap on per-frame work
   if (gp.inflight.length >= 2) return;                              // never queue far ahead of the display
   const spent = timed('work', 0, () => pump(S.work));
+  if (DEBUG && spent > 0) dtrail(`f${frameCount} pumped est=${dM(spent)} of work=${dM(S.work)} inflight=${gp.inflight.length}`);
   if (spent > 0) { gp.inflight.push(gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0)); gl.flush(); }
 }
 
@@ -1127,7 +1209,7 @@ function frame(now) {
       gl.enable(gl.BLEND); const a = smoothstep(0, 1, S.fade);
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); drawJourney(S.next, a); gl.disable(gl.BLEND);
     }
-    if (!veilGone) { veilGone = true; $('veil').style.opacity = 0; showName(); }
+    if (!veilGone) { veilGone = true; $('veil').style.opacity = 0; showName(); DEBUG && dstage('shown', 'veil removed, first picture at frame ' + frameCount); }
   } else {
     gl.clearColor(0.027, 0.031, 0.047, 1); gl.clear(gl.COLOR_BUFFER_BIT);
     if (S.cur && frameCount % 10 === 0) { const J = S.cur, pc = probeCount(J), k = J.keys.slice(0, 2).filter(x => x.state === 2).length;
@@ -1138,6 +1220,7 @@ function frame(now) {
   // time; without one we adapt to frame pacing. A floor keeps progress going whatever happens.
   try { gpuSchedule(dt); } catch (err) { console.error(err); if (S.job && S.job.prev) S.job.prev.pin--; S.job = null; }
   if (frameCount % 6 === 0) updateHud();
+  if (DEBUG) { if (frameCount === 1) dstage('frames', 'first rAF frame'); if (frameCount % 10 === 0) dstatus(); }
 }
 
 function showName() { $('locname').textContent = S.cur.loc.name; }
@@ -1174,7 +1257,7 @@ function poke() { document.body.classList.remove('idle'); clearTimeout(idleT); i
 canvas.addEventListener('dblclick', () => { try { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => {}); } catch (_) {} });
 try { navigator.wakeLock && navigator.wakeLock.request('screen').catch(() => {}); } catch (_) {}
 
-resize();
+resize(); DEBUG && dinfo2();
 let resume = null;
 try { resume = JSON.parse(sessionStorage.getItem('md-resume') || 'null'); sessionStorage.removeItem('md-resume'); } catch (_) {}
 if (resume && Date.now() - resume.t < 600000) { const i = LOCATIONS.findIndex(l => l.id === resume.id); if (i >= 0) { order.splice(order.indexOf(i), 1); order.unshift(i); orderPos = 0; } else resume = null; } else resume = null;
