@@ -1,0 +1,3523 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Can You Hear the Shape of a Drum?</title>
+<link rel="manifest" href="../manifest.json"><link rel="icon" href="../icons/icon-192.png"><link rel="apple-touch-icon" href="../icons/icon-180.png"><meta name="apple-mobile-web-app-title" content="Math Widgets"><script>if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("../sw.js"));</script>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Gloock&family=Martian+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Layout: header (title + lede) over a two-column grid. Left: square drum stage with the spectrum strip beneath. Right: a ~340px bench panel (shapes, readouts, mode gallery). One column on phones. */
+:root{
+  color-scheme: dark;
+  --bg:#12100e; --panel:#1a1714; --raise:#231f1a; --line:#3a332b;
+  --fg:#ede5d7; --muted:#a2968a; --accent:#d9a441; --on-accent:#12100e;
+  --warm:#e2774a; --cool:#58a7b9; --skin:#2a2520;
+  --font-display:"Gloock", Georgia, "Times New Roman", serif;
+  --font-body:"Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono:"Martian Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    color-scheme: light;
+    --bg:#f2ece1; --panel:#fbf8f2; --raise:#ffffff; --line:#d7cdbd;
+    --fg:#221c15; --muted:#6c6052; --accent:#93630f; --on-accent:#ffffff;
+    --warm:#c2532b; --cool:#2c7d90; --skin:#e9e0d0;
+  }
+}
+:root[data-theme="light"]{
+  color-scheme: light;
+  --bg:#f2ece1; --panel:#fbf8f2; --raise:#ffffff; --line:#d7cdbd;
+  --fg:#221c15; --muted:#6c6052; --accent:#93630f; --on-accent:#ffffff;
+  --warm:#c2532b; --cool:#2c7d90; --skin:#e9e0d0;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{height:100%}
+body{margin:0;min-height:100%;background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:16px;line-height:1.5;overflow-x:hidden;-webkit-text-size-adjust:100%}
+[hidden]{display:none !important}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1080px;margin:0 auto;padding-block:28px 48px;padding-inline:max(16px,3vw)}
+header{margin-bottom:22px;max-width:46rem}
+h1{font-family:var(--font-display);font-weight:400;font-size:clamp(28px,5.2vw,44px);line-height:1.1;margin:0 0 10px;letter-spacing:.005em}
+.lede{margin:0;color:var(--muted);font-size:17px}
+h2{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 10px;font-weight:700}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:28px;align-items:start}
+.stage-col{min-width:0;max-width:640px}
+.panel{min-width:0;display:flex;flex-direction:column;gap:22px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+.num{font-family:var(--font-mono);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+
+/* stage */
+.stage{position:relative;width:100%;aspect-ratio:1/1;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--bg)}
+#stageCanvas{display:block;width:100%;height:100%;touch-action:manipulation;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.stage.drawing #stageCanvas{touch-action:none;cursor:crosshair}
+.pill{position:absolute;left:10px;top:10px;bottom:auto;max-width:60%;text-align:left;padding:5px 11px;border-radius:999px;background:color-mix(in srgb,var(--panel) 90%,transparent);border:1px solid var(--line);color:var(--fg);font-size:13px;pointer-events:none;transition:opacity .4s}
+.busy{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:color-mix(in srgb,var(--bg) 55%,transparent);pointer-events:none}
+.busy span{background:var(--panel);border:1px solid var(--line);padding:6px 14px;border-radius:999px}
+.bar{width:160px;height:4px;border-radius:2px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .15s}
+.stagebar{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin:12px 0 18px;min-height:3em}
+.caption{margin:0;color:var(--muted);font-size:15px}
+.caption b{color:var(--fg);font-weight:500;font-size:14px;line-height:1.5}
+.btn{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:6px 14px;border-radius:999px;border:1px solid var(--accent);background:var(--accent);color:var(--on-accent);font-weight:700;cursor:pointer;white-space:nowrap}
+.btn:hover{filter:brightness(1.08)}
+.btn.ghost{background:transparent;color:var(--accent)}
+
+/* spectrum */
+.spec{padding:14px 14px 12px}
+.spec-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.spec-head h2{margin:0}
+#specCanvas{display:block;width:100%;height:130px;touch-action:manipulation;cursor:pointer}
+.spec .caption{font-size:14px;margin-top:8px}
+
+/* chips */
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:5px 12px 5px 7px;border:1px solid var(--line);border-radius:999px;background:var(--raise);cursor:pointer;font-size:14px;line-height:1.1}
+.chip canvas{width:28px;height:28px;flex:none}
+.chip:hover{border-color:var(--muted)}
+.chip[aria-pressed="true"]{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 16%,var(--raise))}
+.chip.plain{padding-left:14px}
+.msg{margin:10px 0 0;font-size:14px;color:var(--warm);min-height:1.4em}
+
+/* readouts */
+dl.read{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0 0 12px;font-size:14px}
+dl.read dt{color:var(--muted)}
+dl.read dd{margin:0;text-align:right;font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-size:13px}
+.fact{margin:0;padding-top:12px;border-top:1px solid var(--line);font-size:15px}
+
+/* gallery */
+.gal{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.mode{position:relative;display:flex;flex-direction:column;align-items:stretch;gap:3px;padding:4px;border-radius:10px;border:1px solid var(--line);background:var(--raise);cursor:pointer;min-width:0}
+.mode:hover{border-color:var(--muted)}
+.mode[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.mode canvas{display:block;width:100%;aspect-ratio:1/1;border-radius:6px}
+.mode .mn{position:absolute;left:7px;top:6px;font-family:var(--font-mono);font-size:10px;line-height:1;padding:2px 4px;border-radius:4px;background:color-mix(in srgb,var(--panel) 80%,transparent);color:var(--fg)}
+.mode .ml{font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-size:11px;color:var(--muted);text-align:center}
+.mode.extra{display:none}
+.gal.more .mode.extra{display:flex}
+.galnote{margin:10px 0 0;font-size:13px;color:var(--muted)}
+.galfoot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px}
+.how{margin:26px 0 0;max-width:46rem;color:var(--muted);font-size:14px}
+
+/* view tabs (each view is one entry in TABS) */
+.topbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 20px;margin:0 0 20px}
+.tabs{display:flex;flex-wrap:wrap;gap:8px}
+.voices{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.vlab{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-right:4px}
+.tab{font-size:15px;padding-left:16px;padding-right:16px}
+.tl-short{display:none}
+.vsel{display:none;align-items:center;flex-wrap:wrap;gap:6px 14px}
+.vsel>label{display:flex;align-items:center;gap:6px}
+.vsel>label[hidden]{display:none}
+.vsel select{min-height:36px;padding:4px 10px;border:1px solid var(--line);border-radius:999px;background:var(--raise);color:var(--fg);font:inherit;font-size:14px}
+.chip[aria-selected="true"]{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 16%,var(--raise))}
+
+/* twin drums */
+.twins{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.twlabel{margin:0 0 6px}
+.tcv{display:block;width:100%;height:100%;touch-action:manipulation;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.twmode{margin-bottom:18px}
+.twrow{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.stepper{display:flex;align-items:center;gap:8px}
+.chip.stepbtn{width:44px;padding:0;justify-content:center}
+.chip.stepbtn:disabled{opacity:.4;cursor:default}
+.stepl{min-width:6.5em;text-align:center;font-size:15px}
+.twmode .caption{margin-top:10px}
+#twSpec{display:block;width:100%;height:210px;touch-action:manipulation;cursor:pointer}
+.btnrow{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.btn:disabled{opacity:.45;cursor:default;filter:none}
+.story p{margin:0 0 10px;font-size:15px}
+.story p:last-child{margin-bottom:0}
+.small{margin:0;font-size:14px;color:var(--muted)}
+table.freq{width:100%;border-collapse:collapse;margin:0 0 14px}
+.freq th{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;text-align:right;padding:0 0 6px;border-bottom:1px solid var(--line)}
+.freq td{font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-size:13px;text-align:right;padding:5px 0;border-bottom:1px solid color-mix(in srgb,var(--line) 55%,transparent)}
+.freq th:first-child,.freq td:first-child{text-align:left}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* billiards */
+#billCanvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair;-webkit-tap-highlight-color:transparent}
+#chaosCanvas{display:block;width:100%;height:176px}
+.chaos .caption{margin-top:8px;font-size:14px}
+.slrow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 6px;font-size:14px}
+.slrow label{color:var(--muted)}
+input[type=range]{display:block;width:100%;min-width:0;margin:0;min-height:28px;accent-color:var(--accent);cursor:pointer}
+input[type=range]:disabled{opacity:.45;cursor:default}
+.mrow{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.mrow input[type=range]{flex:1}
+.blmode{margin:14px 0 8px;font-size:14px;min-height:1.5em}
+.blhint{margin:0;font-size:14px;color:var(--muted)}
+
+/* guess game */
+.gs-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px}
+.gs-head h2{margin:0 0 2px}
+.gs-title{margin:0;font-size:17px}
+.dots{display:flex;gap:6px;padding-top:1px;flex:none}
+.dot{display:flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;border:1.5px solid var(--line);font-size:10px;line-height:1;font-weight:700;color:var(--on-accent)}
+.dot.here{border-color:var(--muted)}
+.dot.ok{background:var(--accent);border-color:var(--accent)}
+.dot.ok::after{content:"\2713"}
+.dot.no{background:var(--warm);border-color:var(--warm)}
+.dot.no::after{content:"\2715"}
+.gs-play{min-height:48px;padding:8px 24px;font-size:17px}
+.gs-body{position:relative;margin:16px 0}
+.gs-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.gs-card{display:flex;flex-direction:column;align-items:stretch;gap:8px;min-width:0;padding:8px;border-radius:12px;border:1px solid var(--line);background:var(--raise)}
+.gs-card.right{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.gs-card.wrong{border-color:var(--warm);box-shadow:0 0 0 1px var(--warm)}
+.gs-pick{display:flex;flex-direction:column;align-items:stretch;gap:6px;min-width:0;padding:0;border:0;border-radius:8px;background:none;cursor:pointer}
+.gs-pick:disabled{cursor:default}
+.gs-card:not(.right):not(.wrong):has(.gs-pick:not(:disabled):hover){border-color:var(--muted)}
+.gs-pick canvas{display:block;width:100%;aspect-ratio:1/1;border-radius:8px;background:var(--bg)}
+.gs-name{font-size:14px;line-height:1.25;text-align:center;overflow-wrap:anywhere}
+.gs-tag{min-height:1.2em;font-size:11px;line-height:1.2;text-align:center;color:var(--muted)}
+.gs-card .chip{align-self:center;margin-top:auto;min-height:36px;padding:4px 12px}
+.gs-card .chip:disabled{opacity:.4;cursor:default}
+.gs-res{margin:0 0 12px;font-size:16px}
+.gs-after{margin-top:4px}
+#gsSpec{display:block;width:100%;height:236px;margin-bottom:12px;touch-action:manipulation;cursor:pointer}
+.gs-score{margin:0 0 10px;font-family:var(--font-display);font-size:28px;line-height:1.2}
+.mut{color:var(--muted)}
+
+@media (max-width:860px){
+  .grid{grid-template-columns:minmax(0,1fr)}
+  .stage-col{max-width:none}
+}
+@media (max-width:560px){
+  .twins{gap:8px}
+  .twin .busy span{font-size:13px;padding:4px 10px}
+  .tabs{flex-wrap:nowrap;gap:5px;width:100%}
+  .chip.tab{flex:1 1 0;min-width:0;justify-content:center;font-size:14px;padding-left:4px;padding-right:4px}
+  .tl-long{display:none}
+  .tl-short{display:inline}
+  .voices{display:none}
+  .vsel{display:flex}
+  .gs-cards{gap:6px}
+  .gs-card{padding:6px;gap:6px}
+  .gs-name{font-size:13px}
+  .gs-card .chip{padding:4px 10px;font-size:13px}
+}
+@media (prefers-reduced-motion: reduce){
+  .pill,.bar i{transition:none}
+}
+</style>
+</head>
+
+<div class="wrap">
+  <header>
+    <a href="../index.html" style="display:table;margin-bottom:6px;font-size:13px;color:#d0457f;font-weight:500;text-decoration:none">← All widgets</a>
+    <h1>Can you hear the shape of a drum?</h1>
+    <p class="lede" id="lede">Pick a shape, or draw your own, and it becomes a drum. The page works out every way that skin can ring, then lets you strike it and listen.</p>
+  </header>
+
+  <div class="topbar">
+    <div class="tabs" id="tabs" role="tablist" aria-label="Choose a view"></div>
+    <div class="vsel">
+      <label><span class="vlab">Sound</span><select id="voiceSel">
+        <option value="tuned">Tuned</option><option value="singing">Singing</option><option value="glass">Glass</option><option value="drum">Drum</option><option value="music">Song</option>
+      </select></label>
+      <label id="scaleSelWrap" hidden><span class="vlab">Scale</span><select id="scaleSel">
+        <option value="pentatonic">Pentatonic</option><option value="handpan">Handpan</option><option value="dreamy">Dreamy</option>
+      </select></label>
+    </div>
+    <div class="voices" role="group" aria-labelledby="voiceLab">
+      <span class="vlab" id="voiceLab">Sound</span>
+      <button class="chip plain" type="button" id="voice-tuned" aria-pressed="true">Tuned</button>
+      <button class="chip plain" type="button" id="voice-singing" aria-pressed="false">Singing</button>
+      <button class="chip plain" type="button" id="voice-glass" aria-pressed="false">Glass</button>
+      <button class="chip plain" type="button" id="voice-drum" aria-pressed="false">Drum</button>
+      <button class="chip plain" type="button" id="voice-music" aria-pressed="false">Song</button>
+    </div>
+    <div class="voices" id="scales" hidden role="group" aria-labelledby="scaleLab">
+      <span class="vlab" id="scaleLab">Scale</span>
+      <button class="chip plain" type="button" id="scale-pentatonic" aria-pressed="true">Pentatonic</button>
+      <button class="chip plain" type="button" id="scale-handpan" aria-pressed="false">Handpan</button>
+      <button class="chip plain" type="button" id="scale-dreamy" aria-pressed="false">Dreamy</button>
+    </div>
+  </div>
+
+  <main class="grid">
+    <section class="stage-col" id="oneCol" role="tabpanel" aria-labelledby="tab-drum" aria-label="Drum head">
+      <div class="stage" id="stage">
+        <canvas id="stageCanvas" tabindex="0" role="img" aria-label="Drum head. Press Enter to strike it."></canvas>
+        <div class="pill" id="pill" hidden></div>
+        <div class="busy" id="busy" role="status" hidden><span id="busyText">Tuning the drum…</span><div class="bar"><i id="busyBar"></i></div></div>
+      </div>
+      <div class="stagebar">
+        <p class="caption" id="stageCaption" aria-live="polite"></p>
+        <button class="btn ghost" id="backBtn" type="button" hidden>← Back to the drum</button>
+      </div>
+
+      <div class="card spec">
+        <div class="spec-head">
+          <h2>What you hear</h2>
+          <button class="chip plain" id="stringToggle" type="button" aria-pressed="false">Compare with a string</button>
+        </div>
+        <canvas id="specCanvas" aria-label="Spectrum: one bar for each vibration pattern, placed at its pitch. Tap a bar to hear that pattern."></canvas>
+        <p class="caption" id="specCaption" aria-live="polite"></p>
+      </div>
+    </section>
+
+    <aside class="panel" id="onePanel" aria-label="Controls">
+      <div class="card">
+        <h2>Shape</h2>
+        <div class="chips" id="shapeChips" role="group" aria-label="Choose a shape"></div>
+        <p class="msg" id="shapeMsg" role="status"></p>
+      </div>
+
+      <div class="card">
+        <h2>This drum</h2>
+        <dl class="read">
+          <dt>Shape</dt><dd id="rdShape">–</dd>
+          <dt>Area</dt><dd id="rdArea">–</dd>
+          <dt>Lowest note</dt><dd id="rdFund">–</dd>
+          <dt>Solved</dt><dd id="rdSolve">–</dd>
+        </dl>
+        <p class="fact" id="fact"></p>
+      </div>
+
+      <div class="card">
+        <h2>Vibration patterns</h2>
+        <div class="gal" id="gallery"></div>
+        <div class="galfoot">
+          <p class="galnote" style="margin:0">Tap a pattern to hear it alone. The still lines are where that pattern never moves.</p>
+          <button class="chip plain" id="moreBtn" type="button" aria-pressed="false">Show more</button>
+        </div>
+      </div>
+    </aside>
+
+    <section class="stage-col" id="twinCol" role="tabpanel" aria-labelledby="tab-twins" hidden>
+      <div class="twins">
+        <div class="twin">
+          <h2 class="twlabel">Drum A</h2>
+          <div class="stage" id="twStageA">
+            <canvas class="tcv" id="twCanvasA" tabindex="0" role="img" aria-label="Drum A. Press Enter to strike it."></canvas>
+            <div class="busy" id="busyA" role="status" hidden><span id="busyTextA">Tuning drum A…</span><div class="bar"><i id="busyBarA"></i></div></div>
+          </div>
+        </div>
+        <div class="twin">
+          <h2 class="twlabel">Drum B</h2>
+          <div class="stage" id="twStageB">
+            <canvas class="tcv" id="twCanvasB" tabindex="0" role="img" aria-label="Drum B. Press Enter to strike it."></canvas>
+            <div class="busy" id="busyB" role="status" hidden><span id="busyTextB">Tuning drum B…</span><div class="bar"><i id="busyBarB"></i></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="stagebar">
+        <p class="caption" id="twHint">Tap a drum to strike it at that spot.</p>
+        <button class="chip plain" id="twTri" type="button" aria-pressed="false">Show the seven triangles</button>
+      </div>
+
+      <div class="card twmode">
+        <h2>Same note, different dance</h2>
+        <div class="twrow">
+          <div class="stepper" role="group" aria-label="Choose a vibration pattern">
+            <button class="chip stepbtn" id="twPrev" type="button" aria-label="Previous pattern">◀</button>
+            <span class="num stepl" id="twModeLbl">Mode 1</span>
+            <button class="chip stepbtn" id="twNext" type="button" aria-label="Next pattern">▶</button>
+          </div>
+        </div>
+        <p class="caption" id="twCaption" aria-live="polite"></p>
+      </div>
+
+      <div class="card spec">
+        <div class="spec-head"><h2>What you hear</h2></div>
+        <canvas id="twSpec" aria-label="Mirrored spectrum. Drum A's notes point up from the middle line, Drum B's point down. Each bar has a partner exactly opposite it. Tap a bar to hear that note."></canvas>
+        <p class="caption" id="twSpecCaption">Every note one drum can play, the other can too.</p>
+      </div>
+    </section>
+
+    <aside class="panel" id="twinPanel" aria-label="About the twin drums" hidden>
+      <div class="card story">
+        <h2>Kac’s question</h2>
+        <p>In 1966 the mathematician Mark Kac asked: can one hear the shape of a drum? If you knew every note a drum could play, could you work out its shape?</p>
+        <p>In 1992 Carolyn Gordon, David Webb and Scott Wolpert found these two drums: different shapes, exactly the same notes. So the answer is no.</p>
+      </div>
+
+      <div class="card">
+        <h2>Ring them</h2>
+        <div class="btnrow">
+          <button class="btn ghost" id="twRingA" type="button" disabled>Ring A</button>
+          <button class="btn ghost" id="twRingB" type="button" disabled>Ring B</button>
+          <button class="btn" id="twRingAB" type="button" disabled>Ring A, then B</button>
+        </div>
+        <p class="small">Tap a drum to strike it at that spot. Where you hit changes how loud each note is, so strikes can differ — but the set of notes is identical. Ring makes both drums play every note equally.</p>
+      </div>
+
+      <div class="card">
+        <h2>The first ten notes</h2>
+        <table class="freq" id="twTable">
+          <caption class="sr">Frequencies of the first ten notes of each drum, in hertz</caption>
+          <thead><tr><th scope="col">Mode</th><th scope="col">Drum A (Hz)</th><th scope="col">Drum B (Hz)</th></tr></thead>
+          <tbody id="twRows"></tbody>
+        </table>
+        <dl class="read">
+          <dt>Area</dt><dd id="twArea">–</dd>
+          <dt>Solved</dt><dd id="twSolve">–</dd>
+          <dt>A vs B, first 20</dt><dd id="twAgree">–</dd>
+        </dl>
+        <p class="msg" id="twMsg" role="status"></p>
+      </div>
+    </aside>
+
+    <section class="stage-col" id="billCol" role="tabpanel" aria-labelledby="tab-billiards" aria-label="Billiard table" hidden>
+      <div class="stage" id="billStage">
+        <canvas id="billCanvas" tabindex="0" role="img" aria-label="Billiard table. Press, drag and let go to launch two balls. Press Enter to launch from the usual starting point."></canvas>
+        <div class="pill" id="billPill" hidden>Press, drag, and let go to launch</div>
+        <div class="busy" id="busyBill" role="status" hidden><span id="busyTextBill">Finding the patterns…</span><div class="bar"><i id="busyBarBill"></i></div></div>
+      </div>
+      <div class="stagebar">
+        <p class="caption" id="billCaption">Press inside the table, drag to aim, let go. Two balls leave together. The second starts one millionth of a radian off (about 0.000057 of a degree), far too small to see.</p>
+      </div>
+
+      <div class="card spec chaos">
+        <div class="spec-head"><h2>Chaos meter</h2></div>
+        <canvas id="chaosCanvas" role="img" aria-label="Chaos meter. Launch the balls to start it."></canvas>
+        <p class="caption num" id="gapLine"></p>
+        <p class="caption">Each dot is one bounce of the brass ball. A steady climb means the gap multiplies again and again: chaos. A slow creep means order.</p>
+      </div>
+    </section>
+
+    <aside class="panel" id="billPanel" aria-label="Billiard controls" hidden>
+      <div class="card">
+        <h2>Table</h2>
+        <div class="chips" id="blTables" role="group" aria-label="Choose a table"></div>
+      </div>
+
+      <div class="card">
+        <h2>Balls</h2>
+        <div class="slrow"><label for="blSpeed">Speed</label><span class="num" id="blSpeedVal">1.0×</span></div>
+        <input type="range" id="blSpeed" min="0.25" max="3" step="0.05" value="1">
+        <div class="btnrow" style="margin:14px 0 0">
+          <button class="btn" id="blAgain" type="button" disabled>Launch again</button>
+          <button class="btn ghost" id="blClear" type="button">Clear</button>
+          <button class="chip plain" id="blPause" type="button" aria-pressed="false">Pause</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>The drum’s patterns</h2>
+        <button class="chip plain" id="blPat" type="button" aria-pressed="false">Show the drum’s patterns</button>
+        <div class="blmode"><b class="num" id="blModeLbl">Mode 1</b></div>
+        <div class="mrow" role="group" aria-label="Choose a vibration pattern">
+          <button class="chip stepbtn" id="blPrev" type="button" aria-label="Previous pattern" disabled>◀</button>
+          <input type="range" id="blMode" min="1" max="120" step="1" value="1" aria-label="Pattern number, 1 to 120" disabled>
+          <button class="chip stepbtn" id="blNext" type="button" aria-label="Next pattern" disabled>▶</button>
+        </div>
+        <div class="btnrow" style="margin-bottom:10px"><button class="btn ghost" id="blScar" type="button">Find a scar</button></div>
+        <p class="blhint" id="blScarCap" role="status"></p>
+      </div>
+
+      <div class="card story">
+        <h2>Order and chaos</h2>
+        <p>Take the drum away and roll a ball across the frame instead, bouncing off the rim. In a circle the ball’s path stays orderly forever. In a stadium it becomes chaotic: two balls that start almost identically soon go completely different ways.</p>
+        <p>Strangely, the drum remembers this. Some of the stadium drum’s high vibration patterns pile up along the ball’s unstable paths. Physicists call them quantum scars (Eric Heller, 1984), because the same equation describes a quantum particle trapped in this shape.</p>
+      </div>
+
+      <div class="card">
+        <h2>Readouts</h2>
+        <dl class="read" style="margin:0">
+          <dt>Bounces</dt><dd id="blRdB">–</dd>
+          <dt>Gap</dt><dd id="blRdG">–</dd>
+          <dt>Patterns solved</dt><dd id="blRdS">–</dd>
+        </dl>
+      </div>
+    </aside>
+
+    <section class="stage-col" id="guessCol" role="tabpanel" aria-labelledby="tab-guess" aria-label="Listening game" hidden>
+      <div class="card">
+        <div id="gsGame">
+          <div class="gs-head">
+            <div>
+              <h2 id="gsRound" tabindex="-1">Round 1 of 5</h2>
+              <p class="gs-title" id="gsTitle"></p>
+            </div>
+            <div class="dots" id="gsDots" role="img" aria-label="Progress"></div>
+          </div>
+          <button class="btn gs-play" id="gsPlay" type="button" disabled>▶ Play the mystery drum</button>
+          <p class="caption" id="gsCaption" style="margin-top:8px"></p>
+          <div class="gs-body">
+            <div class="gs-cards" id="gsCards" role="group" aria-label="Pick the shape you heard"></div>
+            <div class="busy" id="busyGuess" role="status" hidden><span id="busyTextGuess">Tuning the drums…</span><div class="bar"><i id="busyBarGuess"></i></div></div>
+          </div>
+          <div id="gsErr" hidden>
+            <p class="msg" id="gsErrMsg" role="alert"></p>
+            <div class="btnrow"><button class="btn ghost" id="gsRetry" type="button">Try again</button></div>
+          </div>
+          <div class="gs-after" id="gsAfter" hidden>
+            <p class="gs-res" id="gsResult" role="status"></p>
+            <canvas id="gsSpec" role="img" aria-label="Mirrored spectrum. The mystery drum’s first twenty notes point up from the middle line, the notes of the drum you picked point down. Tap a bar to hear that note."></canvas>
+            <div class="btnrow"><button class="btn" id="gsNext" type="button">Next round →</button></div>
+          </div>
+        </div>
+        <div id="gsEnd" hidden>
+          <h2 id="gsEndH" tabindex="-1">Your score</h2>
+          <p class="gs-score" id="gsScore"></p>
+          <p class="caption" style="margin-bottom:14px">In 1966 Mark Kac asked whether you could hear the shape of a drum. The notes do give away a lot: the size, the area, even the length of the edge. But in 1992 Gordon, Webb and Wolpert found two different drums with exactly the same notes, so the full answer is no.</p>
+          <div class="btnrow"><button class="btn" id="gsAgain" type="button">Play again</button></div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="panel" id="guessPanel" aria-label="What the sound gave away" hidden>
+      <div class="card">
+        <h2>What the sound gave away</h2>
+        <p class="small" id="gsHint">Answer to see what the notes alone reveal about the mystery drum.</p>
+        <div id="gsClues" hidden>
+          <dl class="read">
+            <dt>Lowest note</dt><dd id="gsLow">–</dd>
+            <dt>Area, from the notes</dt><dd id="gsArea">–</dd>
+            <dt>Edge length, from the notes</dt><dd id="gsEdge">–</dd>
+            <dt>Shape</dt><dd>not directly</dd>
+          </dl>
+          <p class="small" id="gsLesson"></p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>How to listen</h2>
+        <p class="small">Play the mystery, then Listen to each shape. Compare the lowest note first, then how the notes climb.</p>
+      </div>
+    </aside>
+  </main>
+
+  <p class="how" id="how">How it works: the drum skin is cut into about three thousand tiny cells, and the page finds its forty lowest vibration patterns. A strike is a mix of those patterns, weighted by how much each one moves at the spot you hit. All of it runs here in your browser.</p>
+</div>
+
+<script>
+/* ===================================================================
+   SOLVER  (runs in a Web Worker built from this function's source)
+   Dirichlet eigenproblem  -Δu = λu  on an arbitrary polygon.
+   =================================================================== */
+function workerMain() {
+  'use strict';
+  var EPS = 2.220446049250313e-16, TLIM = 9000;      // TLIM: Lanczos time budget in ms (a message may raise it)
+
+  // --- symmetric eigen solver (Householder tridiagonalisation + implicit QL) ---
+  // V: array of n Float64Arrays (rows). On entry holds the matrix, on exit its
+  // columns are the eigenvectors; d holds the eigenvalues (unsorted).
+  function tred2(V, d, e, n) {
+    var i, j, k, f, g, h, hh, scale;
+    for (j = 0; j < n; j++) d[j] = V[n - 1][j];
+    for (i = n - 1; i > 0; i--) {
+      scale = 0; h = 0;
+      for (k = 0; k < i; k++) scale += Math.abs(d[k]);
+      if (scale === 0) {
+        e[i] = d[i - 1];
+        for (j = 0; j < i; j++) { d[j] = V[i - 1][j]; V[i][j] = 0; V[j][i] = 0; }
+      } else {
+        for (k = 0; k < i; k++) { d[k] /= scale; h += d[k] * d[k]; }
+        f = d[i - 1];
+        g = Math.sqrt(h);
+        if (f > 0) g = -g;
+        e[i] = scale * g;
+        h -= f * g;
+        d[i - 1] = f - g;
+        for (j = 0; j < i; j++) e[j] = 0;
+        for (j = 0; j < i; j++) {
+          f = d[j]; V[j][i] = f;
+          g = e[j] + V[j][j] * f;
+          for (k = j + 1; k <= i - 1; k++) { g += V[k][j] * d[k]; e[k] += V[k][j] * f; }
+          e[j] = g;
+        }
+        f = 0;
+        for (j = 0; j < i; j++) { e[j] /= h; f += e[j] * d[j]; }
+        hh = f / (h + h);
+        for (j = 0; j < i; j++) e[j] -= hh * d[j];
+        for (j = 0; j < i; j++) {
+          f = d[j]; g = e[j];
+          for (k = j; k <= i - 1; k++) V[k][j] -= (f * e[k] + g * d[k]);
+          d[j] = V[i - 1][j];
+          V[i][j] = 0;
+        }
+      }
+      d[i] = h;
+    }
+    for (i = 0; i < n - 1; i++) {
+      V[n - 1][i] = V[i][i];
+      V[i][i] = 1;
+      h = d[i + 1];
+      if (h !== 0) {
+        for (k = 0; k <= i; k++) d[k] = V[k][i + 1] / h;
+        for (j = 0; j <= i; j++) {
+          g = 0;
+          for (k = 0; k <= i; k++) g += V[k][i + 1] * V[k][j];
+          for (k = 0; k <= i; k++) V[k][j] -= g * d[k];
+        }
+      }
+      for (k = 0; k <= i; k++) V[k][i + 1] = 0;
+    }
+    for (j = 0; j < n; j++) { d[j] = V[n - 1][j]; V[n - 1][j] = 0; }
+    V[n - 1][n - 1] = 1;
+    e[0] = 0;
+  }
+
+  function tql2(V, d, e, n) {
+    var i, k, l, m, iter, f = 0, tst1 = 0, g, p, r, dl1, h, c, c2, c3, el1, s, s2;
+    for (i = 1; i < n; i++) e[i - 1] = e[i];
+    e[n - 1] = 0;
+    for (l = 0; l < n; l++) {
+      tst1 = Math.max(tst1, Math.abs(d[l]) + Math.abs(e[l]));
+      m = l;
+      while (m < n) { if (Math.abs(e[m]) <= EPS * tst1) break; m++; }
+      if (m > l) {
+        iter = 0;
+        do {
+          iter++;
+          g = d[l];
+          p = (d[l + 1] - g) / (2 * e[l]);
+          r = Math.sqrt(p * p + 1);
+          if (p < 0) r = -r;
+          d[l] = e[l] / (p + r);
+          d[l + 1] = e[l] * (p + r);
+          dl1 = d[l + 1];
+          h = g - d[l];
+          for (i = l + 2; i < n; i++) d[i] -= h;
+          f += h;
+          p = d[m];
+          c = 1; c2 = c; c3 = c; el1 = e[l + 1]; s = 0; s2 = 0;
+          for (i = m - 1; i >= l; i--) {
+            c3 = c2; c2 = c; s2 = s;
+            g = c * e[i];
+            h = c * p;
+            r = Math.sqrt(p * p + e[i] * e[i]);
+            e[i + 1] = s * r;
+            s = e[i] / r;
+            c = p / r;
+            p = c * d[i] - s * g;
+            d[i + 1] = h + s * (c * g + s * d[i]);
+            for (k = 0; k < n; k++) {
+              h = V[k][i + 1];
+              V[k][i + 1] = s * V[k][i] + c * h;
+              V[k][i] = c * V[k][i] - s * h;
+            }
+          }
+          p = -s * s2 * c3 * el1 * e[l] / dl1;
+          e[l] = s * p;
+          d[l] = c * p;
+        } while (Math.abs(e[l]) > EPS * tst1 && iter < 100);
+      }
+      d[l] = d[l] + f;
+      e[l] = 0;
+    }
+  }
+
+  // --- grid: cell centres on a square lattice, kept if inside the polygon (even-odd) ---
+  function makeMask(poly, nv, minx, miny, maxx, maxy, h) {
+    var nx = Math.max(1, Math.ceil((maxx - minx) / h - 1e-9));
+    var ny = Math.max(1, Math.ceil((maxy - miny) / h - 1e-9));
+    var mask = new Uint8Array(nx * ny), count = 0, xs = [];
+    for (var j = 0; j < ny; j++) {
+      var yc = miny + (j + 0.5) * h;
+      xs.length = 0;
+      for (var a = 0; a < nv; a++) {
+        var b = (a + 1) % nv, y0 = poly[2 * a + 1], y1 = poly[2 * b + 1];
+        if ((y0 <= yc) !== (y1 <= yc)) {
+          var x0 = poly[2 * a], x1 = poly[2 * b];
+          xs.push(x0 + (yc - y0) / (y1 - y0) * (x1 - x0));
+        }
+      }
+      xs.sort(function (p, q) { return p - q; });
+      for (var m = 0; m + 1 < xs.length; m += 2) {
+        var i0 = Math.ceil((xs[m] - minx) / h - 0.5);
+        var i1 = Math.ceil((xs[m + 1] - minx) / h - 0.5) - 1;
+        if (i0 < 0) i0 = 0;
+        if (i1 > nx - 1) i1 = nx - 1;
+        for (var i = i0; i <= i1; i++) { mask[j * nx + i] = 1; count++; }
+      }
+    }
+    return { nx: nx, ny: ny, mask: mask, count: count };
+  }
+
+  function solvePoly(poly, Kreq, targetN, report) {
+    var t0 = performance.now();
+    var nv = poly.length / 2, i, j, k, c;
+    var minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity, area = 0;
+    for (i = 0; i < nv; i++) {
+      var x = poly[2 * i], y = poly[2 * i + 1], jn = (i + 1) % nv;
+      if (x < minx) minx = x; if (x > maxx) maxx = x;
+      if (y < miny) miny = y; if (y > maxy) maxy = y;
+      area += x * poly[2 * jn + 1] - poly[2 * jn] * y;
+    }
+    area = Math.abs(area) / 2;
+    if (!(area > 1e-6)) throw new Error('The outline has no area.');
+
+    // choose h so that the number of interior cells is close to targetN
+    var h = Math.sqrt(area / targetN), g = null;
+    for (var it = 0; it < 4; it++) {
+      g = makeMask(poly, nv, minx, miny, maxx, maxy, h);
+      if (g.count < 10) { h *= 0.5; continue; }
+      var ratio = g.count / targetN;
+      if (Math.abs(ratio - 1) < 0.12 || it === 3) break;
+      h *= Math.sqrt(ratio);
+    }
+    var nx = g.nx, ny = g.ny, mask = g.mask, N = g.count;
+    if (N < 120) throw new Error('The outline is too thin to tune.');
+
+    // Number the unknowns along the longer axis so the matrix bandwidth is the shorter side.
+    var idx = new Int32Array(nx * ny).fill(-1), n = 0;
+    if (nx <= ny) { for (j = 0; j < ny; j++) for (i = 0; i < nx; i++) if (mask[j * nx + i]) idx[j * nx + i] = n++; }
+    else { for (i = 0; i < nx; i++) for (j = 0; j < ny; j++) if (mask[j * nx + i]) idx[j * nx + i] = n++; }
+
+    // M = h^2 * A : diagonal 4 (+1 per missing neighbour: ghost value -u puts the wall on the cell edge,
+    // so the cells' union has the polygon's area), off-diagonals -1.
+    var DI = [1, -1, 0, 0], DJ = [0, 0, 1, -1];
+    var diag = new Float64Array(N), bw = 0;
+    var low = [], lowCnt = new Int32Array(N);   // lower-triangle neighbours (index < own)
+    for (j = 0; j < ny; j++) for (i = 0; i < nx; i++) {
+      var p = idx[j * nx + i]; if (p < 0) continue;
+      var miss = 0;
+      for (var d4 = 0; d4 < 4; d4++) {
+        var ii = i + DI[d4], jj = j + DJ[d4], q = -1;
+        if (ii >= 0 && ii < nx && jj >= 0 && jj < ny) q = idx[jj * nx + ii];
+        if (q < 0) miss++;
+        else if (q < p) { if (p - q > bw) bw = p - q; low.push(p, q); lowCnt[p]++; }
+      }
+      diag[p] = 4 + miss;
+    }
+    var b = bw, Wd = b + 1;
+    var L = new Float64Array(N * Wd);
+    for (i = 0; i < N; i++) L[i * Wd + b] = diag[i];
+    for (i = 0; i < low.length; i += 2) L[low[i] * Wd + (low[i + 1] - low[i] + b)] = -1;
+    bandChol(L, N, b);
+    var applyInv = bandSolver(L, N, b);    // out = M^{-1} x
+    report(0.08);
+
+    var E = lanczosInv(N, applyInv, Kreq, t0, report), K = E.K;
+    // Ritz vectors scaled so that sum(u^2 h^2) = 1, sign fixed so the largest |value| is positive.
+    var lam = new Float64Array(K), vecs = new Float64Array(K * N);
+    for (var jk = 0; jk < K; jk++) {
+      var big = 0, bi = 0;
+      for (i = 0; i < N; i++) if (Math.abs(E.Y[jk * N + i]) > big) { big = Math.abs(E.Y[jk * N + i]); bi = i; }
+      var scl = (E.Y[jk * N + bi] < 0 ? -1 : 1) / h;
+      for (i = 0; i < N; i++) vecs[jk * N + i] = E.Y[jk * N + i] * scl;
+      lam[jk] = 1 / (E.th[jk] * h * h);
+    }
+    return {
+      K: K, N: N, lam: lam, vecs: vecs, area: area, iters: E.iters, dim: E.dim, nconv: E.nconv,
+      grid: { nx: nx, ny: ny, h: h, x0: minx, y0: miny, idx: idx },
+      ms: performance.now() - t0
+    };
+  }
+
+  // Banded Cholesky, in place. L holds the lower band row by row (width b+1, diagonal at offset b).
+  function bandChol(L, N, b) {
+    var Wd = b + 1, i, j, k;
+    for (i = 0; i < N; i++) {
+      var ri = i * Wd, jmin = Math.max(0, i - b);
+      for (j = jmin; j <= i; j++) {
+        var rj = j * Wd, s = L[ri + j - i + b];
+        for (k = jmin; k < j; k++) s -= L[ri + k - i + b] * L[rj + k - j + b];
+        if (j < i) L[ri + j - i + b] = s / L[rj + b];
+        else { if (!(s > 0)) throw new Error('Matrix factorisation failed.'); L[ri + b] = Math.sqrt(s); }
+      }
+    }
+  }
+  function bandSolver(L, N, b) {           // returns x -> (L L^T)^{-1} x  (two triangular solves)
+    var Wd = b + 1, tmp = new Float64Array(N);
+    return function (x, out) {
+      var ii, kk, ss, r0;
+      for (ii = 0; ii < N; ii++) {
+        r0 = ii * Wd; ss = x[ii];
+        for (kk = Math.max(0, ii - b); kk < ii; kk++) ss -= L[r0 + kk - ii + b] * tmp[kk];
+        tmp[ii] = ss / L[r0 + b];
+      }
+      for (ii = 0; ii < N; ii++) out[ii] = tmp[ii];
+      for (ii = N - 1; ii >= 0; ii--) {
+        r0 = ii * Wd;
+        out[ii] /= L[r0 + b];
+        var zi = out[ii];
+        for (kk = Math.max(0, ii - b); kk < ii; kk++) out[kk] -= L[r0 + kk - ii + b] * zi;
+      }
+    };
+  }
+
+  // Shift-and-invert block Lanczos with full reorthogonalisation, for any symmetric positive definite
+  // operator B given as applyInv = B^{-1}. Returns the Kreq smallest eigenpairs of B as theta = 1/lambda
+  // (descending) and Euclidean-unit Ritz vectors Y (row k is vector k).
+  // The smallest eigenvalues of B are the LARGEST of B^{-1}, which Lanczos finds fast.
+  // Block size 4 so repeated eigenvalues (square, circle) are all found.
+  function lanczosInv(N, applyInv, Kreq, t0, report) {
+    var i, c, P = 4, cap = Math.min(N, 1200), K = Math.min(Kreq, N);
+    var Q = [], Wv = [], T = new Float64Array(cap * cap);
+    var seed = 2463534242;
+    function rnd() { seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5; return (seed >>> 0) / 4294967296; }
+    function dot(u, v) { var ss = 0; for (var ii = 0; ii < N; ii++) ss += u[ii] * v[ii]; return ss; }
+    function tryAdd(r, ref) {
+      for (var pass = 0; pass < 2; pass++)
+        for (var qi = 0; qi < Q.length; qi++) {
+          var qv = Q[qi], cf = dot(qv, r);
+          for (var ii = 0; ii < N; ii++) r[ii] -= cf * qv[ii];
+        }
+      var nrm = Math.sqrt(dot(r, r));
+      if (nrm > 1e-8 * ref) { for (var ii = 0; ii < N; ii++) r[ii] /= nrm; Q.push(r); return true; }
+      return false;
+    }
+    for (c = 0; c < P; c++) {
+      var r0v = new Float64Array(N);
+      for (i = 0; i < N; i++) r0v[i] = rnd() - 0.5;
+      tryAdd(r0v, Math.sqrt(N) * 0.3);
+    }
+
+    var TOL = 1e-6, progress = 0.08, R = null;
+    function ritz() {
+      var m = Wv.length, V = [], dd = new Float64Array(m), ee = new Float64Array(m), a, bb;
+      for (a = 0; a < m; a++) { var row = new Float64Array(m); for (bb = 0; bb < m; bb++) row[bb] = T[a * cap + bb]; V.push(row); }
+      tred2(V, dd, ee, m); tql2(V, dd, ee, m);
+      var order = new Array(m); for (a = 0; a < m; a++) order[a] = a;
+      order.sort(function (p1, p2) { return dd[p2] - dd[p1]; });
+      var nconv = 0, res = [], rv = new Float64Array(N);
+      for (var jj = 0; jj < K; jj++) {
+        var col = order[jj], th = dd[col];
+        rv.fill(0);
+        for (a = 0; a < m; a++) {
+          var sc = V[a][col]; if (Math.abs(sc) < 1e-14) continue;
+          var wv = Wv[a], qv = Q[a];
+          for (var ii = 0; ii < N; ii++) rv[ii] += sc * (wv[ii] - th * qv[ii]);
+        }
+        var rn = Math.sqrt(dot(rv, rv));
+        res.push(rn);
+        if (rn <= TOL * th) nconv++;
+      }
+      return { m: m, V: V, d: dd, order: order, nconv: nconv, res: res };
+    }
+
+    var blockStart = 0, nextCheck = K + P, iters = 0;
+    for (;;) {
+      var m = Q.length;
+      for (c = blockStart; c < m; c++) {
+        var w = new Float64Array(N);
+        applyInv(Q[c], w); Wv[c] = w;
+        for (i = 0; i < m; i++) { var dv = dot(Q[i], w); T[i * cap + c] = dv; T[c * cap + i] = dv; }
+        iters++;
+      }
+      var exhausted = (m + P > cap) || (performance.now() - t0 > TLIM);
+      if (m >= nextCheck || exhausted) {
+        R = ritz();
+        progress = Math.max(progress, 0.08 + 0.9 * Math.min(1, R.nconv / K));
+        report(progress);
+        if (R.nconv >= K) break;
+        nextCheck = m + Math.max(8, Math.round(0.15 * m));
+      } else {
+        progress = Math.max(progress, 0.08 + 0.5 * Math.min(1, m / (4 * K)));
+        report(progress);
+      }
+      if (exhausted) break;
+      var oldStart = blockStart;
+      for (c = oldStart; c < m; c++) {
+        var rr = Wv[c].slice();
+        tryAdd(rr, Math.sqrt(dot(Wv[c], Wv[c])));
+      }
+      if (Q.length === m) break;           // Krylov space is invariant: nothing more to learn
+      blockStart = m;
+    }
+    if (!R || R.m !== Wv.length) R = ritz();
+
+    var th = new Float64Array(K), Y = new Float64Array(K * N), y = new Float64Array(N);
+    for (var jk = 0; jk < K; jk++) {
+      var col2 = R.order[jk];
+      y.fill(0);
+      for (var a2 = 0; a2 < R.m; a2++) {
+        var sc2 = R.V[a2][col2], qv2 = Q[a2];
+        for (i = 0; i < N; i++) y[i] += sc2 * qv2[i];
+      }
+      var nn = Math.sqrt(dot(y, y));
+      for (i = 0; i < N; i++) Y[jk * N + i] = y[i] / nn;
+      th[jk] = R.d[col2];
+    }
+    return { K: K, th: th, Y: Y, iters: iters, dim: Q.length, nconv: R.nconv };
+  }
+
+  /* ------------------------------------------------------------------
+     Finite elements for polygons made of right isosceles triangles.
+     tri: 6 numbers per triangle (right-angle corner P, then the far ends A and B of the two legs).
+     Each triangle is cut into n*n congruent sub-triangles by lines parallel to its sides; nodes are
+     shared between neighbours (matched by rounded coordinates). P1 elements, lumped (diagonal) mass:
+       K u = lambda M u   ->   (M^-1/2 K M^-1/2) y = lambda y,  u = M^-1/2 y.
+     ------------------------------------------------------------------ */
+  function solveFE(tri, n, Kreq, report) {
+    var t0 = performance.now();
+    var nt = tri.length / 6, n1 = n + 1, per = n1 * n1, t, i, j, e;
+    var ids = new Map(), xs = [], ys = [];
+    function node(x, y) {
+      var key = Math.round(x * 1e6) + ',' + Math.round(y * 1e6), v = ids.get(key);
+      if (v === undefined) { v = xs.length; ids.set(key, v); xs.push(x); ys.push(y); }
+      return v;
+    }
+    var gid = new Int32Array(nt * per).fill(-1);          // global node id of lattice point (i,j) of triangle t
+    var T = new Int32Array(nt * n * n * 3), nT = 0;
+    for (t = 0; t < nt; t++) {
+      var px = tri[6 * t], py = tri[6 * t + 1];
+      var e1x = (tri[6 * t + 2] - px) / n, e1y = (tri[6 * t + 3] - py) / n;
+      var e2x = (tri[6 * t + 4] - px) / n, e2y = (tri[6 * t + 5] - py) / n;
+      for (j = 0; j <= n; j++) for (i = 0; i + j <= n; i++)
+        gid[t * per + j * n1 + i] = node(px + i * e1x + j * e2x, py + i * e1y + j * e2y);
+      for (j = 0; j < n; j++) for (i = 0; i + j < n; i++) {
+        var o = t * per;
+        T[nT++] = gid[o + j * n1 + i]; T[nT++] = gid[o + j * n1 + i + 1]; T[nT++] = gid[o + (j + 1) * n1 + i];
+        if (i + j < n - 1) {
+          T[nT++] = gid[o + j * n1 + i + 1]; T[nT++] = gid[o + (j + 1) * n1 + i]; T[nT++] = gid[o + (j + 1) * n1 + i + 1];
+        }
+      }
+    }
+    var nn = xs.length, nTri = nT / 3;
+    // Dirichlet nodes: ends of edges that belong to exactly one sub-triangle.
+    var cnt = new Map(), a, b2, key2;
+    for (e = 0; e < nTri; e++) for (i = 0; i < 3; i++) {
+      a = T[3 * e + i]; b2 = T[3 * e + (i + 1) % 3];
+      key2 = a < b2 ? a * nn + b2 : b2 * nn + a;
+      cnt.set(key2, (cnt.get(key2) || 0) + 1);
+    }
+    var bnd = new Uint8Array(nn);
+    cnt.forEach(function (c, k2) { if (c === 1) { bnd[Math.floor(k2 / nn)] = 1; bnd[k2 % nn] = 1; } });
+    // Number the interior nodes along x or along y, whichever gives the narrower band.
+    var inter = [];
+    for (i = 0; i < nn; i++) if (!bnd[i]) inter.push(i);
+    var N = inter.length;
+    if (N < 50) throw new Error('The mesh is too coarse.');
+    var best = null;
+    for (var pass = 0; pass < 2; pass++) {
+      var ord = inter.slice();
+      ord.sort(pass === 0
+        ? function (p, q) { return Math.round((xs[p] - xs[q]) * 1e6) || (ys[p] - ys[q]); }
+        : function (p, q) { return Math.round((ys[p] - ys[q]) * 1e6) || (xs[p] - xs[q]); });
+      var num = new Int32Array(nn).fill(-1);
+      for (i = 0; i < N; i++) num[ord[i]] = i;
+      var bw = 0;
+      for (e = 0; e < nTri; e++) {
+        var lo = 1e9, hi = -1;
+        for (i = 0; i < 3; i++) { var q = num[T[3 * e + i]]; if (q >= 0) { if (q < lo) lo = q; if (q > hi) hi = q; } }
+        if (hi - lo > bw) bw = hi - lo;
+      }
+      if (!best || bw < best.bw) best = { num: num, bw: bw };
+    }
+    var num2 = best.num, b = best.bw, Wd = b + 1;
+    var L = new Float64Array(N * Wd), mass = new Float64Array(N), area = 0;
+    for (e = 0; e < nTri; e++) {
+      var v0 = T[3 * e], v1 = T[3 * e + 1], v2 = T[3 * e + 2];
+      var X = [xs[v0], xs[v1], xs[v2]], Yc = [ys[v0], ys[v1], ys[v2]], V3 = [v0, v1, v2];
+      var A2 = (X[1] - X[0]) * (Yc[2] - Yc[0]) - (X[2] - X[0]) * (Yc[1] - Yc[0]), Ar = Math.abs(A2) / 2;
+      area += Ar;
+      var bb = [Yc[1] - Yc[2], Yc[2] - Yc[0], Yc[0] - Yc[1]], cc = [X[2] - X[1], X[0] - X[2], X[1] - X[0]];
+      for (i = 0; i < 3; i++) {
+        var pi = num2[V3[i]]; if (pi < 0) continue;
+        mass[pi] += Ar / 3;
+        for (j = 0; j < 3; j++) {
+          var pj = num2[V3[j]]; if (pj < 0 || pj > pi) continue;
+          L[pi * Wd + (pj - pi + b)] += (bb[i] * bb[j] + cc[i] * cc[j]) / (4 * Ar);
+        }
+      }
+    }
+    bandChol(L, N, b);
+    var solveK = bandSolver(L, N, b), sq = new Float64Array(N), w = new Float64Array(N), ii;
+    for (i = 0; i < N; i++) sq[i] = Math.sqrt(mass[i]);
+    function applyInv(x, out) {               // out = (M^-1/2 K M^-1/2)^-1 x = M^1/2 K^-1 M^1/2 x
+      for (var r = 0; r < N; r++) w[r] = x[r] * sq[r];
+      solveK(w, out);
+      for (var s = 0; s < N; s++) out[s] *= sq[s];
+    }
+    report(0.08);
+    var E = lanczosInv(N, applyInv, Kreq, t0, report), K = E.K;
+    var lam = new Float64Array(K), vecs = new Float64Array(K * N);
+    for (var jk = 0; jk < K; jk++) {
+      var big = 0, bi = 0;
+      for (ii = 0; ii < N; ii++) { var u = E.Y[jk * N + ii] / sq[ii]; vecs[jk * N + ii] = u; if (Math.abs(u) > big) { big = Math.abs(u); bi = ii; } }
+      if (vecs[jk * N + bi] < 0) for (ii = 0; ii < N; ii++) vecs[jk * N + ii] = -vecs[jk * N + ii];
+      lam[jk] = 1 / E.th[jk];                 // already in the units of the coordinates passed in
+    }
+    // lattice point -> unknown index (N = boundary / outside), for the page's per-pixel interpolation
+    var nid = new Int32Array(nt * per).fill(N);
+    for (i = 0; i < nt * per; i++) if (gid[i] >= 0 && num2[gid[i]] >= 0) nid[i] = num2[gid[i]];
+    return {
+      K: K, N: N, lam: lam, vecs: vecs, area: area, iters: E.iters, dim: E.dim, nconv: E.nconv,
+      nodes: nn, elements: nTri, bandwidth: b,
+      grid: { n: n, tri: tri, nid: nid },
+      ms: performance.now() - t0
+    };
+  }
+
+  self.onmessage = function (ev) {
+    var msg = ev.data;
+    TLIM = msg.maxMs || 9000;
+    if (msg.type !== 'solve'&& msg.type !== 'solveFE') return;
+    try {
+      var rep = function (p) { self.postMessage({ type: 'progress', id: msg.id, p: p }); };
+      var out, xfer;
+      if (msg.type === 'solve') {
+        out = solvePoly(msg.poly, msg.K, msg.targetN, rep);
+        xfer = [out.lam.buffer, out.vecs.buffer, out.grid.idx.buffer];
+      } else {
+        out = solveFE(msg.tri, msg.n, msg.K, rep);
+        xfer = [out.lam.buffer, out.vecs.buffer, out.grid.nid.buffer];
+      }
+      out.type = 'done'; out.id = msg.id;
+      self.postMessage(out, xfer);
+    } catch (err) {
+      self.postMessage({ type: 'error', id: msg.id, message: String(err && err.message || err) });
+    }
+  };
+}
+
+/* ===================================================================
+   PAGE
+   =================================================================== */
+(function () {
+'use strict';
+
+var $ = function (id) { return document.getElementById(id); };
+var K_MODES = 40;
+var VIEW = 1.1;                                 // stage shows world [-1.1, 1.1]^2
+var SIGMA2 = 0.06 * 0.06;                       // soft mallet width^2
+var F_CONST = 196 * 0.85 / 2.404826;            // so a circle of radius 0.85 has f1 = 196 Hz (G3): tom-tom range, and audible on laptop speakers
+var DEBUG = location.hash === '#debug' || location.search.indexOf('debug') >= 0;
+var reduceMQ = window.matchMedia('(prefers-reduced-motion: reduce)');
+var reduced = reduceMQ.matches;
+var NOTES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+var MINUS = '−';
+
+/* ---------- small helpers ---------- */
+function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+function dprNow() { return Math.min(window.devicePixelRatio || 1, 2); }
+function noteOf(f) {
+  var m = 69 + 12 * Math.log2(f / 440), n = Math.round(m), cents = Math.round((m - n) * 100);
+  var name = NOTES[((n % 12) + 12) % 12] + (Math.floor(n / 12) - 1);
+  return { name: name, cents: cents, text: name + ' ' + (cents < 0 ? MINUS : '+') + Math.abs(cents) + '¢' };
+}
+function polyArea(p) {
+  var a = 0;
+  for (var i = 0; i < p.length; i++) { var q = p[(i + 1) % p.length]; a += p[i][0] * q[1] - q[0] * p[i][1]; }
+  return Math.abs(a) / 2;
+}
+function polyPerimeter(p) {
+  var s = 0;
+  for (var i = 0; i < p.length; i++) { var q = p[(i + 1) % p.length]; s += Math.hypot(q[0] - p[i][0], q[1] - p[i][1]); }
+  return s;
+}
+function polyBox(p) {
+  var x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+  p.forEach(function (q) { x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); y0 = Math.min(y0, q[1]); y1 = Math.max(y1, q[1]); });
+  return { x0: x0, x1: x1, y0: y0, y1: y1, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, w: x1 - x0, h: y1 - y0 };
+}
+function scaledPoly(p, area) {                    // a copy scaled about its bounding-box centre so its area is exactly `area`
+  var b = polyBox(p), s = Math.sqrt(area / polyArea(p));
+  return p.map(function (q) { return [b.cx + (q[0] - b.cx) * s, b.cy + (q[1] - b.cy) * s]; });
+}
+// Weyl's law: N(lam) ~ A lam / 4pi - L sqrt(lam) / 4pi. Least squares over modes 4.. (0-based i = 3..), N_i = i + 0.5 (no constant term).
+function weylFit(lam) {
+  var c = 1 / (4 * Math.PI), s11 = 0, s12 = 0, s22 = 0, b1 = 0, b2 = 0;
+  for (var i = 3; i < lam.length; i++) {
+    var x1 = lam[i] * c, x2 = -Math.sqrt(lam[i]) * c, y = i + 0.5;
+    s11 += x1 * x1; s12 += x1 * x2; s22 += x2 * x2; b1 += x1 * y; b2 += x2 * y;
+  }
+  var det = s11 * s22 - s12 * s12;
+  return { A: (b1 * s22 - b2 * s12) / det, L: (s11 * b2 - s12 * b1) / det };
+}
+function pointInPoly(p, x, y) {
+  var inside = false;
+  for (var i = 0, j = p.length - 1; i < p.length; j = i++) {
+    var xi = p[i][0], yi = p[i][1], xj = p[j][0], yj = p[j][1];
+    if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+// Ramer-Douglas-Peucker on an open polyline.
+function rdp(pts, eps) {
+  var n = pts.length; if (n < 3) return pts.slice();
+  var keep = new Uint8Array(n); keep[0] = keep[n - 1] = 1;
+  var stack = [[0, n - 1]];
+  while (stack.length) {
+    var seg = stack.pop(), a = seg[0], b = seg[1], dmax = 0, im = -1;
+    var ax = pts[a][0], ay = pts[a][1], dx = pts[b][0] - ax, dy = pts[b][1] - ay, len = Math.hypot(dx, dy);
+    for (var i = a + 1; i < b; i++) {
+      var d = len < 1e-12 ? Math.hypot(pts[i][0] - ax, pts[i][1] - ay)
+        : Math.abs(dy * (pts[i][0] - ax) - dx * (pts[i][1] - ay)) / len;
+      if (d > dmax) { dmax = d; im = i; }
+    }
+    if (dmax > eps && im > 0) { keep[im] = 1; stack.push([a, im], [im, b]); }
+  }
+  var out = []; for (var k = 0; k < n; k++) if (keep[k]) out.push(pts[k]);
+  return out;
+}
+
+/* ---------- colour ---------- */
+function parseColor(s) {
+  s = String(s).trim();
+  var m = /^#([0-9a-f]{3})$/i.exec(s);
+  if (m) return [parseInt(m[1][0] + m[1][0], 16), parseInt(m[1][1] + m[1][1], 16), parseInt(m[1][2] + m[1][2], 16)];
+  m = /^#([0-9a-f]{6})/i.exec(s);
+  if (m) return [parseInt(m[1].slice(0, 2), 16), parseInt(m[1].slice(2, 4), 16), parseInt(m[1].slice(4, 6), 16)];
+  m = /rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/.exec(s);
+  if (m) return [+m[1], +m[2], +m[3]];
+  return [128, 128, 128];
+}
+function s2l(c) { c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
+function l2s(c) { c = clamp(c, 0, 1); return 255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055); }
+function toLab(rgb) {                       // OKLab, so mixes look even to the eye
+  var r = s2l(rgb[0]), g = s2l(rgb[1]), b = s2l(rgb[2]);
+  var l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  var m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  var s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  return [0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s,
+          1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
+          0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s];
+}
+function fromLab(c) {
+  var l = c[0] + 0.3963377774 * c[1] + 0.2158037573 * c[2];
+  var m = c[0] - 0.1055613458 * c[1] - 0.0638541728 * c[2];
+  var s = c[0] - 0.0894841775 * c[1] - 1.2914855480 * c[2];
+  l = l * l * l; m = m * m * m; s = s * s * s;
+  return [l2s(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s),
+          l2s(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s),
+          l2s(-0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s)];
+}
+function mixLab(a, b, t) { return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]; }
+
+var TOK = {};            // theme tokens: css string + rgb
+var LUT_N = 1024, LUT_R = new Uint8Array(LUT_N), LUT_G = new Uint8Array(LUT_N), LUT_B = new Uint8Array(LUT_N);
+var MODE_COL = [];
+var INT_N = 256, INT_R = new Uint8Array(INT_N), INT_G = new Uint8Array(INT_N), INT_B = new Uint8Array(INT_N);
+function rgba(name, a) { var c = TOK[name].rgb; return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a + ')'; }
+function readTokens() {
+  var cs = getComputedStyle(document.documentElement);
+  ['bg', 'panel', 'raise', 'line', 'fg', 'muted', 'accent', 'warm', 'cool', 'skin'].forEach(function (n) {
+    var v = cs.getPropertyValue('--' + n).trim();
+    TOK[n] = { css: v, rgb: parseColor(v) };
+  });
+  TOK.mono = cs.getPropertyValue('--font-mono').trim();
+  TOK.body = cs.getPropertyValue('--font-body').trim();
+  var skin = toLab(TOK.skin.rgb), warm = toLab(TOK.warm.rgb), cool = toLab(TOK.cool.rgb);
+  for (var i = 0; i < LUT_N; i++) {
+    var c = (i / (LUT_N - 1)) * 2 - 1, t = Math.min(1, 1.15 * Math.pow(Math.abs(c), 0.72));   // lift mid-amplitudes so the skin glows
+    var rgb = fromLab(mixLab(skin, c >= 0 ? warm : cool, t));
+    LUT_R[i] = rgb[0] + 0.5; LUT_G[i] = rgb[1] + 0.5; LUT_B[i] = rgb[2] + 0.5;
+  }
+  var acc = toLab(TOK.accent.rgb);
+  MODE_COL = [];
+  for (var k = 0; k < K_MODES; k++) {
+    var u = k / (K_MODES - 1), lab = u < 0.5 ? mixLab(cool, acc, u * 2) : mixLab(acc, warm, (u - 0.5) * 2);
+    var cc = fromLab(lab); MODE_COL.push('rgb(' + (cc[0] | 0) + ',' + (cc[1] | 0) + ',' + (cc[2] | 0) + ')');
+  }
+  // One-sided ramp for |phi|^2 (billiards): skin -> brass -> a bright warm highlight (cream on dark, deep orange on light).
+  var dark = toLab(TOK.bg.rgb)[0] < 0.5, hi = dark ? mixLab(acc, toLab([255, 243, 214]), 0.72) : toLab(TOK.warm.rgb);
+  for (var j = 0; j < INT_N; j++) {
+    var u = j / (INT_N - 1), rgb2 = fromLab(u < 0.5 ? mixLab(skin, acc, u * 2) : mixLab(acc, hi, (u - 0.5) * 2));
+    INT_R[j] = rgb2[0] + 0.5; INT_G[j] = rgb2[1] + 0.5; INT_B[j] = rgb2[2] + 0.5;
+  }
+}
+
+/* ---------- shapes (world coords, y down like the screen) ---------- */
+function ngon(cx, cy, rx, ry, n) {
+  var p = []; for (var i = 0; i < n; i++) { var a = 2 * Math.PI * i / n; p.push([cx + rx * Math.cos(a), cy + ry * Math.sin(a)]); }
+  return p;
+}
+function stadium() {
+  var r = 0.475, hl = 0.475, p = [], i, n = 60;
+  for (i = 0; i <= n; i++) { var a = -Math.PI / 2 + Math.PI * i / n; p.push([hl + r * Math.cos(a), r * Math.sin(a)]); }
+  for (i = 0; i <= n; i++) { var b = Math.PI / 2 + Math.PI * i / n; p.push([-hl + r * Math.cos(b), r * Math.sin(b)]); }
+  return p;
+}
+function guitar() {
+  // two bouts (circles); the outline is the wider of the two, then blurred along the body so the waist curves gently
+  var cu = -0.45, ru = 0.48, cl = 0.36, rl = 0.6, top = cu - ru, bot = cl + rl, M = 400, raw = [], sm = [], j, q;
+  for (j = 0; j <= M; j++) {
+    var yy = top + (bot - top) * j / M;
+    raw.push(Math.max(Math.sqrt(Math.max(0, ru * ru - (yy - cu) * (yy - cu))), Math.sqrt(Math.max(0, rl * rl - (yy - cl) * (yy - cl)))));
+  }
+  var sig = 0.09 / (bot - top) * M;                   // blur width, in samples
+  for (j = 0; j <= M; j++) {
+    var s = 0, ws = 0;
+    for (q = Math.max(0, j - 3 * sig | 0); q <= Math.min(M, j + 3 * sig | 0); q++) { var e = Math.exp(-0.5 * (q - j) * (q - j) / (sig * sig)); s += e * raw[q]; ws += e; }
+    var yj = top + (bot - top) * j / M;
+    sm.push(yj > cu && yj < cl ? Math.max(raw[j], s / ws) : raw[j]);   // the blur only fills the waist between the bouts; the round ends stay as they are
+  }
+  sm[0] = sm[M] = 0;
+  function w(y) { var x = (y - top) / (bot - top) * M, i0 = Math.max(0, Math.min(M - 1, x | 0)), f = x - i0; return sm[i0] * (1 - f) + sm[i0 + 1] * f; }
+  var ts = [], n = 90, i;
+  for (i = 0; i <= n; i++) ts.push(0.5 - 0.5 * Math.cos(Math.PI * i / n));   // denser near the ends
+  var right = ts.map(function (t) { var y = top + (bot - top) * t; return [Math.max(0, w(y)), y]; });
+  var left = ts.slice().reverse().map(function (t) { var y = top + (bot - top) * t; return [-Math.max(0, w(y)), y]; });
+  return right.slice(0, -1).concat(left.slice(0, -1));
+}
+function star() {
+  var p = []; for (var i = 0; i < 10; i++) { var r = i % 2 ? 0.475 : 0.95, a = -Math.PI / 2 + i * Math.PI / 5; p.push([r * Math.cos(a), r * Math.sin(a)]); }
+  return p;
+}
+function heart() {
+  var raw = [], i, n = 160;
+  for (i = 0; i < n; i++) {
+    var t = 2 * Math.PI * i / n;
+    raw.push([16 * Math.pow(Math.sin(t), 3), -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t))]);
+  }
+  var x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+  raw.forEach(function (q) { x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); y0 = Math.min(y0, q[1]); y1 = Math.max(y1, q[1]); });
+  var s = 1.85 / Math.max(x1 - x0, y1 - y0), cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  return raw.map(function (q) { return [(q[0] - cx) * s, (q[1] - cy) * s]; });
+}
+var SHAPES = [
+  { key: 'circle', name: 'Circle', poly: ngon(0, 0, 0.85, 0.85, 200),
+    fact: 'Its overtones follow the zeros of Bessel functions: exactly 1.593 (twice), 2.136 (twice), 2.295… The page’s pairs differ slightly in the third decimal, because square cells can only approximate a round edge.' },
+  { key: 'square', name: 'Square', poly: [[-0.75, -0.75], [0.75, -0.75], [0.75, 0.75], [-0.75, 0.75]],
+    fact: 'Modes come in pairs that sound exactly alike.' },
+  { key: 'stadium', name: 'Stadium', poly: stadium(),
+    fact: 'Hold on to this one — it is chaotic as a billiard table.' },
+  { key: 'lshape', name: 'L-shape', poly: [[-0.8, -0.8], [0, -0.8], [0, 0], [0.8, 0], [0.8, 0.8], [-0.8, 0.8]],
+    fact: 'Three unit squares joined in an L. The L-shaped membrane’s first mode is the MATLAB logo.' },
+  { key: 'guitar', name: 'Guitar', poly: guitar(),
+    fact: 'Guitar makers tap a soundboard and listen for patterns just like these to tune it.' },
+  { key: 'star', name: 'Star', poly: star(),
+    fact: 'In a sharp tip the skin barely moves — the sound lives in the fat middle.' },
+  { key: 'heart', name: 'Heart', poly: heart(),
+    fact: 'The dent at the top is an inward corner, where the skin’s pattern bends sharply.' }
+];
+SHAPES.forEach(function (s) { s.area = polyArea(s.poly); });
+
+/* ---------- state ---------- */
+var state = {
+  view: 'drum', shape: null, sol: null, solving: false, progress: 0,
+  tapped: false, selMode: 0, hits: [], lastAmps: null, lastStrike: null, ripple: null,
+  showMore: false, stringCmp: false, hoverBar: -1,
+  drawing: { on: false, active: false, pts: [] },
+  lastGood: null, idleStart: 0
+};
+
+/* ---------- view registry (a view is one TABS entry, one VIEWS entry, its columns in the markup) ---------- */
+var TABS = [{ key: 'drum', label: 'One drum', short: 'Drum' }, { key: 'twins', label: 'Twin drums', short: 'Twins' }, { key: 'billiards', label: 'Billiards', short: 'Billiards' }, { key: 'guess', label: 'Can you hear it?', short: 'Game' }];
+var VIEW_TEXT = {
+  drum: {
+    lede: $('lede').textContent,
+    how: $('how').textContent
+  },
+  twins: {
+    lede: 'Two drums with different shapes that ring with exactly the same notes. Strike them, ring them, and compare.',
+    how: 'How it works: each drum is cut into seven right triangles, and each triangle into about a thousand smaller ones (finite elements). The page finds the forty lowest vibration patterns of both drums here in your browser. Because the two drums are built from the very same pieces, the sums for A and B come out as the same list of numbers, to within rounding.'
+  },
+  billiards: {
+    lede: 'Roll a ball around a table instead of striking a drum. In some tables the path stays tidy, in others it turns chaotic, and the drum of the same shape still remembers.',
+    how: 'How it works: a ball moves in straight lines and bounces off the rim like light off a mirror. The page finds exactly where it hits next and jumps there, so there are no tiny time steps and no drift. The drum patterns are the 120 lowest of the same shape, found on a grid of about six thousand cells. A scar’s score is how much brighter a pattern is along an orbit than it is on average.'
+  },
+  guess: {
+    lede: 'Hear a mystery drum, then pick its shape from three. Five rounds, from easy to hard.',
+    how: 'How it works: each drum’s notes are found the same way as in One drum. The clues come from Weyl’s law: a drum with more area has more notes below any pitch, and a longer edge has slightly fewer. Fitting that rule to the first forty notes gives back the area and the edge length, without ever looking at the shape.'
+  }
+};
+var VIEWS = {
+  drum:  { cols: ['oneCol', 'onePanel'],   enter: function () { onResize(); }, leave: function () {} },
+  twins: { cols: ['twinCol', 'twinPanel'], enter: function () { twEnter(); },  leave: function () {} },
+  billiards: { cols: ['billCol', 'billPanel'], enter: function () { blEnter(); }, leave: function () { blLeave(); } },
+  guess: { cols: ['guessCol', 'guessPanel'], enter: function () { gsEnter(); }, leave: function () {} }
+};
+function setView(name) {
+  if (!VIEWS[name] || name === state.view) return;
+  VIEWS[state.view].leave(); state.view = name;
+  Object.keys(VIEWS).forEach(function (k) { VIEWS[k].cols.forEach(function (id) { $(id).hidden = k !== name; }); });
+  $('lede').textContent = VIEW_TEXT[name].lede; $('how').textContent = VIEW_TEXT[name].how;
+  syncTabs();
+  VIEWS[name].enter(); scheduleDraw();
+}
+function buildTabs() {
+  var box = $('tabs');
+  TABS.forEach(function (t, i) {
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'chip plain tab'; b.id = 'tab-' + t.key; b.setAttribute('role', 'tab');
+    b.setAttribute('aria-controls', VIEWS[t.key].cols[0]); b.setAttribute('aria-label', t.label);
+    b.innerHTML = '<span class="tl-long">' + t.label + '</span><span class="tl-short" aria-hidden="true">' + t.short + '</span>';
+    b.addEventListener('click', function () { ensureAudio(); setView(t.key); });
+    b.addEventListener('keydown', function (ev) {
+      var d = ev.key === 'ArrowRight' ? 1 : ev.key === 'ArrowLeft' ? -1 : ev.key === 'Home' ? -99 : ev.key === 'End' ? 99 : 0;
+      if (!d) return;
+      ev.preventDefault();
+      var j = Math.abs(d) > 1 ? (d < 0 ? 0 : TABS.length - 1) : (i + d + TABS.length) % TABS.length;
+      $('tab-' + TABS[j].key).focus(); setView(TABS[j].key);
+    });
+    box.appendChild(b);
+  });
+  syncTabs();
+}
+function syncTabs() {
+  TABS.forEach(function (t) {
+    var b = $('tab-' + t.key), on = state.view === t.key;
+    b.setAttribute('aria-selected', on ? 'true' : 'false'); b.tabIndex = on ? 0 : -1;
+  });
+}
+
+/* ===================================================================
+   Solving (worker)
+   =================================================================== */
+var workerUrl = null, worker = null, solveId = 0;
+function getWorkerUrl() {
+  if (!workerUrl) workerUrl = URL.createObjectURL(new Blob(['(' + workerMain.toString() + ')();'], { type: 'text/javascript' }));
+  return workerUrl;
+}
+function setBusy(on, p, sfx) {                     // sfx: '' for the single stage, 'A' / 'B' for the twins
+  sfx = sfx || '';
+  var busy = $('busy' + sfx);
+  busy.hidden = !on;
+  if (on) {
+    var pc = Math.round(clamp(p || 0, 0, 1) * 100);
+    $('busyText' + sfx).textContent = (sfx === 'Bill' ? 'Finding 120 patterns… ' : sfx ? 'Tuning drum ' + sfx + '… ' : 'Tuning the drum… ') + pc + '%';
+    $('busyBar' + sfx).style.width = pc + '%';
+  }
+}
+function loadShape(shape) {
+  var id = ++solveId;
+  state.shape = shape; state.sol = null; state.solving = true; state.progress = 0;
+  state.hits = []; state.selMode = 0; state.lastAmps = null; state.ripple = null; lastTuned = null;
+  clearStageCaches(); setBusy(true, 0); syncChips(); updateReadouts(); updateCaption(); updatePill(); drawSpectrum(); scheduleDraw();
+  $('shapeMsg').textContent = '';
+  if (worker) { worker.terminate(); worker = null; }
+  return new Promise(function (resolve) {
+    var w;
+    try { w = new Worker(getWorkerUrl()); } catch (err) {
+      state.solving = false; setBusy(false); $('shapeMsg').textContent = 'This browser would not start the tuning worker.'; resolve(null); return;
+    }
+    worker = w;
+    var flat = new Float64Array(shape.poly.length * 2);
+    shape.poly.forEach(function (q, i) { flat[2 * i] = q[0]; flat[2 * i + 1] = q[1]; });
+    w.onmessage = function (ev) {
+      var m = ev.data; if (m.id !== id) return;
+      if (m.type === 'progress') { state.progress = m.p; setBusy(true, m.p); return; }
+      w.terminate(); if (worker === w) worker = null;
+      state.solving = false; setBusy(false);
+      if (m.type === 'error') {
+        $('shapeMsg').textContent = 'Could not tune that shape (' + m.message + ') Try a bigger, rounder outline.';
+        if (state.lastGood && state.lastGood !== shape) loadShape(state.lastGood);
+        resolve(null); return;
+      }
+      finishSolve(shape, m); resolve(state.sol);
+    };
+    w.onerror = function (ev) {
+      state.solving = false; setBusy(false);
+      $('shapeMsg').textContent = 'The tuning worker hit a problem.'; resolve(null);
+    };
+    w.postMessage({ type: 'solve', id: id, poly: flat, K: K_MODES, targetN: 3000 });
+  });
+}
+function makeSol(shape, m) {
+  var K = m.K, N = m.N, vecs = [], f = new Float64Array(K);
+  for (var k = 0; k < K; k++) {
+    var v = new Float64Array(N + 1);            // slot N is a permanent zero (cells outside the drum)
+    v.set(m.vecs.subarray(k * N, (k + 1) * N));
+    vecs.push(v);
+    f[k] = F_CONST * Math.sqrt(m.lam[k]);
+  }
+  return { K: K, N: N, lam: m.lam, vecs: vecs, f: f, grid: m.grid, ms: m.ms, area: shape.area, iters: m.iters, dim: m.dim, nconv: m.nconv };
+}
+function finishSolve(shape, m) {
+  state.sol = makeSol(shape, m);
+  state.lastGood = shape;
+  state.idleStart = performance.now();
+  buildStage(); buildThumbs();
+  updateReadouts(); updateCaption(); updatePill(); drawSpectrum(); scheduleDraw();
+  $('stageCanvas').setAttribute('aria-label', 'Drum head, shape: ' + shape.name + '. Press Enter to strike it.');
+}
+
+/* ===================================================================
+   Pixel maps: where each canvas pixel sits in the solver grid
+   =================================================================== */
+function buildMap(poly, sol, W, H, win) {
+  var cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  var cx = cv.getContext('2d', { willReadFrequently: true });
+  cx.fillStyle = '#fff'; cx.beginPath();
+  poly.forEach(function (q, i) {
+    var X = ((q[0] - win.cx) / win.half + 1) / 2 * W, Y = ((q[1] - win.cy) / win.half + 1) / 2 * H;
+    if (i) cx.lineTo(X, Y); else cx.moveTo(X, Y);
+  });
+  cx.closePath(); cx.fill('evenodd');
+  var data = cx.getImageData(0, 0, W, H).data, count = 0, i, px, py;
+  for (py = 2; py < H - 2; py++) for (px = 2; px < W - 2; px++) if (data[(py * W + px) * 4 + 3] > 3) count++;
+  var pix = new Int32Array(count), alpha = new Float32Array(count), tap = new Int32Array(count * 4), wt = new Float32Array(count * 4);
+  var g = sol.grid, N = sol.N, q = 0;
+  for (py = 2; py < H - 2; py++) for (px = 2; px < W - 2; px++) {
+    var a = data[(py * W + px) * 4 + 3]; if (a <= 3) continue;
+    var wx = win.cx + ((px + 0.5) / W * 2 - 1) * win.half, wy = win.cy + ((py + 0.5) / H * 2 - 1) * win.half;
+    pix[q] = py * W + px; alpha[q] = a / 255;
+    pointTaps(g, N, wx, wy, tap, wt, q * 4);
+    q++;
+  }
+  return { W: W, H: H, count: count, pix: pix, alpha: alpha, tap: tap, wt: wt };
+}
+// Triangle-mesh version (the twin drums): the point's sub-triangle gives 3 taps, the 4th has weight 0.
+function meshTaps(g, N, x, y, tap, wt, o) {
+  var n = g.n, n1 = n + 1, tri = g.tri, nt = tri.length / 6;
+  tap[o] = tap[o + 1] = tap[o + 2] = tap[o + 3] = N; wt[o] = wt[o + 1] = wt[o + 2] = wt[o + 3] = 0;
+  for (var t = 0; t < nt; t++) {
+    var px = tri[6 * t], py = tri[6 * t + 1], e1x = tri[6 * t + 2] - px, e1y = tri[6 * t + 3] - py, e2x = tri[6 * t + 4] - px, e2y = tri[6 * t + 5] - py;
+    var l2 = e1x * e1x + e1y * e1y, dx = x - px, dy = y - py;
+    var s = (dx * e1x + dy * e1y) / l2, u = (dx * e2x + dy * e2y) / l2;      // legs are perpendicular and equal
+    if (s < -1e-9 || u < -1e-9 || s + u > 1 + 1e-9) continue;
+    var S = s * n, U = u * n, i = Math.floor(S), j = Math.floor(U);
+    if (i > n - 1) i = n - 1; if (i < 0) i = 0;
+    if (j > n - 1 - i) j = n - 1 - i; if (j < 0) j = 0;
+    var fs = S - i, fu = U - j, b = t * n1 * n1 + j * n1 + i, nid = g.nid;
+    if (fs + fu <= 1) {
+      tap[o] = nid[b]; tap[o + 1] = nid[b + 1]; tap[o + 2] = nid[b + n1];
+      wt[o] = 1 - fs - fu; wt[o + 1] = fs; wt[o + 2] = fu;
+    } else {
+      tap[o] = nid[b + 1]; tap[o + 1] = nid[b + n1]; tap[o + 2] = nid[b + n1 + 1];
+      wt[o] = 1 - fu; wt[o + 1] = 1 - fs; wt[o + 2] = fs + fu - 1;
+    }
+    return;
+  }
+}
+// Bilinear interpolation taps for world point (x,y): 4 unknown indices (N = outside) and weights.
+function pointTaps(g, N, x, y, tap, wt, o) {
+  if (g.tri) { meshTaps(g, N, x, y, tap, wt, o); return; }
+  var gx = (x - g.x0) / g.h - 0.5, gy = (y - g.y0) / g.h - 0.5;
+  var i0 = Math.floor(gx), j0 = Math.floor(gy), fx = gx - i0, fy = gy - j0;
+  for (var d = 0; d < 4; d++) {
+    var ii = i0 + (d & 1), jj = j0 + (d >> 1), t = N;
+    if (ii >= 0 && ii < g.nx && jj >= 0 && jj < g.ny) { var v = g.idx[jj * g.nx + ii]; if (v >= 0) t = v; }
+    tap[o + d] = t;
+    wt[o + d] = ((d & 1) ? fx : 1 - fx) * ((d >> 1) ? fy : 1 - fy);
+  }
+}
+function sampleField(map, u, out) {
+  var pix = map.pix, tap = map.tap, wt = map.wt, n = map.count;
+  for (var q = 0; q < n; q++) {
+    var o = q * 4;
+    out[pix[q]] = wt[o] * u[tap[o]] + wt[o + 1] * u[tap[o + 1]] + wt[o + 2] * u[tap[o + 2]] + wt[o + 3] * u[tap[o + 3]];
+  }
+}
+function makeBase(map, base) {
+  var bg = TOK.bg.rgb, sk = TOK.skin.rgb;
+  var bgv = (255 << 24) | (bg[2] << 16) | (bg[1] << 8) | bg[0];
+  base.fill(bgv);
+  for (var q = 0; q < map.count; q++) {
+    var a = map.alpha[q], r = bg[0] + (sk[0] - bg[0]) * a, g = bg[1] + (sk[1] - bg[1]) * a, b = bg[2] + (sk[2] - bg[2]) * a;
+    base[map.pix[q]] = (255 << 24) | ((b + 0.5 | 0) << 16) | ((g + 0.5 | 0) << 8) | (r + 0.5 | 0);
+  }
+}
+// Thin dark lines where the field crosses zero (distance to zero in pixels < ~1).
+function makeNodal(map, phi) {
+  var W = map.W, out = new Float32Array(W * map.H), mx = 0, q;
+  for (q = 0; q < map.count; q++) { var a = Math.abs(phi[map.pix[q]]); if (a > mx) mx = a; }
+  for (q = 0; q < map.count; q++) {
+    var p = map.pix[q], v = phi[p];
+    var vx = (phi[p + 1] - phi[p - 1]) * 0.5, vy = (phi[p + W] - phi[p - W]) * 0.5;
+    var d = Math.abs(v) / (Math.sqrt(vx * vx + vy * vy) + 1e-9 * mx + 1e-30);
+    var t = clamp((d - 0.45) / 1.1, 0, 1);
+    out[p] = (1 - t * t * (3 - 2 * t)) * (Math.abs(v) < 0.4 * mx ? 1 : 0);
+  }
+  return out;
+}
+// Colour + fake-normal lighting (light from the top-left) for one frame.
+function shade(map, V, A0, nodal, u32, base, light) {
+  u32.set(base);
+  var W = map.W, n = map.count, pix = map.pix, al = map.alpha, inv = 1 / A0, bg = TOK.bg.rgb;
+  var ls = light * W * 0.5;
+  for (var q = 0; q < n; q++) {
+    var p = pix[q], x = V[p] * inv * 1.6;
+    var c = x / (1 + (x < 0 ? -x : x));
+    var li = ((c + 1) * 0.5 * (LUT_N - 1)) | 0;
+    var s = clamp((V[p + 2] - V[p - 2] + V[p + 2 * W] - V[p - 2 * W]) * inv * ls, -0.4, 0.4);
+    var k = 1 + s;
+    if (nodal) k *= 1 - 0.6 * nodal[p];
+    var r = LUT_R[li] * k, g = LUT_G[li] * k, b = LUT_B[li] * k, a = al[q];
+    if (a < 1) { r = bg[0] + (r - bg[0]) * a; g = bg[1] + (g - bg[1]) * a; b = bg[2] + (b - bg[2]) * a; }
+    r = r > 255 ? 255 : (r < 0 ? 0 : r); g = g > 255 ? 255 : (g < 0 ? 0 : g); b = b > 255 ? 255 : (b < 0 ? 0 : b);
+    u32[p] = (255 << 24) | ((b + 0.5 | 0) << 16) | ((g + 0.5 | 0) << 8) | (r + 0.5 | 0);
+  }
+}
+
+/* ===================================================================
+   Stage rendering
+   =================================================================== */
+var stageCv = $('stageCanvas'), stageCtx = stageCv.getContext('2d');
+var fieldCv = document.createElement('canvas'), fieldCtx = fieldCv.getContext('2d');
+var S = { cw: 0, ch: 0, rw: 0, map: null, img: null, u32: null, base: null, V: null, phi: {}, uN: null };
+
+function clearStageCaches() { S.map = null; S.phi = {}; }
+function sizeStage() {
+  var st = $('stage'), css = Math.max(1, st.clientWidth), dpr = dprNow();
+  var px = Math.max(2, Math.round(css * dpr));
+  if (px !== S.cw) {
+    S.cw = S.ch = px; stageCv.width = px; stageCv.height = px;
+    S.rw = clamp(Math.round(px * 0.75), 160, 460);
+    fieldCv.width = S.rw; fieldCv.height = S.rw;
+    return true;
+  }
+  return false;
+}
+function buildStage() {
+  S.phi = {};
+  if (!state.sol || !S.rw) { S.map = null; return; }
+  S.map = buildMap(state.shape.poly, state.sol, S.rw, S.rw, { cx: 0, cy: 0, half: VIEW });
+  S.img = fieldCtx.createImageData(S.rw, S.rw);
+  S.u32 = new Uint32Array(S.img.data.buffer);
+  S.base = new Uint32Array(S.rw * S.rw);
+  S.V = new Float32Array(S.rw * S.rw);
+  S.uN = new Float64Array(state.sol.N + 1);
+  makeBase(S.map, S.base);
+}
+function stageMode(k) {                            // static pattern of mode k (0-based) on the stage
+  if (S.phi[k]) return S.phi[k];
+  var phi = new Float32Array(S.rw * S.rw);
+  sampleField(S.map, state.sol.vecs[k], phi);
+  var mx = 0; for (var q = 0; q < S.map.count; q++) { var a = Math.abs(phi[S.map.pix[q]]); if (a > mx) mx = a; }
+  return (S.phi[k] = { phi: phi, A0: mx || 1, nodal: makeNodal(S.map, phi) });
+}
+function toCanvas(x, y, size) { size = size || S.cw; return [(x / VIEW + 1) / 2 * size, (y / VIEW + 1) / 2 * size]; }
+function toWorld(ev, cv) {
+  var r = (cv || stageCv).getBoundingClientRect();
+  return { x: ((ev.clientX - r.left) / r.width * 2 - 1) * VIEW, y: ((ev.clientY - r.top) / r.height * 2 - 1) * VIEW };
+}
+function pathPoly(ctx, poly, size) {
+  ctx.beginPath();
+  poly.forEach(function (q, i) { var c = toCanvas(q[0], q[1], size); if (i) ctx.lineTo(c[0], c[1]); else ctx.moveTo(c[0], c[1]); });
+  ctx.closePath();
+}
+function modeVisualHz(k, sol) {                    // slow, gentle oscillation for the single-mode view
+  sol = sol || state.sol;
+  var ratio = sol.f[k] / sol.f[0];
+  return Math.min(2.4, 0.7 * Math.pow(ratio, 0.6));
+}
+var HIT_LIFE = function () { return reduced ? 4 : 10; };
+function hitAge(h, now) { return (now - h.t0) / 1000 * (reduced ? 2 : 1); }
+// All live strikes added up at time `now` (into uN); returns the display scale and the strikes still ringing.
+// A strike whose t0 is still in the future (a ring scheduled for later) is kept but contributes nothing yet.
+function synthHits(sol, hits, now, uN) {
+  uN.fill(0);
+  var life = HIT_LIFE(), keep = [], A0 = 1e-9, tscale = reduced ? 0.4 : 1;
+  hits.forEach(function (h) {
+    var age = hitAge(h, now);
+    if (age > life) return;
+    keep.push(h);
+    if (age < 0) return;
+    for (var ai = 0; ai < h.active.length; ai++) {
+      var k = h.active[ai], T = 3.0 * tscale * Math.pow(sol.f[0] / sol.f[k], 0.35);
+      var coef = h.a[k] * Math.cos(2 * Math.PI * 1.2 * (sol.f[k] / sol.f[0]) * age) * Math.exp(-age / T);
+      if (Math.abs(coef) < 1e-9) continue;
+      var vk = sol.vecs[k];
+      for (var i = 0, N = sol.N; i < N; i++) uN[i] += coef * vk[i];
+    }
+    A0 = Math.max(A0, h.rms0 * 2.5);
+  });
+  return { A0: A0, keep: keep };
+}
+function drawHoop(ctx, poly, size, dpr) {          // the brass rim
+  pathPoly(ctx, poly, size);
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = rgba('bg', 0.55); ctx.lineWidth = 6 * dpr; ctx.stroke();
+  ctx.strokeStyle = TOK.accent.css; ctx.lineWidth = 2.5 * dpr; ctx.stroke();
+}
+function drawRipple(ctx, rp, now, size, dpr) {     // false once it has faded
+  var age = Math.max(0, now - rp.t0) / 1000, dur = reduced ? 0.4 : 0.9;
+  if (age > dur) return false;
+  var cc = toCanvas(rp.x, rp.y, size), u = age / dur;
+  ctx.beginPath(); ctx.arc(cc[0], cc[1], (0.02 + 0.22 * u) * size / (2 * VIEW), 0, 6.2832);
+  ctx.strokeStyle = rgba('accent', (1 - u) * (1 - u) * 0.6); ctx.lineWidth = 1.5 * dpr; ctx.stroke();
+  return true;
+}
+
+var rafId = 0, lastFrameTs = 0;
+function scheduleDraw() { if (!rafId) rafId = requestAnimationFrame(frame); }
+function wantsAnim() {
+  if (state.view === 'twins') return twWantsAnim();
+  if (state.view === 'billiards') return blWantsAnim();
+  if (state.view === 'guess') return false;
+  if (state.drawing.on || !state.sol || state.solving) return false;
+  if (state.hits.length || state.ripple) return true;
+  if (state.selMode && !reduced) return true;
+  if (!state.tapped && !reduced) return true;
+  return false;
+}
+function frame(ts) {
+  rafId = 0; lastFrameTs = ts;
+  if (state.view === 'twins') drawTwins(ts); else if (state.view === 'billiards') drawBilliards(ts); else if (state.view !== 'guess') drawStage(ts);
+  if (wantsAnim()) scheduleDraw(); else BL.lastTs = 0;
+}
+
+function drawStage(ts) {
+  var ctx = stageCtx, cw = S.cw, ch = S.ch, dpr = dprNow();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = TOK.bg.css; ctx.fillRect(0, 0, cw, ch);
+  if (state.drawing.on) { drawSketch(ctx, cw, dpr); return; }
+  var shape = state.shape;
+  if (!shape) return;
+  var sol = state.sol, map = S.map;
+  if (!sol || !map) {                              // solving: show the bare skin
+    pathPoly(ctx, shape.poly); ctx.fillStyle = TOK.skin.css; ctx.fill();
+  } else {
+    var V = S.V, A0 = 1, nodal = null, light = 0.02, now = ts || performance.now(), mi = -1, c = 0;
+    if (state.selMode) {
+      mi = state.selMode - 1;
+      var sm = stageMode(mi);
+      c = reduced ? 1 : Math.cos(2 * Math.PI * modeVisualHz(mi) * (now - state.selStart) / 1000);
+      for (var q = 0; q < map.count; q++) { var p = map.pix[q]; V[p] = sm.phi[p] * c; }
+      A0 = sm.A0; nodal = sm.nodal;
+    } else if (state.hits.length) {
+      var sh = synthHits(sol, state.hits, now, S.uN);
+      A0 = sh.A0; state.hits = sh.keep;
+      sampleField(map, S.uN, V);
+    } else if (!state.tapped && !reduced) {
+      var t = Math.max(0, now - state.idleStart) / 1000, slot = Math.floor(t / 2.5), s = t / 2.5 - slot;
+      mi = slot % 5;
+      var im = stageMode(mi);
+      c = 0.9 * Math.sin(2 * Math.PI * s);
+      for (var q2 = 0; q2 < map.count; q2++) { var p2 = map.pix[q2]; V[p2] = im.phi[p2] * c; }
+      A0 = im.A0;
+    } else {
+      mi = -2;                                     // at rest
+    }
+    if (mi === -2) S.u32.set(S.base); else shade(map, V, A0, nodal, S.u32, S.base, light);
+    fieldCtx.putImageData(S.img, 0, 0);
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(fieldCv, 0, 0, cw, ch);
+  }
+  drawHoop(ctx, shape.poly, cw, dpr);
+  if (state.ripple && !drawRipple(ctx, state.ripple, ts || performance.now(), cw, dpr)) state.ripple = null;
+}
+function drawSketch(ctx, cw, dpr) {
+  ctx.strokeStyle = rgba('line', 0.6); ctx.lineWidth = 1 * dpr;
+  for (var g = -1; g <= 1.0001; g += 0.5) {
+    var a = toCanvas(g, 0)[0], b = toCanvas(0, g)[1];
+    ctx.beginPath(); ctx.moveTo(a, 0); ctx.lineTo(a, cw); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, b); ctx.lineTo(cw, b); ctx.stroke();
+  }
+  var pts = state.drawing.pts;
+  if (pts.length > 1) {
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.beginPath();
+    pts.forEach(function (q, i) { var c = toCanvas(q[0], q[1]); if (i) ctx.lineTo(c[0], c[1]); else ctx.moveTo(c[0], c[1]); });
+    ctx.strokeStyle = TOK.accent.css; ctx.lineWidth = 3 * dpr; ctx.stroke();
+    var f = toCanvas(pts[0][0], pts[0][1]), l = toCanvas(pts[pts.length - 1][0], pts[pts.length - 1][1]);
+    ctx.setLineDash([6 * dpr, 6 * dpr]); ctx.beginPath(); ctx.moveTo(l[0], l[1]); ctx.lineTo(f[0], f[1]);
+    ctx.strokeStyle = rgba('accent', 0.5); ctx.lineWidth = 2 * dpr; ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(f[0], f[1], 5 * dpr, 0, 6.2832); ctx.fillStyle = TOK.accent.css; ctx.fill();
+  }
+}
+
+/* ===================================================================
+   Audio
+   =================================================================== */
+// The pitches always come from the shape, except Song, which deliberately tunes them to a scale. A voice only
+// changes how each pitch rings: how long it lasts, how hard the mallet is, a click or not, room reverb and stereo width.
+// Tuned plays only a few of the drum's true notes, one after another; see playTuned.
+var VOICES = {
+  tuned:   { name: 'Tuned',   dur: 6, tau: function (r) { return 3.2 * Math.pow(r, 0.8); }, soft: 0.11, attack: 0.005,
+             stick: false, shimmer: 0, reverb: 0.5, width: 0.4 },
+  singing: { name: 'Singing', dur: 7, tau: function (r) { return 3.4 * Math.pow(r, 0.45); }, soft: 0.11, attack: 0.012,
+             stick: false, shimmer: 0.32, reverb: 0.42, width: 0.55 },
+  glass:   { name: 'Glass',   dur: 6, tau: function (r) { return 2.8 * Math.pow(r, 0.2); },  soft: 0.035, attack: 0.002,
+             stick: false, shimmer: 0.12, reverb: 0.34, width: 0.75 },
+  drum:    { name: 'Drum',    dur: 2.5, tau: function (r) { return 1.4 * Math.pow(r, 0.7); }, soft: 0.06, attack: 0.0015,
+             stick: true, shimmer: 0, reverb: 0.1, width: 0.25 },
+  music:   { name: 'Music',   dur: 6, tau: function (r) { return 3.4 * Math.pow(r, 0.45); }, soft: 0.11, attack: 0.005,
+             stick: false, shimmer: 0.22, reverb: 0.5, width: 0.4 }
+};
+// Song voice (key 'music'): the drum's own patterns choose the notes, then each pitch is tuned to the nearest note of a scale.
+var SCALES = {
+  pentatonic: { name: 'Pentatonic', root: 62, steps: [0, 2, 4, 7, 9] },        // D major pentatonic: every pair of notes agrees
+  handpan:    { name: 'Handpan',    root: 62, steps: [0, 2, 3, 5, 7, 8, 10] }, // D minor, the "Kurd" tuning of many handpans
+  dreamy:     { name: 'Dreamy',     root: 65, steps: [0, 2, 4, 6, 7, 9, 11] }  // F Lydian: bright and floating
+};
+var scaleKey = 'pentatonic', MUSIC_LO = 57, MUSIC_HI = 86, lastMusic = null, lastTuned = null;
+var voiceKey = 'tuned';
+var audio = null;
+function makeImpulse(ctx, secs) {                  // a generated room: two channels of darkening, decaying noise
+  var sr = ctx.sampleRate, n = Math.floor(secs * sr), buf = ctx.createBuffer(2, n, sr), seed = 12345;
+  for (var c = 0; c < 2; c++) {
+    var d = buf.getChannelData(c), lp = 0;
+    for (var i = 0; i < n; i++) {
+      seed = (seed * 16807) % 2147483647;
+      var t = i / sr, nz = (seed / 1073741823.5) - 1, k = 0.5 * Math.exp(-t * 1.6) + 0.04;   // the tail loses its highs
+      lp += k * (nz - lp);
+      d[i] = lp * Math.exp(-t * 2.3) * (i < 0.006 * sr ? i / (0.006 * sr) : 1);
+    }
+  }
+  return buf;
+}
+function ensureAudio() {
+  if (audio) { if (audio.ctx.state === 'suspended') audio.ctx.resume(); return audio; }
+  try {
+    var AC = window.AudioContext || window.webkitAudioContext;
+    var ctx = new AC(), master = ctx.createGain(), comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -10; comp.knee.value = 8; comp.ratio.value = 4; comp.attack.value = 0.004; comp.release.value = 0.25;
+    master.gain.value = 0.9; master.connect(comp); comp.connect(ctx.destination);   // long overlapping rings never clip
+    var verb = ctx.createConvolver(); verb.normalize = true; verb.buffer = makeImpulse(ctx, 3.2); verb.connect(master);
+    audio = { ctx: ctx, master: master, verb: verb };
+    if (ctx.resume) ctx.resume();
+  } catch (e) { audio = null; }
+  return audio;
+}
+// A strike is rendered as a "job": a bank of decaying sines in two channels (complex-rotation recurrence: one
+// multiply per sample per mode), each mode panned to its own place, with an optional slightly-detuned twin for a
+// slow shimmer. The job renders in pieces, so the first half-second can play at once while the long tail is
+// still being computed.
+var HEAD_SECS = 0.6;
+function soundJob(parts, sr, voice, maxDur) {
+  var V = voice || VOICES[voiceKey], dur = Math.min(V.dur, maxDur || V.dur);
+  var n = Math.floor(dur * sr), osc = [], p;
+  function add(f, a, tau, pan) {
+    if (f > 0.45 * sr || Math.abs(a) < 1e-7) return;
+    var th = 2 * Math.PI * f / sr, rho = Math.exp(-1 / (tau * sr)), q = (pan + 1) * Math.PI / 4;   // equal-power pan
+    osc.push({ cr: rho * Math.cos(th), ci: rho * Math.sin(th), re: 1, im: 0, gl: a * Math.cos(q), gr: a * Math.sin(q) });
+  }
+  for (p = 0; p < parts.length; p++) {
+    var pt = parts[p], pan = pt.pan || 0;
+    add(pt.f, pt.a, pt.tau, pan);
+    if (V.shimmer) add(pt.f * 1.0011, pt.a * V.shimmer, pt.tau * 0.9, -pan);   // ~0.2-2 Hz beating, mirrored in space
+  }
+  var fin = Math.max(1, Math.floor(V.attack * sr)), fout = Math.floor(Math.min(0.6, dur * 0.25) * sr), gain = 0;
+  function env(i) {                                // smooth onset (no click) and a gentle fade at the very end
+    var g = 1; if (i < fin) { var u = i / fin; g = u * u * (3 - 2 * u); }
+    if (i > n - fout) g *= (n - i) / fout;
+    return g;
+  }
+  function render(i0, i1) {                        // samples [i0, i1), continuing every oscillator where it stopped
+    var m = Math.max(0, i1 - i0), L = new Float32Array(m), R = new Float32Array(m), i, j;
+    for (j = 0; j < osc.length; j++) {
+      var o = osc[j], cr = o.cr, ci = o.ci, re = o.re, im = o.im, gl = o.gl, gr = o.gr;
+      for (i = 0; i < m; i++) { L[i] += gl * im; R[i] += gr * im; var nr = re * cr - im * ci; im = re * ci + im * cr; re = nr; }
+      o.re = re; o.im = im;
+    }
+    if (V.stick && i0 === 0) {                     // 4 ms of low-passed noise at the start: the mallet's tick
+      var pk0 = 0; for (i = 0; i < m; i++) pk0 = Math.max(pk0, Math.abs(L[i]));
+      var len = Math.min(m, Math.floor(0.004 * sr)), seed = 9301, lp = 0;
+      for (i = 0; i < len; i++) {
+        seed = (seed * 16807) % 2147483647; lp += 0.35 * ((seed / 1073741823.5) - 1 - lp);
+        var e = 1 - i / len, tick = lp * e * e * (pk0 || 1) * 0.55; L[i] += tick; R[i] += tick;
+      }
+    }
+    for (i = 0; i < m; i++) { var g = env(i0 + i); L[i] *= g; R[i] *= g; }
+    if (i0 === 0) {                                // the loudest moment is always near the start: set the level from the head
+      var pk = 0; for (i = 0; i < m; i++) pk = Math.max(pk, Math.abs(L[i]), Math.abs(R[i]));
+      gain = pk > 0 ? 0.5 / pk : 0;                // peak at -6 dBFS, measured after the envelope
+    }
+    for (i = 0; i < m; i++) { L[i] *= gain; R[i] *= gain; }
+    return { L: L, R: R };
+  }
+  return { n: n, sr: sr, render: render, reverb: V.reverb };
+}
+function renderSound(parts, sr, voice, maxDur) {   // whole sound at once (used by tests via the debug hook)
+  var job = soundJob(parts, sr, voice, maxDur), head = job.render(0, Math.min(job.n, Math.floor(HEAD_SECS * sr))), tail = job.render(head.L.length, job.n);
+  var L = new Float32Array(job.n), R = new Float32Array(job.n);
+  L.set(head.L); R.set(head.R); L.set(tail.L, head.L.length); R.set(tail.R, head.R.length);
+  return { L: L, R: R, reverb: job.reverb };
+}
+function playJob(job, delay, vol) {                // play the head now, then compute the tail and butt it on sample-exactly
+  if (!audio) return;
+  var ctx = audio.ctx, g = ctx.createGain(), send = ctx.createGain();
+  g.gain.value = vol === undefined ? 1 : vol; send.gain.value = job.reverb; g.connect(audio.master); g.connect(send); send.connect(audio.verb);
+  var t0 = ctx.currentTime + 0.02 + (delay || 0), nh = Math.min(job.n, Math.floor(HEAD_SECS * job.sr));
+  function sched(chunk, at, last) {
+    if (!chunk.L.length) return;
+    var buf = ctx.createBuffer(2, chunk.L.length, job.sr); buf.copyToChannel(chunk.L, 0); buf.copyToChannel(chunk.R, 1);
+    var src = ctx.createBufferSource(); src.buffer = buf; src.connect(g); src.start(at);
+    if (last) src.onended = function () { setTimeout(function () { try { g.disconnect(); send.disconnect(); } catch (e) {} }, 3500); };
+  }
+  sched(job.render(0, nh), t0, nh >= job.n);
+  if (nh < job.n) setTimeout(function () { sched(job.render(nh, job.n), t0 + nh / job.sr, true); }, 0);
+}
+function tauOf(sol, k, V) { return (V || VOICES[voiceKey]).tau(sol.f[0] / sol.f[k]); }
+function panOf(k, V) { return k ? (V || VOICES[voiceKey]).width * Math.sin(k * 2.39996) : 0; }   // golden-angle spread; the fundamental sits in the middle
+function midiToHz(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+function quantize(f) {                             // fold into a comfortable register, then snap to the scale
+  var S = SCALES[scaleKey], m = 69 + 12 * Math.log2(f / 440), best = 0, bd = 1e9;
+  while (m > MUSIC_HI) m -= 12; while (m < MUSIC_LO) m += 12;
+  for (var n = Math.round(m) - 4; n <= Math.round(m) + 4; n++) {
+    var pc = ((n - S.root) % 12 + 12) % 12;
+    if (S.steps.indexOf(pc) >= 0 && Math.abs(n - m) < bd) { bd = Math.abs(n - m); best = n; }
+  }
+  return best;
+}
+function playNote(midi, vol, delay) {             // a pitched tone: fundamental, soft harmonics and a faint bell partial
+  var f = midiToHz(midi), pan = clamp((midi - 72) / 18, -0.6, 0.6);
+  var parts = [{ f: f, a: 1, tau: 3.6, pan: pan }, { f: 2 * f, a: 0.18, tau: 1.5, pan: pan }, { f: 3 * f, a: 0.06, tau: 0.8, pan: pan }, { f: 5.4 * f, a: 0.025, tau: 0.35, pan: pan }];
+  playJob(soundJob(parts, audio.ctx.sampleRate, VOICES.music), delay, vol);
+}
+function droneTouch(fLow, fHigh, type2) {          // a soft two-note hum that swells while you play, then fades away
+  var ctx = audio.ctx, now = ctx.currentTime, D = audio.drone;
+  if (!D) {
+    D = audio.drone = { g: ctx.createGain(), lp: ctx.createBiquadFilter(), o1: ctx.createOscillator(), o2: ctx.createOscillator(), send: ctx.createGain() };
+    D.lp.type = 'lowpass'; D.lp.frequency.value = 900; D.g.gain.value = 0; D.send.gain.value = 0.6;
+    D.o1.type = 'sine'; D.o2.type = 'triangle';
+    D.o1.connect(D.lp); D.o2.connect(D.lp); D.lp.connect(D.g); D.g.connect(audio.master); D.g.connect(D.send); D.send.connect(audio.verb);
+    D.o1.frequency.value = fLow; D.o2.frequency.value = fHigh;
+    D.o1.start(); D.o2.start();
+  }
+  D.o2.type = type2;
+  D.o1.frequency.setTargetAtTime(fLow, now, 0.3); D.o2.frequency.setTargetAtTime(fHigh, now, 0.3);
+  D.g.gain.cancelScheduledValues(now); D.g.gain.setTargetAtTime(0.045, now, 0.6);
+  clearTimeout(D.timer); D.timer = setTimeout(function () { D.g.gain.setTargetAtTime(0, ctx.currentTime, 1.6); }, 8000);
+}
+function playMusic(a, sol, delay) {                // the spot you hit picks the patterns; their pitches, in tune, make a strum
+  var idx = [], k, mx = 0, notes = [], used = {};
+  for (k = 0; k < sol.K; k++) { idx.push(k); mx = Math.max(mx, Math.abs(a[k])); }
+  idx.sort(function (i, j) { return Math.abs(a[j]) - Math.abs(a[i]); });
+  for (var t = 0; t < idx.length && notes.length < 3; t++) {
+    k = idx[t]; var w = mx > 0 ? Math.abs(a[k]) / mx : 0; if (w < 0.15) break;
+    var m = quantize(sol.f[k]); if (used[m]) continue; used[m] = 1;
+    notes.push({ m: m, w: w, k: k });
+  }
+  notes.sort(function (p, q) { return p.m - q.m; });
+  notes.forEach(function (nt, i) { playNote(nt.m, 0.6 * (0.35 + 0.65 * nt.w), (delay || 0) + i * 0.075); });
+  droneTouch(midiToHz(SCALES[scaleKey].root - 12), midiToHz(SCALES[scaleKey].root - 5), 'triangle');   // root and fifth of the scale
+  lastMusic = notes.map(function (nt) { var nm = noteOf(midiToHz(nt.m)).name; return { name: nm, mode: nt.k + 1 }; });
+}
+// Tuned notes: the few patterns that move most at the hit point, as [{k, f, w}] by rising pitch. f is always the drum's
+// own sol.f[k]. Patterns within 12 cents of one already chosen are folded into it (a circle's twin pairs differ by ~2 cents).
+function tunedNotes(a, sol, max) {
+  var idx = [], k, mx = 0, notes = [];
+  for (k = 0; k < sol.K; k++) { idx.push(k); mx = Math.max(mx, Math.abs(a[k])); }
+  if (!(mx > 0)) return notes;
+  idx.sort(function (i, j) { return Math.abs(a[j]) - Math.abs(a[i]); });
+  for (var t = 0; t < idx.length; t++) {
+    k = idx[t]; var w = Math.abs(a[k]) / mx; if (w < 0.15) break;
+    var twin = null;
+    for (var n = 0; n < notes.length; n++) if (Math.abs(1200 * Math.log2(sol.f[k] / notes[n].f)) < 12) { twin = notes[n]; break; }
+    if (twin) { twin.w = Math.min(1, twin.w + w); continue; }
+    if (notes.length >= max) break;
+    notes.push({ k: k, f: sol.f[k], w: w });
+  }
+  notes.sort(function (p, q) { return p.f - q.f; });
+  return notes;
+}
+// Tuned voice: a brief thump of the whole drum, then its strongest true notes strummed one at a time as pure sines.
+function playTuned(a, sol, delay, opts) {
+  var o = opts || {}, max = o.max || 4, gap = o.gap || 0.075, d = delay || 0, V = VOICES.tuned, sr = audio.ctx.sampleRate;
+  var f0 = sol.f[0], notes = tunedNotes(a, sol, max), body = [], k;
+  for (k = 0; k < sol.K; k++) body.push({ f: sol.f[k], a: a[k], tau: 0.22 * Math.pow(f0 / sol.f[k], 0.5), pan: panOf(k, V) });
+  playJob(soundJob(body, sr, V, 1.2), d, 0.22);   // every pattern, a quarter-second each: the full spectrum, then it is gone
+  notes.forEach(function (nt, i) {
+    var pan = clamp((Math.log2(nt.f / f0) - 1) * 0.35, -0.6, 0.6);
+    playJob(soundJob([{ f: nt.f, a: 1, tau: tauOf(sol, nt.k, V), pan: pan }], sr, V), d + i * gap, 0.6 * (0.35 + 0.65 * nt.w));
+  });
+  droneTouch(f0 / 2, f0, 'sine');                  // an octave below the drum's lowest note, and that note
+  lastTuned = notes.map(function (nt) { return { text: noteOf(nt.f).text, mode: nt.k + 1 }; });
+}
+function playStrike(a, sol, delay, maxDur) {      // sol, delay and maxDur (seconds) are optional
+  if (!ensureAudio()) return;
+  sol = sol || state.sol;
+  if (voiceKey === 'tuned') { playTuned(a, sol, delay); return; }
+  if (voiceKey === 'music') { playMusic(a, sol, delay); return; }
+  var V = VOICES[voiceKey], parts = [], extra = V.soft * V.soft - SIGMA2;   // the voice's mallet: softer (or harder) than the picture's
+  for (var k = 0; k < sol.K; k++) parts.push({ f: sol.f[k], a: a[k] * Math.exp(Math.min(1, -sol.lam[k] * extra)), tau: tauOf(sol, k, V), pan: panOf(k, V) });   // a hard mallet brightens by at most e×
+  playJob(soundJob(parts, audio.ctx.sampleRate, V, maxDur), delay);
+}
+Object.keys(VOICES).forEach(function (key) {      // the Sound switch: pick a voice, hear it at once on the current drum
+  document.getElementById('voice-' + key).addEventListener('click', function () {
+    voiceKey = key;
+    Object.keys(VOICES).forEach(function (k2) { document.getElementById('voice-' + k2).setAttribute('aria-pressed', k2 === key ? 'true' : 'false'); });
+    document.getElementById('scales').hidden = key !== 'music';
+    document.getElementById('scaleSelWrap').hidden = key !== 'music'; document.getElementById('voiceSel').value = key;
+    if (key !== 'music' && key !== 'tuned' && audio && audio.drone) audio.drone.g.gain.setTargetAtTime(0, audio.ctx.currentTime, 0.4);
+    lastMusic = null; lastTuned = null; updateCaption(); gsCaption();
+    if (state.view === 'guess') return;               // the game plays its own true pitches
+    var sol = state.view === 'twins' && TD[0].sol ? TD[0].sol : state.sol;
+    if (sol && ensureAudio()) { var a = new Float64Array(sol.K); for (var k = 0; k < sol.K; k++) a[k] = 1 / Math.sqrt(k + 1); playStrike(a, sol); }
+  });
+});
+Object.keys(SCALES).forEach(function (key) {      // the Scale picker (Music voice only): retune and play a short phrase
+  document.getElementById('scale-' + key).addEventListener('click', function () {
+    scaleKey = key; document.getElementById('scaleSel').value = key;
+    Object.keys(SCALES).forEach(function (k2) { document.getElementById('scale-' + k2).setAttribute('aria-pressed', k2 === key ? 'true' : 'false'); });
+    if (!ensureAudio()) return;
+    var S = SCALES[key], ph = [0, 2, 4, 2, 5].map(function (d) { var o = Math.floor(d / S.steps.length); return S.root + S.steps[d % S.steps.length] + 12 * o; });
+    ph.forEach(function (m, i) { playNote(m, 0.45, i * 0.16); });
+    droneTouch(midiToHz(S.root - 12), midiToHz(S.root - 5), 'triangle');
+  });
+});
+document.getElementById('voiceSel').addEventListener('change', function () { document.getElementById('voice-' + this.value).click(); });   // phone selects drive the chips
+document.getElementById('scaleSel').addEventListener('change', function () { document.getElementById('scale-' + this.value).click(); });
+function playMode(k, sol) {
+  if (!ensureAudio()) return;
+  sol = sol || state.sol;
+  var V = VOICES[voiceKey];
+  if (voiceKey === 'tuned') {                      // the pattern's own pitch, a single pure sine
+    playJob(soundJob([{ f: sol.f[k], a: 1, tau: 3.5, pan: 0 }], audio.ctx.sampleRate, V), 0, 0.6);
+    droneTouch(sol.f[0] / 2, sol.f[0], 'sine'); return;
+  }
+  if (voiceKey === 'music') { playNote(quantize(sol.f[k]), 0.6); droneTouch(midiToHz(SCALES[scaleKey].root - 12), midiToHz(SCALES[scaleKey].root - 5), 'triangle'); return; }
+  playJob(soundJob([{ f: sol.f[k], a: 1, tau: tauOf(sol, k, V) * 1.3, pan: 0 }], audio.ctx.sampleRate, V));
+}
+
+/* ===================================================================
+   Striking and mode selection
+   =================================================================== */
+var tapA = new Int32Array(4), tapW = new Float32Array(4);
+function strikeAmps(sol, x, y) {                   // how much each mode is excited by a soft mallet at (x,y)
+  pointTaps(sol.grid, sol.N, x, y, tapA, tapW, 0);
+  var a = new Float64Array(sol.K), mx = 0, k, sq = 0;
+  for (k = 0; k < sol.K; k++) {
+    var phi = 0; for (var d = 0; d < 4; d++) phi += tapW[d] * sol.vecs[k][tapA[d]];
+    a[k] = phi * Math.exp(-sol.lam[k] * SIGMA2);   // mode shape at the hit point x soft-mallet low-pass
+    if (Math.abs(a[k]) > mx) mx = Math.abs(a[k]);
+    sq += a[k] * a[k];
+  }
+  var active = []; for (k = 0; k < sol.K; k++) if (Math.abs(a[k]) > 0.02 * mx) active.push(k);
+  return { a: a, active: active, rms0: Math.sqrt(sq / sol.area) };
+}
+function strikeAt(x, y) {
+  var sol = state.sol; if (!sol) return false;
+  var r = strikeAmps(sol, x, y), a = r.a, now = performance.now();
+  state.hits.push({ t0: now, a: a, active: r.active, rms0: r.rms0 });
+  if (state.hits.length > 3) state.hits.shift();
+  state.ripple = { x: x, y: y, t0: now };
+  state.tapped = true; state.lastAmps = a; state.lastStrike = { x: x, y: y };
+  playStrike(a);
+  updateCaption(); updatePill(); drawSpectrum(); scheduleDraw();
+  return true;
+}
+function selectMode(n) {                           // n is 1-based
+  var sol = state.sol; if (!sol || n < 1 || n > sol.K) return;
+  ensureAudio();
+  state.selMode = n; state.selStart = performance.now(); state.hits = []; state.ripple = null;
+  playMode(n - 1);
+  syncGallery(); updateCaption(); updatePill(); drawSpectrum(); scheduleDraw();
+}
+function backToDrum() {
+  state.selMode = 0; state.hits = [];
+  syncGallery(); updateCaption(); updatePill(); drawSpectrum(); scheduleDraw();
+}
+function centrePoint(sol, poly) {
+  sol = sol || state.sol; poly = poly || state.shape.poly;
+  var cx = 0, cy = 0, a = 0, i;
+  for (i = 0; i < poly.length; i++) {
+    var p = poly[i], q = poly[(i + 1) % poly.length], cr = p[0] * q[1] - q[0] * p[1];
+    a += cr; cx += (p[0] + q[0]) * cr; cy += (p[1] + q[1]) * cr;
+  }
+  if (Math.abs(a) > 1e-9) { cx /= 3 * a; cy /= 3 * a; }
+  if (pointInPoly(poly, cx, cy)) return { x: cx, y: cy };
+  var g = sol.grid, best = 1e9, bx = 0, by = 0;       // fall back to the nearest interior cell
+  if (g.tri) {                                         // triangle mesh: scan a lattice over the outline instead
+    for (var yy = -VIEW; yy <= VIEW; yy += 0.02) for (var xx = -VIEW; xx <= VIEW; xx += 0.02) {
+      var dd = (xx - cx) * (xx - cx) + (yy - cy) * (yy - cy);
+      if (dd < best && pointInPoly(poly, xx, yy)) { best = dd; bx = xx; by = yy; }
+    }
+    return { x: bx, y: by };
+  }
+  for (var j = 0; j < g.ny; j++) for (i = 0; i < g.nx; i++) if (g.idx[j * g.nx + i] >= 0) {
+    var x = g.x0 + (i + 0.5) * g.h, y = g.y0 + (j + 0.5) * g.h, d = (x - cx) * (x - cx) + (y - cy) * (y - cy);
+    if (d < best) { best = d; bx = x; by = y; }
+  }
+  return { x: bx, y: by };
+}
+
+/* ===================================================================
+   Pointer / keyboard on the stage, and drawing
+   =================================================================== */
+stageCv.addEventListener('pointerdown', function (ev) {
+  ensureAudio();
+  var w = toWorld(ev);
+  if (state.drawing.on) {
+    state.drawing.active = true; state.drawing.pts = [[w.x, w.y]];
+    $('shapeMsg').textContent = '';
+    try { stageCv.setPointerCapture(ev.pointerId); } catch (e) {}
+    ev.preventDefault(); updatePill(); scheduleDraw(); return;
+  }
+  if (!state.sol || state.solving) return;
+  if (pointInPoly(state.shape.poly, w.x, w.y)) {
+    if (state.selMode) backToDrum();
+    strikeAt(w.x, w.y);
+  }
+});
+stageCv.addEventListener('pointermove', function (ev) {
+  var d = state.drawing; if (!d.on || !d.active) return;
+  var w = toWorld(ev), l = d.pts[d.pts.length - 1];
+  if (Math.hypot(w.x - l[0], w.y - l[1]) > 0.008) { d.pts.push([clamp(w.x, -VIEW, VIEW), clamp(w.y, -VIEW, VIEW)]); scheduleDraw(); }
+});
+function endStroke() {
+  var d = state.drawing; if (!d.on || !d.active) return;
+  d.active = false;
+  var res = finishDrawing(d.pts);
+  if (res.error) { $('shapeMsg').textContent = res.error; d.pts = []; updatePill(); scheduleDraw(); return; }
+  setDrawing(false);
+  loadShape({ key: 'custom', name: 'Your drawing', poly: res.poly, area: polyArea(res.poly),
+    fact: 'A one-off. Every outline has its own set of notes — and a smaller drum rings higher.' });
+}
+stageCv.addEventListener('pointerup', endStroke);
+stageCv.addEventListener('pointercancel', endStroke);
+stageCv.addEventListener('keydown', function (ev) {
+  if (ev.key !== 'Enter' && ev.key !== ' ') return;
+  ev.preventDefault(); ensureAudio();
+  if (!state.sol || state.drawing.on) return;
+  var c = state.lastStrike && pointInPoly(state.shape.poly, state.lastStrike.x, state.lastStrike.y) ? state.lastStrike : centrePoint();
+  if (state.selMode) backToDrum();
+  strikeAt(c.x, c.y);
+});
+document.addEventListener('pointerdown', ensureAudio, true);   // first gesture unlocks sound
+document.addEventListener('keydown', ensureAudio, true);
+
+function finishDrawing(pts) {
+  if (pts.length < 8) return { error: 'Drag a closed loop across the drum, then let go.' };
+  var path = pts.concat([pts[0]]);                 // close it
+  var eps = 0.008, simp = rdp(path, eps);
+  while (simp.length - 1 > 200) { eps *= 1.35; simp = rdp(path, eps); }
+  simp.pop();                                      // drop duplicate closing point
+  if (simp.length < 3) return { error: 'That loop is too small. Try a bigger one.' };
+  var area = polyArea(simp);
+  var x0 = 9, x1 = -9, y0 = 9, y1 = -9;
+  simp.forEach(function (q) { x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); y0 = Math.min(y0, q[1]); y1 = Math.max(y1, q[1]); });
+  if (area < 0.12 || Math.min(x1 - x0, y1 - y0) < 0.2) return { error: 'That shape is too small or too thin to ring. Try a bigger, rounder loop.' };
+  return { poly: simp };
+}
+function setDrawing(on) {
+  state.drawing.on = on; state.drawing.active = false; state.drawing.pts = [];
+  $('stage').classList.toggle('drawing', on);
+  if (on) $('shapeMsg').textContent = '';
+  syncChips(); updatePill(); updateCaption(); scheduleDraw();
+}
+
+/* ===================================================================
+   UI: chips, readouts, gallery, captions
+   =================================================================== */
+function drawIconPoly(cv, poly, active) {
+  var dpr = dprNow(), css = 28; cv.width = css * dpr; cv.height = css * dpr;
+  var c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, css, css);
+  var x0 = 9, x1 = -9, y0 = 9, y1 = -9;
+  poly.forEach(function (q) { x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); y0 = Math.min(y0, q[1]); y1 = Math.max(y1, q[1]); });
+  var s = 20 / Math.max(x1 - x0, y1 - y0), ox = 14 - (x0 + x1) / 2 * s, oy = 14 - (y0 + y1) / 2 * s;
+  c.beginPath(); poly.forEach(function (q, i) { if (i) c.lineTo(q[0] * s + ox, q[1] * s + oy); else c.moveTo(q[0] * s + ox, q[1] * s + oy); });
+  c.closePath(); c.fillStyle = rgba('accent', active ? 0.22 : 0.1); c.fill();
+  c.lineJoin = 'round'; c.lineWidth = 1.6; c.strokeStyle = active ? TOK.accent.css : TOK.fg.css; c.stroke();
+}
+function drawIconPencil(cv, active) {
+  var dpr = dprNow(), css = 28; cv.width = css * dpr; cv.height = css * dpr;
+  var c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, css, css);
+  c.lineWidth = 1.8; c.lineCap = 'round'; c.lineJoin = 'round'; c.strokeStyle = active ? TOK.accent.css : TOK.fg.css;
+  c.beginPath(); c.moveTo(4, 17); c.bezierCurveTo(5, 6, 14, 5, 16, 11); c.bezierCurveTo(18, 17, 10, 22, 14, 23); c.bezierCurveTo(18, 24, 24, 19, 23, 12);
+  c.setLineDash([3, 3]); c.stroke(); c.setLineDash([]);
+}
+function buildChips() {
+  var box = $('shapeChips');
+  SHAPES.forEach(function (s) {
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'chip'; b.id = 'chip-' + s.key; b.setAttribute('aria-pressed', 'false');
+    var cv = document.createElement('canvas'); cv.setAttribute('aria-hidden', 'true');
+    b.appendChild(cv); b.appendChild(document.createTextNode(s.name));
+    b.addEventListener('click', function () {
+      if (state.drawing.on) setDrawing(false);
+      ensureAudio(); loadShape(s);
+    });
+    box.appendChild(b); s.icon = cv;
+  });
+  var d = document.createElement('button');
+  d.type = 'button'; d.className = 'chip'; d.id = 'chip-draw'; d.setAttribute('aria-pressed', 'false');
+  var dc = document.createElement('canvas'); dc.setAttribute('aria-hidden', 'true');
+  d.appendChild(dc); d.appendChild(document.createTextNode('Draw your own'));
+  d.addEventListener('click', function () { ensureAudio(); setDrawing(!state.drawing.on); });
+  box.appendChild(d);
+  buildChips.draw = dc;
+}
+function syncChips() {
+  SHAPES.forEach(function (s) {
+    var on = state.shape === s && !state.drawing.on;
+    $('chip-' + s.key).setAttribute('aria-pressed', on ? 'true' : 'false');
+    drawIconPoly(s.icon, s.poly, on);
+  });
+  var dOn = state.drawing.on || (state.shape && state.shape.key === 'custom');
+  $('chip-draw').setAttribute('aria-pressed', dOn ? 'true' : 'false');
+  drawIconPencil(buildChips.draw, dOn);
+}
+function updateReadouts() {
+  var sh = state.shape, sol = state.sol;
+  $('rdShape').textContent = sh ? sh.name : '–';
+  $('rdArea').textContent = sh ? 'area ' + sh.area.toFixed(2) + ' units²' : '–';
+  $('fact').textContent = sh ? sh.fact : '';
+  if (sol) {
+    $('rdFund').textContent = sol.f[0].toFixed(1) + ' Hz · ' + noteOf(sol.f[0]).text;
+    $('rdSolve').textContent = sol.K + ' modes · ' + (sol.ms / 1000).toFixed(1) + ' s';
+  } else { $('rdFund').textContent = '…'; $('rdSolve').textContent = 'tuning…'; }
+}
+function modeCaption(n) {
+  var sol = state.sol, f = sol.f[n - 1];
+  return 'Mode ' + n + ' · ' + (f / sol.f[0]).toFixed(3) + ' × fundamental · ' + f.toFixed(1) + ' Hz · ' + noteOf(f).text;
+}
+function updateCaption() {
+  var el = $('stageCaption'), back = $('backBtn');
+  back.hidden = !state.selMode;
+  if (state.drawing.on) el.textContent = 'Draw any closed outline. A bigger drawing means a lower note.';
+  else if (state.selMode && state.sol) { el.textContent = ''; var cb = document.createElement('b'); cb.className = 'num'; cb.textContent = modeCaption(state.selMode); el.appendChild(cb); }
+  else if (voiceKey === 'tuned' && lastTuned && lastTuned.length) {
+    el.textContent = 'You heard ' + lastTuned.map(function (n) { return n.text; }).join(' · ') + ': the drum’s own notes, at their true pitch. They come from patterns ' +
+      lastTuned.map(function (n) { return n.mode; }).join(', ') + ', the ones that move most where you hit.';
+  }
+  else if (voiceKey === 'tuned') el.textContent = 'Tap anywhere. You’ll hear the patterns that move most at that spot, at their true pitches, one after another.';
+  else if (voiceKey === 'music' && lastMusic && lastMusic.length) {
+    el.textContent = 'You played ' + lastMusic.map(function (n) { return n.name; }).join(' · ') + '. The patterns that move most where you hit (' +
+      lastMusic.map(function (n) { return n.mode; }).join(', ') + ') choose the notes, tuned to the ' + SCALES[scaleKey].name.toLowerCase() + ' scale.';
+  }
+  else if (voiceKey === 'music') el.textContent = 'Song mode: each spot picks the patterns that move most there, then moves their pitches onto a scale so every tap fits. These are not the drum’s true notes.';
+  else if (!state.tapped) el.textContent = 'Tap near the rim, then the centre. Each spot wakes the vibration patterns differently.';
+  else el.textContent = 'Strike a different spot. Hit a still line of a pattern and that pattern falls silent.';
+  var sc = $('specCaption');
+  sc.textContent = state.stringCmp
+    ? 'A guitar string’s overtones fall exactly on 2×, 3×, 4× the lowest note. A drum’s don’t, which is why a drum sounds like a thud rather than a note.'
+    : 'Each bar is one vibration pattern, placed at its pitch. Strike somewhere new and the bars change height.';
+}
+function updatePill() {
+  var pill = $('pill');
+  if (state.drawing.on) { pill.hidden = false; pill.textContent = state.drawing.active ? 'Let go to close the outline' : 'Drag to draw a closed outline'; }
+  else if (!state.tapped && state.sol && !state.solving && !state.selMode) { pill.hidden = false; pill.textContent = 'Tap the drum to hear it'; }
+  else pill.hidden = true;
+}
+
+/* ---------- gallery ---------- */
+var MAXG = 24, galBtns = [], thumb = { px: 0, map: null, img: null, u32: null, base: null, V: null, data: [] };
+function buildGallery() {
+  var gal = $('gallery');
+  for (var k = 1; k <= MAXG; k++) {
+    (function (k) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'mode' + (k > 12 ? ' extra' : ''); b.id = 'mode-' + k; b.setAttribute('aria-pressed', 'false');
+      b.disabled = true;
+      var cv = document.createElement('canvas'); cv.id = 'thumb-' + k; cv.setAttribute('aria-hidden', 'true');
+      var mn = document.createElement('span'); mn.className = 'mn'; mn.textContent = k;
+      var ml = document.createElement('span'); ml.className = 'ml'; ml.textContent = '–';
+      b.appendChild(cv); b.appendChild(mn); b.appendChild(ml);
+      b.addEventListener('click', function () { selectMode(k); });
+      gal.appendChild(b); galBtns.push({ b: b, cv: cv, ml: ml });
+    })(k);
+  }
+  $('moreBtn').addEventListener('click', function () {
+    state.showMore = !state.showMore;
+    gal.classList.toggle('more', state.showMore);
+    this.setAttribute('aria-pressed', state.showMore ? 'true' : 'false');
+    this.textContent = state.showMore ? 'Show fewer' : 'Show more';
+  });
+}
+function buildThumbs() {
+  var sol = state.sol; if (!sol) return;
+  var css = galBtns[0].cv.clientWidth || 70, px = clamp(Math.round(css * dprNow()), 48, 200);
+  var poly = state.shape.poly, x0 = 9, x1 = -9, y0 = 9, y1 = -9;
+  poly.forEach(function (q) { x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); y0 = Math.min(y0, q[1]); y1 = Math.max(y1, q[1]); });
+  var win = { cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, half: Math.max(x1 - x0, y1 - y0) / 2 * 1.1 };
+  thumb.px = px; thumb.map = buildMap(poly, sol, px, px, win);
+  thumb.cv = document.createElement('canvas'); thumb.cv.width = thumb.cv.height = px;
+  thumb.img = thumb.cv.getContext('2d').createImageData(px, px);
+  thumb.u32 = new Uint32Array(thumb.img.data.buffer);
+  thumb.base = new Uint32Array(px * px); thumb.V = new Float32Array(px * px);
+  thumb.data = [];
+  for (var k = 0; k < MAXG; k++) {
+    var phi = new Float32Array(px * px), mx = 0;
+    sampleField(thumb.map, sol.vecs[k], phi);
+    for (var q = 0; q < thumb.map.count; q++) { var a = Math.abs(phi[thumb.map.pix[q]]); if (a > mx) mx = a; }
+    thumb.data.push({ phi: phi, A0: mx || 1, nodal: makeNodal(thumb.map, phi) });
+    var g = galBtns[k];
+    g.cv.width = px; g.cv.height = px;
+    g.ml.textContent = (sol.f[k] / sol.f[0]).toFixed(3);
+    g.b.disabled = false;
+    g.b.setAttribute('aria-label', 'Mode ' + (k + 1) + ', ' + (sol.f[k] / sol.f[0]).toFixed(3) + ' times the fundamental, ' + sol.f[k].toFixed(1) + ' hertz. Play this pattern alone.');
+  }
+  paintThumbs(); syncGallery();
+}
+function paintThumbs() {
+  if (!state.sol || !thumb.map) return;
+  makeBase(thumb.map, thumb.base);
+  for (var k = 0; k < MAXG; k++) {
+    var d = thumb.data[k];
+    shade(thumb.map, d.phi, d.A0, d.nodal, thumb.u32, thumb.base, 0.02);
+    galBtns[k].cv.getContext('2d').putImageData(thumb.img, 0, 0);
+  }
+}
+function syncGallery() {
+  galBtns.forEach(function (g, i) { g.b.setAttribute('aria-pressed', state.selMode === i + 1 ? 'true' : 'false'); });
+}
+
+/* ===================================================================
+   Spectrum strip
+   =================================================================== */
+var specCv = $('specCanvas'), specCtx = specCv.getContext('2d');
+var SPEC = { ml: 12, mr: 12, top: 36, bottom: 22, cssW: 0, cssH: 130 };
+function sizeSpec() {
+  var dpr = dprNow(), w = Math.max(1, specCv.clientWidth);
+  SPEC.cssW = w; specCv.width = Math.round(w * dpr); specCv.height = Math.round(SPEC.cssH * dpr);
+}
+function specX(f, f1) { return SPEC.ml + f / (6 * f1) * (SPEC.cssW - SPEC.ml - SPEC.mr); }
+function niceStep(range) {
+  var steps = [5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000];
+  for (var i = 0; i < steps.length; i++) if (range / steps[i] <= 8) return steps[i];
+  return 5000;
+}
+function drawSpectrum() {
+  if (!SPEC.cssW) return;
+  var dpr = dprNow(), c = specCtx, W = SPEC.cssW, H = SPEC.cssH;
+  c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, W, H);
+  var sol = state.sol, baseY = H - SPEC.bottom;
+  c.font = '10px ' + TOK.mono; c.textBaseline = 'alphabetic';
+  c.strokeStyle = TOK.line.css; c.lineWidth = 1;
+  c.beginPath(); c.moveTo(SPEC.ml, baseY + 0.5); c.lineTo(W - SPEC.mr, baseY + 0.5); c.stroke();
+  if (!sol) return;
+  var f1 = sol.f[0], axisMax = 6 * f1, step = niceStep(axisMax);
+  if (!isFinite(f1) || f1 <= 0) return;
+  c.fillStyle = TOK.muted.css; c.textAlign = 'center';
+  for (var t = 0; t <= axisMax + 1e-6; t += step) {
+    var x = specX(t, f1);
+    c.beginPath(); c.moveTo(x + 0.5, baseY); c.lineTo(x + 0.5, baseY + 4); c.stroke();
+    var lab = t >= 1000 ? (t / 1000) + 'k' : String(t);
+    if (x > 8 && x < W - 8) c.fillText(lab, x, baseY + 15); else if (t === 0) { c.textAlign = 'left'; c.fillText('0 Hz', SPEC.ml, baseY + 15); c.textAlign = 'center'; }
+  }
+  c.textAlign = 'right'; c.fillText('Hz', W - 2, baseY + 15);
+  if (state.stringCmp) {
+    c.setLineDash([3, 4]); c.strokeStyle = rgba('muted', 0.7); c.fillStyle = TOK.muted.css; c.textAlign = 'left';
+    for (var n = 2; n <= 6; n++) {
+      var xs = specX(n * f1, f1);
+      c.beginPath(); c.moveTo(xs + 0.5, 26); c.lineTo(xs + 0.5, baseY); c.stroke();
+      if (n === 2) { c.fillText('string overtones', Math.min(xs + 4, W - 84), 33); }
+      else { c.textAlign = 'left'; c.fillText(n + '×', xs + 3, 33); }
+    }
+    c.setLineDash([]);
+  }
+  var amps = state.lastAmps, mx = 0, k;
+  if (amps) for (k = 0; k < sol.K; k++) mx = Math.max(mx, Math.abs(amps[k]));
+  var maxH = baseY - 40, hi = state.hoverBar >= 0 ? state.hoverBar : (state.selMode ? state.selMode - 1 : -1);
+  for (k = 0; k < sol.K; k++) {
+    if (sol.f[k] > axisMax * 1.001) break;
+    var bx = specX(sol.f[k], f1), bh = amps ? Math.max(2, Math.abs(amps[k]) / (mx || 1) * maxH) : maxH * 0.55;
+    var wbar = k === hi ? 6 : 4;
+    c.fillStyle = MODE_COL[k]; c.globalAlpha = (hi >= 0 && k !== hi) ? 0.55 : 1;
+    c.fillRect(bx - wbar / 2, baseY - bh, wbar, bh);
+    c.globalAlpha = 1;
+  }
+  if (hi >= 0 && sol.f[hi] <= axisMax * 1.001) {
+    var hx = specX(sol.f[hi], f1), txt = 'Mode ' + (hi + 1) + ' · ' + sol.f[hi].toFixed(1) + ' Hz';
+    c.font = '11px ' + TOK.mono; var tw = c.measureText(txt).width + 12;
+    var lx = clamp(hx - tw / 2, 2, W - tw - 2);
+    c.fillStyle = TOK.raise.css; c.strokeStyle = TOK.accent.css;
+    c.fillRect(lx, 2, tw, 18); c.strokeRect(lx + 0.5, 2.5, tw - 1, 17);
+    c.fillStyle = TOK.fg.css; c.textAlign = 'center'; c.fillText(txt, lx + tw / 2, 15);
+  }
+}
+function barAt(ev) {
+  var sol = state.sol; if (!sol) return -1;
+  var r = specCv.getBoundingClientRect(), x = ev.clientX - r.left, f1 = sol.f[0], best = -1, bd = 14;
+  for (var k = 0; k < sol.K; k++) {
+    if (sol.f[k] > 6 * f1) break;
+    var d = Math.abs(specX(sol.f[k], f1) - x);
+    if (d < bd) { bd = d; best = k; }
+  }
+  return best;
+}
+specCv.addEventListener('pointermove', function (ev) {
+  var k = barAt(ev);
+  if (k !== state.hoverBar) { state.hoverBar = k; drawSpectrum(); }
+});
+specCv.addEventListener('pointerleave', function () { if (state.hoverBar >= 0) { state.hoverBar = -1; drawSpectrum(); } });
+specCv.addEventListener('pointerdown', function (ev) {
+  ensureAudio();
+  var k = barAt(ev); if (k < 0) return;
+  state.hoverBar = k; selectMode(k + 1);
+});
+$('stringToggle').addEventListener('click', function () {
+  state.stringCmp = !state.stringCmp;
+  this.setAttribute('aria-pressed', state.stringCmp ? 'true' : 'false');
+  updateCaption(); drawSpectrum();
+});
+$('backBtn').addEventListener('click', backToDrum);
+
+/* ===================================================================
+   Twin drums  (Gordon, Webb & Wolpert 1992)
+   Both drums are 7 copies of one right isosceles triangle (legs 2, original units), glued differently.
+   Each triangle is [Px,Py, Ax,Ay, Bx,By]: the right angle at P, the legs running to A and B.
+   World coordinates are x*0.3 and -y*0.3 (the page's y points down), so each drum has area 1.26.
+   =================================================================== */
+var TW_SCALE = 0.3, TW_N = 32, TW_K = 40, TW_MODES = 20, TW_RING_GAP = 3.2;
+var DRISCOLL = [2.53794, 3.65550, 5.17555936, 6.53755, 7.24807];     // lowest eigenvalues, original units (Driscoll 1997)
+var GWW = {
+  A: { poly: [[-3, -3], [-3, -1], [1, 3], [1, 1], [3, 1], [1, -1], [-1, -1], [-1, -3]],
+       tris: [[-3, -3, -1, -3, -3, -1], [-1, -1, -3, -1, -1, -3], [-1, -1, 1, -1, -1, 1], [1, 1, -1, 1, 1, -1],
+              [-1, -1, -3, -1, -1, 1], [1, 1, -1, 1, 1, 3], [1, 1, 1, -1, 3, 1]] },
+  B: { poly: [[-3, 1], [1, 1], [1, 3], [3, 1], [1, -1], [-1, -1], [-1, -3], [-3, -1]],
+       tris: [[-3, -1, -1, -1, -3, 1], [-1, 1, -3, 1, -1, -1], [-1, -1, 1, -1, -1, 1], [1, 1, -1, 1, 1, -1],
+              [-1, -1, -3, -1, -1, -3], [1, 1, 1, 3, 3, 1], [1, 1, 1, -1, 3, 1]] }
+};
+function wpt(q) { return [q[0] * TW_SCALE, -q[1] * TW_SCALE]; }
+// Debug aid: do the seven triangles tile each polygon exactly (right isosceles, legs 2, total area 14)?
+function twinCheck() {
+  var out = {};
+  ['A', 'B'].forEach(function (key) {
+    var raw = GWW[key], area = 0, right = true, bad = 0, inside = 0;
+    raw.tris.forEach(function (t) {
+      var ax = t[2] - t[0], ay = t[3] - t[1], bx = t[4] - t[0], by = t[5] - t[1];
+      if (ax * bx + ay * by !== 0 || Math.hypot(ax, ay) !== 2 || Math.hypot(bx, by) !== 2) right = false;
+      area += Math.abs(ax * by - ay * bx) / 2;
+    });
+    for (var iy = 0; iy < 300; iy++) for (var ix = 0; ix < 300; ix++) {
+      var x = -3.2 + ix * 0.021377, y = -3.2 + iy * 0.020713, cnt = 0;
+      raw.tris.forEach(function (t) {
+        var ax = t[2] - t[0], ay = t[3] - t[1], bx = t[4] - t[0], by = t[5] - t[1], dx = x - t[0], dy = y - t[1];
+        var s = (dx * ax + dy * ay) / 4, u = (dx * bx + dy * by) / 4;
+        if (s >= 0 && u >= 0 && s + u <= 1) cnt++;
+      });
+      var inP = pointInPoly(raw.poly, x, y); if (inP) inside++;
+      if (cnt !== (inP ? 1 : 0)) bad++;
+    }
+    out[key] = { triangles: raw.tris.length, rightIsosceles: right, polygonArea: polyArea(raw.poly), triangleArea: area, samplesInside: inside, mismatches: bad };
+  });
+  return out;
+}
+
+function makeTD(key) {
+  var raw = GWW[key], poly = raw.poly.map(wpt), tri = new Float64Array(raw.tris.length * 6), triPolys = [];
+  raw.tris.forEach(function (t, i) {
+    var pts = [];
+    for (var k = 0; k < 3; k++) { var q = wpt([t[2 * k], t[2 * k + 1]]); tri[6 * i + 2 * k] = q[0]; tri[6 * i + 2 * k + 1] = q[1]; pts.push(q); }
+    triPolys.push(pts);
+  });
+  var cv = $('twCanvas' + key), fcv = document.createElement('canvas');
+  return {
+    key: key, shape: { key: 'twin' + key, name: 'Drum ' + key, poly: poly, area: polyArea(poly) }, tri: tri, triPolys: triPolys,
+    cv: cv, ctx: cv.getContext('2d'), stageEl: $('twStage' + key), fieldCv: fcv, fieldCtx: fcv.getContext('2d'),
+    cw: 0, rw: 0, sol: null, map: null, img: null, u32: null, base: null, V: null, uN: null, phi: {},
+    hits: [], ripple: null, lastAmps: null
+  };
+}
+var TD = [makeTD('A'), makeTD('B')];
+var TW = { solved: false, solving: false, progress: [0, 0], workers: [null, null], k: 1, showMode: true, modeStart: 0, tris: false, hover: -1, cmp: null };
+
+function sizeTD(td) {
+  var css = td.stageEl.clientWidth;
+  if (!css) return false;                          // hidden
+  var px = Math.max(2, Math.round(css * dprNow()));
+  if (px === td.cw) return false;
+  td.cw = px; td.cv.width = px; td.cv.height = px;
+  td.rw = clamp(Math.round(px * 0.75), 160, 460);
+  td.fieldCv.width = td.rw; td.fieldCv.height = td.rw;
+  return true;
+}
+function buildTD(td) {
+  td.phi = {};
+  if (!td.sol || !td.rw) { td.map = null; return; }
+  td.map = buildMap(td.shape.poly, td.sol, td.rw, td.rw, { cx: 0, cy: 0, half: VIEW });
+  td.img = td.fieldCtx.createImageData(td.rw, td.rw);
+  td.u32 = new Uint32Array(td.img.data.buffer);
+  td.base = new Uint32Array(td.rw * td.rw);
+  td.V = new Float32Array(td.rw * td.rw);
+  td.uN = new Float64Array(td.sol.N + 1);
+  makeBase(td.map, td.base);
+}
+function tdMode(td, k) {
+  if (td.phi[k]) return td.phi[k];
+  var phi = new Float32Array(td.rw * td.rw);
+  sampleField(td.map, td.sol.vecs[k], phi);
+  var mx = 0; for (var q = 0; q < td.map.count; q++) { var a = Math.abs(phi[td.map.pix[q]]); if (a > mx) mx = a; }
+  return (td.phi[k] = { phi: phi, A0: mx || 1, nodal: makeNodal(td.map, phi) });
+}
+function drawTD(td, now) {
+  var ctx = td.ctx, cw = td.cw, dpr = dprNow(), sol = td.sol, map = td.map;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = TOK.bg.css; ctx.fillRect(0, 0, cw, cw);
+  if (!sol || !map) { pathPoly(ctx, td.shape.poly, cw); ctx.fillStyle = TOK.skin.css; ctx.fill(); }
+  else {
+    var V = td.V, A0 = 1, nodal = null, rest = false;
+    if (TW.showMode) {
+      var mi = TW.k - 1, sm = tdMode(td, mi);
+      var c = reduced ? 1 : Math.cos(2 * Math.PI * modeVisualHz(mi, sol) * (now - TW.modeStart) / 1000);
+      for (var q = 0; q < map.count; q++) { var p = map.pix[q]; V[p] = sm.phi[p] * c; }
+      A0 = sm.A0; nodal = sm.nodal;
+    } else if (td.hits.length) {
+      var sh = synthHits(sol, td.hits, now, td.uN);
+      A0 = sh.A0; td.hits = sh.keep;
+      sampleField(map, td.uN, V);
+    } else rest = true;
+    if (rest) td.u32.set(td.base); else shade(map, V, A0, nodal, td.u32, td.base, 0.02);
+    td.fieldCtx.putImageData(td.img, 0, 0);
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(td.fieldCv, 0, 0, cw, cw);
+  }
+  drawHoop(ctx, td.shape.poly, cw, dpr);
+  if (TW.tris) {                                   // the seven triangles, as faint dashed outlines
+    ctx.save();
+    ctx.setLineDash([5 * dpr, 4 * dpr]); ctx.lineJoin = 'round'; ctx.lineWidth = 1.3 * dpr; ctx.strokeStyle = rgba('fg', 0.5);
+    td.triPolys.forEach(function (tp) { pathPoly(ctx, tp, cw); ctx.stroke(); });
+    ctx.restore();
+  }
+  if (td.ripple && !drawRipple(ctx, td.ripple, now, cw, dpr)) td.ripple = null;
+}
+function drawTwins(ts) {
+  var now = ts || performance.now();
+  TD.forEach(function (td) { if (td.cw) drawTD(td, now); });
+}
+function twWantsAnim() {
+  if (!TW.solved) return false;
+  if (TW.showMode && !reduced) return true;
+  return TD.some(function (td) { return td.hits.length || td.ripple; });
+}
+
+/* ---------- solving: both drums in parallel, once ---------- */
+function twFail(msg) {
+  TW.solving = false;
+  TW.workers.forEach(function (w, i) { if (w) { w.terminate(); TW.workers[i] = null; } });
+  TD.forEach(function (td) { setBusy(false, 0, td.key); });
+  $('twMsg').textContent = msg; twSync(); gsTwins();
+}
+function twSolve() {
+  if (TW.solved || TW.solving) return;
+  TW.solving = true; TW.progress = [0, 0]; $('twMsg').textContent = '';
+  var id = ++solveId;
+  TD.forEach(function (td, ix) {
+    if (!TW.solving) return;
+    setBusy(true, 0, td.key);
+    var w;
+    try { w = new Worker(getWorkerUrl()); } catch (err) { twFail('This browser would not start the tuning worker.'); return; }
+    TW.workers[ix] = w;
+    w.onmessage = function (ev) {
+      var m = ev.data; if (m.id !== id) return;
+      if (m.type === 'progress') { TW.progress[ix] = m.p; setBusy(true, m.p, td.key); gsProgress(); return; }
+      w.terminate(); TW.workers[ix] = null;
+      if (m.type === 'error') { twFail('Could not tune the twin drums (' + m.message + ')'); return; }
+      finishTwin(td, m); setBusy(false, 0, td.key);
+      if (TD.every(function (d) { return d.sol; })) twDone();
+    };
+    w.onerror = function () { twFail('The tuning worker hit a problem.'); };
+    w.postMessage({ type: 'solveFE', id: id, tri: td.tri, n: TW_N, K: TW_K });
+  });
+}
+function finishTwin(td, m) {
+  var K = m.K, N = m.N, vecs = [], f = new Float64Array(K);
+  for (var k = 0; k < K; k++) {
+    var v = new Float64Array(N + 1);              // slot N is a permanent zero (the rim, and outside)
+    v.set(m.vecs.subarray(k * N, (k + 1) * N));
+    vecs.push(v);
+    f[k] = F_CONST * Math.sqrt(m.lam[k]);
+  }
+  td.sol = { K: K, N: N, lam: m.lam, vecs: vecs, f: f, grid: m.grid, ms: m.ms, area: td.shape.area, iters: m.iters, dim: m.dim,
+             nconv: m.nconv, nodes: m.nodes, elements: m.elements, bandwidth: m.bandwidth };
+}
+function twDone() {
+  TW.solving = false; TW.solved = true;
+  TW.cmp = compareTwins(); TW.modeStart = performance.now();
+  if (state.view === 'twins') twLayout();
+  twFillTable(); twSync(); scheduleDraw(); gsTwins();
+}
+// Eigenvalues of A against B (first 20), and against Driscoll's reference values (original units: lambda_orig = lambda_world * 0.09).
+function compareTwins() {
+  var a = TD[0].sol, b = TD[1].sol; if (!a || !b) return null;
+  var n = Math.min(20, a.K, b.K), rel = [], maxRel = 0, k;
+  for (k = 0; k < n; k++) { var r = Math.abs(a.lam[k] - b.lam[k]) / a.lam[k]; rel.push(r); if (r > maxRel) maxRel = r; }
+  var sc = TW_SCALE * TW_SCALE, ref = [], maxRef = 0;
+  DRISCOLL.forEach(function (d, i) {
+    var ra = a.lam[i] * sc / d - 1, rb = b.lam[i] * sc / d - 1;
+    ref.push({ ref: d, A: a.lam[i] * sc, B: b.lam[i] * sc, relA: ra, relB: rb });
+    maxRef = Math.max(maxRef, Math.abs(ra), Math.abs(rb));
+  });
+  return { n: n, maxRel: maxRel, rel: rel, driscoll: ref, maxDriscoll: maxRef, ms: [a.ms, b.ms], N: [a.N, b.N] };
+}
+
+/* ---------- layout, view enter ---------- */
+function twLayout() {
+  TD.forEach(function (td) {
+    var changed = sizeTD(td);
+    if (td.sol && (changed || !td.map)) buildTD(td);
+  });
+  if (sizeTwSpec()) drawTwinSpec();
+}
+function twEnter() {
+  twLayout();
+  if (!TW.solved && !TW.solving) twSolve();
+  else if (TW.solved) TW.modeStart = performance.now();
+  twSync(); scheduleDraw();
+}
+
+/* ---------- sound and interaction ---------- */
+function sci(x) { return x === 0 ? '0' : x.toExponential(1); }
+function twSetMode(k, silent) {
+  if (!TW.solved) return;
+  TW.k = clamp(k, 1, TW_MODES); TW.showMode = true; TW.modeStart = performance.now();
+  TD.forEach(function (td) { td.hits = []; td.ripple = null; });
+  if (!silent) { ensureAudio(); playMode(TW.k - 1, TD[0].sol); }
+  twSync(); scheduleDraw();
+}
+function twStrike(td, x, y) {
+  if (!td.sol) return;
+  var r = strikeAmps(td.sol, x, y), now = performance.now();
+  td.hits.push({ t0: now, a: r.a, active: r.active, rms0: r.rms0 });
+  if (td.hits.length > 3) td.hits.shift();
+  td.ripple = { x: x, y: y, t0: now }; td.lastAmps = r.a; TW.showMode = false;
+  playStrike(r.a, td.sol);
+  twSync(); scheduleDraw();
+}
+// Every mode equally loud (a_k = 1/sqrt(k)), same envelope as a strike: the two drums sound the same.
+function twRing(which) {
+  if (!TW.solved) return;
+  ensureAudio();
+  var tun = voiceKey === 'tuned', gapAB = tun ? 8 * 0.16 + 1.2 : TW_RING_GAP;   // Tuned: B waits for A's 8-note arpeggio, plus a breath
+  var seq = which === 'AB' ? [[0, 0], [1, gapAB]] : [[which === 'A' ? 0 : 1, 0]], now = performance.now();
+  seq.forEach(function (s) {
+    var td = TD[s[0]], sol = td.sol, a = new Float64Array(sol.K), act = [], sq = 0;
+    for (var k = 0; k < sol.K; k++) { a[k] = 1 / Math.sqrt(k + 1); act.push(k); sq += a[k] * a[k]; }
+    td.hits.push({ t0: now + s[1] * 1000, a: a, active: act, rms0: Math.sqrt(sq / sol.area) });
+    if (td.hits.length > 3) td.hits.shift();
+    if (tun) playTuned(a, sol, s[1], { max: 8, gap: 0.16 });   // a slow ascending arpeggio of the first 8 notes, not a crash
+    else playStrike(a, sol, s[1], which === 'AB' && !s[1] ? TW_RING_GAP : 0);   // in "A, then B", A fades out as B begins
+  });
+  TD.forEach(function (td) { td.lastAmps = null; });
+  TW.showMode = false; twSync(); scheduleDraw();
+}
+TD.forEach(function (td) {
+  td.cv.addEventListener('pointerdown', function (ev) {
+    ensureAudio();
+    if (!td.sol) return;
+    var w = toWorld(ev, td.cv);
+    if (pointInPoly(td.shape.poly, w.x, w.y)) twStrike(td, w.x, w.y);
+  });
+  td.cv.addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Enter' && ev.key !== ' ') return;
+    ev.preventDefault(); ensureAudio();
+    if (!td.sol) return;
+    var c = centrePoint(td.sol, td.shape.poly);
+    twStrike(td, c.x, c.y);
+  });
+});
+$('twPrev').addEventListener('click', function () { twSetMode(TW.k - 1); });
+$('twNext').addEventListener('click', function () { twSetMode(TW.k + 1); });
+$('twRingA').addEventListener('click', function () { twRing('A'); });
+$('twRingB').addEventListener('click', function () { twRing('B'); });
+$('twRingAB').addEventListener('click', function () { twRing('AB'); });
+$('twTri').addEventListener('click', function () {
+  TW.tris = !TW.tris; this.setAttribute('aria-pressed', TW.tris ? 'true' : 'false'); scheduleDraw();
+});
+
+/* ---------- readouts, table, mirrored spectrum ---------- */
+function twSync() {
+  var ready = TW.solved, a = TD[0].sol;
+  $('twModeLbl').textContent = 'Mode ' + TW.k;
+  $('twPrev').disabled = !ready || TW.k <= 1; $('twNext').disabled = !ready || TW.k >= TW_MODES;
+  ['twRingA', 'twRingB', 'twRingAB'].forEach(function (id) { $(id).disabled = !ready; });
+  var cap = $('twCaption');
+  if (ready) {
+    cap.textContent = ''; var b = document.createElement('b'); b.className = 'num';
+    b.textContent = 'Mode ' + TW.k + ' · ' + a.f[TW.k - 1].toFixed(1) + ' Hz on both drums'; cap.appendChild(b);
+  } else cap.textContent = TW.solving ? 'Tuning the drums…' : '';
+  $('twHint').textContent = !ready ? '' : TW.showMode ? 'Tap a drum to strike it at that spot.' : 'Tap a drum to strike it again, or use the arrows to bring a pattern back.';
+  $('twArea').textContent = TD[0].shape.area.toFixed(2) + ' units² each';
+  if (ready) {
+    $('twSolve').textContent = 'A ' + (a.ms / 1000).toFixed(1) + ' s · B ' + (TD[1].sol.ms / 1000).toFixed(1) + ' s';
+    var c = TW.cmp;
+    $('twAgree').textContent = c ? 'within ' + sci(c.maxRel) : '–';
+  } else { $('twSolve').textContent = TW.solving ? 'tuning…' : '–'; $('twAgree').textContent = '–'; }
+  drawTwinSpec();
+}
+function twFillTable() {
+  var body = $('twRows'); body.textContent = '';
+  var a = TD[0].sol, b = TD[1].sol; if (!a || !b) return;
+  for (var k = 0; k < 10; k++) {
+    var tr = document.createElement('tr'), cells = [String(k + 1), a.f[k].toFixed(2), b.f[k].toFixed(2)];
+    cells.forEach(function (t) { var td = document.createElement('td'); td.textContent = t; tr.appendChild(td); });
+    body.appendChild(tr);
+  }
+}
+
+var twSpecCv = $('twSpec'), twSpecCtx = twSpecCv.getContext('2d');
+var TS = { ml: 12, mr: 12, top: 26, bottom: 22, cssW: 0, cssH: 210 };
+function sizeTwSpec() {
+  var w = twSpecCv.clientWidth; if (!w) return false;
+  var dpr = dprNow(); TS.cssW = w; twSpecCv.width = Math.round(w * dpr); twSpecCv.height = Math.round(TS.cssH * dpr);
+  return true;
+}
+function twAxisMax() { var s = TD[0].sol; return s ? s.f[s.K - 1] * 1.03 : 1; }
+function twX(f) { return TS.ml + f / twAxisMax() * (TS.cssW - TS.ml - TS.mr); }
+function drawTwinSpec() {
+  if (!TS.cssW) return;
+  var dpr = dprNow(), c = twSpecCtx, W = TS.cssW, H = TS.cssH;
+  c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, W, H);
+  var axisY = H - TS.bottom, midY = TS.top + (axisY - TS.top) / 2, maxH = (axisY - TS.top) / 2 - 4;
+  c.font = '10px ' + TOK.mono; c.textBaseline = 'alphabetic'; c.lineWidth = 1;
+  c.strokeStyle = TOK.line.css;
+  c.beginPath(); c.moveTo(TS.ml, axisY + 0.5); c.lineTo(W - TS.mr, axisY + 0.5); c.stroke();
+  c.beginPath(); c.moveTo(TS.ml, Math.round(midY) + 0.5); c.lineTo(W - TS.mr, Math.round(midY) + 0.5); c.stroke();
+  c.fillStyle = TOK.muted.css; c.textAlign = 'left';
+  c.fillText('Drum A', TS.ml, TS.top + 10); c.fillText('Drum B', TS.ml, axisY - 5);
+  var sa = TD[0].sol, sb = TD[1].sol;
+  if (!sa || !sb) return;
+  var axisMax = twAxisMax(), step = niceStep(axisMax);
+  c.textAlign = 'center';
+  for (var t = 0; t <= axisMax + 1e-6; t += step) {
+    var x = twX(t);
+    c.beginPath(); c.moveTo(x + 0.5, axisY); c.lineTo(x + 0.5, axisY + 4); c.stroke();
+    var lab = t >= 1000 ? (t / 1000) + 'k' : String(t);
+    if (t > 0 && x < W - 22) c.fillText(lab, x, axisY + 15);
+  }
+  c.textAlign = 'right'; c.fillText('Hz', W - 2, axisY + 15);
+  var hi = TW.hover >= 0 ? TW.hover : (TW.showMode ? TW.k - 1 : -1);
+  [sa, sb].forEach(function (sol, ix) {
+    var amps = TD[ix].lastAmps, mx = 0, k;
+    if (amps) for (k = 0; k < sol.K; k++) mx = Math.max(mx, Math.abs(amps[k]));
+    for (k = 0; k < sol.K; k++) {
+      var bx = twX(sol.f[k]), bh = amps ? Math.max(2, Math.abs(amps[k]) / (mx || 1) * maxH) : maxH * 0.55, wbar = k === hi ? 6 : 4;
+      c.fillStyle = MODE_COL[k]; c.globalAlpha = (hi >= 0 && k !== hi) ? 0.55 : 1;
+      if (ix === 0) c.fillRect(bx - wbar / 2, midY - 1 - bh, wbar, bh); else c.fillRect(bx - wbar / 2, midY + 2, wbar, bh);
+    }
+    c.globalAlpha = 1;
+  });
+  if (hi >= 0) {
+    var hx = twX(sa.f[hi]), txt = 'Mode ' + (hi + 1) + ' · ' + sa.f[hi].toFixed(1) + ' Hz';
+    c.strokeStyle = rgba('accent', 0.6); c.beginPath(); c.moveTo(Math.round(hx) + 0.5, TS.top); c.lineTo(Math.round(hx) + 0.5, axisY); c.stroke();
+    c.font = '11px ' + TOK.mono; var tw = c.measureText(txt).width + 12, lx = clamp(hx - tw / 2, 2, W - tw - 2);
+    c.fillStyle = TOK.raise.css; c.strokeStyle = TOK.accent.css;
+    c.fillRect(lx, 2, tw, 18); c.strokeRect(lx + 0.5, 2.5, tw - 1, 17);
+    c.fillStyle = TOK.fg.css; c.textAlign = 'center'; c.fillText(txt, lx + tw / 2, 15);
+  }
+}
+function twBarAt(ev) {
+  var sa = TD[0].sol; if (!sa) return -1;
+  var r = twSpecCv.getBoundingClientRect(), x = ev.clientX - r.left, best = -1, bd = 12;
+  for (var k = 0; k < sa.K; k++) { var d = Math.abs(twX(sa.f[k]) - x); if (d < bd) { bd = d; best = k; } }
+  return best;
+}
+twSpecCv.addEventListener('pointermove', function (ev) {
+  var k = twBarAt(ev); if (k !== TW.hover) { TW.hover = k; drawTwinSpec(); }
+});
+twSpecCv.addEventListener('pointerleave', function () { if (TW.hover >= 0) { TW.hover = -1; drawTwinSpec(); } });
+twSpecCv.addEventListener('pointerdown', function (ev) {
+  ensureAudio();
+  var k = twBarAt(ev); if (k < 0) return;
+  TW.hover = k;
+  if (k < TW_MODES) twSetMode(k + 1); else { playMode(k, TD[0].sol); drawTwinSpec(); }
+});
+
+/* ===================================================================
+   Billiards: a ball on the table, and the drum of the same shape.
+   Circle and stadium bounce exactly (circle and straight pieces); the cardioid and "My drum" bounce off their polygon.
+   Balls move by analytic steps: find the next hit along the ray, jump to it, reflect.
+   =================================================================== */
+var BL_DELTA = 1e-6, BL_V0 = 2.7, BL_HI_K = 120, BL_HI_N = 6000, BL_MIN_MODE = 20, BL_MAXB = 60, BL_EPS = 1e-10;
+var BL_LMIN = -7, BL_LMAX = 0.6, BL_TRAIL = 3.2;
+function cardioidPoly() {                           // r = 1 + cos(t), cusp at the top, fitted to the stage
+  var n = 400, raw = [], i, x0 = 9, x1 = -9, y0 = 9, y1 = -9;
+  for (i = 0; i < n; i++) {
+    var t = 2 * Math.PI * i / n, r = 1 + Math.cos(t), q = [r * Math.sin(t), r * Math.cos(t)];
+    raw.push(q); x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); y0 = Math.min(y0, q[1]); y1 = Math.max(y1, q[1]);
+  }
+  var s = 1.85 / Math.max(x1 - x0, y1 - y0), cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  return raw.map(function (q) { return [(q[0] - cx) * s, (q[1] - cy) * s]; });
+}
+function shapeByKey(k) { return SHAPES.filter(function (s) { return s.key === k; })[0]; }
+var TABLES = {
+  circle:   { key: 'circle', name: 'Circle', kind: 'circle', R: 0.85, poly: shapeByKey('circle').poly },
+  stadium:  { key: 'stadium', name: 'Stadium', kind: 'stadium', r: 0.475, hl: 0.475, poly: shapeByKey('stadium').poly },
+  cardioid: { key: 'cardioid', name: 'Cardioid', kind: 'poly', poly: cardioidPoly() },
+  mine:     { key: 'mine', name: 'My drum', kind: 'poly' }
+};
+Object.defineProperty(TABLES.mine, 'poly', { enumerable: true, get: function () { return state.shape ? state.shape.poly : SHAPES[0].poly; } });
+var TABLE_ORDER = ['circle', 'stadium', 'cardioid', 'mine'];
+var BL_START = { circle: { x: -0.5, y: 0.25, a: 0.9 }, stadium: { x: -0.3, y: 0.12, a: 0.55 }, cardioid: { x: 0.1, y: 0.25, a: -0.7 } };
+
+var BL = {
+  table: 'stadium', balls: [], launch: null, speed: 1, paused: false, lastTs: 0, chaos: [], gap: 0, nGap: 0, dirty: true, aim: null,
+  cw: 0, rw: 0, entered: false, keyAng: 0.6, mineShape: null,
+  patterns: false, mode: 64, modeTouched: false, cache: {}, solving: false, solveKey: '', solveShape: null, worker: null,
+  scar: null, scarIdx: 0, scarMsg: '', pendingScar: false, fieldDirty: true, msg: ''
+};
+var blCv = $('billCanvas'), blCtx = blCv.getContext('2d'), blFieldCv = document.createElement('canvas'), blFieldCtx = blFieldCv.getContext('2d');
+var chCv = $('chaosCanvas'), chCtx = chCv.getContext('2d');
+var CH = { ml: 46, mr: 12, top: 22, bottom: 34, cssW: 0, cssH: 176 };
+var blImg = null, blU32 = null, blBase = null, blPhi = null;
+function blTable() { return TABLES[BL.table]; }
+function blEnt(key) {
+  key = key || BL.table;
+  var e = BL.cache[key];
+  if (e && key === 'mine' && e.srcShape !== state.shape) return null;
+  return e || null;
+}
+function blSpeed() { return BL_V0 * BL.speed * (reduced ? 0.5 : 1); }
+function blInterior(poly) {
+  var cx = 0, cy = 0, a = 0, i;
+  for (i = 0; i < poly.length; i++) {
+    var p = poly[i], q = poly[(i + 1) % poly.length], cr = p[0] * q[1] - q[0] * p[1];
+    a += cr; cx += (p[0] + q[0]) * cr; cy += (p[1] + q[1]) * cr;
+  }
+  if (Math.abs(a) > 1e-9) { cx /= 3 * a; cy /= 3 * a; }
+  if (pointInPoly(poly, cx, cy)) return { x: cx, y: cy };
+  var best = 1e9, bx = 0, by = 0;
+  for (var yy = -VIEW; yy <= VIEW; yy += 0.02) for (var xx = -VIEW; xx <= VIEW; xx += 0.02) {
+    var d = (xx - cx) * (xx - cx) + (yy - cy) * (yy - cy);
+    if (d < best && pointInPoly(poly, xx, yy)) { best = d; bx = xx; by = yy; }
+  }
+  return { x: bx, y: by };
+}
+
+/* ---------- geometry: next hit along a ray from inside the table ---------- */
+var HIT = { t: 0, nx: 0, ny: 0, seg: -1 };
+// A polygon of many short edges stands in for a smooth curve, but flat edges alone never scatter a ray, so the cardioid
+// would not look chaotic. Where neighbouring edges turn by less than ~25 degrees the outline is treated as smooth and the
+// reflection normal is blended along the edge; real corners (square, L, star) keep their flat edges.
+function blPolyNormals(tb) {
+  var P = tb.poly; if (tb._pnFor === P) return tb._pn;
+  var n = P.length, en = new Float64Array(2 * n), out = new Float64Array(4 * n), i;
+  for (i = 0; i < n; i++) {
+    var a = P[i], q = P[(i + 1) % n], ex = q[0] - a[0], ey = q[1] - a[1], L = Math.sqrt(ex * ex + ey * ey) || 1;
+    en[2 * i] = -ey / L; en[2 * i + 1] = ex / L;
+  }
+  function vertex(v, edge) {                         // the normal vertex v offers to `edge` (flat if the corner is sharp)
+    var p = (v + n - 1) % n, ax = en[2 * p], ay = en[2 * p + 1], bx = en[2 * v], by = en[2 * v + 1];
+    if (ax * bx + ay * by < 0.906) return edge === v ? [bx, by] : [ax, ay];
+    var sx = ax + bx, sy = ay + by, sl = Math.sqrt(sx * sx + sy * sy) || 1;
+    return [sx / sl, sy / sl];
+  }
+  for (i = 0; i < n; i++) {
+    var s = vertex(i, i), e = vertex((i + 1) % n, i);
+    out[4 * i] = s[0]; out[4 * i + 1] = s[1]; out[4 * i + 2] = e[0]; out[4 * i + 3] = e[1];
+  }
+  tb._pnFor = P; tb._pn = out;
+  return out;
+}
+function blHit(tb, x, y, dx, dy, skip) {
+  var best = Infinity, nx = 0, ny = 0, seg = -1, t, px, py, i;
+  if (tb.kind === 'circle') {
+    var b = x * dx + y * dy, c = x * x + y * y - tb.R * tb.R, disc = b * b - c;
+    if (disc >= 0) {
+      t = -b + Math.sqrt(disc);
+      if (t > BL_EPS) { best = t; px = x + t * dx; py = y + t * dy; nx = -px / tb.R; ny = -py / tb.R; }
+    }
+  } else if (tb.kind === 'stadium') {
+    var r = tb.r, hl = tb.hl;
+    if (dy > 1e-15) { t = (r - y) / dy; px = x + t * dx; if (t > BL_EPS && px >= -hl - 1e-12 && px <= hl + 1e-12) { best = t; nx = 0; ny = -1; } }
+    else if (dy < -1e-15) { t = (-r - y) / dy; px = x + t * dx; if (t > BL_EPS && px >= -hl - 1e-12 && px <= hl + 1e-12) { best = t; nx = 0; ny = 1; } }
+    for (var sg = -1; sg <= 1; sg += 2) {
+      var cx = sg * hl, ox = x - cx, b2 = ox * dx + y * dy, c2 = ox * ox + y * y - r * r, d2 = b2 * b2 - c2;
+      if (d2 < 0) continue;
+      var sq = Math.sqrt(d2);
+      for (var k = 0; k < 2; k++) {
+        t = k ? -b2 + sq : -b2 - sq;
+        if (t <= BL_EPS || t >= best) continue;
+        px = x + t * dx; py = y + t * dy;
+        if (sg * px < hl - 1e-12) continue;           // right arc lives at x >= hl, left arc at x <= -hl
+        best = t; nx = (cx - px) / r; ny = -py / r;
+      }
+    }
+  } else {
+    var P = tb.poly, n = P.length, bu = 0;
+    for (i = 0; i < n; i++) {
+      if (i === skip) continue;
+      var a = P[i], q = P[i + 1 === n ? 0 : i + 1], ex = q[0] - a[0], ey = q[1] - a[1];
+      var den = dx * ey - dy * ex; if (den > -1e-14 && den < 1e-14) continue;
+      var ax = a[0] - x, ay = a[1] - y;
+      t = (ax * ey - ay * ex) / den; if (t <= BL_EPS || t >= best) continue;
+      var u = (ax * dy - ay * dx) / den; if (u < -1e-9 || u > 1 + 1e-9) continue;
+      if (ex * ex + ey * ey < 1e-24) continue;
+      best = t; seg = i; bu = u;
+    }
+    if (seg >= 0) {                                   // normal: blended between the edge's two end normals where the outline is smooth
+      var pn = blPolyNormals(tb), o = 4 * seg;
+      nx = pn[o] + (pn[o + 2] - pn[o]) * bu; ny = pn[o + 1] + (pn[o + 3] - pn[o + 1]) * bu;
+      var nl = Math.sqrt(nx * nx + ny * ny); nx /= nl; ny /= nl;
+      if (nx * dx + ny * dy > 0) { nx = -nx; ny = -ny; }   // the normal faces back into the table
+    }
+  }
+  if (best === Infinity) return null;
+  HIT.t = best; HIT.nx = nx; HIT.ny = ny; HIT.seg = seg;
+  return HIT;
+}
+function blAim(b) {                                  // find the wall this ball will hit next
+  var tb = blTable(), h = blHit(tb, b.x, b.y, b.dx, b.dy, b.skip);
+  if (!h) { b.dx = -b.dx; b.dy = -b.dy; h = blHit(tb, b.x, b.y, b.dx, b.dy, -1); }       // it would have escaped: send it back
+  if (!h) { var c = blInterior(tb.poly); b.x = c.x; b.y = c.y; h = blHit(tb, b.x, b.y, b.dx, b.dy, -1); }
+  if (!h) { b.tNext = Infinity; b.nx = b.ny = 0; b.hitSeg = -1; return; }
+  b.tNext = h.t; b.nx = h.nx; b.ny = h.ny; b.hitSeg = h.seg;
+}
+function blBall(x, y, a, col) {
+  var b = { x: x, y: y, dx: Math.cos(a), dy: Math.sin(a), tNext: 0, nx: 0, ny: 0, skip: -1, hitSeg: -1, bounces: 0, len: 0, verts: [{ x: x, y: y, s: 0 }], col: col };
+  blAim(b); return b;
+}
+function blAdvance(b, s) {                           // move a ball s along its path, reflecting at each wall
+  for (var g = 0; s >= 0 && g < 5000; g++) {
+    if (s < b.tNext) { b.x += b.dx * s; b.y += b.dy * s; b.tNext -= s; b.len += s; return; }
+    var t = b.tNext; b.x += b.dx * t; b.y += b.dy * t; b.len += t; s -= t;
+    var dn = b.dx * b.nx + b.dy * b.ny;
+    b.dx -= 2 * dn * b.nx; b.dy -= 2 * dn * b.ny;
+    var m = Math.sqrt(b.dx * b.dx + b.dy * b.dy); b.dx /= m; b.dy /= m;
+    b.x += b.nx * 1e-9; b.y += b.ny * 1e-9;           // step off the wall so it cannot be hit again at distance zero
+    b.bounces++; b.verts.push({ x: b.x, y: b.y, s: b.len }); if (b.verts.length > 300) b.verts.shift();
+    b.skip = b.hitSeg; blAim(b);
+  }
+}
+function blStep(D) {                                 // both balls travel the same path length D; ball 1's bounces set the clock
+  var b1 = BL.balls[0], b2 = BL.balls[1];
+  if (!b1 || !b2) return;
+  for (var g = 0; D > 0 && g < 6000; g++) {
+    var step = Math.min(D, b1.tNext), hit = step >= b1.tNext;
+    blAdvance(b2, step); blAdvance(b1, step); D -= step;
+    if (hit) {
+      BL.gap = Math.hypot(b1.x - b2.x, b1.y - b2.y); BL.nGap = b1.bounces;
+      if (b1.bounces <= BL_MAXB) BL.chaos.push({ n: b1.bounces, g: BL.gap });
+      BL.dirty = true;
+    }
+  }
+}
+function blLaunch(x, y, a) {                         // two balls from one point; the second is turned by 1e-6 radian
+  var tb = blTable();
+  if (!pointInPoly(tb.poly, x, y)) { var c = blInterior(tb.poly); x = c.x; y = c.y; }
+  BL.launch = { x: x, y: y, a: a };
+  BL.balls = [blBall(x, y, a, 'accent'), blBall(x, y, a + BL_DELTA, 'cool')];
+  BL.chaos = []; BL.gap = 0; BL.nGap = 0; BL.paused = false; BL.lastTs = 0; BL.dirty = true;
+  blSync(); scheduleDraw();
+  return BL.balls;
+}
+function blLaunchDefault() {
+  var tb = blTable(), d = BL_START[BL.table];
+  if (!d || !pointInPoly(tb.poly, d.x, d.y)) { var c = blInterior(tb.poly); d = { x: c.x, y: c.y, a: 0.7 }; }
+  return blLaunch(d.x, d.y, d.a);
+}
+
+/* ---------- tables, solving, patterns ---------- */
+function blSetTable(key, force) {
+  if (!TABLES[key] || (key === BL.table && !force)) return;
+  BL.table = key; BL.scar = null; BL.scarIdx = 0; BL.scarMsg = ''; BL.msg = ''; BL.fieldDirty = true; BL.pendingScar = false;
+  if (key === 'mine') BL.mineShape = state.shape;
+  BL.balls = []; BL.chaos = []; BL.gap = 0; BL.nGap = 0; BL.launch = null; BL.dirty = true;
+  if (!reduced) blLaunchDefault();
+  if (BL.patterns) blEnsureSol();
+  blSync(); scheduleDraw();
+}
+function blCancel() {
+  if (BL.worker) { BL.worker.terminate(); BL.worker = null; }
+  BL.solving = false; setBusy(false, 0, 'Bill');
+}
+function blEnsureSol() {
+  var key = BL.table, ent = blEnt(key);
+  if (ent && ent.sol) { blSolved(); return; }
+  var src = key === 'mine' ? state.shape : null;
+  if (BL.solving && BL.solveKey === key && BL.solveShape === src) return;
+  blCancel();
+  var tb = TABLES[key], poly = tb.poly.map(function (q) { return [q[0], q[1]]; });
+  var shape = { key: 'bill-' + key, name: tb.name, poly: poly, area: polyArea(poly) }, id = ++solveId, w;
+  try { w = new Worker(getWorkerUrl()); } catch (err) { BL.msg = 'This browser would not start the tuning worker.'; BL.patterns = false; blSync(); return; }
+  BL.worker = w; BL.solving = true; BL.solveKey = key; BL.solveShape = src; BL.msg = '';
+  setBusy(true, 0, 'Bill'); blSync();
+  var flat = new Float64Array(poly.length * 2);
+  poly.forEach(function (q, i) { flat[2 * i] = q[0]; flat[2 * i + 1] = q[1]; });
+  w.onmessage = function (ev) {
+    var m = ev.data; if (m.id !== id) return;
+    if (m.type === 'progress') { setBusy(true, m.p, 'Bill'); return; }
+    w.terminate(); if (BL.worker === w) BL.worker = null;
+    BL.solving = false; setBusy(false, 0, 'Bill');
+    if (m.type === 'error') { BL.msg = 'Could not find the patterns (' + m.message + ')'; BL.patterns = false; blSync(); scheduleDraw(); return; }
+    BL.cache[key] = { sol: makeSol(shape, m), shape: shape, srcShape: src, map: null, orbits: null };
+    if (BL.table === key && BL.patterns && (key !== 'mine' || state.shape === src)) blSolved();
+    blSync(); scheduleDraw();
+  };
+  w.onerror = function () { BL.solving = false; BL.patterns = false; setBusy(false, 0, 'Bill'); BL.msg = 'The tuning worker hit a problem.'; blSync(); scheduleDraw(); };
+  w.postMessage({ type: 'solve', id: id, poly: flat, K: BL_HI_K, targetN: BL_HI_N, maxMs: 30000 });
+}
+function blSolved() {
+  var ent = blEnt(); if (!ent) return;
+  BL.mode = clamp(BL.mode, 1, ent.sol.K); BL.fieldDirty = true;
+  if (BL.pendingScar) { BL.pendingScar = false; blFindScar(false); }
+  else if (!BL.modeTouched && BL.table === 'stadium') blFindScar(true);      // first look at the stadium: start on a scar
+}
+function blSetPatterns(on) {
+  BL.patterns = !!on; BL.fieldDirty = true; BL.msg = '';
+  if (on) blEnsureSol(); else { blCancel(); BL.pendingScar = false; }
+  blSync(); scheduleDraw();
+}
+function blSetMode(n, play) {
+  var ent = blEnt(); if (!ent || !ent.sol) return;
+  BL.mode = clamp(Math.round(n), 1, ent.sol.K); BL.modeTouched = true; BL.scar = null; BL.scarMsg = ''; BL.fieldDirty = true;
+  if (play) { ensureAudio(); playMode(BL.mode - 1, ent.sol); }
+  blSync(); scheduleDraw();
+}
+
+/* ---------- scar scores: mean |phi|^2 along a path / mean |phi|^2 over the table ---------- */
+function blMeanSq(sol, k) {
+  if (!sol.meanSq) sol.meanSq = new Float64Array(sol.K);
+  if (!sol.meanSq[k]) { var v = sol.vecs[k], s = 0; for (var i = 0; i < sol.N; i++) s += v[i] * v[i]; sol.meanSq[k] = s / sol.N; }
+  return sol.meanSq[k];
+}
+function blScores(sol, pts) {                        // pts: flat [x0,y0,x1,y1,...]; returns one score per mode
+  var n = pts.length / 2, tap = new Int32Array(4 * n), wt = new Float32Array(4 * n), out = new Float64Array(sol.K), i, k;
+  for (i = 0; i < n; i++) pointTaps(sol.grid, sol.N, pts[2 * i], pts[2 * i + 1], tap, wt, 4 * i);
+  for (k = 0; k < sol.K; k++) {
+    var v = sol.vecs[k], s = 0;
+    for (i = 0; i < n; i++) { var o = 4 * i, f = wt[o] * v[tap[o]] + wt[o + 1] * v[tap[o + 1]] + wt[o + 2] * v[tap[o + 2]] + wt[o + 3] * v[tap[o + 3]]; s += f * f; }
+    out[k] = s / n / blMeanSq(sol, k);
+  }
+  return out;
+}
+function scarScore(sol, k, pts) { return blScores(sol, pts)[k]; }   // k is 0-based
+function blRank(scores, K, minMode, count, space) {   // best modes (0-based), no two within `space` of each other
+  var idx = [], out = [], k;
+  for (k = minMode - 1; k < K; k++) idx.push(k);
+  idx.sort(function (a, b) { return scores[b] - scores[a]; });
+  for (var i = 0; i < idx.length && out.length < count; i++) {
+    var c = idx[i]; if (out.every(function (o) { return Math.abs(o - c) > space; })) out.push(c);
+  }
+  return out;
+}
+function blSampleLine(v, closed, step) {
+  var out = [], n = v.length, segs = closed ? n : n - 1;
+  for (var i = 0; i < segs; i++) {
+    var a = v[i], b = v[(i + 1) % n], L = Math.hypot(b[0] - a[0], b[1] - a[1]), m = Math.max(1, Math.ceil(L / step));
+    for (var j = 0; j < m; j++) { var t = j / m; out.push(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t); }
+  }
+  if (!closed) out.push(v[n - 1][0], v[n - 1][1]);
+  return out;
+}
+function blOrbitsFor(key) {                          // the stadium's three classic periodic orbits, scored against every mode
+  var ent = blEnt(key || 'stadium'); if (!ent || !ent.sol) return null;
+  if (ent.orbits) return ent.orbits;
+  var tb = TABLES.stadium, r = tb.r, ext = tb.hl + tb.r;
+  var defs = [
+    { key: 'bounce', name: 'bouncing-ball', verts: [[0, -r], [0, r]], closed: false },
+    { key: 'diamond', name: 'diamond', verts: [[ext, 0], [0, -r], [-ext, 0], [0, r]], closed: true },
+    { key: 'axis', name: 'long-axis', verts: [[-ext, 0], [ext, 0]], closed: false }
+  ];
+  defs.forEach(function (o) {
+    o.pts = blSampleLine(o.verts, o.closed, 0.01); o.scores = blScores(ent.sol, o.pts); o.rank = blRank(o.scores, ent.sol.K, BL_MIN_MODE, 3, 1);
+  });
+  return (ent.orbits = defs);
+}
+function blTrailPts() {                              // ball 1's recent path, as sample points
+  var b = BL.balls[0]; if (!b || b.verts.length < 3) return null;
+  var v = b.verts.slice(-150).map(function (p) { return [p.x, p.y]; }); v.push([b.x, b.y]);
+  return blSampleLine(v, false, 0.03);
+}
+function blFindScar(silent) {
+  var tb = blTable(), ent = blEnt();
+  if (!BL.patterns || !ent || !ent.sol) {
+    if (tb.kind !== 'stadium' && !BL.balls.length) return;
+    BL.pendingScar = true; if (BL.patterns) blEnsureSol(); else blSetPatterns(true);
+    return;
+  }
+  var sol = ent.sol, k, score, text, orbit = null;
+  if (tb.kind === 'stadium') {
+    var orbs = blOrbitsFor('stadium').slice().sort(function (a, b) { return (a.key === 'bounce') - (b.key === 'bounce'); }), seq = [];   // true scars first; the bouncing-ball cousin last
+    orbs.forEach(function (o) { for (var r = 0; r < 3; r++) if (o.rank[r] !== undefined && o.scores[o.rank[r]] >= 2) seq.push({ o: o, k: o.rank[r] }); });   // only clear matches (the diamond's are too faint at these pitches)
+    if (!seq.length) orbs.forEach(function (o) { if (o.rank[0] !== undefined) seq.push({ o: o, k: o.rank[0] }); });
+    var pick = seq[BL.scarIdx % seq.length]; BL.scarIdx++;
+    orbit = pick.o; k = pick.k; score = orbit.scores[k];
+    text = orbit.key === 'bounce'
+      ? 'Mode ' + (k + 1) + ' is a bouncing-ball pattern: it piles up along the straight up-and-down paths. Those paths are only borderline unstable, so this is a close cousin of a scar.'
+      : 'Mode ' + (k + 1) + ' is a scar: it piles up along the ' + orbit.name + ' path, even though that path is unstable. Nudge a ball off it and it flies away chaotically.';
+  } else {
+    var pts = blTrailPts();
+    if (!pts) { BL.scarMsg = 'Let the ball bounce a few times first. The pattern is matched to its path.'; blSync(); return; }
+    var sc = blScores(sol, pts), rank = blRank(sc, sol.K, BL_MIN_MODE, 5, 1);
+    k = rank[BL.scarIdx % rank.length]; BL.scarIdx++; score = sc[k];
+    text = 'Mode ' + (k + 1) + ' glows along the ball’s recent path.';
+  }
+  blSetMode(k + 1, !silent);
+  BL.scar = { orbit: orbit, mode: k + 1, score: score };
+  BL.scarMsg = text + ' Along it the pattern is ' + score.toFixed(1) + '× brighter than average.';
+  blSync(); scheduleDraw();
+}
+
+/* ---------- drawing ---------- */
+function blLayout() {
+  var st = $('billStage'), css = st.clientWidth, dpr = dprNow();
+  if (!css) return;
+  var px = Math.max(2, Math.round(css * dpr));
+  if (px !== BL.cw) {
+    BL.cw = px; blCv.width = px; blCv.height = px;
+    BL.rw = clamp(Math.round(px * 0.75), 160, 460); blFieldCv.width = BL.rw; blFieldCv.height = BL.rw;
+    blImg = null; BL.fieldDirty = true;
+    Object.keys(BL.cache).forEach(function (k) { BL.cache[k].map = null; });
+  }
+  var w = chCv.clientWidth;
+  if (w) { CH.cssW = w; chCv.width = Math.round(w * dpr); chCv.height = Math.round(CH.cssH * dpr); }
+  BL.dirty = true;
+}
+function blRenderField(ent) {                        // |phi|^2 of the chosen mode, one ramp, no signs, no nodal lines
+  BL.fieldDirty = false;
+  var rw = BL.rw; if (!rw) return;
+  if (!ent.map || ent.map.W !== rw) ent.map = buildMap(ent.shape.poly, ent.sol, rw, rw, { cx: 0, cy: 0, half: VIEW });
+  if (!blImg || blImg.width !== rw) {
+    blImg = blFieldCtx.createImageData(rw, rw); blU32 = new Uint32Array(blImg.data.buffer);
+    blBase = new Uint32Array(rw * rw); blPhi = new Float32Array(rw * rw);
+  }
+  var map = ent.map, mx = 1e-30, q;
+  makeBase(map, blBase);
+  sampleField(map, ent.sol.vecs[BL.mode - 1], blPhi);
+  for (q = 0; q < map.count; q++) { var a = Math.abs(blPhi[map.pix[q]]); if (a > mx) mx = a; }
+  blU32.set(blBase);
+  var inv = 1 / (0.8 * mx * mx), bg = TOK.bg.rgb;
+  for (q = 0; q < map.count; q++) {
+    var p = map.pix[q], v = blPhi[p], t = v * v * inv; if (t > 1) t = 1;
+    var li = (Math.pow(t, 0.6) * (INT_N - 1)) | 0, r = INT_R[li], g = INT_G[li], b = INT_B[li], al = map.alpha[q];
+    if (al < 1) { r = bg[0] + (r - bg[0]) * al; g = bg[1] + (g - bg[1]) * al; b = bg[2] + (b - bg[2]) * al; }
+    blU32[p] = (255 << 24) | ((b + 0.5 | 0) << 16) | ((g + 0.5 | 0) << 8) | (r + 0.5 | 0);
+  }
+  blFieldCtx.putImageData(blImg, 0, 0);
+}
+function blDrawTrail(ctx, b, cw, dpr) {
+  var pts = [[b.x, b.y, 0]], i;
+  for (i = b.verts.length - 1; i >= 0; i--) {
+    var v = b.verts[i], age = b.len - v.s, last = pts[pts.length - 1];
+    if (age >= BL_TRAIL) {
+      var f = (BL_TRAIL - last[2]) / Math.max(1e-12, age - last[2]);
+      pts.push([last[0] + (v.x - last[0]) * f, last[1] + (v.y - last[1]) * f, BL_TRAIL]); break;
+    }
+    pts.push([v.x, v.y, age]);
+  }
+  ctx.lineCap = 'round';
+  for (i = pts.length - 1; i > 0; i--) {
+    var p0 = pts[i], p1 = pts[i - 1], c0 = toCanvas(p0[0], p0[1], cw), c1 = toCanvas(p1[0], p1[1], cw);
+    var a0 = Math.pow(Math.max(0, 1 - p0[2] / BL_TRAIL), 1.4), a1 = Math.pow(Math.max(0, 1 - p1[2] / BL_TRAIL), 1.4);
+    var gr = ctx.createLinearGradient(c0[0], c0[1], c1[0], c1[1]);
+    gr.addColorStop(0, rgba('bg', a0 * 0.55)); gr.addColorStop(1, rgba('bg', a1 * 0.55));
+    ctx.strokeStyle = gr; ctx.lineWidth = 5 * dpr; ctx.beginPath(); ctx.moveTo(c0[0], c0[1]); ctx.lineTo(c1[0], c1[1]); ctx.stroke();
+    var g2 = ctx.createLinearGradient(c0[0], c0[1], c1[0], c1[1]);
+    g2.addColorStop(0, rgba(b.col, a0)); g2.addColorStop(1, rgba(b.col, a1));
+    ctx.strokeStyle = g2; ctx.lineWidth = 2.2 * dpr; ctx.beginPath(); ctx.moveTo(c0[0], c0[1]); ctx.lineTo(c1[0], c1[1]); ctx.stroke();
+  }
+}
+function blDot(ctx, b, rad, cw, dpr) {
+  var c = toCanvas(b.x, b.y, cw);
+  ctx.beginPath(); ctx.arc(c[0], c[1], rad * dpr, 0, 6.2832);
+  ctx.fillStyle = TOK[b.col].css; ctx.fill();
+  ctx.lineWidth = 1.6 * dpr; ctx.strokeStyle = TOK.bg.css; ctx.stroke();
+}
+function drawBilliards(ts) {
+  var now = ts || performance.now();
+  if (BL.balls.length && !BL.paused && BL.lastTs) blStep(blSpeed() * Math.min(0.05, Math.max(0, (now - BL.lastTs) / 1000)));
+  BL.lastTs = now;
+  var ctx = blCtx, cw = BL.cw, dpr = dprNow();
+  if (!cw) return;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = TOK.bg.css; ctx.fillRect(0, 0, cw, cw);
+  var tb = blTable(), ent = BL.patterns ? blEnt() : null;
+  if (ent && ent.sol) {
+    if (BL.fieldDirty) blRenderField(ent);
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(blFieldCv, 0, 0, cw, cw);
+  } else { pathPoly(ctx, tb.poly, cw); ctx.fillStyle = TOK.skin.css; ctx.fill(); }
+  drawHoop(ctx, tb.poly, cw, dpr);
+  if (BL.patterns && BL.scar && BL.scar.orbit) {     // the periodic orbit the chosen pattern hugs
+    var ov = BL.scar.orbit.verts;
+    ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.beginPath();
+    ov.forEach(function (q, i) { var c = toCanvas(q[0], q[1], cw); if (i) ctx.lineTo(c[0], c[1]); else ctx.moveTo(c[0], c[1]); });
+    if (BL.scar.orbit.closed) ctx.closePath();
+    ctx.setLineDash([8 * dpr, 7 * dpr]);
+    ctx.strokeStyle = rgba('bg', 0.6); ctx.lineWidth = 5 * dpr; ctx.stroke();
+    ctx.strokeStyle = TOK.accent.css; ctx.lineWidth = 2 * dpr; ctx.stroke();
+    ctx.restore();
+  }
+  if (BL.balls.length) {
+    blDrawTrail(ctx, BL.balls[1], cw, dpr); blDrawTrail(ctx, BL.balls[0], cw, dpr);
+    blDot(ctx, BL.balls[1], 6, cw, dpr); blDot(ctx, BL.balls[0], 4.2, cw, dpr);
+  }
+  if (BL.aim) {
+    var a = BL.aim, p0 = toCanvas(a.x0, a.y0, cw), p1 = toCanvas(a.x1, a.y1, cw), len = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]);
+    ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    for (var pass = 0; pass < 2; pass++) {
+      ctx.strokeStyle = pass ? TOK.accent.css : rgba('bg', 0.6); ctx.lineWidth = (pass ? 2.5 : 6) * dpr;
+      ctx.beginPath(); ctx.moveTo(p0[0], p0[1]); ctx.lineTo(p1[0], p1[1]);
+      if (len > 10 * dpr) {
+        var ang = Math.atan2(p1[1] - p0[1], p1[0] - p0[0]), hd = 10 * dpr;
+        ctx.moveTo(p1[0] - hd * Math.cos(ang - 0.45), p1[1] - hd * Math.sin(ang - 0.45)); ctx.lineTo(p1[0], p1[1]);
+        ctx.lineTo(p1[0] - hd * Math.cos(ang + 0.45), p1[1] - hd * Math.sin(ang + 0.45));
+      }
+      ctx.stroke();
+    }
+    ctx.beginPath(); ctx.arc(p0[0], p0[1], 4.5 * dpr, 0, 6.2832); ctx.fillStyle = TOK.accent.css; ctx.fill();
+    ctx.restore();
+  }
+  if (BL.dirty) { BL.dirty = false; blReadouts(); drawChaos(); }
+}
+function blWantsAnim() { return BL.balls.length > 0 && !BL.paused; }
+
+/* ---------- the chaos meter ---------- */
+var SUP = { '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹', '-': '⁻' };
+function tenTo(e) { return e === 0 ? '1' : '10' + String(e).split('').map(function (ch) { return SUP[ch] || ch; }).join(''); }
+function drawChaos() {
+  if (!CH.cssW) return;
+  var dpr = dprNow(), c = chCtx, W = CH.cssW, H = CH.cssH, x0 = CH.ml, x1 = W - CH.mr, y0 = CH.top, y1 = H - CH.bottom, l, n;
+  function X(v) { return x0 + v / BL_MAXB * (x1 - x0); }
+  function Y(v) { return y1 - (v - BL_LMIN) / (BL_LMAX - BL_LMIN) * (y1 - y0); }
+  c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, W, H);
+  c.font = '10px ' + TOK.mono; c.textBaseline = 'middle'; c.lineWidth = 1;
+  for (l = BL_LMIN; l <= 0; l++) {                   // one faint line for every factor of ten
+    var yy = Math.round(Y(l)) + 0.5;
+    c.strokeStyle = rgba('line', l % 2 === 0 ? 0.9 : 0.45); c.beginPath(); c.moveTo(x0, yy); c.lineTo(x1, yy); c.stroke();
+    if (l % 2 === 0) { c.fillStyle = TOK.muted.css; c.textAlign = 'right'; c.fillText(tenTo(l), x0 - 6, yy); }
+  }
+  var ty = Math.round(Y(Math.log10(2))) + 0.5;       // the table is about 2 across: gaps cannot grow past this
+  c.setLineDash([4, 4]); c.strokeStyle = rgba('muted', 0.7); c.beginPath(); c.moveTo(x0, ty); c.lineTo(x1, ty); c.stroke(); c.setLineDash([]);
+  c.fillStyle = TOK.muted.css; c.textAlign = 'right'; c.textBaseline = 'alphabetic'; c.fillText('table size', x1 - 2, ty - 4);
+  c.strokeStyle = TOK.line.css; c.beginPath(); c.moveTo(x0 + 0.5, y0); c.lineTo(x0 + 0.5, y1 + 0.5); c.lineTo(x1, y1 + 0.5); c.stroke();
+  c.textAlign = 'center'; c.fillStyle = TOK.muted.css;
+  for (n = 0; n <= BL_MAXB; n += 10) {
+    c.beginPath(); c.moveTo(Math.round(X(n)) + 0.5, y1); c.lineTo(Math.round(X(n)) + 0.5, y1 + 4); c.stroke();
+    c.fillText(String(n), X(n), y1 + 15);
+  }
+  c.fillText('bounces', (x0 + x1) / 2, H - 4);
+  c.textAlign = 'left'; c.fillText('how far apart, ×10 per line', 2, 10);
+  var d = BL.chaos;
+  if (d.length) {
+    c.lineJoin = 'round'; c.strokeStyle = rgba('accent', 0.55); c.lineWidth = 1.5; c.beginPath();
+    d.forEach(function (p, i) { var px = X(p.n), py = Y(clamp(Math.log10(Math.max(p.g, 1e-12)), BL_LMIN, BL_LMAX)); if (i) c.lineTo(px, py); else c.moveTo(px, py); });
+    c.stroke();
+    d.forEach(function (p, i) {
+      var px = X(p.n), py = Y(clamp(Math.log10(Math.max(p.g, 1e-12)), BL_LMIN, BL_LMAX));
+      c.beginPath(); c.arc(px, py, i === d.length - 1 ? 4 : 2.6, 0, 6.2832); c.fillStyle = TOK.accent.css; c.fill();
+    });
+  }
+}
+
+/* ---------- UI ---------- */
+function blGapText() {
+  if (!BL.balls.length) return 'Launch the balls to start the meter.';
+  if (!BL.nGap) return 'Gap: waiting for the first bounce';
+  return 'Gap: ' + sci(BL.gap) + ' after ' + BL.nGap + (BL.nGap === 1 ? ' bounce' : ' bounces');
+}
+function blReadouts() {
+  var b1 = BL.balls[0], ent = blEnt();
+  $('blRdB').textContent = b1 ? String(b1.bounces) : '–';
+  $('blRdG').textContent = BL.nGap ? sci(BL.gap) : '–';
+  $('blRdS').textContent = ent && ent.sol ? ent.sol.K + ' modes · ' + (ent.sol.ms / 1000).toFixed(1) + ' s' : BL.solving ? 'solving…' : '–';
+  var gt = blGapText(); $('gapLine').textContent = gt;
+  chCv.setAttribute('aria-label', 'Chaos meter: bounces across, how far apart the two balls are up, one gridline per factor of ten. ' + gt);
+}
+function blPill() { $('billPill').hidden = BL.balls.length > 0 || !!BL.aim; }
+function blSync() {
+  var tb = blTable(), ent = BL.patterns ? blEnt() : null, ready = !!(ent && ent.sol);
+  TABLE_ORDER.forEach(function (k) { $('bl-chip-' + k).setAttribute('aria-pressed', k === BL.table ? 'true' : 'false'); });
+  blSyncIcons();
+  $('blPat').setAttribute('aria-pressed', BL.patterns ? 'true' : 'false');
+  $('blSpeedVal').textContent = BL.speed.toFixed(1) + '×';
+  $('blAgain').disabled = !BL.launch;
+  $('blPause').textContent = BL.paused ? 'Resume' : 'Pause'; $('blPause').setAttribute('aria-pressed', BL.paused ? 'true' : 'false');
+  var slider = $('blMode'); slider.disabled = !ready; slider.value = BL.mode;
+  $('blPrev').disabled = !ready || BL.mode <= 1; $('blNext').disabled = !ready || BL.mode >= BL_HI_K;
+  $('blModeLbl').textContent = !BL.patterns ? 'Patterns are off' : ready ? 'Mode ' + BL.mode + ' · ' + Math.round(ent.sol.f[BL.mode - 1]).toLocaleString('en-US') + ' Hz'
+    : BL.solving ? 'Finding the patterns…' : 'Mode ' + BL.mode;
+  var isSt = tb.kind === 'stadium', haveBall = BL.balls.length > 0;
+  $('blScar').disabled = BL.solving || (!isSt && !haveBall);
+  $('blScarCap').textContent = BL.msg || BL.scarMsg || (BL.solving ? 'Working out 120 patterns of this shape…'
+    : !isSt && !haveBall ? 'Launch a ball first. Find a scar looks for the pattern that glows along its path.'
+    : isSt ? 'Finds a pattern that piles up along one of the stadium’s special paths. Press again for the next.' : 'Finds the pattern that glows most along the ball’s recent path.');
+  blPill(); blReadouts();
+  BL.dirty = true;
+}
+function blSyncIcons() {
+  TABLE_ORDER.forEach(function (k) { drawIconPoly(TABLES[k].icon, TABLES[k].poly, k === BL.table); });
+}
+function blTheme() { BL.fieldDirty = true; BL.dirty = true; blSyncIcons(); }
+function blEnter() {
+  if (BL.table === 'mine' && BL.mineShape !== state.shape) blSetTable('mine', true);
+  blLayout();
+  if (!BL.entered) { BL.entered = true; if (!reduced && !BL.balls.length) blLaunchDefault(); }
+  BL.lastTs = 0; blSync(); scheduleDraw();
+}
+function blLeave() { BL.lastTs = 0; BL.aim = null; }
+function blBuild() {
+  var box = $('blTables');
+  TABLE_ORDER.forEach(function (key) {
+    var tb = TABLES[key], b = document.createElement('button');
+    b.type = 'button'; b.className = 'chip'; b.id = 'bl-chip-' + key; b.setAttribute('aria-pressed', 'false');
+    var cv = document.createElement('canvas'); cv.setAttribute('aria-hidden', 'true');
+    b.appendChild(cv); b.appendChild(document.createTextNode(tb.name));
+    b.addEventListener('click', function () { ensureAudio(); blSetTable(key); });
+    box.appendChild(b); tb.icon = cv;
+  });
+  $('blSpeed').addEventListener('input', function () { BL.speed = +this.value; $('blSpeedVal').textContent = BL.speed.toFixed(1) + '×'; });
+  $('blAgain').addEventListener('click', function () { if (BL.launch) blLaunch(BL.launch.x, BL.launch.y, BL.launch.a); });
+  $('blClear').addEventListener('click', function () {
+    BL.balls = []; BL.chaos = []; BL.gap = 0; BL.nGap = 0; BL.paused = false; BL.aim = null; BL.dirty = true;
+    if (blTable().kind !== 'stadium') { BL.scar = null; BL.scarMsg = ''; }       // a path-matched pattern means nothing without its path
+    blSync(); scheduleDraw();
+  });
+  $('blPause').addEventListener('click', function () { BL.paused = !BL.paused; blSync(); scheduleDraw(); });
+  $('blPat').addEventListener('click', function () { ensureAudio(); blSetPatterns(!BL.patterns); });
+  $('blPrev').addEventListener('click', function () { blSetMode(BL.mode - 1, true); });
+  $('blNext').addEventListener('click', function () { blSetMode(BL.mode + 1, true); });
+  $('blMode').addEventListener('input', function () { blSetMode(+this.value, false); });
+  $('blMode').addEventListener('change', function () { var e = blEnt(); if (e && e.sol) { ensureAudio(); playMode(BL.mode - 1, e.sol); } });
+  $('blScar').addEventListener('click', function () { ensureAudio(); blFindScar(false); });
+
+  blCv.addEventListener('pointerdown', function (ev) {
+    ensureAudio();
+    var w = toWorld(ev, blCv);
+    if (!pointInPoly(blTable().poly, w.x, w.y)) return;
+    BL.aim = { x0: w.x, y0: w.y, x1: w.x, y1: w.y };
+    try { blCv.setPointerCapture(ev.pointerId); } catch (e) {}
+    ev.preventDefault(); blPill(); scheduleDraw();
+  });
+  blCv.addEventListener('pointermove', function (ev) {
+    if (!BL.aim) return;
+    var w = toWorld(ev, blCv); BL.aim.x1 = w.x; BL.aim.y1 = w.y; scheduleDraw();
+  });
+  blCv.addEventListener('pointerup', function (ev) {
+    var a = BL.aim; if (!a) return;
+    var w = toWorld(ev, blCv), dx = w.x - a.x0, dy = w.y - a.y0;
+    BL.aim = null;
+    var ang = Math.hypot(dx, dy) < 0.08 ? (BL.keyAng += 2.399) : Math.atan2(dy, dx);   // a plain tap picks a direction for you
+    blLaunch(a.x0, a.y0, ang);
+  });
+  blCv.addEventListener('pointercancel', function () { BL.aim = null; blPill(); scheduleDraw(); });
+  blCv.addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Enter' && ev.key !== ' ') return;
+    ev.preventDefault(); ensureAudio();
+    var d = BL.launch || BL_START[BL.table] || blInterior(blTable().poly);
+    blLaunch(d.x, d.y, BL.keyAng += 2.399);
+  });
+  blSyncIcons();
+}
+
+/* ===================================================================
+   Can you hear it?  Five rounds: hear a mystery drum, pick its shape from three.
+   Every candidate is solved privately (the blEnsureSol pattern: its own Worker, state.sol untouched) and cached by key,
+   so replays are instant. All shapes live in world units with the same F_CONST, so their pitches are comparable.
+   =================================================================== */
+var GS_N = 5, GS_SPEC_N = 20;
+var GS = { sols: {}, jobs: {}, tw: [], defs: [] };   // key -> sol, solves in flight, waiters for the twin drums, built round definitions
+var G = { started: false, over: false, round: 0, score: 0, results: [], R: [], cards: [], ready: false, err: '', tok: 0, hov: null, specM: null, specP: null };
+
+function gsCand(key, name, poly, twin) { return { key: key, name: name, poly: poly, twin: twin }; }   // twin: index into TD, else undefined
+function gsCircle(a) { var r = Math.sqrt(a / Math.PI); return scaledPoly(ngon(0, 0, r, r, 200), a); }
+function gsShape(key, a) { return scaledPoly(shapeByKey(key).poly, a); }
+function gsRect(a, aspect) { var h = Math.sqrt(a / aspect) / 2, w = h * aspect; return [[-w, -h], [w, -h], [w, h], [-w, h]]; }   // aspect:1, area a
+var GS_DEFS = [
+  function () {
+    return { title: 'Bigger drums ring lower', lesson: 'Bigger drums ring lower: the lowest note gives away the size.', cands: [
+      gsCand('r1-small', 'Small circle', gsCircle(0.8)), gsCand('r1-medium', 'Medium circle', gsCircle(1.6)), gsCand('r1-large', 'Large circle', gsCircle(2.6))] };
+  },
+  function () {
+    return { title: 'Same size, different shape', lesson: 'Same area, so the lowest notes are close. A thin drum bunches lots of notes together low down; a round one spaces them out.', cands: [
+      gsCand('circle-1.8', 'Circle', gsCircle(1.8)), gsCand('r2-rect', 'Thin rectangle', gsRect(1.8, 4)), gsCand('r2-star', 'Star', gsShape('star', 1.8))] };
+  },
+  function () {
+    return { title: 'Round or cornered?', lesson: 'Corners and curves change the spacing of the notes. The square has a note exactly an octave above its lowest; the circle doesn’t.', cands: [
+      gsCand('circle-1.8', 'Circle', gsCircle(1.8)), gsCand('r3-square', 'Square', gsShape('square', 1.8)), gsCand('r3-stadium', 'Stadium', gsShape('stadium', 1.8))] };
+  },
+  function () {
+    return { title: 'The tricky ones', lesson: 'These differ only in the details of their notes. The area and edge length still come out right.', cands: [
+      gsCand('r4-lshape', 'L-shape', gsShape('lshape', 1.8)), gsCand('r4-heart', 'Heart', gsShape('heart', 1.8)), gsCand('r4-guitar', 'Guitar', gsShape('guitar', 1.8))] };
+  },
+  function () {
+    return { title: 'The famous pair', lesson: 'Drum A and Drum B have the same area, the same edge length and exactly the same notes. The sound can’t tell them apart.', cands: [
+      gsCand('r5-a', 'Drum A', TD[0].shape.poly, 0), gsCand('r5-b', 'Drum B', TD[1].shape.poly, 1), gsCand('r5-decoy', 'Square', gsShape('square', TD[0].shape.area))] };
+  }
+];
+function gsDef(i) { return GS.defs[i] || (GS.defs[i] = GS_DEFS[i]()); }
+function gsSolOf(c) { return c.twin === undefined ? GS.sols[c.key] : TD[c.twin].sol; }
+function gsShuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+
+/* ---------- solving ---------- */
+function gsSolve(c, cb) {                          // cb(ok, message); concurrent asks for one key share a single worker
+  if (GS.sols[c.key]) { cb(true); return; }
+  var job = GS.jobs[c.key];
+  if (job) { job.cbs.push(cb); return; }
+  job = GS.jobs[c.key] = { cbs: [cb], p: 0 };
+  var shape = { key: 'guess-' + c.key, name: c.name, poly: c.poly, area: polyArea(c.poly) }, id = ++solveId, w;
+  function end(ok, msg) { delete GS.jobs[c.key]; job.cbs.forEach(function (f) { f(ok, msg); }); }
+  try { w = new Worker(getWorkerUrl()); } catch (err) { end(false, 'This browser would not start the tuning worker.'); return; }
+  var flat = new Float64Array(shape.poly.length * 2);
+  shape.poly.forEach(function (q, i) { flat[2 * i] = q[0]; flat[2 * i + 1] = q[1]; });
+  w.onmessage = function (ev) {
+    var m = ev.data; if (m.id !== id) return;
+    if (m.type === 'progress') { job.p = m.p; gsProgress(); return; }
+    w.terminate();
+    if (m.type === 'error') { end(false, 'Could not tune the ' + c.name.toLowerCase() + ' (' + m.message + ')'); return; }
+    GS.sols[c.key] = makeSol(shape, m); end(true);
+  };
+  w.onerror = function () { w.terminate(); end(false, 'The tuning worker hit a problem.'); };
+  w.postMessage({ type: 'solve', id: id, poly: flat, K: K_MODES, targetN: 3000 });
+}
+function gsTwinWait(cb) {                          // the twins come from the Twin drums solver
+  if (TW.solved) { cb(true); return; }
+  GS.tw.push(cb); twSolve();
+}
+function gsTwins() {                               // called when twSolve finishes or fails
+  var ws = GS.tw; GS.tw = [];
+  ws.forEach(function (f) { if (TW.solved) f(true); else f(false, 'Could not tune the twin drums.'); });
+}
+function gsPrep(ri, serial, cb) {                  // solve a round's three drums (serial: one worker at a time, for quiet pre-solving)
+  var cands = gsDef(ri).cands, bad = '', i = 0, left = cands.length;
+  function fin(ok, msg) {
+    if (!ok && !bad) bad = msg || 'The tuning worker hit a problem.';
+    if (--left === 0) cb(!bad, bad); else if (serial) go();
+  }
+  function go() { var c = cands[i++]; if (c.twin === undefined) gsSolve(c, fin); else gsTwinWait(fin); }
+  if (serial) go(); else while (i < cands.length) go();
+}
+function gsProg(ri) {
+  var cands = gsDef(ri).cands, s = 0;
+  cands.forEach(function (c) { s += gsSolOf(c) ? 1 : c.twin !== undefined ? (TW.progress[c.twin] || 0) : (GS.jobs[c.key] ? GS.jobs[c.key].p : 0); });
+  return s / cands.length;
+}
+function gsBusy(on, p) {
+  $('busyGuess').hidden = !on;
+  if (on) {
+    var pc = Math.round(clamp(p || 0, 0, 1) * 100);
+    $('busyTextGuess').textContent = 'Tuning the drums… ' + pc + '%'; $('busyBarGuess').style.width = pc + '%';
+  }
+}
+function gsProgress() { if (G.started && !G.ready && !G.err) gsBusy(true, gsProg(G.round)); }
+
+/* ---------- game flow ---------- */
+function gsStart(n) {                              // n: round to begin at, 1-based; a fresh game with new random mysteries and card orders
+  n = clamp(Math.round(+n || 1), 1, GS_N);
+  G.started = true; G.over = false; G.score = 0; G.results = []; G.round = n - 1; G.R = [];
+  for (var i = 0; i < GS_N; i++) G.R.push({ order: gsShuffle([0, 1, 2]), myst: i === GS_N - 1 ? Math.floor(Math.random() * 2) : Math.floor(Math.random() * 3), pick: -1, ok: null });
+  $('gsEnd').hidden = true; $('gsGame').hidden = false;
+  gsLoadRound();
+}
+function gsLoadRound() {
+  var tok = ++G.tok;                               // a result for an older round (or a restarted game) is ignored
+  G.ready = false; G.err = ''; G.hov = null; G.specM = G.specP = null;
+  gsBuildCards(); gsSync(); gsBusy(true, gsProg(G.round)); gsLayout();
+  gsPrep(G.round, false, function (ok, msg) {
+    if (tok !== G.tok) return;
+    gsBusy(false);
+    if (!ok) { G.err = msg || 'The tuning worker hit a problem.'; gsSync(); return; }
+    G.ready = true; gsSync();
+    if (G.round + 1 < GS_N) gsPrep(G.round + 1, true, function () {});   // quietly get the next round ready
+  });
+}
+function gsEnter() { if (!G.started) gsStart(1); else gsLayout(); }
+function gsPick(pos) {                             // pos: 0..2, the card's place on screen
+  var rd = G.R[G.round];
+  if (!G.started || G.over || !G.ready || !rd || rd.pick >= 0 || !(pos >= 0 && pos < 3)) return;
+  var ci = rd.order[pos];
+  rd.pick = ci; rd.ok = G.round === GS_N - 1 ? ci < 2 : ci === rd.myst;     // the last round: Drum A and Drum B are both right
+  G.results[G.round] = rd.ok; if (rd.ok) G.score++;
+  gsSync();
+  $('gsNext').focus({ preventScroll: true });
+}
+function gsFinish() {
+  G.over = true; $('gsGame').hidden = true; $('gsEnd').hidden = false;
+  $('gsScore').textContent = 'You heard ' + G.score + ' of ' + GS_N + '.';
+  $('gsEndH').focus();
+}
+function gsArp(sol) {                              // the whole drum as an 8-note ascending arpeggio, always at true pitch
+  if (!ensureAudio()) return;
+  var a = new Float64Array(sol.K); for (var k = 0; k < sol.K; k++) a[k] = 1 / Math.sqrt(k + 1);
+  playTuned(a, sol, 0, { max: 8, gap: 0.16 });
+}
+function gsListen(c) { var sol = gsSolOf(c); if (G.ready && sol) gsArp(sol); }
+
+/* ---------- screen ---------- */
+function gsCaption() {
+  $('gsCaption').textContent = 'Then listen to each shape and pick the one that matches.' + (voiceKey === 'music' ? ' (The game always plays true pitches.)' : '');
+}
+function gsBuildCards() {
+  var box = $('gsCards'), rd = G.R[G.round], def = gsDef(G.round);
+  box.textContent = ''; G.cards = [];
+  rd.order.forEach(function (ci, pos) {
+    var c = def.cands[ci], card = document.createElement('div'), pick = document.createElement('button'), cv = document.createElement('canvas');
+    var nm = document.createElement('span'), tag = document.createElement('span'), lis = document.createElement('button');
+    card.className = 'gs-card'; card.setAttribute('role', 'group'); card.setAttribute('aria-label', c.name);
+    pick.type = 'button'; pick.className = 'gs-pick'; pick.disabled = true; pick.setAttribute('aria-label', 'Pick ' + c.name);
+    cv.setAttribute('aria-hidden', 'true');
+    nm.className = 'gs-name'; nm.textContent = c.name; tag.className = 'gs-tag';
+    pick.appendChild(cv); pick.appendChild(nm); pick.appendChild(tag);
+    lis.type = 'button'; lis.className = 'chip plain'; lis.disabled = true; lis.textContent = 'Listen'; lis.setAttribute('aria-label', 'Listen to ' + c.name);
+    pick.addEventListener('click', function () { gsPick(pos); });
+    lis.addEventListener('click', function () { gsListen(c); });
+    card.appendChild(pick); card.appendChild(lis); box.appendChild(card);
+    G.cards.push({ card: card, pick: pick, tag: tag, lis: lis, cv: cv, cand: c });
+  });
+}
+function gsDots() {
+  var box = $('gsDots'), right = 0, wrong = 0;
+  box.textContent = '';
+  for (var i = 0; i < GS_N; i++) {
+    var r = G.results[i], d = document.createElement('span');
+    d.className = 'dot' + (r === true ? ' ok' : r === false ? ' no' : i === G.round && !G.over ? ' here' : '');
+    if (r === true) right++; else if (r === false) wrong++;
+    box.appendChild(d);
+  }
+  box.setAttribute('aria-label', 'Round ' + (G.round + 1) + ' of ' + GS_N + '. ' + right + ' right, ' + wrong + ' wrong so far.');
+}
+function gsResultText() {
+  var rd = G.R[G.round], def = gsDef(G.round), m = def.cands[rd.myst], p = def.cands[rd.pick];
+  if (G.round === GS_N - 1) {
+    var other = def.cands[1 - rd.myst];
+    return rd.ok ? 'Both are right! The mystery was ' + m.name + ', but ' + other.name + ' plays exactly the same notes. You can’t always hear the shape of a drum.'
+      : 'It was ' + m.name + ', but ' + other.name + ' would have been right too: the two play exactly the same notes.';
+  }
+  return rd.ok ? 'Yes, it was the ' + m.name + '.' : 'Not quite: it was the ' + m.name + '. You picked the ' + p.name + '.';
+}
+function gsClue(el, a, b) { el.textContent = a; var s = document.createElement('span'); s.className = 'mut'; s.textContent = b; el.appendChild(s); }
+function gsPanel() {                               // the side card: what the notes alone reveal about the mystery drum
+  var rd = G.R[G.round], ans = G.started && !!rd && rd.pick >= 0;
+  $('gsHint').hidden = ans; $('gsClues').hidden = !ans;
+  if (!ans) return;
+  var def = gsDef(G.round), c = def.cands[rd.myst], sol = gsSolOf(c), fit = weylFit(sol.lam);
+  $('gsLow').textContent = sol.f[0].toFixed(1) + ' Hz · ' + noteOf(sol.f[0]).text;
+  gsClue($('gsArea'), '≈ ' + fit.A.toFixed(2) + ' ', '(true ' + sol.area.toFixed(2) + ')');
+  gsClue($('gsEdge'), '≈ ' + fit.L.toFixed(1) + ' ', '(true ' + polyPerimeter(c.poly).toFixed(1) + ')');
+  $('gsLesson').textContent = def.lesson;
+}
+function gsSync() {                                // bring every control in line with the game state
+  var rd = G.R[G.round], def = gsDef(G.round), ans = rd.pick >= 0, last = G.round === GS_N - 1;
+  $('gsRound').textContent = 'Round ' + (G.round + 1) + ' of ' + GS_N;
+  $('gsTitle').textContent = def.title;
+  gsDots(); gsCaption();
+  $('gsPlay').disabled = !G.ready;
+  $('gsErr').hidden = !G.err; $('gsErrMsg').textContent = G.err;
+  G.cards.forEach(function (k, pos) {
+    var ci = rd.order[pos], right = ans && (last ? ci < 2 : ci === rd.myst), wrong = ans && ci === rd.pick && !right, tags = [];
+    k.card.classList.toggle('right', right); k.card.classList.toggle('wrong', wrong);
+    k.pick.disabled = !G.ready || ans; k.lis.disabled = !G.ready;
+    if (ans) {
+      if (ci === rd.myst) tags.push('Mystery'); else if (right) tags.push('Same notes');
+      if (ci === rd.pick) tags.push('Your pick');
+    }
+    k.tag.textContent = tags.join(' · ');
+  });
+  $('gsAfter').hidden = !ans;
+  if (ans) {
+    $('gsResult').textContent = gsResultText();
+    $('gsNext').textContent = last ? 'See your score' : 'Next round →';
+    G.specM = gsSolOf(def.cands[rd.myst]); G.specP = gsSolOf(def.cands[rd.pick]);
+    if (sizeGsSpec()) gsDrawSpec();
+  }
+  gsPanel();
+}
+
+/* ---------- drawing ---------- */
+function gsDrawCard(cv, poly, span) {              // span: the world size the canvas edge stands for (one scale for the whole round)
+  var px = cv.width, dpr = dprNow(), c = cv.getContext('2d'), b = polyBox(poly), s = px / span;
+  c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, px, px);
+  c.beginPath();
+  poly.forEach(function (q, i) { var X = px / 2 + (q[0] - b.cx) * s, Y = px / 2 + (q[1] - b.cy) * s; if (i) c.lineTo(X, Y); else c.moveTo(X, Y); });
+  c.closePath(); c.fillStyle = TOK.skin.css; c.fill();
+  c.lineJoin = 'round';
+  c.strokeStyle = rgba('bg', 0.55); c.lineWidth = 4.5 * dpr; c.stroke();
+  c.strokeStyle = TOK.accent.css; c.lineWidth = 2 * dpr; c.stroke();
+}
+function gsLayout() {                              // size and paint the card canvases and the spectrum (resize, theme, view enter)
+  if (!G.started || !G.R.length) return;
+  var dpr = dprNow(), span = 0;
+  gsDef(G.round).cands.forEach(function (c) { var b = polyBox(c.poly); span = Math.max(span, b.w, b.h); });
+  G.cards.forEach(function (k) {
+    var w = k.cv.clientWidth; if (!w) return;      // hidden
+    var px = Math.max(2, Math.round(w * dpr));
+    k.cv.width = px; k.cv.height = px;
+    gsDrawCard(k.cv, k.cand.poly, span * 1.2);
+  });
+  if (sizeGsSpec()) gsDrawSpec();
+}
+
+var gsSpecCv = $('gsSpec'), gsSpecCtx = gsSpecCv.getContext('2d');
+var GSP = { ml: 12, mr: 12, top: 24, bottom: 44, cssW: 0, cssH: 236 };
+function sizeGsSpec() {
+  var w = gsSpecCv.clientWidth; if (!w) return false;
+  var dpr = dprNow(); GSP.cssW = w; gsSpecCv.width = Math.round(w * dpr); gsSpecCv.height = Math.round(GSP.cssH * dpr);
+  return true;
+}
+function gsAxisMax() { var n = GS_SPEC_N; return Math.max(G.specM.f[n - 1], G.specP.f[n - 1]) * 1.03; }
+function gsX(f, amax) { return GSP.ml + f / amax * (GSP.cssW - GSP.ml - GSP.mr); }
+function gsGeom() { var axisY = GSP.cssH - GSP.bottom, midY = GSP.top + (axisY - GSP.top) / 2; return { axisY: axisY, midY: midY, maxH: (axisY - GSP.top) / 2 - 4 }; }
+function gsDrawSpec() {                            // the mystery's notes up from the middle line, the picked drum's notes down
+  if (!GSP.cssW || !G.specM || !G.specP) return;
+  var dpr = dprNow(), c = gsSpecCtx, W = GSP.cssW, H = GSP.cssH, g = gsGeom(), amax = gsAxisMax(), step = niceStep(amax), n = GS_SPEC_N, t;
+  var rd = G.R[G.round], picked = gsDef(G.round).cands[rd.pick];
+  c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, W, H);
+  c.font = '10px ' + TOK.mono; c.textBaseline = 'alphabetic'; c.lineWidth = 1; c.strokeStyle = TOK.line.css;
+  c.beginPath(); c.moveTo(GSP.ml, g.axisY + 0.5); c.lineTo(W - GSP.mr, g.axisY + 0.5); c.stroke();
+  c.beginPath(); c.moveTo(GSP.ml, Math.round(g.midY) + 0.5); c.lineTo(W - GSP.mr, Math.round(g.midY) + 0.5); c.stroke();
+  c.fillStyle = TOK.muted.css; c.textAlign = 'left';
+  c.fillText('Mystery', GSP.ml, 14); c.fillText(picked.name, GSP.ml, g.axisY + 34);
+  c.textAlign = 'center';
+  for (t = 0; t <= amax + 1e-6; t += step) {
+    var x = gsX(t, amax);
+    c.beginPath(); c.moveTo(x + 0.5, g.axisY); c.lineTo(x + 0.5, g.axisY + 4); c.stroke();
+    var lab = t >= 1000 ? (t / 1000) + 'k' : String(t);
+    if (t > 0 && x < W - 22) c.fillText(lab, x, g.axisY + 15);
+  }
+  c.textAlign = 'right'; c.fillText('Hz', W - 2, g.axisY + 15);
+  var bh = g.maxH * 0.85;
+  [G.specM, G.specP].forEach(function (sol, side) {
+    for (var k = 0; k < n; k++) {
+      var hi = !!G.hov && G.hov.side === side && G.hov.k === k, wbar = hi ? 6 : 4, bx = gsX(sol.f[k], amax);
+      c.fillStyle = MODE_COL[k]; c.globalAlpha = G.hov && !hi ? 0.55 : 1;
+      if (side === 0) c.fillRect(bx - wbar / 2, g.midY - 1 - bh, wbar, bh); else c.fillRect(bx - wbar / 2, g.midY + 2, wbar, bh);
+    }
+  });
+  c.globalAlpha = 1;
+  if (G.hov) {
+    var hs = G.hov.side ? G.specP : G.specM, hx = gsX(hs.f[G.hov.k], amax), txt = 'Note ' + (G.hov.k + 1) + ' · ' + hs.f[G.hov.k].toFixed(1) + ' Hz';
+    c.font = '11px ' + TOK.mono; var tw = c.measureText(txt).width + 12, lx = clamp(hx - tw / 2, 2, W - tw - 2);
+    c.fillStyle = TOK.raise.css; c.strokeStyle = TOK.accent.css;
+    c.fillRect(lx, 2, tw, 18); c.strokeRect(lx + 0.5, 2.5, tw - 1, 17);
+    c.fillStyle = TOK.fg.css; c.textAlign = 'center'; c.fillText(txt, lx + tw / 2, 15);
+  }
+}
+function gsBarAt(ev) {                             // nearest bar on the half (mystery above, picked below) the pointer is in
+  if (!G.specM || !G.specP) return null;
+  var r = gsSpecCv.getBoundingClientRect(), x = ev.clientX - r.left, y = ev.clientY - r.top, side = y < gsGeom().midY ? 0 : 1;
+  var sol = side ? G.specP : G.specM, amax = gsAxisMax(), best = -1, bd = 12;
+  for (var k = 0; k < GS_SPEC_N; k++) { var d = Math.abs(gsX(sol.f[k], amax) - x); if (d < bd) { bd = d; best = k; } }
+  return best < 0 ? null : { side: side, k: best };
+}
+function gsSetHov(h) {
+  var o = G.hov;
+  if (o === h || (o && h && o.side === h.side && o.k === h.k)) return;
+  G.hov = h; gsDrawSpec();
+}
+gsSpecCv.addEventListener('pointermove', function (ev) { gsSetHov(gsBarAt(ev)); });
+gsSpecCv.addEventListener('pointerleave', function () { gsSetHov(null); });
+gsSpecCv.addEventListener('pointerdown', function (ev) {
+  ensureAudio();
+  var h = gsBarAt(ev); if (!h) return;
+  gsSetHov(h); playMode(h.k, h.side ? G.specP : G.specM);
+});
+
+$('gsPlay').addEventListener('click', function () {
+  var rd = G.R[G.round]; if (!G.ready || !rd) return;
+  gsArp(gsSolOf(gsDef(G.round).cands[rd.myst]));
+});
+$('gsNext').addEventListener('click', function () {
+  if (G.round >= GS_N - 1) { gsFinish(); return; }
+  G.round++; gsLoadRound(); $('gsRound').focus();
+});
+$('gsRetry').addEventListener('click', function () { gsLoadRound(); });
+$('gsAgain').addEventListener('click', function () { gsStart(1); $('gsRound').focus(); });
+
+/* ===================================================================
+   Theme, resize, boot
+   =================================================================== */
+function onTheme() {
+  readTokens();
+  if (S.map) makeBase(S.map, S.base);
+  if (thumb.map) paintThumbs();
+  TD.forEach(function (td) { if (td.map) makeBase(td.map, td.base); });
+  syncChips(); drawSpectrum(); drawTwinSpec(); blTheme(); gsLayout(); scheduleDraw();
+}
+var themeMQ = window.matchMedia('(prefers-color-scheme: light)');
+if (themeMQ.addEventListener) themeMQ.addEventListener('change', onTheme); else if (themeMQ.addListener) themeMQ.addListener(onTheme);
+new MutationObserver(onTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+var onReduce = function () { reduced = reduceMQ.matches; scheduleDraw(); };
+if (reduceMQ.addEventListener) reduceMQ.addEventListener('change', onReduce); else if (reduceMQ.addListener) reduceMQ.addListener(onReduce);
+
+var resizeTimer = 0;
+function onResize() {
+  if (state.view === 'twins') { twLayout(); scheduleDraw(); return; }
+  if (state.view === 'billiards') { blLayout(); scheduleDraw(); return; }
+  if (state.view === 'guess') { gsLayout(); return; }
+  var changed = sizeStage();
+  sizeSpec();
+  if (changed) { if (state.sol) buildStage(); }
+  var tpx = galBtns[0] ? clamp(Math.round((galBtns[0].cv.clientWidth || 70) * dprNow()), 48, 200) : 0;
+  if (state.sol && tpx && tpx !== thumb.px) buildThumbs();
+  drawSpectrum(); scheduleDraw();
+}
+if (window.ResizeObserver) {
+  new ResizeObserver(function () { clearTimeout(resizeTimer); resizeTimer = setTimeout(onResize, 80); }).observe(document.body);
+}
+window.addEventListener('resize', function () { clearTimeout(resizeTimer); resizeTimer = setTimeout(onResize, 80); });
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { drawSpectrum(); drawTwinSpec(); gsDrawSpec(); });
+
+readTokens();
+buildTabs();
+buildChips();
+buildGallery();
+blBuild();
+sizeStage(); sizeSpec();
+updateCaption();
+loadShape(SHAPES[0]);
+
+if (DEBUG) {
+  window.__drum = {
+    state: state, SHAPES: SHAPES, solve: loadShape, strike: strikeAt, selectMode: selectMode, backToDrum: backToDrum,
+    setDrawing: setDrawing, finishDrawing: finishDrawing, rdp: rdp, noteOf: noteOf, renderSound: renderSound, tunedNotes: tunedNotes,
+    ensureAudio: ensureAudio, stage: S, thumb: thumb, setView: setView, VIEWS: VIEWS, workerSource: workerMain.toString(),
+    TW: TW, TD: TD, twSolve: twSolve, compareTwins: compareTwins, twinCheck: twinCheck, twRing: twRing, twSetMode: twSetMode, twStrike: twStrike
+  };
+  window.__drum.guess = { G: G, GS: GS, start: gsStart, pick: gsPick, weylFit: weylFit, polyPerimeter: polyPerimeter };
+  window.__drum.billiards = {
+    state: BL, TABLES: TABLES, launch: blLaunch, step: blStep, setTable: blSetTable, setPatterns: blSetPatterns, findScar: blFindScar,
+    scarScore: scarScore, scores: blScores, orbits: blOrbitsFor, hit: blHit, sol: function (key) { var e = BL.cache[key || BL.table]; return e && e.sol; }
+  };
+  Object.defineProperty(window.__drum.billiards, 'high', { enumerable: true, get: function () {
+    var o = {}; Object.keys(BL.cache).forEach(function (k) { o[k] = BL.cache[k].sol; }); return o; } });
+  Object.defineProperty(window.__drum, 'twins', { enumerable: true, get: function () { return { A: TD[0].sol, B: TD[1].sol }; } });
+}
+})();
+</script>

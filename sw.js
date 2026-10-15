@@ -5,7 +5,7 @@
 // When you add a widget: add its folder name to WIDGETS below (it needs previews/<name>.jpg too)
 // and bump VERSION, so phones that already have the app download the new list.
 
-const VERSION = "v3";
+const VERSION = "v4";
 const CACHE = "math-widgets-" + VERSION;
 const FONTS = "math-widgets-fonts";
 const SLOW_MS = 4000;
@@ -15,7 +15,7 @@ const WIDGETS = [
   "gravity-well", "gravity-well-3d", "hooke-newton-squaring-map",
   "double-pendulum-flip-map", "bifurcation-mandelbrot",
   "schrodinger-sandbox", "schrodinger-sandbox-2d", "inside-the-proton",
-  "fourier-studio", "three-body-chaos-map", "padic-warp",
+  "fourier-studio", "three-body-chaos-map", "padic-warp", "hear-the-drum",
 ];
 const FILES = [
   "./", "index.html", "manifest.json",
