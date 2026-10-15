@@ -417,7 +417,14 @@ if (!gl) fail('WebGL 2 is unavailable right now. If this page worked before, the
 let ctxLost = false;
 function saveResume() { try { if (S.cur) sessionStorage.setItem('md-resume', JSON.stringify({ id: S.cur.loc.id, u: S.cur.u, t: Date.now() })); } catch (_) {} }
 function reloadSoon() { if (ctxLost && document.visibilityState === 'visible') setTimeout(() => location.reload(), 600); }
-canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); ctxLost = true; saveResume(); const el = document.getElementById('err'); el.textContent = 'The graphics driver reset. Picking the descent back up…'; el.hidden = false; reloadSoon(); });
+// Two resets within a minute means reloading would just loop (e.g. a GPU that can't keep up), so stop and let the viewer retry.
+function recentLosses() { try { return JSON.parse(sessionStorage.getItem('md-lost') || '[]').filter(t => Date.now() - t < 60000); } catch (_) { return []; } }
+canvas.addEventListener('webglcontextlost', (e) => {
+  e.preventDefault(); saveResume(); const el = document.getElementById('err'), lost = recentLosses(); el.hidden = false;
+  if (lost.length >= 2) { el.textContent = 'The graphics driver keeps resetting on this device. Tap to try again.'; el.style.cursor = 'pointer'; el.onclick = () => { try { sessionStorage.removeItem('md-lost'); } catch (_) {} location.reload(); }; return; }
+  try { sessionStorage.setItem('md-lost', JSON.stringify(lost.concat(Date.now()))); } catch (_) {}
+  ctxLost = true; el.textContent = 'The graphics driver reset. Picking the descent back up…'; reloadSoon();
+});
 canvas.addEventListener('webglcontextrestored', () => location.reload());
 document.addEventListener('visibilitychange', reloadSoon);
 if (!gl.getExtension('EXT_color_buffer_float')) fail('This visualizer needs float render targets (EXT_color_buffer_float), which this GPU does not offer.');
@@ -802,8 +809,10 @@ function gpuSchedule(dt) {
     const sliceMs = shown ? clamp(S.refresh * 0.72 - gp.dispMs - 2, 1, S.refresh * 0.5) : 30;
     S.work = clamp(gp.rate * sliceMs, WORK_MIN, WORK_MAX);
   } else if (frameCount > 5) {
-    if (shown && dt * 1000 > S.refresh * 1.5) { gp.ceil = S.work; S.work = Math.max(WORK_MIN, S.work * 0.7); }
-    else { S.work = Math.min(WORK_MAX, S.work * (shown ? 1.03 : 1.15), shown ? gp.ceil * 0.85 : Infinity); gp.ceil *= 1.002; }
+    // no timer (all iPhones/iPads): slow frames mean the GPU is behind, so back off, before the first picture
+    // too; phones also get a hard cap so no single submission runs long enough to trip iOS's GPU watchdog
+    if (shown ? dt * 1000 > S.refresh * 1.5 : dt > 0.05) { gp.ceil = S.work; S.work = Math.max(WORK_MIN, S.work * 0.7); }
+    else { S.work = Math.min(MOBILE ? 6e7 : WORK_MAX, S.work * (shown ? 1.03 : 1.15), shown ? gp.ceil * 0.85 : Infinity); gp.ceil *= 1.002; }
   }
   if (gp.inflight.length >= 2) return;                              // never queue far ahead of the display
   const spent = timed('work', 0, () => pump(S.work));
