@@ -1,0 +1,1902 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Adelic Mirror</title>
+<link rel="manifest" href="../manifest.json"><link rel="icon" href="../icons/icon-192.png"><link rel="apple-touch-icon" href="../icons/icon-180.png"><meta name="apple-mobile-web-app-title" content="Math Widgets"><script>if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("../sw.js"));</script>
+<style>:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a real-line strip and a 2x2 grid of p-adic disks beside a quiet instrument panel; stacks to one column on phones. Dark-first. */
+:root{
+  --bg:#0d1120; --panel:#141a2d; --raise:#1b2238; --line:#2a3252; --fg:#e8e5dc; --muted:#8f95ad;
+  --accent:#e3a25f; --accent-ink:#1a1206; --sel:#ffffff; --dot-l:66%; --dot-s:74%; --is-dark:1; --target:#3cc9b4; --hot:#ff7a45;
+  --display:"Instrument Serif", "Iowan Old Style", Georgia, serif;
+  --body:"Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){ :root:not([data-theme="dark"]){
+  --bg:#eceef4; --panel:#f8f9fc; --raise:#ffffff; --line:#cdd2e0; --fg:#161a2a; --muted:#5a6079;
+  --accent:#a8541a; --accent-ink:#fff7ef; --sel:#0d1120; --dot-l:45%; --dot-s:72%; --is-dark:0; --target:#0b7d6c; --hot:#d2400f; color-scheme:light }}
+:root[data-theme="light"]{
+  --bg:#eceef4; --panel:#f8f9fc; --raise:#ffffff; --line:#cdd2e0; --fg:#161a2a; --muted:#5a6079;
+  --accent:#a8541a; --accent-ink:#fff7ef; --sel:#0d1120; --dot-l:45%; --dot-s:72%; --is-dark:0; --target:#0b7d6c; --hot:#d2400f; color-scheme:light }
+html,body{background:var(--bg);color:var(--fg)}
+body{font-family:var(--body);font-size:15px;line-height:1.5;padding-inline:16px;padding-block:20px 40px}
+.wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+header{display:flex;flex-direction:column;gap:6px}
+h1{font-family:var(--display);font-weight:400;font-size:clamp(34px,6vw,52px);line-height:1;margin:0;letter-spacing:-.01em}
+h1 i{color:var(--accent)}
+.lede{color:var(--muted);margin:0;max-width:64ch;text-wrap:pretty}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:20px;align-items:start}
+@media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
+.stage{display:flex;flex-direction:column;gap:12px;min-width:0}
+.canvasbox{position:relative;width:100%;aspect-ratio:1/1;max-width:100%;background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;touch-action:none;box-sizing:border-box}
+.canvasbox.strip{aspect-ratio:auto;height:132px}
+.canvasbox canvas{position:absolute;inset:0;display:block;width:100%;height:100%;cursor:crosshair}
+.disks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.disks .canvasbox.exp{grid-column:1/-1}
+.badge{position:absolute;left:12px;top:10px;right:68px;font-family:var(--mono);font-size:12px;line-height:1.3;color:var(--muted);pointer-events:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.note{position:absolute;left:12px;bottom:8px;right:12px;font-family:var(--mono);font-size:12px;line-height:1.3;color:var(--muted);pointer-events:none}
+.zoombtns{position:absolute;right:8px;top:7px;display:flex;flex-direction:row;align-items:center;gap:5px}
+.pill{position:absolute;left:50%;bottom:6px;transform:translateX(-50%);max-width:calc(100% - 24px);box-sizing:border-box;padding:3px 14px;border-radius:999px;background:color-mix(in srgb,var(--panel) 90%,transparent);border:1px solid var(--line);color:var(--accent);font:500 12px/1.35 var(--mono);text-align:center;pointer-events:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.legend{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted)}
+.legend .bar{height:10px;border-radius:5px}
+.legend p{margin:0;text-wrap:pretty}
+button,.chip{font:500 14px var(--body);color:var(--fg);background:var(--raise);border:1px solid var(--line);border-radius:999px;padding:7px 14px;cursor:pointer}
+button:hover:not(:disabled),.chip:hover{border-color:var(--muted)}
+button:disabled{opacity:.45;cursor:default}
+button:focus-visible,.chip:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.zoombtns button{padding:4px 10px;font-size:12px;background:color-mix(in srgb,var(--raise) 85%,transparent)}
+.zoombtns button.mini{width:30px;height:28px;padding:0;font-size:15px;line-height:1;display:inline-flex;align-items:center;justify-content:center}
+input[type=range]{accent-color:var(--accent);width:100%}
+aside{display:flex;flex-direction:column;gap:16px;min-width:0}
+.sect{display:flex;flex-direction:column;gap:8px}
+.lab{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.chip.mode{font-family:var(--display);font-size:20px;line-height:1;padding:6px 16px}
+.slots{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.slot{border-radius:12px;display:flex;flex-direction:column;align-items:flex-start;gap:0;padding:8px 12px;text-align:left;min-width:0}
+.slot .sl{font-size:12px;color:inherit;opacity:.75;font-weight:600}
+.slot .sv{font-family:var(--mono);font-size:14px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.slot[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+select,input[type=text]{width:100%;box-sizing:border-box;font:15px var(--body);color:var(--fg);background:var(--raise);border:1px solid var(--line);border-radius:10px;padding:9px 10px;min-width:0}
+input[type=text]{font-family:var(--mono);font-size:14px}
+.row{display:flex;gap:8px;align-items:center}
+.err{color:var(--accent);font-size:13px;margin:0}
+.readout{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;font-size:14px}
+.readout p{margin:0;text-wrap:pretty}
+.readout h3{margin:0;font:600 14px var(--body)}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.hint{color:var(--muted);font-size:13px;margin:0;text-wrap:pretty}
+.wtab{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12.5px;font-variant-numeric:tabular-nums}
+.wtab th{font:600 12px var(--body);color:var(--muted);text-align:left;padding:2px 8px 4px 0}
+.wtab td{padding:2px 8px 2px 0;vertical-align:top;overflow-wrap:anywhere}
+.trytab td:nth-child(-n+3):not([colspan]){white-space:nowrap;overflow-wrap:normal}
+.wtab tr.best td{color:var(--accent);font-weight:500}
+.remark{color:var(--accent);font-size:14px}
+.pill.ok{color:var(--target)} .pill.bad{color:var(--hot)}
+.gstat{position:absolute;left:12px;bottom:26px;max-width:calc(100% - 24px);box-sizing:border-box;padding:2px 9px;border-radius:10px;background:color-mix(in srgb,var(--panel) 90%,transparent);border:1px solid var(--line);font:500 12px/1.35 var(--mono);color:var(--muted);pointer-events:none}
+.gstat.ok{color:var(--target);border-color:var(--target)} .gstat.bad{color:var(--hot);border-color:var(--hot)}
+.lvdots{display:flex;gap:6px;flex-wrap:wrap}
+.ldot{width:38px;height:38px;padding:0;border-radius:50%;font:600 13px var(--mono);display:inline-flex;align-items:center;justify-content:center}
+.ldot.done{border-color:var(--target);color:var(--target)}
+.ldot[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.goal{margin:0;font-size:15px;text-wrap:pretty}
+.gbig{font:500 30px/1.1 var(--mono);overflow-wrap:anywhere}
+.okc{color:var(--target)}
+.nudge{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.tgl{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px;font-size:14px}
+.tgl li{padding-left:10px;border-left:3px solid var(--target)}
+.howtxt p,.howtxt ul{margin:0 0 6px}.howtxt ul{padding-left:18px}
+#gTry{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}#gTry[hidden]{display:none}
+.howtxt .wtab{margin-bottom:6px}.howtxt .wtab td:first-child{white-space:nowrap}
+.canvasbox.bal{aspect-ratio:auto;height:320px;touch-action:auto}
+.canvasbox.bal canvas{cursor:default}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.sw.t{background:var(--target)} .sw.c{background:var(--hot)}
+.sw.off{opacity:.55;background-image:repeating-linear-gradient(135deg,var(--panel) 0 2px,transparent 2px 4px)}
+.eq{margin:0;font-family:var(--mono);font-size:14px;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.baltab td:last-child{color:var(--muted)}.baltab td:first-child{white-space:nowrap}
+.linkrow{display:flex;margin-top:4px}
+.jrtab td:first-child{white-space:nowrap}.jrtab td:last-child{color:var(--muted);white-space:nowrap}.jrtab .okc{font-weight:500}
+.jrx{margin:0;font:500 15px/1.35 var(--mono);overflow-wrap:anywhere}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <a href="../index.html" style="display:table;margin-bottom:6px;font-size:13px;color:#d0457f;font-weight:500;text-decoration:none">← All widgets</a>
+    <h1>The Adelic <i>Mirror</i></h1>
+    <p class="lede">The same fractions, seen in five worlds that measure size differently: the real line and the 2-, 3-, 5- and 7-adic worlds. One of these worlds up close: <a href="../padic-warp/index.html" style="color:var(--accent)">p-adic Warp</a>.</p>
+  </header>
+
+  <div class="grid">
+    <div class="stage">
+      <div class="canvasbox strip" id="stripBox">
+        <canvas id="cvReal" aria-label="Fractions on the real number line"></canvas>
+        <div class="badge" id="realBadge">ℝ · real line</div>
+        <div class="zoombtns"><button id="resetReal" type="button" title="Reset the view to −3 … 3">Reset</button></div>
+        <div class="pill" id="pill">Tap any dot to see it in every world</div>
+      </div>
+      <div class="disks" id="disks"></div>
+      <p class="hint" id="hint">Drag to pan, scroll or pinch to zoom. Tap a dot to pick it. Tap empty space inside a disk to brush that ball, or shift-drag (or press and hold, then drag) along the real line to brush an interval. Esc clears.</p>
+    </div>
+
+    <aside>
+      <div class="sect">
+        <span class="lab">View</span>
+        <div class="chips" id="views"></div>
+      </div>
+
+      <div data-view="mirror" class="sect-group" style="display:contents">
+        <div class="sect">
+          <span class="lab">Denominators up to <span id="bVal" class="mono" style="color:var(--fg)">10</span></span>
+          <input type="range" id="bIn" min="1" max="24" value="10" aria-label="Largest denominator">
+          <span class="hint" id="bCount"></span>
+        </div>
+
+        <div class="sect">
+          <span class="lab">Paint by world</span>
+          <div class="chips" id="paints"></div>
+          <div class="legend" id="legend"></div>
+        </div>
+
+        <div class="sect">
+          <span class="lab">Pick A and B</span>
+          <div class="slots">
+            <button type="button" class="slot" id="slotA" aria-pressed="true"><span class="sl">A</span><span class="sv" id="slotAv">tap a dot</span></button>
+            <button type="button" class="slot" id="slotB" aria-pressed="false"><span class="sl">B</span><span class="sv" id="slotBv">tap a dot</span></button>
+          </div>
+          <div class="row">
+            <input type="text" id="fracIn" placeholder="Type a fraction, e.g. -3/8" aria-label="Type a fraction" spellcheck="false" autocomplete="off" inputmode="text">
+            <button type="button" id="fracGo">Set</button>
+          </div>
+          <p class="err" id="fracErr" hidden></p>
+          <select id="pairSel" aria-label="Famous pairs"></select>
+        </div>
+
+        <div class="readout" id="picked"></div>
+        <div class="readout" id="dist" hidden></div>
+        <div class="readout" id="brushOut"><p class="muted">Nothing brushed.</p></div>
+      </div>
+
+      <div data-view="game" class="sect-group" style="display:contents" hidden>
+        <div class="sect">
+          <span class="lab" id="gLab">Level 1 of 6</span>
+          <div class="lvdots" id="gDots"></div>
+          <p class="goal" id="gGoal"></p>
+          <ul class="tgl" id="gTargets"></ul>
+        </div>
+
+        <div class="readout" id="gGuess"></div>
+
+        <div class="sect">
+          <span class="lab">Make a guess</span>
+          <div class="row">
+            <input type="text" id="gIn" placeholder="Type a fraction, e.g. 7/13" aria-label="Type a guess" spellcheck="false" autocomplete="off" inputmode="text">
+            <button type="button" id="gSet">Set</button>
+          </div>
+          <p class="err" id="gErr" hidden></p>
+          <div class="nudge">
+            <button type="button" id="gTm">top −1</button><button type="button" id="gTp">top +1</button>
+            <button type="button" id="gBm">bottom −1</button><button type="button" id="gBp">bottom +1</button>
+          </div>
+          <p class="hint">Or tap any dot, in any world.</p>
+        </div>
+
+        <div class="readout">
+          <p id="gSurv"></p>
+          <div class="row"><button type="button" id="gGrow">Grow the cloud</button></div>
+          <p class="hint" id="gGrowNote"></p>
+        </div>
+
+        <div class="readout">
+          <p id="gPar"></p>
+          <div class="row"><button type="button" id="gHow">Show me how</button></div>
+          <div id="gHowBox" hidden>
+            <span class="lab" id="gHowStep"></span>
+            <div class="howtxt" id="gHowText"></div>
+            <div id="gTry" hidden>
+              <div class="row"><button type="button" id="gTryNext" class="primary">Try next b</button><button type="button" id="gPlay">Play</button></div>
+              <div class="row"><input type="text" id="gTryB" inputmode="numeric" placeholder="b" aria-label="Your own bottom number b" style="width:80px;flex:none"><button type="button" id="gTryGo">Try your own b</button></div>
+              <p class="err" id="gTryErr" hidden></p>
+            </div>
+            <div class="row"><button type="button" id="gBack">Back</button><button type="button" id="gFwd" class="primary">Next</button><button type="button" id="gUse" hidden>Use this answer</button></div>
+          </div>
+        </div>
+
+        <div class="row" style="flex-wrap:wrap">
+          <button type="button" id="gNext" class="primary">Next level</button>
+          <button type="button" id="gPuz">Make me a puzzle</button>
+        </div>
+      </div>
+
+      <div data-view="balance" class="sect-group" style="display:contents" hidden>
+        <div class="sect">
+          <span class="lab">Weigh</span>
+          <div class="chips" id="balModes"><button type="button" class="chip" data-m="size" aria-pressed="true">Size of x</button><button type="button" class="chip" data-m="dist" aria-pressed="false">Distance between A and B</button></div>
+        </div>
+        <div class="canvasbox bal" id="balBox"><canvas id="cvBal" role="img" aria-label="A balance with two towers"></canvas></div>
+        <div class="readout" id="balOut"></div>
+        <div class="sect">
+          <span class="lab" id="balLab">The fraction x</span>
+          <div class="slots" id="balSlots" hidden>
+            <button type="button" class="slot" id="balA" aria-pressed="true"><span class="sl">A</span><span class="sv" id="balAv">tap a dot</span></button>
+            <button type="button" class="slot" id="balB" aria-pressed="false"><span class="sl">B</span><span class="sv" id="balBv">tap a dot</span></button>
+          </div>
+          <div class="row">
+            <input type="text" id="balIn" placeholder="Type a fraction, e.g. -22/7" aria-label="Type a fraction" spellcheck="false" autocomplete="off" inputmode="text">
+            <button type="button" id="balGo">Set</button>
+          </div>
+          <p class="err" id="balErr" hidden></p>
+          <div class="chips" id="balPre"></div>
+        </div>
+      </div>
+      <div data-view="journey" class="sect-group" style="display:contents" hidden>
+        <div class="sect">
+          <span class="lab">Journey</span>
+          <div class="chips" id="jrChips"></div>
+        </div>
+        <div class="readout" id="jrNow"></div>
+        <div class="row" style="flex-wrap:wrap">
+          <button type="button" id="jrPlay" class="primary">Play</button>
+          <button type="button" id="jrStep">Step</button>
+          <button type="button" id="jrReset">Start over</button>
+        </div>
+        <div class="readout" id="jrSees"></div>
+        <div class="readout" id="jrWhy"></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const SUB = s => String(s).replace(/[0-9]/g, d => '₀₁₂₃₄₅₆₇₈₉'[+d]);
+const SUP = s => String(s).replace(/[0-9]/g, d => '⁰¹²³⁴⁵⁶⁷⁸⁹'[+d]);
+const TAU = Math.PI * 2;
+
+// =====================================================================
+// 1. Maths: BigInt fractions and p-adic digits
+// =====================================================================
+const PR = [2, 3, 5, 7];
+const MAXE = 12;                                // biggest window we ever build: |x|_p <= p^12
+const BELOW = {2:20, 3:11, 5:8, 7:7};           // digit levels kept below the whole numbers ℤ_p
+const EP = [2, 2, 2, 2];                        // per-world window: |x|_p <= p^EP, i.e. digits start at level -EP (grows when something needs it)
+const TDEP = {2:0, 3:0, 5:0, 7:0};              // digit levels kept per world = EP + BELOW (levels -E .. T-E-1)
+const needFromB = B => PR.map(p => Math.max(2, Math.floor(Math.log(B)/Math.log(p) + 1e-9)));   // window needed for denominators up to B
+needFromB(10).forEach((e, i) => { EP[i] = e; });
+const HUEN = {2:10, 3:6, 5:4, 7:3};             // leading digits used for the hue
+const babs = a => a < 0n ? -a : a;
+function bgcd(a, b){ a = babs(a); b = babs(b); while (b){ [a, b] = [b, a % b]; } return a; }
+function mkFrac(n, d){ if (d < 0n){ n = -n; d = -d; } const g = bgcd(n, d); return [n / g, d / g]; }
+function vpBig(x, P){ let v = 0; x = babs(x); while (x % P === 0n){ x /= P; v++; } return v; }
+function vp(n, d, p){ if (n === 0n) return Infinity; const P = BigInt(p); return vpBig(n, P) - vpBig(d, P); }
+function modInv(a, m){
+  let r0 = m, r1 = ((a % m) + m) % m, s0 = 0n, s1 = 1n;
+  while (r1){ const q = r0 / r1; [r0, r1] = [r1, r0 - q*r1]; [s0, s1] = [s1, s0 - q*s1]; }
+  return ((s0 % m) + m) % m;
+}
+// x = p^v * u; digits d_v, d_(v+1), ... are the base-p digits of u mod p^N (least significant first)
+function padicDigits(n, d, p, N){
+  if (n === 0n) return {v:Infinity, digits:[]};
+  const P = BigInt(p); let un = n, ud = d, v = 0;
+  while (un % P === 0n){ un /= P; v++; }
+  while (ud % P === 0n){ ud /= P; v--; }
+  const M = P ** BigInt(N);
+  let w = (((un % M) + M) % M) * modInv(ud, M) % M; const digits = [];
+  for (let i = 0; i < N; i++){ digits.push(Number(w % P)); w /= P; }
+  return {v, digits};
+}
+const pbig = (p, k) => (BigInt(p) ** BigInt(k)).toString();
+const sizeOfV = (p, v) => v === Infinity ? '0' : v === 0 ? '1' : v > 0 ? '1/' + pbig(p, v) : pbig(p, -v);
+const fmtNum = x => { if (x === 0) return '0'; const s = String(+x.toPrecision(6)); return s.replace('-', '−'); };
+const fmt2 = x => (Math.round(x*100)/100).toString().replace('-', '−');   // short numbers for the walkthrough table
+const fracStr = r => (r.d === 1n ? String(r.n) : r.n + '/' + r.d).replace('-', '−');
+function parseFrac(s){
+  s = s.replace(/[−–]/g, '-').replace(/\s+/g, '');
+  const m = /^([+-]?\d+)(?:\/([+-]?\d+))?$/.exec(s);
+  if (!m) throw new Error('Type a fraction like -3/8, or a whole number like 1025.');
+  if (m[1].replace(/\D/g, '').length > 30 || (m[2] || '').replace(/\D/g, '').length > 30) throw new Error('Please keep the numbers under 30 digits.');
+  const n = BigInt(m[1]), d = m[2] === undefined ? 1n : BigInt(m[2]);
+  if (d === 0n) throw new Error("The bottom number can't be 0.");
+  return mkFrac(n, d);
+}
+
+// =====================================================================
+// 2. Worlds and geometry (p-adic Warp's nested balls, top level scaled to 1)
+// =====================================================================
+const S_OF = {}, ANG = [], COSS = [], SINS = [], SHAPE = [], FITR = [], MINR = [];
+function buildWorld(pi){                          // (re)build the nested-ball geometry of world pi for its current window EP[pi]
+  const p = PR[pi], E = EP[pi], T = E + BELOW[p];
+  const S = p === 2 ? 0.62 : 0.84*Math.sin(Math.PI/p)/(1 + Math.sin(Math.PI/p));
+  TDEP[p] = T; S_OF[p] = S;
+  ANG[pi] = new Float64Array(T*p); COSS[pi] = new Float64Array(T*p); SINS[pi] = new Float64Array(T*p); SHAPE[pi] = [];
+  for (let lv = 0; lv <= T; lv++){
+    const k = lv - E, sk = Math.pow(S, lv);
+    if (lv < T) for (let j = 0; j < p; j++){
+      const a = p === 2 ? ((((k % 2) + 2) % 2) ? Math.PI/2 : 0) + (j ? 0 : Math.PI) : -Math.PI/2 + TAU*j/p;
+      ANG[pi][lv*p+j] = a; COSS[pi][lv*p+j] = sk*Math.cos(a); SINS[pi][lv*p+j] = sk*Math.sin(a);
+    }
+    // the ball whose first lv digits are fixed; p=2 balls are ellipses along the direction of the next split
+    const rot = p === 2 ? ((((k % 2) + 2) % 2) ? Math.PI/2 : 0) : 0;
+    const sh = p === 2 ? {rx:sk/(1 - S*S)*1.04, ry:sk*S/(1 - S*S)*1.04, rot} : {rx:sk/(1 - S)*1.04, ry:sk/(1 - S)*1.04, rot:0}   /* 1.04: the dust reaches sk/(1−S); siblings still never touch */;
+    sh.cos = Math.cos(sh.rot); sh.sin = Math.sin(sh.rot); sh.box = p === 2; sh.R = Math.max(sh.rx, sh.ry); SHAPE[pi][lv] = sh;
+  }
+  FITR[pi] = SHAPE[pi][0].R*1.06; MINR[pi] = FITR[pi]*Math.pow(S, T - 3);
+}
+PR.forEach((p, pi) => buildWorld(pi));
+function homeView(pi){ const E = EP[pi], zero = new Array(E).fill(0), [cx, cy] = centreOf(pi, zero, E); return {cx, cy, r:SHAPE[pi][E].R*1.12}; }   // opens on ℤ_p, the numbers of size ≤ 1
+
+// the digits of one fraction in world pi at levels 0..cnt-1 (zeros below its valuation); null when it is outside the window
+function levelDigits(n, d, pi, cnt){
+  const p = PR[pi], E = EP[pi], v = vp(n, d, p); if (v < -E) return null;
+  const dig = new Array(cnt).fill(0); if (n === 0n) return dig;
+  const start = v + E; if (start < cnt){ const r = padicDigits(n, d, p, cnt - start); for (let i = 0; i < r.digits.length; i++) dig[start + i] = r.digits[i]; }
+  return dig;
+}
+function computeW(rec, pi){
+  const p = PR[pi], E = EP[pi], T = TDEP[p], n = rec.n, d = rec.d, v = vp(n, d, p), dig = new Uint8Array(T), w = {v, inWin:v >= -E, dig, x:0, y:0, hue:0};
+  if (!w.inWin) return w;
+  const start = v + E;
+  if (n !== 0n && start < T){ const r = padicDigits(n, d, p, T - start); for (let i = 0; i < r.digits.length; i++) dig[start + i] = r.digits[i]; }
+  let x = 0, y = 0; for (let lv = 0; lv < T; lv++){ x += COSS[pi][lv*p + dig[lv]]; y += SINS[pi][lv*p + dig[lv]]; }
+  w.x = x; w.y = y;
+  let h = 0, sc = 1/p; for (let i = 0; i < HUEN[p] && E + i < T; i++){ h += dig[E + i]*sc; sc /= p; } w.hue = h;   // colour from the digits after the point, so ℤ_p (the opening view) gets the whole rainbow
+  return w;
+}
+function makeRec(n, d){
+  const rec = {n, d, key:n + '/' + d, val:Number(n)/Number(d), den:Number(d)};
+  rec.jit = ((Math.abs(Number(n % 1009n))*37 + Number(d % 1009n)*101) % 211) / 211;
+  rec.w = PR.map((p, pi) => computeW(rec, pi));
+  return rec;
+}
+function centreOf(pi, prefix, lv){ let x = 0, y = 0; const p = PR[pi]; for (let l = 0; l < lv; l++){ x += COSS[pi][l*p + prefix[l]]; y += SINS[pi][l*p + prefix[l]]; } return [x, y]; }
+
+// the cloud: every reduced a/b with 1 <= b <= 24 and value in [-4, 4]
+const CMAXB = 24, cloud = [], cloudMap = new Map(), cloudCount = [0];
+for (let b = 1; b <= CMAXB; b++){
+  for (let a = -4*b; a <= 4*b; a++){
+    if (bgcd(BigInt(a), BigInt(b)) !== 1n) continue;
+    const rec = makeRec(BigInt(a), BigInt(b)); cloud.push(rec); cloudMap.set(rec.key, rec);
+  }
+  cloudCount[b] = cloud.length;
+}
+
+// text for a fraction in a p-adic world, e.g. …2101.12₃
+const SHOWD = {2:14, 3:10, 5:8, 7:7};
+function fmtPadic(rec, pi){
+  const p = PR[pi]; if (rec.n === 0n) return '0';
+  const v = rec.w[pi].v, lo = Math.min(v, 0), hi = Math.max(lo + SHOWD[p] - 1, 0), cnt = hi - v + 1;
+  const digs = cnt > 0 ? padicDigits(rec.n, rec.d, p, cnt).digits : [];
+  let s = ''; for (let k = hi; k >= lo; k--){ s += k < v ? 0 : digs[k - v]; if (k === 0 && lo < 0) s += '.'; }
+  return '…' + s + SUB(p);
+}
+
+// =====================================================================
+// 3. State
+// =====================================================================
+const WNAME = ['Real line', '2-adic', '3-adic', '5-adic', '7-adic'];
+const VIEWS = [{id:'mirror', label:'Mirror'}, {id:'game', label:'Hit every target'}, {id:'balance', label:'Balance'}, {id:'journey', label:'Journeys'}];       // later stages add further views here
+const PAIRS = [
+  {a:'1', b:'1025', label:'1 and 1025 (2-adic twins: they differ by 2¹⁰)'},
+  {a:'0', b:'729', label:'0 and 729 (3-adic twins: 3⁶)'},
+  {a:'1/2', b:'1251/2', label:'1/2 and 1251/2 (5-adic twins: differ by 5⁴)'},
+  {a:'-1', b:'2400', label:'−1 and 2400 (7-adic twins: 7⁴)'},
+  {a:'1/7', b:'1/8', label:'1/7 and 1/8 (neighbours on the real line, far apart elsewhere)'},
+];
+const st = {view:'mirror', maxB:10, paint:0, active:'A', pick:{A:null, B:null}, brush:null, hint:true};
+const extras = [];
+let list = [], mlist = [], memb = new Uint8Array(0), brushCount = 0;     // list = the dots of the view on screen; mlist = the Mirror's own dots
+const gm = {idx:0, cur:null, steps:[10, 24, 50, 100, 200, 400], bi:0, B:10, pool:[], surv:new Uint8Array(0), nSurv:0, capped:false,
+  guess:null, recMap:new Map(), par:null, solved:new Set(), won:false, how:null, inited:false};
+
+// ---- windows: |x|_p <= p^EP grows when a fraction, target or guess needs it (everything is rebuilt, views keep their meaning) ----
+const jrReg = [];                                // journey steps and limits, kept so a window growth recomputes them too
+function allRecs(){ return new Set([...cloud, ...extras, ...gm.recMap.values(), ...jrReg]); }
+function ensureEFor(n, d){ PR.forEach((p, pi) => { const v = vp(n, d, p); if (v !== Infinity && -v > EP[pi]) growE(pi, -v); }); }
+function ensureCloudE(B){ needFromB(B).forEach((e, pi) => growE(pi, e)); }
+function growE(pi, need){
+  const newE = Math.min(MAXE, need), old = EP[pi]; if (newE <= old) return;
+  const dl = newE - old; EP[pi] = newE; buildWorld(pi);
+  for (const r of allRecs()) r.w[pi] = computeW(r, pi);
+  const b = st.brush; if (b && b.kind === 'ball' && b.pi === pi){ b.prefix = new Array(dl).fill(0).concat(b.prefix); b.lv += dl; }
+  // the old window is now the ball of radius S^dl around the new top-level 0-branch: every view maps over exactly
+  const d = disks[pi], s = Math.pow(S_OF[PR[pi]], dl), [ox, oy] = centreOf(pi, new Array(dl).fill(0), dl);
+  for (const k in d.vs){ const v = d.vs[k]; v.cx = ox + s*v.cx; v.cy = oy + s*v.cy; v.r *= s; d.clamp(v); }
+  syncList(); markAll();
+}
+
+function getRec(n, d){
+  ensureEFor(n, d);
+  const key = n + '/' + d; let r = cloudMap.get(key);
+  if (!r){ r = extras.find(e => e.key === key); if (!r){ r = makeRec(n, d); extras.push(r); } }
+  else if (!inCloud(r) && !extras.includes(r)) extras.push(r);
+  return r;
+}
+const inCloud = r => cloudMap.get(r.key) === r && r.den <= st.maxB;
+function rebuildList(){
+  mlist = cloud.slice(0, cloudCount[st.maxB]);
+  for (const r of extras) if (!inCloud(r)) mlist.push(r);
+  syncList();
+}
+function syncList(){
+  if (st.view === 'game'){ list = gm.pool; return; }
+  list = mlist; rebuildBuckets(); recomputeMembers();
+}
+
+// ---- colour buckets: dots grouped by hue so each colour is one batched path ----
+const NB = 60; let bucketLists = [], bcols = [];
+function hueOf(rec){
+  if (st.paint === 0) return Math.min(1, Math.max(0, (rec.val + 4)/8));
+  const w = rec.w[st.paint - 1]; return w.inWin ? w.hue : -1;
+}
+function rebuildBuckets(){
+  bucketLists = Array.from({length:NB + 1}, () => []);
+  for (let i = 0; i < list.length; i++){ const h = hueOf(list[i]); bucketLists[h < 0 ? NB : Math.min(NB - 1, Math.floor(h*NB))].push(i); }
+}
+let colLine = '#2a3252', colAccent = '#e3a25f', colSel = '#fff', colMuted = '#8f95ad', colPanel = '#141a2d', colFg = '#e8e5dc', colTarget = '#3cc9b4', colHot = '#ff7a45', colInk = '#0d1120';
+const tok = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+function readTheme(){
+  colLine = tok('--line'); colAccent = tok('--accent'); colSel = tok('--sel'); colMuted = tok('--muted'); colPanel = tok('--panel'); colFg = tok('--fg'); colTarget = tok('--target') || colTarget; colHot = tok('--hot') || colHot;
+  colInk = tok('--is-dark') === '1' ? (tok('--bg') || '#0d1120') : '#ffffff';
+  const Lr = tok('--dot-l') || '66%', Sa = tok('--dot-s') || '74%';
+  bcols = []; for (let b = 0; b < NB; b++) bcols.push(`hsl(${(b + 0.5)/NB*300} ${Sa} ${Lr})`); bcols.push(colMuted);
+  const stops = []; for (let k = 0; k <= 10; k++) stops.push(`hsl(${k/10*300} ${Sa} ${Lr})`);
+  const bar = document.querySelector('#legend .bar'); if (bar) bar.style.background = `linear-gradient(90deg,${stops.join(',')})`;
+}
+
+// ---- brush ----
+function inBrush(rec){
+  const b = st.brush; if (!b) return true;
+  if (b.kind === 'interval') return rec.val >= b.lo && rec.val <= b.hi;
+  const w = rec.w[b.pi]; if (!w.inWin) return false;
+  for (let l = 0; l < b.lv; l++) if (w.dig[l] !== b.prefix[l]) return false;
+  return true;
+}
+function recomputeMembers(){
+  memb = new Uint8Array(list.length); brushCount = 0;
+  if (!st.brush) return;
+  for (let i = 0; i < list.length; i++) if (inBrush(list[i])){ memb[i] = 1; brushCount++; }
+}
+function setBrush(b){ st.brush = b; recomputeMembers(); renderBrush(); markAll(); }
+function clearBrush(){ if (st.brush) setBrush(null); }
+
+// =====================================================================
+// 4. Canvas plumbing, gestures
+// =====================================================================
+const views = []; const dirty = new Set(); let raf = 0;
+function mark(c){ dirty.add(c); if (!raf) raf = requestAnimationFrame(flush); }
+function markAll(){ views.forEach(mark); }
+function flush(){ raf = 0; const ds = [...dirty]; dirty.clear(); for (const c of ds) if (c.W > 0) c.draw(); }
+function sizeCv(c){
+  const r = c.el.getBoundingClientRect(); c.W = r.width; c.H = r.height; c.dpr = Math.min(window.devicePixelRatio || 1, 3);
+  c.el.width = Math.max(1, Math.round(c.W*c.dpr)); c.el.height = Math.max(1, Math.round(c.H*c.dpr));
+}
+function makeView(box, el, draw){
+  const c = {box, el, ctx:el.getContext('2d'), W:0, H:0, dpr:1, draw:null}; c.draw = () => draw(c);
+  views.push(c); new ResizeObserver(() => { sizeCv(c); mark(c); }).observe(box); return c;
+}
+function attachGestures(c, h){
+  const el = c.el, ptrs = new Map(); let g = null;
+  const pos = e => { const r = el.getBoundingClientRect(); return {x:e.clientX - r.left, y:e.clientY - r.top}; };
+  const two = () => { const a = [...ptrs.values()]; return {d:Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y) || 1, x:(a[0].x + a[1].x)/2, y:(a[0].y + a[1].y)/2}; };
+  const endSelect = () => { if (g && g.mode === 'select' && h.onSelectEnd) h.onSelectEnd(); };
+  el.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    try { el.setPointerCapture(e.pointerId); } catch (_) {}
+    const q = pos(e); ptrs.set(e.pointerId, q);
+    if (ptrs.size === 1){
+      g = {sx:q.x, sy:q.y, lx:q.x, ly:q.y, moved:false, mode:'tap', timer:0};
+      if (h.onSelectStart){
+        if (e.shiftKey){ g.mode = 'select'; h.onSelectStart(q.x); }
+        else g.timer = setTimeout(() => { if (g && g.mode === 'tap' && !g.moved && ptrs.size === 1){ g.mode = 'select'; h.onSelectStart(g.sx); } }, 450);
+      }
+    } else if (ptrs.size === 2 && g){
+      clearTimeout(g.timer); endSelect(); const t = two(); g.mode = 'pinch'; g.moved = true; g.pd = t.d; g.px = t.x; g.py = t.y;
+    }
+  });
+  el.addEventListener('pointermove', e => {
+    if (!ptrs.has(e.pointerId) || !g) return;
+    const q = pos(e); ptrs.set(e.pointerId, q);
+    if (g.mode === 'pinch' && ptrs.size >= 2){
+      const t = two(); h.onZoom(t.d/g.pd, t.x, t.y); h.onPan(t.x - g.px, t.y - g.py); g.pd = t.d; g.px = t.x; g.py = t.y; return;
+    }
+    if (ptrs.size !== 1) return;
+    if (!g.moved && Math.hypot(q.x - g.sx, q.y - g.sy) > 5){ g.moved = true; clearTimeout(g.timer); if (g.mode === 'tap') g.mode = 'pan'; }
+    if (g.mode === 'pan'){ h.onPan(q.x - g.lx, q.y - g.ly); g.lx = q.x; g.ly = q.y; }
+    else if (g.mode === 'select') h.onSelectMove(q.x);
+  });
+  const up = e => {
+    if (!ptrs.has(e.pointerId)) return;
+    const q = pos(e); ptrs.delete(e.pointerId);
+    if (!g) return;
+    if (ptrs.size === 0){
+      clearTimeout(g.timer);
+      if (g.mode === 'tap' && !g.moved && e.type === 'pointerup') h.onTap(q.x, q.y, e);
+      endSelect(); g = null;
+    } else if (ptrs.size === 1 && g.mode === 'pinch'){
+      const r = [...ptrs.values()][0]; g.mode = 'pan'; g.lx = r.x; g.ly = r.y; g.moved = true;
+    }
+  };
+  el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+  el.addEventListener('wheel', e => {
+    e.preventDefault(); const q = pos(e);
+    h.onZoom(Math.exp(-e.deltaY*(e.deltaMode === 1 ? 0.04 : 0.0015)), q.x, q.y);
+  }, {passive:false});
+}
+
+// =====================================================================
+// 5. Real strip
+// =====================================================================
+const AX = 76;                                   // axis height in the strip
+const rvs = {mirror:{c:0, span:6}, game:{c:0, span:8.5}, balance:{c:0, span:6}, journey:{c:0, span:6}};   // each view keeps its own strip position
+let rv = rvs.mirror;
+const RV_MIN = 0.002, RV_MAX = 4000;
+function realLo(c){ return rv.c - rv.span/2; }
+const cvReal = makeView($('stripBox'), $('cvReal'), drawReal);
+function niceStep(span, W){ const raw = 80*span/W, pw = Math.pow(10, Math.floor(Math.log10(raw))), m = raw/pw; return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 5 ? 5 : 10)*pw; }
+// things to ring: the picks A / B in the Mirror; the guess (and walkthrough helpers) in the game
+function ringItems(){
+  if (st.view === 'journey') return [];
+  if (st.view === 'balance' && bal.mode === 'size') return bal.x ? [{rec:bal.x, tag:'x', label:'x = ' + fracStr(bal.x), col:colSel, r:9, w:3}] : [];
+  if (st.view !== 'game') return ['A', 'B'].filter(s => st.pick[s]).map(s => ({rec:st.pick[s], tag:s, label:s + ' ' + fracStr(st.pick[s]), col:s === 'A' ? colSel : colAccent, dash:s === 'B', r:7.5, w:2}));
+  const a = [], H = gm.how;
+  if (H) for (const t of H.teeth) a.push({rec:t, tag:null, label:null, col:colHot, r:4, w:1.5, fill:true});
+  if (H && H.ring) a.push({rec:H.ring, tag:H.ringTag, label:H.ringLabel, col:colHot, dash:true, r:8, w:2.5});
+  const f = focusRec(); if (f) a.push({rec:f, tag:'x', label:'x = ' + fracStr(f), col:colSel, r:9, w:3});
+  return a;
+}
+function drawRings(c, at){                       // at(rec) -> [x, y] or null
+  const ctx = c.ctx;
+  for (const it of ringItems()){
+    const q = at(it.rec); if (!q) continue;
+    ctx.beginPath(); ctx.arc(q[0], q[1], it.r, 0, TAU);
+    if (it.fill){ ctx.fillStyle = it.col; ctx.fill(); ctx.strokeStyle = colSel; ctx.lineWidth = it.w; ctx.stroke(); continue; }
+    ctx.setLineDash(it.dash ? [3, 3] : []); ctx.strokeStyle = it.col; ctx.lineWidth = it.w; ctx.stroke(); ctx.setLineDash([]);
+    ctx.font = '500 12px "JetBrains Mono", ui-monospace, monospace'; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+    const tw = ctx.measureText(it.label).width;
+    const lx = Math.min(Math.max(q[0] + 11, 4), c.W - tw - 4), ly = Math.max(10, q[1] - 12);
+    ctx.lineWidth = 3; ctx.strokeStyle = colPanel; ctx.strokeText(it.label, lx, ly); ctx.fillStyle = it.col; ctx.fillText(it.label, lx, ly);
+  }
+}
+function drawReal(c){
+  const ctx = c.ctx, W = c.W, H = c.H, ppu = W/rv.span, lo = realLo(), hi = lo + rv.span;
+  ctx.setTransform(c.dpr, 0, 0, c.dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+  const sx = x => (x - lo)*ppu;
+  // interval brush
+  if (st.view === 'game') drawGameReal(c, sx);
+  if (st.view === 'mirror' && st.brush && st.brush.kind === 'interval'){
+    const a = sx(st.brush.lo), b = sx(st.brush.hi);
+    ctx.globalAlpha = 0.14; ctx.fillStyle = colAccent; ctx.fillRect(a, 0, Math.max(b - a, 1), H); ctx.globalAlpha = 1;
+    ctx.strokeStyle = colAccent; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(a, 0); ctx.lineTo(a, H); ctx.moveTo(b, 0); ctx.lineTo(b, H); ctx.stroke();
+  }
+  // axis and ticks
+  ctx.strokeStyle = colMuted; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, AX + 0.5); ctx.lineTo(W, AX + 0.5); ctx.stroke();
+  const step = niceStep(rv.span, W), dec = Math.min(8, Math.max(0, -Math.floor(Math.log10(step) + 1e-9)));
+  ctx.font = '12px "JetBrains Mono", ui-monospace, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillStyle = colMuted;
+  const i0 = Math.ceil(lo/step), i1 = Math.floor(hi/step);
+  for (let i = i0; i <= i1 && i - i0 < 400; i++){
+    const x = i*step, X = Math.round(sx(x)) + 0.5, zero = i === 0;
+    ctx.strokeStyle = zero ? colFg : colMuted; ctx.lineWidth = zero ? 1.5 : 1;
+    ctx.beginPath(); ctx.moveTo(X, AX - (zero ? 6 : 4)); ctx.lineTo(X, AX + 6); ctx.stroke();
+    const lab = (Math.abs(x) < step/2 ? 0 : x).toFixed(dec).replace('-', '−');
+    ctx.fillText(lab, X, AX + 9);
+  }
+  ctx.textAlign = 'left';
+  // dots
+  const jy = r => AX - 9 - r.jit*(AX - 30);
+  paintDots(c, (r, o) => { const x = sx(r.val); if (x < -6 || x > W + 6) return false; o.x = x; o.y = jy(r); return true; });
+  // rings, plus edge markers for picked fractions that are off screen
+  drawRings(c, r => { const x = sx(r.val); return x < -8 || x > W + 8 ? null : [x, jy(r)]; });
+  ctx.font = '500 12px "JetBrains Mono", ui-monospace, monospace'; ctx.textBaseline = 'middle';
+  ringItems().filter(it => it.tag).forEach((it, i) => {
+    const x = sx(it.rec.val); if (x >= -8 && x <= W + 8) return;
+    const left = x < 0, t = left ? '◂ ' + it.tag : it.tag + ' ▸', y = AX - 20 - 20*i;
+    ctx.textAlign = left ? 'left' : 'right'; ctx.fillStyle = it.col; ctx.fillText(t, left ? 6 : W - 6, y);
+  });
+  ctx.textAlign = 'left';
+  if (st.view === 'journey' && jr.inited) drawJourney(c, 0, (r, i) => [sx(r.val), AX - 16 - Math.min(i, 16)*2.2], lim => [sx(lim.val), AX]);
+}
+function realNearest(x, y){
+  const W = cvReal.W, ppu = W/rv.span, lo = realLo(); let best = null, bd = 144;
+  for (const r of list){ const dx = (r.val - lo)*ppu - x, dy = AX - 9 - r.jit*(AX - 30) - y, d = dx*dx + dy*dy; if (d < bd){ bd = d; best = r; } }
+  return best;
+}
+function realZoom(f, x){
+  const ppu = cvReal.W/rv.span, val = realLo() + x/ppu;
+  rv.span = Math.min(RV_MAX, Math.max(RV_MIN, rv.span/f)); rv.c = val - (x - cvReal.W/2)/(cvReal.W/rv.span);
+}
+let selAnchor = 0;
+attachGestures(cvReal, {
+  onPan(dx){ rv.c -= dx/(cvReal.W/rv.span); mark(cvReal); },
+  onZoom(f, x){ realZoom(f, x); mark(cvReal); },
+  onTap(x, y){ const r = realNearest(x, y); if (r) pickRec(r); else if (st.view === 'mirror') clearBrush(); },
+  onSelectStart(x){ if (st.view !== 'mirror') return; selAnchor = realLo() + x/(cvReal.W/rv.span); setBrush({kind:'interval', lo:selAnchor, hi:selAnchor}); },
+  onSelectMove(x){ if (st.view !== 'mirror') return; const v = realLo() + x/(cvReal.W/rv.span); setBrush({kind:'interval', lo:Math.min(v, selAnchor), hi:Math.max(v, selAnchor)}); },
+  onSelectEnd(){ const b = st.brush; if (st.view === 'mirror' && b && b.kind === 'interval' && (b.hi - b.lo)*cvReal.W/rv.span < 3) clearBrush(); },
+});
+cvReal.el.addEventListener('contextmenu', e => e.preventDefault());
+$('resetReal').addEventListener('click', () => { if (st.view === 'game') gameFitReal(); else if (st.view === 'journey') jrFitReal(); else { rv.c = 0; rv.span = 6; mark(cvReal); } });
+function fitReal(vals){
+  const lo = Math.min(...vals), hi = Math.max(...vals);
+  rv.c = (lo + hi)/2; rv.span = Math.min(RV_MAX, Math.max(RV_MIN, hi > lo ? (hi - lo)*1.5 : rv.span)); mark(cvReal);
+}
+function showOnReal(rec){ if (rec.val < realLo() || rec.val > realLo() + rv.span){ rv.c = rec.val; mark(cvReal); } }
+
+// =====================================================================
+// 6. p-adic disks
+// =====================================================================
+const disks = [];
+PR.forEach((p, pi) => {
+  const box = document.createElement('div'); box.className = 'canvasbox disk';
+  box.innerHTML = `<canvas aria-label="${p}-adic numbers drawn as nested disks"></canvas><div class="badge">ℚ${SUB(p)} ${p}-adic</div><div class="note"></div><div class="gstat" hidden></div>` +
+    `<div class="zoombtns"><button type="button" class="mini" data-act="reset" title="Reset the view" aria-label="Reset the ${p}-adic view">↺</button>` +
+    `<button type="button" class="mini" data-act="expand" title="Expand or shrink" aria-label="Expand the ${p}-adic disk" aria-pressed="false">⤢</button></div>`;
+  $('disks').appendChild(box);
+  const d = {pi, p, box, vs:{mirror:homeView(pi), game:homeView(pi), balance:homeView(pi), journey:homeView(pi)}, note:box.querySelector('.note'), badge:box.querySelector('.badge'), gstat:box.querySelector('.gstat'),
+    get view(){ return this.vs[st.view]; }, set view(v){ this.vs[st.view] = v; }};   // each view keeps its own pan and zoom
+  d.c = makeView(box, box.querySelector('canvas'), c => drawDisk(d, c));
+  disks.push(d);
+  d.clamp = v => clampView(v);
+  const k = () => Math.min(d.c.W, d.c.H)/2/d.view.r;
+  const clampView = (v = d.view) => {
+    const lim = FITR[pi]*1.3; v.r = Math.min(FITR[pi]*1.5, Math.max(MINR[pi], v.r));
+    v.cx = Math.min(lim, Math.max(-lim, v.cx)); v.cy = Math.min(lim, Math.max(-lim, v.cy));
+  };
+  attachGestures(d.c, {
+    onPan(dx, dy){ d.view.cx -= dx/k(); d.view.cy -= dy/k(); clampView(); mark(d.c); },
+    onZoom(f, x, y){
+      const v = d.view, k0 = k(), wx = v.cx + (x - d.c.W/2)/k0, wy = v.cy + (y - d.c.H/2)/k0;
+      v.r = v.r/f; clampView(); const k1 = k(); v.cx = wx - (x - d.c.W/2)/k1; v.cy = wy - (y - d.c.H/2)/k1; clampView(); mark(d.c);
+    },
+    onTap(x, y){
+      const r = diskNearest(d, x, y); if (r){ pickRec(r); return; }
+      if (st.view !== 'mirror') return;
+      const hit = hitBall(d, x, y); if (!hit){ clearBrush(); return; }
+      const b = st.brush; if (b && b.kind === 'ball' && b.pi === pi && b.lv === hit.lv && b.prefix.every((q, i) => q === hit.prefix[i])) clearBrush(); else setBrush(hit);
+    },
+  });
+  box.querySelector('[data-act=reset]').addEventListener('click', () => { d.view = st.view === 'game' ? targetView(d) : st.view === 'journey' ? jrDiskView(d) : homeView(pi); mark(d.c); });
+  const ex = box.querySelector('[data-act=expand]');
+  ex.addEventListener('click', () => { const on = !box.classList.contains('exp'); box.classList.toggle('exp', on); ex.setAttribute('aria-pressed', on); ex.setAttribute('aria-label', (on ? 'Shrink the ' : 'Expand the ') + p + '-adic disk'); });
+});
+
+function drawDisk(d, c){
+  const {pi, p} = d, ctx = c.ctx, W = c.W, H = c.H, v = d.view, k = Math.min(W, H)/2/v.r, T = TDEP[p];
+  ctx.setTransform(c.dpr, 0, 0, c.dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+  // ball outlines, one path per level
+  const paths = []; for (let lv = 0; lv < T; lv++) paths.push(new Path2D());
+  const walk = (lv, cx, cy) => {
+    const g = SHAPE[pi][lv], sx = (cx - v.cx)*k + W/2, sy = (cy - v.cy)*k + H/2, R = g.R*k;
+    if (sx + R < 0 || sx - R > W || sy + R < 0 || sy - R > H || R < 2.5) return;
+    const path = paths[lv];
+    if (p === 2) boxPath(path, sx, sy, g, k);
+    else { path.moveTo(sx + R, sy); path.arc(sx, sy, R, 0, TAU); }
+    if (lv >= T - 1) return;
+    for (let j = 0; j < p; j++) walk(lv + 1, cx + COSS[pi][lv*p + j], cy + SINS[pi][lv*p + j]);
+  };
+  walk(0, 0, 0);
+  ctx.strokeStyle = colMuted; ctx.lineWidth = 1;
+  for (let lv = 0; lv < T; lv++){ ctx.globalAlpha = lv === 0 ? 0.6 : 0.07 + 0.4*Math.pow(0.8, lv); ctx.stroke(paths[lv]); }
+  ctx.globalAlpha = 1;
+  // brushed ball
+  const b = st.brush;
+  if (st.view === 'game'){                       // the target ball, tinted
+    const g = tgGeom(pi);
+    if (g){
+      const [bx, by] = centreOf(pi, g.prefix, g.lv), sh = SHAPE[pi][g.lv], sx = (bx - v.cx)*k + W/2, sy = (by - v.cy)*k + H/2;
+      ctx.beginPath(); if (p === 2) boxPath(ctx, sx, sy, sh, k); else ctx.arc(sx, sy, sh.R*k, 0, TAU);
+      ctx.globalAlpha = 0.2; ctx.fillStyle = colTarget; ctx.fill(); ctx.globalAlpha = 1; ctx.strokeStyle = colTarget; ctx.lineWidth = 2.5; ctx.stroke();
+    }
+  }
+  if (st.view === 'mirror' && b && b.kind === 'ball' && b.pi === pi){
+    const [bx, by] = centreOf(pi, b.prefix, b.lv), g = SHAPE[pi][b.lv], sx = (bx - v.cx)*k + W/2, sy = (by - v.cy)*k + H/2;
+    ctx.beginPath(); if (p === 2) boxPath(ctx, sx, sy, g, k); else ctx.arc(sx, sy, g.R*k, 0, TAU);
+    ctx.globalAlpha = 0.1; ctx.fillStyle = colAccent; ctx.fill(); ctx.globalAlpha = 1; ctx.strokeStyle = colAccent; ctx.lineWidth = 2; ctx.stroke();
+  }
+  const at = r => { const w = r.w[pi]; return w.inWin ? [(w.x - v.cx)*k + W/2, (w.y - v.cy)*k + H/2] : null; };
+  paintDots(c, (r, o) => { const q = at(r); if (!q || q[0] < -6 || q[0] > W + 6 || q[1] < -6 || q[1] > H + 6) return false; o.x = q[0]; o.y = q[1]; return true; }, pi);
+  drawRings(c, at);
+  if (st.view === 'journey' && jr.inited){
+    const toXY = w => w && w.inWin ? [(w.x - v.cx)*k + W/2, (w.y - v.cy)*k + H/2] : null;
+    drawJourney(c, pi + 1, r => toXY(r.w[pi]), lim => toXY(limW(lim.rec, pi)));
+  }
+}
+function diskNearest(d, x, y){
+  const c = d.c, v = d.view, k = Math.min(c.W, c.H)/2/v.r; let best = null, bd = 144;
+  for (const r of list){ const w = r.w[d.pi]; if (!w.inWin) continue; const dx = (w.x - v.cx)*k + c.W/2 - x, dy = (w.y - v.cy)*k + c.H/2 - y, q = dx*dx + dy*dy; if (q < bd){ bd = q; best = r; } }
+  return best;
+}
+// a 2-adic ball is a box-shaped dust (its x and y digits vary independently), so it is drawn and hit-tested as a slightly padded rounded box
+const BOXPAD = 1.06;
+function boxHalf(g){ const c = Math.abs(g.cos), s = Math.abs(g.sin); return [(c*g.rx + s*g.ry)*BOXPAD, (s*g.rx + c*g.ry)*BOXPAD]; }
+function boxPath(path, sx, sy, g, k){ const [hx, hy] = boxHalf(g), r = 0.2*Math.min(hx, hy)*k; path.moveTo(sx + hx*k, sy); path.roundRect(sx - hx*k, sy - hy*k, 2*hx*k, 2*hy*k, r); }
+function inEll(px, py, cx, cy, g){
+  if (g.box){ const [hx, hy] = boxHalf(g); return Math.abs(px - cx) <= hx && Math.abs(py - cy) <= hy; }
+  const dx = px - cx, dy = py - cy, u = dx*g.cos + dy*g.sin, w = -dx*g.sin + dy*g.cos; return (u/g.rx)*(u/g.rx) + (w/g.ry)*(w/g.ry) <= 1;
+}
+function hitBall(d, x, y){                       // smallest drawn ball containing the tap
+  const {pi, p} = d, c = d.c, v = d.view, k = Math.min(c.W, c.H)/2/v.r, T = TDEP[p];
+  const wx = v.cx + (x - c.W/2)/k, wy = v.cy + (y - c.H/2)/k;
+  if (!inEll(wx, wy, 0, 0, SHAPE[pi][0])) return null;
+  let lv = 0, cx = 0, cy = 0; const prefix = [];
+  while (lv < T - 1){
+    const g = SHAPE[pi][lv + 1]; if (g.R*k < 2.5) break; let found = -1;
+    for (let j = 0; j < p; j++) if (inEll(wx, wy, cx + COSS[pi][lv*p + j], cy + SINS[pi][lv*p + j], g)){ found = j; break; }
+    if (found < 0) break;
+    prefix.push(found); cx += COSS[pi][lv*p + found]; cy += SINS[pi][lv*p + found]; lv++;
+  }
+  return {kind:'ball', pi, lv, prefix};
+}
+function fitDisk(d, a, b){                       // zoom to the smallest ball holding both fractions
+  const pi = d.pi, wa = a.w[pi], wb = b.w[pi];
+  if (!wa.inWin || !wb.inWin){ d.view = homeView(pi); mark(d.c); return; }
+  const T = TDEP[d.p]; let lv = 0; while (lv < T - 3 && wa.dig[lv] === wb.dig[lv]) lv++;
+  const [cx, cy] = centreOf(pi, wa.dig, lv);
+  d.view = {cx, cy, r:Math.min(FITR[pi]*1.5, Math.max(MINR[pi], SHAPE[pi][lv].R*1.35))}; mark(d.c);
+}
+
+// ---- batched dot painting, shared by all five canvases ----
+function paintGame(c, place){                    // the game: survivors bright, everything else dim
+  const ctx = c.ctx, out = {x:0, y:0}, S = gm.surv; let any;
+  ctx.fillStyle = colMuted; ctx.globalAlpha = 0.2; ctx.beginPath(); any = false;
+  for (let i = 0; i < list.length; i++){ if (S[i] || !place(list[i], out)) continue; ctx.moveTo(out.x + 2.2, out.y); ctx.arc(out.x, out.y, 2.2, 0, TAU); any = true; }
+  if (any) ctx.fill();
+  ctx.fillStyle = colHot; ctx.globalAlpha = 1; ctx.beginPath(); any = false;
+  for (let i = 0; i < list.length; i++){ if (!S[i] || !place(list[i], out)) continue; ctx.moveTo(out.x + 3.6, out.y); ctx.arc(out.x, out.y, 3.6, 0, TAU); any = true; }
+  if (any) ctx.fill();
+  ctx.globalAlpha = 1;
+}
+function paintDots(c, place, pi){
+  if (st.view === 'game') return paintGame(c, place);
+  if (st.view === 'journey'){                    // the cloud, faint grey, so the journey stands out
+    const g = c.ctx, o = {x:0, y:0}; g.fillStyle = colMuted; g.globalAlpha = 0.17; g.beginPath(); let any = false;
+    for (let i = 0; i < list.length; i++){ if (!place(list[i], o)) continue; g.moveTo(o.x + 1.8, o.y); g.arc(o.x, o.y, 1.8, 0, TAU); any = true; }
+    if (any) g.fill(); g.globalAlpha = 1; return;
+  }
+  const ctx = c.ctx, out = {x:0, y:0}, brushOn = st.view === 'mirror' && !!st.brush, rr = 2.6;
+  const passes = brushOn ? [0, 1] : [2];
+  for (const pass of passes){
+    ctx.globalAlpha = pass === 0 ? 0.15 : 1; const r = pass === 1 ? rr + 0.8 : rr;
+    for (let b = 0; b <= NB; b++){
+      const L = bucketLists[b]; if (!L.length) continue; let any = false; ctx.beginPath();
+      for (let q = 0; q < L.length; q++){
+        const i = L[q]; if (pass === 0 && memb[i]) continue; if (pass === 1 && !memb[i]) continue;
+        if (!place(list[i], out)) continue;
+        ctx.moveTo(out.x + r, out.y); ctx.arc(out.x, out.y, r, 0, TAU); any = true;
+      }
+      if (any){ ctx.fillStyle = bcols[b]; ctx.fill(); }
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+// =====================================================================
+// 7. Picking, typing, famous pairs
+// =====================================================================
+function setSlot(slot, rec){
+  st.pick[slot] = rec; if (slot === 'A') st.active = 'B';
+  if (st.hint){ st.hint = false; $('pill').hidden = true; }
+  renderSlots(); renderPicked(); renderNotes(); markAll();
+  if (st.view === 'balance'){ bal.note = ''; renderBalance(); }
+}
+function pickRec(rec){
+  if (st.view === 'journey') return;
+  if (st.view === 'game') setGuess(rec.n, rec.d);
+  else if (st.view === 'balance' && bal.mode === 'size') setBalX(rec);
+  else setSlot(st.active, rec);
+}
+function submitFrac(){
+  const err = $('fracErr');
+  try {
+    const [n, d] = parseFrac($('fracIn').value); err.hidden = true;
+    const rec = getRec(n, d); rebuildList(); showOnReal(rec); setSlot(st.active, rec);
+  } catch (e) { err.textContent = e.message; err.hidden = false; }
+}
+function applyPair(i){ const pr = PAIRS[i]; if (pr) applyPairStr(pr.a, pr.b); }
+function applyPairStr(sa, sb){
+  const [an, ad] = parseFrac(sa), [bn, bd] = parseFrac(sb), a = getRec(an, ad), b = getRec(bn, bd);
+  rebuildList(); st.brush = null; recomputeMembers(); renderBrush();
+  st.pick.A = a; st.pick.B = b; st.active = 'B'; st.hint = false; $('pill').hidden = true;
+  fitReal([a.val, b.val]); disks.forEach(d => { d.view = homeView(d.pi); mark(d.c); });   // full view: the twins overlap in their own world
+  renderSlots(); renderPicked(); renderNotes(); markAll();
+  if (st.view === 'balance'){ bal.note = ''; renderBalance(); }
+}
+
+// =====================================================================
+// 8. Panel rendering
+// =====================================================================
+function renderSlots(){
+  for (const s of ['A', 'B']){
+    $('slot' + s).setAttribute('aria-pressed', st.active === s);
+    $('slot' + s + 'v').textContent = st.pick[s] ? fracStr(st.pick[s]) : 'tap a dot';
+    $('bal' + s).setAttribute('aria-pressed', st.active === s);
+    $('bal' + s + 'v').textContent = st.pick[s] ? fracStr(st.pick[s]) : 'tap a dot';
+  }
+}
+function renderNotes(){
+  if (st.view === 'journey'){ disks.forEach(d => { d.note.textContent = ''; }); return; }
+  disks.forEach(d => {
+    const parts = []; const far = list.reduce((n, r) => n + (r.w[d.pi].v < 0 ? 1 : 0), 0);
+    if (far) parts.push('+' + far + ' off view');
+    for (const s of ['A', 'B']) if (st.pick[s] && !st.pick[s].w[d.pi].inWin) parts.push(s + ' is farther out');
+    d.note.textContent = parts.join(' · ');
+  });
+}
+function posCell(r, wi){ return wi === 0 ? fmtNum(r.val) : fmtPadic(r, wi - 1); }
+function sizeCell(r, wi){ return wi === 0 ? (r.d === 1n ? String(babs(r.n)) : babs(r.n) + '/' + r.d) : sizeOfV(PR[wi - 1], r.w[wi - 1].v); }
+function renderPicked(){
+  let h = '';
+  for (const s of ['A', 'B']){
+    const r = st.pick[s];
+    if (!r){ h += `<p class="muted"><b>${s}</b>: not picked yet.</p>`; continue; }
+    h += `<div><h3>${s} = <span class="mono">${fracStr(r)}</span> <span class="muted mono">≈ ${fmtNum(r.val)}</span></h3>` +
+      `<table class="wtab"><thead><tr><th>World</th><th>Position</th><th>Size</th></tr></thead><tbody>` +
+      WNAME.map((nm, wi) => `<tr><td>${nm}</td><td>${posCell(r, wi)}</td><td>${sizeCell(r, wi)}</td></tr>`).join('') + `</tbody></table></div>`;
+  }
+  $('picked').innerHTML = h;
+  const A = st.pick.A, B = st.pick.B, el = $('dist');
+  if (!A || !B){ el.hidden = true; return; }
+  const [dn, dd] = mkFrac(A.n*B.d - B.n*A.d, A.d*B.d), rv0 = Math.abs(Number(dn)/Number(dd));
+  const ds = [{nm:WNAME[0], d:rv0, txt:(babs(dn) + (dd === 1n ? '' : '/' + dd)) + (dd === 1n ? '' : ' ≈ ' + fmtNum(rv0))}];
+  PR.forEach(p => { const v = vp(dn, dd, p); ds.push({nm:WNAME[ds.length], d:v === Infinity ? 0 : Math.pow(p, -v), txt:sizeOfV(p, v)}); });
+  const best = Math.min(...ds.map(x => x.d));
+  const near = ds.filter(x => x.d <= 0.125), far = ds.filter(x => x.d >= 1);
+  const lst = a => {
+    const ps = a.filter(x => x.nm !== 'Real line').map(x => parseInt(x.nm)), out = [];
+    if (a.length > ps.length) out.push('on the real line');
+    if (ps.length === 1) out.push(`in the ${ps[0]}-adic world`);
+    else if (ps.length) out.push(`in the ${ps.slice(0, -1).map(x => x + '-').join(', ')} and ${ps[ps.length - 1]}-adic worlds`);
+    return out.join(' and ');
+  };
+  let rem;
+  if (dn === 0n) rem = 'Same fraction: the distance is 0 in every world.';
+  else if (near.length && far.length) rem = `Very close ${lst(near)}; far ${lst(far)}.`;
+  else if (near.length) rem = `Close ${lst(near)}.`;
+  else if (far.length) rem = `Far apart ${lst(far)}.`;
+  else rem = 'Neither very close nor far in any world.';
+  el.hidden = false;
+  el.innerHTML = `<h3>Distance between A and B</h3><table class="wtab"><thead><tr><th>World</th><th>Distance |A − B|</th></tr></thead><tbody>` +
+    ds.map(x => `<tr${x.d === best ? ' class="best"' : ''}><td>${x.nm}</td><td>${x.txt}</td></tr>`).join('') + `</tbody></table><p class="remark">${rem}</p>`;
+}
+function ballLabel(b){
+  if (b.lv === 0) return 'the whole window'; const p = PR[b.pi], E = EP[b.pi];
+  let int = '', frac = '';                          // fixed digits left of the point, and after it (d₋₁ d₋₂ …)
+  for (let l = b.lv - 1; l >= 0; l--){ if (l >= E) int += b.prefix[l]; else frac += b.prefix[l]; }
+  frac = '?'.repeat(Math.max(0, E - b.lv)) + frac;
+  if (/^0+$/.test(frac)){ if (!int) return `${p}-adic whole numbers (size 1 or less)`; frac = ''; }
+  return 'numbers ending in ' + (int ? '…' + int : '') + (frac ? '.' + frac : '') + SUB(p);
+}
+function renderBrush(){
+  const b = st.brush, el = $('brushOut');
+  if (!b){ el.innerHTML = '<p class="muted">Nothing brushed. Tap empty space inside a disk, or shift-drag along the real line.</p>'; return; }
+  const what = b.kind === 'interval' ? `the interval from ${fmtNum(b.lo)} to ${fmtNum(b.hi)}` : 'the ball of ' + ballLabel(b);
+  el.innerHTML = `<p>Brushed: ${what} — <b>${brushCount}</b> fraction${brushCount === 1 ? '' : 's'}</p><div class="row"><button type="button" id="clearBrush">Clear</button></div>`;
+  $('clearBrush').addEventListener('click', clearBrush);
+}
+function renderLegend(){
+  const pi = st.paint - 1;
+  $('legend').innerHTML = '<div class="bar"></div><p>' + (st.paint === 0
+    ? 'Coloured by place on the real line (left to right: red to violet) — notice the colours scramble in the other worlds.'
+    : `Coloured by place in the ${PR[pi]}-adic world: each ball gets its own range of colours. Notice the real line turns to confetti. Fractions with ${PR[pi]} in the denominator are outside the opening view: zoom out to see them.`) + '</p>';
+  readTheme();
+}
+function renderCount(){ $('bVal').textContent = st.maxB; $('bCount').textContent = mlist.length.toLocaleString('en-US') + ' dots in all'; }
+
+// ---- wire up the controls ----
+$('views').innerHTML = VIEWS.map(v => `<button type="button" class="chip mode" data-v="${v.id}" aria-pressed="${v.id === st.view}">${v.label}</button>`).join('');
+function setView(v){
+  if (v === st.view && gm.inited) return;
+  if (st.view === 'journey' && v !== 'journey') jrStop();
+  st.view = v; rv = rvs[v];
+  $('views').querySelectorAll('[data-v]').forEach(x => x.setAttribute('aria-pressed', x.dataset.v === st.view));
+  document.querySelectorAll('[data-view]').forEach(x => { x.hidden = x.dataset.view !== st.view; });
+  if (v === 'game' && !gm.inited) initGame();
+  if (v === 'balance') initBalance();
+  if (v === 'journey') initJourney();
+  $('hint').textContent = v === 'journey'
+    ? 'A dot for each step of the sequence, older steps fading, joined by a dashed trail; the ring marks the current step and a cross marks where it is heading. Grey dots are the usual fractions. Drag to pan, scroll or pinch to zoom; the reset buttons return to the journey.'
+    : v === 'balance'
+    ? 'Tap a dot in any world: in "Size of x" it is weighed, in "Distance" it fills the active slot (A, then B). Drag to pan, scroll or pinch to zoom.'
+    : v === 'game'
+    ? 'Teal marks the targets. Bright dots hit every target; grey dots miss at least one. Tap a dot in any world to guess it. Drag to pan, scroll or pinch to zoom; the reset buttons return to the targets.'
+    : 'Drag to pan, scroll or pinch to zoom. Tap a dot to pick it. Tap empty space inside a disk to brush that ball, or shift-drag (or press and hold, then drag) along the real line to brush an interval. Esc clears.';
+  syncList(); renderNotes(); renderStatus(); markAll();
+  if (v === 'balance') renderBalance();
+}
+$('views').addEventListener('click', e => { const b = e.target.closest('[data-v]'); if (b) setView(b.dataset.v); });
+$('paints').innerHTML = ['Real', '2-adic', '3-adic', '5-adic', '7-adic'].map((t, i) => `<button type="button" class="chip" data-i="${i}" aria-pressed="${i === st.paint}">${t}</button>`).join('');
+$('paints').addEventListener('click', e => { const b = e.target.closest('[data-i]'); if (!b) return; st.paint = +b.dataset.i;
+  $('paints').querySelectorAll('[data-i]').forEach(x => x.setAttribute('aria-pressed', +x.dataset.i === st.paint));
+  renderLegend(); rebuildBuckets(); markAll(); });
+$('bIn').addEventListener('input', e => { st.maxB = +e.target.value; ensureCloudE(st.maxB); rebuildList(); renderCount(); renderNotes(); renderBrush(); markAll(); });
+$('slotA').addEventListener('click', () => { st.active = 'A'; renderSlots(); });
+$('slotB').addEventListener('click', () => { st.active = 'B'; renderSlots(); });
+$('balA').addEventListener('click', () => { st.active = 'A'; renderSlots(); });
+$('balB').addEventListener('click', () => { st.active = 'B'; renderSlots(); });
+$('fracGo').addEventListener('click', submitFrac);
+$('fracIn').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); submitFrac(); } });
+$('fracIn').addEventListener('input', () => { $('fracErr').hidden = true; });
+$('pairSel').innerHTML = '<option value="">Famous pairs…</option>' + PAIRS.map((p, i) => `<option value="${i}">${p.label}</option>`).join('');
+$('pairSel').addEventListener('change', e => { if (e.target.value !== '') applyPair(+e.target.value); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && st.view === 'mirror') clearBrush(); });
+
+// =====================================================================
+// 9. Stage 2: Hit every target (a game)
+// =====================================================================
+const DEBUG = new URLSearchParams(location.search).has('debug');
+const bfloor = (a, b) => { const q = a / b; return (a % b !== 0n && (a < 0n) !== (b < 0n)) ? q - 1n : q; };
+const bceil = (a, b) => -bfloor(-a, b);
+function parseDec(s){                              // '−0.62' -> exact fraction [n, d]
+  s = String(s).replace('−', '-'); let neg = false; if (s[0] === '-'){ neg = true; s = s.slice(1); }
+  const parts = s.split('.'), a = parts[0], b = parts[1] || '', n = BigInt(a + b), d = 10n ** BigInt(b.length);
+  return mkFrac(neg ? -n : n, d);
+}
+
+// a p-adic target is the ball B(c, k) = {x : v_p(x - c) >= k}; the real target is an interval [lo, hi]
+function mkLevel(spec, id){
+  const tg = PR.map((p, pi) => {
+    const s = spec.t[p]; if (!s) return null;
+    const c = mkFrac(BigInt(s[0]), BigInt(s[1])), t = {p, pi, c, k:s[2], g:null, gE:-1};
+    t.cnN = Number(c[0]); t.cdN = Number(c[1]); t.vcd = vpBig(c[1], BigInt(p)); return t;
+  });
+  let real = null;
+  if (spec.real){
+    const lo = parseDec(spec.real[0]), hi = parseDec(spec.real[1]);
+    real = {lo, hi, loS:spec.real[0].replace('-', '−'), hiS:spec.real[1].replace('-', '−'), loV:Number(lo[0])/Number(lo[1]), hiV:Number(hi[0])/Number(hi[1])};
+  }
+  return {id, goal:spec.goal, tg, real, cons:null};
+}
+const LEVELS = [
+  {goal:'Find one number that lands in both targets.', t:{2:[3, 1, 2], 3:[2, 1, 1]}},
+  {goal:'Four worlds at once — still a whole number works.', t:{2:[1, 1, 3], 3:[2, 1, 2], 5:[4, 1, 1], 7:[3, 1, 1]}},
+  {goal:'Add the real line. Its target is wide.', t:{2:[3, 1, 2], 3:[1, 1, 1], 5:[2, 1, 1]}, real:['100', '170']},
+  {goal:'The real target is narrow now: no whole number fits. Fractions can.', t:{2:[3, 1, 2], 3:[2, 1, 1], 5:[3, 1, 1]}, real:['2.2', '2.6']},
+  {goal:'This 2-adic target is outside the whole numbers: your answer needs a 2 in its bottom number.', t:{2:[1, 2, 0], 3:[1, 1, 1]}, real:['0.3', '0.45']},
+  {goal:'Everything at once.', t:{2:[1, 1, 2], 3:[2, 1, 1], 5:[1, 1, 1], 7:[3, 1, 1]}, real:['-0.62', '-0.58']},
+];
+
+// ---- exact hit tests ----
+function vDiff(t, n, d){                           // v_p(n/d - c)
+  const P = BigInt(t.p), num = n*t.c[1] - t.c[0]*d; if (num === 0n) return Infinity;
+  return vpBig(num, P) - vpBig(d, P) - vpBig(t.c[1], P);
+}
+function realSide(R, n, d){                        // -1 left of the band, 1 right of it, 0 inside
+  if (n*R.lo[1] < R.lo[0]*d) return {side:-1, dist:R.loV - Number(n)/Number(d)};
+  if (n*R.hi[1] > R.hi[0]*d) return {side:1, dist:Number(n)/Number(d) - R.hiV};
+  return {side:0, dist:0};
+}
+function hitsOf(n, d, L = gm.cur){                 // [real, 2, 3, 5, 7]: true / false, or null when that world has no target
+  const out = [null, null, null, null, null];
+  if (L.real) out[0] = realSide(L.real, n, d).side === 0;
+  for (const t of L.tg) if (t) out[t.pi + 1] = vDiff(t, n, d) >= t.k;
+  return out;
+}
+const padOf = R => Math.max(Math.min(0.5*(R.hiV - R.loV), 1), 0.15);   // context shown around a real target
+const allHit = h => h.every(x => x !== false);
+const valN = (x, p) => { x = Math.abs(x); let v = 0; while (x % p === 0){ x /= p; v++; } return v; };
+function hitFastN(n, d){                           // p-adic targets only, with plain numbers (for sweeping many candidates)
+  for (const t of gm.cur.tg){
+    if (!t) continue; const num = n*t.cdN - t.cnN*d; if (num === 0) continue;
+    if (valN(num, t.p) - valN(d, t.p) - t.vcd < t.k) return false;
+  }
+  return true;
+}
+const gcdN = (a, b) => { a = Math.abs(a); b = Math.abs(b); while (b){ const t = a % b; a = b; b = t; } return a; };
+
+// ---- the simplest fraction hitting everything ("par"), by congruences instead of brute force ----
+function solveCongr(t, d){                         // n/d in B(c,k)  <=>  n = r (mod m); null when impossible for this d
+  const P = BigInt(t.p), a = vpBig(d, P), b = vpBig(t.c[1], P), m = t.k + a + b;
+  if (m <= 0) return {r:0n, m:1n};
+  const gE = Math.min(b, m), g = P ** BigInt(gE), rhs = t.c[0]*d;
+  if (rhs % g !== 0n) return null;
+  const s = m - gE; if (s === 0) return {r:0n, m:1n};
+  const ms = P ** BigInt(s);
+  return {r:((rhs / g) % ms + ms) % ms * modInv(t.c[1] / g, ms) % ms, m:ms};
+}
+function crt(list){                                // moduli are powers of different primes
+  let r = 0n, M = 1n;
+  for (const x of list){
+    if (x.m === 1n) continue;
+    const inv = modInv(M % x.m, x.m), t = ((x.r - r) % x.m + x.m) % x.m * inv % x.m;
+    r += M*t; M *= x.m;
+  }
+  return {r, M};
+}
+function parSearch(L, dMax){
+  const R = L.real;
+  for (let d = 1; d <= dMax; d++){
+    const D = BigInt(d), cons = []; let bad = false;
+    for (const t of L.tg) if (t){ const s = solveCongr(t, D); if (!s){ bad = true; break; } cons.push(s); }
+    if (bad) continue;
+    const {r, M} = crt(cons); let best = null;
+    const consider = n => { if (bgcd(n, D) !== 1n) return; const a = babs(n); if (best === null || a < babs(best) || (a === babs(best) && n > best)) best = n; };
+    if (R){
+      const nlo = bceil(R.lo[0]*D, R.lo[1]), nhi = bfloor(R.hi[0]*D, R.hi[1]); if (nhi < nlo) continue;
+      let n = nlo + (((r - nlo) % M) + M) % M;
+      for (let it = 0; n <= nhi && it < 3000; it++, n += M) consider(n);
+    } else {
+      const r0 = ((r % M) + M) % M;
+      for (let u = -40n; u <= 40n; u++) consider(r0 + M*u);
+    }
+    if (best !== null && allHit(hitsOf(best, D, L))) return {n:best, d:D};
+  }
+  return null;
+}
+
+// ---- the general construction: Chinese remainder, then divide by a denominator the p-adic worlds cannot see ----
+function construct(L){
+  const ts = L.tg.filter(Boolean), e = {}; let P = 1n;
+  for (const t of ts){
+    const v = vp(t.c[0], t.c[1], t.p), m = v === Infinity ? t.k : Math.min(t.k, v), eq = Math.max(0, -m);
+    e[t.p] = eq; P *= BigInt(t.p) ** BigInt(eq);
+  }
+  const cons = [], rows = [];
+  for (const t of ts){
+    const K = Math.max(t.k + e[t.p], 1), mod = BigInt(t.p) ** BigInt(K);
+    let num = P*t.c[0], den = t.c[1]; const g = bgcd(num, den); num /= g; den /= g;
+    const a = ((num % mod) + mod) % mod * modInv(den, mod) % mod;
+    cons.push({r:a, m:mod}); rows.push({p:t.p, K, a, mod});
+  }
+  const cr = crt(cons), M = cr.M, A = ((cr.r % M) + M) % M, R = L.real;
+  // try bottom numbers b = 1, 2, 3, ... : x = top/(P b) hits every p-adic target exactly when top = A b (mod M)
+  const tried = []; let hitE = null;
+  for (let b = 1; b <= 20000 && !hitE; b++){
+    const e = tryB(L, P, A, M, b); tried.push(e); if (e.hit) hitE = e;
+  }
+  const ans = hitE ? mkFrac(hitE.n, hitE.PD) : mkFrac(A, P), ok = !!hitE && allHit(hitsOf(ans[0], ans[1], L));
+  if (!ok && DEBUG) console.error('construct: the built answer misses a target', L.id, String(ans[0]) + '/' + ans[1]);
+  if (DEBUG){ const ps = parSearch(L, 1000); if (ps && (ps.n !== ans[0] || ps.d !== ans[1])) console.error('construct: the walkthrough answer differs from par', L.id, String(ans[0]) + '/' + ans[1], 'vs', String(ps.n) + '/' + ps.d); }
+  return {P, A, M, rows, e, answer:ans, ok, tried, parB:hitE ? hitE.b : 0};
+}
+// one row of the "try bottom numbers" table: does some tooth of the comb {r + M t}/(P b) land in the real band?
+function tryB(L, P, A, M, b){
+  const B = BigInt(b), R = L.real, PD = P*B;
+  if (bgcd(B, M) !== 1n) return {b, skip:true, PD, hit:false};
+  const r = (A*B) % M, e = {b, skip:false, PD, r, hit:false, n:null, near:null};
+  if (!R){ e.hit = true; e.n = r*2n > M ? r - M : r; e.near = e.n; return e; }   // no real target: the smallest representative
+  const nlo = bceil(R.lo[0]*PD, R.lo[1]), nhi = bfloor(R.hi[0]*PD, R.hi[1]);
+  const n0 = nlo + (((r - nlo) % M) + M) % M;
+  if (n0 <= nhi){
+    let best = n0;
+    for (let n = n0 + M, it = 0; n <= nhi && it < 3000; n += M, it++){ const a = babs(n), c = babs(best); if (a < c || (a === c && n > best)) best = n; }
+    e.hit = true; e.n = best; e.near = best; return e;
+  }
+  const PDn = Number(PD), dist = n => { const v = Number(n)/PDn; return Math.max(R.loV - v, v - R.hiV, 0); };
+  const n1 = n0 - M; e.near = dist(n1) <= dist(n0) ? n1 : n0;
+  return e;
+}
+const consOf = L => L.cons || (L.cons = construct(L));
+function findPar(L){
+  const p = parSearch(L, 1000); if (p) return {n:p.n, d:p.d, exact:true};
+  const C = consOf(L); return {n:C.answer[0], d:C.answer[1], exact:false};
+}
+
+// ---- dots: all fractions while there is room, then only the survivors ----
+function genPool(B){
+  const L = gm.cur, R = L.real, out = [], CAP = 4000, SOFT = 2500; gm.capped = false;
+  let ln = 0, ld = 1, hn = 0, hd = 1, lo = 0, hi = 0, pad = 0;
+  if (R){ ln = Number(R.lo[0]); ld = Number(R.lo[1]); hn = Number(R.hi[0]); hd = Number(R.hi[1]); lo = R.loV; hi = R.hiV; pad = padOf(R); }
+  for (let d = 1; d <= B && !gm.capped; d++){
+    const nlo = R ? Math.ceil((lo - pad)*d - 1e-9) : -4*d, nhi = R ? Math.floor((hi + pad)*d + 1e-9) : 4*d;
+    const all = d <= 24 && out.length + (nhi - nlo + 1)*0.62 <= SOFT;
+    for (let n = nlo; n <= nhi; n++){
+      if (!all){ if (!hitFastN(n, d)) continue; if (R && !(n*ld >= ln*d && n*hd <= hn*d)) continue; }
+      if (gcdN(n, d) !== 1) continue;
+      out.push([n, d]);
+      if (out.length >= CAP){ gm.capped = true; break; }
+    }
+  }
+  return out;
+}
+function grecRaw(n, d){
+  const key = n + '/' + d; let r = cloudMap.get(key) || gm.recMap.get(key);
+  if (!r){ r = makeRec(n, d); gm.recMap.set(key, r); } return r;
+}
+function grec(n, d){ ensureEFor(n, d); return grecRaw(n, d); }
+function computeSurv(){
+  gm.surv = new Uint8Array(gm.pool.length); gm.nSurv = 0;
+  gm.pool.forEach((r, i) => { if (allHit(hitsOf(r.n, r.d))){ gm.surv[i] = 1; gm.nSurv++; } });
+}
+function buildPool(){
+  const pairs = genPool(gm.B), need = [0, 0, 0, 0], seen = new Set();
+  for (const pr of pairs){ const d = pr[1]; if (seen.has(d)) continue; seen.add(d); PR.forEach((p, i) => { let x = d, v = 0; while (x % p === 0){ x /= p; v++; } if (v > need[i]) need[i] = v; }); }
+  need.forEach((v, i) => growE(i, v));
+  gm.pool = pairs.map(pr => grecRaw(BigInt(pr[0]), BigInt(pr[1])));
+  computeSurv(); syncList();
+}
+
+// ---- target geometry in the disks ----
+function tgGeom(pi){
+  const L = gm.cur, t = L && L.tg[pi]; if (!t) return null;
+  if (t.gE !== EP[pi]){
+    const lv = Math.max(0, Math.min(TDEP[PR[pi]], t.k + EP[pi])), dig = levelDigits(t.c[0], t.c[1], pi, lv);
+    t.g = dig ? {lv, prefix:dig} : null; t.gE = EP[pi];
+  }
+  return t.g;
+}
+function targetView(d){                            // the target ball together with its parent
+  const pi = d.pi, g = tgGeom(pi); if (!g) return homeView(pi);
+  if (g.lv === 0) return {cx:0, cy:0, r:FITR[pi]*1.1};
+  const [cx, cy] = centreOf(pi, g.prefix, g.lv - 1);
+  return {cx, cy, r:Math.min(FITR[pi]*1.5, Math.max(MINR[pi], SHAPE[pi][g.lv - 1].R*1.3))};
+}
+function ballWords(t){
+  const {p, pi, c, k} = t, E = EP[pi], v = vp(c[0], c[1], p);
+  if (v >= k){
+    if (k > 0) return `numbers divisible by ${pbig(p, k)} (ending in …${'0'.repeat(k)}${SUB(p)})`;
+    if (k === 0) return `the ${p}-adic whole numbers (size 1 or less)`;
+    return `numbers of size at most ${pbig(p, -k)}`;
+  }
+  const dig = levelDigits(c[0], c[1], pi, k + E); if (!dig) return 'a ball outside the window';
+  const at = i => dig[i + E]; let s = '';
+  if (k >= 1){
+    s = '…'; for (let i = k - 1; i >= 0; i--) s += at(i);
+    if (v < 0){ s += '.'; for (let i = -1; i >= v; i--) s += at(i); }
+  } else { s = '.' + '?'.repeat(-k); for (let i = k - 1; i >= v; i--) s += at(i); }
+  return 'numbers ending in ' + s + SUB(p);
+}
+function targetWords(L){
+  const a = L.tg.filter(Boolean).map(t => `<li><b>${t.p}-adic:</b> ${ballWords(t)}</li>`);
+  if (L.real) a.push(`<li><b>Real:</b> between ${L.real.loS} and ${L.real.hiS}</li>`);
+  return a.join('');
+}
+
+// ---- game state, levels, views ----
+const LSK = 'adelic-mirror-solved';
+function loadSolved(){ try { const a = JSON.parse(localStorage.getItem(LSK) || '[]'); if (Array.isArray(a)) a.forEach(x => gm.solved.add(x)); } catch (_) {} }
+function saveSolved(){ try { localStorage.setItem(LSK, JSON.stringify([...gm.solved])); } catch (_) {} }
+const focusRec = () => (gm.how && gm.how.steps[gm.how.si] === 'done' && gm.how.ans) ? gm.how.ans : gm.guess;
+function gameFitReal(){
+  const L = gm.cur, R = L && L.real, r = rvs.game;
+  if (R){ const pad = padOf(R); r.c = (R.loV + R.hiV)/2; r.span = Math.min(RV_MAX, Math.max(RV_MIN, R.hiV - R.loV + 4*pad)); }
+  else { r.c = 0; r.span = 8.5; }
+  mark(cvReal);
+}
+function gameFitAll(){ gameFitReal(); disks.forEach(d => { d.vs.game = targetView(d); mark(d.c); }); }
+function makePuzzle(){
+  const pick = a => a[Math.floor(Math.random()*a.length)];
+  const wantReal = Math.random() < 0.6;               // decided once, so rejected tries do not tilt puzzles toward no real target
+  for (let tries = 0; tries < 400; tries++){
+    const nw = 2 + Math.floor(Math.random()*3), ps = PR.slice().sort(() => Math.random() - 0.5).slice(0, nw), t = {};
+    const outside = Math.random() < 0.35 ? pick(ps) : 0;
+    for (const p of ps){
+      if (p === outside) t[p] = [1 + Math.floor(Math.random()*(p - 1)), p, pick([0, 0, 1, 2])];
+      else t[p] = [Math.floor(Math.random()*13) - 4, 1, 1 + Math.floor(Math.random()*3)];
+    }
+    let real;
+    if (wantReal){
+      const w = 0.05 + Math.random()*0.45, lo = Math.round((-3 + Math.random()*(6 - w))*100)/100, hi = Math.round((lo + w)*100)/100;
+      if (hi > lo) real = [lo.toFixed(2), hi.toFixed(2)];
+    }
+    const L = mkLevel({goal:'A fresh random puzzle: find one fraction that lands in every target.', t, real}, 'P');
+    const pz = parSearch(L, 60); if (pz && pz.n <= 999n && pz.n >= -999n) return L;   // keep answers human-sized
+  }
+  return mkLevel({goal:'A puzzle: find one fraction that lands in every target.', t:{2:[1, 1, 2], 3:[2, 1, 1]}}, 'P');
+}
+function loadLevel(i){
+  stopHow();
+  if (i === 'puzzle'){ gm.idx = -1; gm.cur = makePuzzle(); }
+  else { gm.idx = i; gm.cur = mkLevel(LEVELS[i], 'L' + (i + 1)); }
+  const L = gm.cur;
+  gm.guess = null; gm.recMap = new Map(); gm.bi = 0; gm.B = gm.steps[0]; gm.pool = []; gm.surv = new Uint8Array(0); gm.nSurv = 0;
+  for (const t of L.tg) if (t){ const v = vp(t.c[0], t.c[1], t.p); growE(t.pi, Math.max(2, -t.k, v === Infinity ? 0 : -v)); }
+  gm.par = findPar(L); gm.won = L.id !== 'P' && gm.solved.has(L.id);
+  buildPool(); gameFitAll();
+  $('gErr').hidden = true; renderGamePanel(); renderStatus(); markAll();
+}
+function initGame(){ gm.inited = true; loadSolved(); loadLevel(0); }
+
+function setGuess(n, d){
+  const r = grec(n, d); gm.guess = r;
+  if (st.view === 'game' && (r.val < realLo() || r.val > realLo() + rv.span)) showOnReal(r);
+  const L = gm.cur;
+  if (allHit(hitsOf(r.n, r.d, L)) && !gm.won){ gm.won = true; if (L.id !== 'P'){ gm.solved.add(L.id); saveSolved(); } }
+  renderStatus(); renderGamePanel(); markAll();
+}
+function nudge(dn, dd){
+  const g = gm.guess ? [gm.guess.n, gm.guess.d] : [0n, 1n], d = g[1] + BigInt(dd); if (d < 1n) return;
+  const f = mkFrac(g[0] + BigInt(dn), d); setGuess(f[0], f[1]);
+}
+
+// ---- status per world ----
+function worldStatus(rec, wi){
+  const L = gm.cur;
+  if (wi === 0){
+    if (!L.real) return {cls:'', text:'no target'};
+    if (!rec) return {cls:'', text:'pick a guess'};
+    const s = realSide(L.real, rec.n, rec.d);
+    if (s.side === 0) return {cls:'ok', text:'✓ inside the band'};
+    return {cls:'bad', text:`✗ ${+s.dist.toPrecision(2)} too far ${s.side < 0 ? 'left' : 'right'}`};
+  }
+  const t = L.tg[wi - 1];
+  if (!t) return {cls:'', text:'no target'};
+  if (!rec) return {cls:'', text:'pick a guess'};
+  const v = vDiff(t, rec.n, rec.d); if (v >= t.k) return {cls:'ok', text:'✓ hit'};
+  const short = t.k - v;
+  return {cls:'bad', text:short === 1 ? '✗ 1 digit short' : short === 2 ? '✗ 2 digits short' : `✗ wrong ball · ${short} digits short`};
+}
+function renderStatus(){
+  if (st.view === 'journey' && jr.inited){ renderJrStatus(); return; }
+  const on = st.view === 'game' && gm.cur, rec = on ? focusRec() : null;
+  disks.forEach(d => {
+    const name = `ℚ${SUB(d.p)} ${d.p}-adic`;
+    if (!on){ d.badge.textContent = name; d.gstat.hidden = true; return; }
+    const s = worldStatus(rec, d.pi + 1);
+    d.badge.textContent = (s.cls === 'ok' ? '✓ ' : s.cls === 'bad' ? '✗ ' : '') + name;
+    d.gstat.hidden = false; d.gstat.textContent = s.text; d.gstat.className = 'gstat ' + s.cls;
+  });
+  const pill = $('pill'), rb = $('realBadge');
+  if (!on){ rb.textContent = 'ℝ · real line'; pill.className = 'pill'; pill.textContent = 'Tap any dot to see it in every world'; pill.hidden = !st.hint; return; }
+  const s = worldStatus(rec, 0);
+  rb.textContent = (s.cls === 'ok' ? '✓ ' : s.cls === 'bad' ? '✗ ' : '') + 'ℝ · real line';
+  pill.hidden = false; pill.className = 'pill ' + s.cls; pill.textContent = s.text;
+}
+function drawGameReal(c, sx){
+  const ctx = c.ctx, W = c.W, H = c.H, L = gm.cur; if (!L) return;
+  const R = L.real, hw = gm.how;
+  if (R){
+    const a = sx(R.loV), b = sx(R.hiV), w = Math.max(b - a, 2);
+    if (b >= -2 && a <= W + 2){
+      ctx.globalAlpha = 0.2; ctx.fillStyle = colTarget; ctx.fillRect(a, 0, w, H); ctx.globalAlpha = 1;
+      ctx.strokeStyle = colTarget; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(a, 0); ctx.lineTo(a, H); ctx.moveTo(a + w, 0); ctx.lineTo(a + w, H); ctx.stroke();
+      if (w > 90){ ctx.font = '500 12px "JetBrains Mono", ui-monospace, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = colTarget; ctx.fillText('target ' + R.loS + ' … ' + R.hiS, Math.min(Math.max(a + w/2, 70), W - 70), 36); ctx.textAlign = 'left'; }
+    }
+  }
+  if (hw && hw.comb){
+    const PD = Number(hw.comb.PD), A = Number(hw.comb.r), M = Number(hw.C.M), lo = realLo(), hi = lo + rv.span;
+    const t0 = Math.ceil((lo*PD - A)/M), t1 = Math.floor((hi*PD - A)/M);
+    if (t1 - t0 < 400){
+      ctx.strokeStyle = colHot; ctx.globalAlpha = 0.65; ctx.lineWidth = 1.5; ctx.beginPath();
+      for (let t = t0; t <= t1; t++){ const X = Math.round(sx((A + M*t)/PD)) + 0.5; ctx.moveTo(X, 6); ctx.lineTo(X, H - 6); }
+      ctx.stroke(); ctx.globalAlpha = 1;
+    }
+  }
+}
+
+// ---- the panel ----
+function winLine(g){
+  const P = gm.par, same = g.d === P.d && babs(g.n) === babs(P.n);
+  if (!P.exact) return 'Every target hit! A simple answer is ' + fracStr(P) + ' — can you find a simpler one?';
+  if (same) return 'Every target hit. You matched par!';
+  return `Every target hit. Par is ${fracStr(P)} — can you find a simpler one?`;
+}
+function renderGuess(){
+  const g = gm.guess, el = $('gGuess');
+  $('gBm').disabled = !g || g.d === 1n;
+  if (!g){ el.innerHTML = '<h3>Your guess</h3><p class="muted">None yet: tap a dot, type a fraction, or nudge from 0.</p>'; return; }
+  const h = hitsOf(g.n, g.d, gm.cur), tot = h.filter(x => x !== null).length, ok = h.filter(x => x === true).length, win = ok === tot;
+  el.innerHTML = `<h3>Your guess</h3><div class="gbig">${fracStr(g)}</div><p class="muted mono" style="margin:0">≈ ${fmtNum(g.val)}</p>` +
+    `<p style="margin:0"><b class="${win ? 'okc' : ''}">${ok} of ${tot} worlds ✓</b></p>` + (win ? `<p class="remark">${winLine(g)}</p>` : '') +
+    (win && g.d !== 1n && whyTarget(g) ? `<div class="linkrow"><button type="button" id="gWhy">Why bottom number ${g.d}?</button></div>` : '');
+}
+// the whole number the walkthrough builds (A, divided by P): the guess agrees with it in every target world
+function whyTarget(g){ const C = consOf(gm.cur), B = mkFrac(C.A, C.P); return B[0] === g.n && B[1] === g.d ? null : B; }
+function goWhy(){
+  const g = gm.guess; if (!g) return; const B = whyTarget(g); if (!B) return;
+  bal.mode = 'dist'; setView('balance'); syncBalUI();
+  applyPairStr(g.n + '/' + g.d, B[0] + '/' + B[1]);
+  const f = factorBig(g.d), ps = f.f.map(x => String(x[0])); if (f.rest > 1n) ps.push(String(f.rest));
+  const where = ps.length === 1 ? `the ${ps[0]}-adic world (your bottom number)` : `the worlds of the primes in your bottom number (${ps.join(', ')})`;
+  bal.note = `Your answer agrees with ${fracStr({n:B[0], d:B[1]})} in every target world, so their difference is small there. The balance has to come from somewhere: the real line and ${where} carry it.`;
+  renderBalance();
+}
+function renderGamePanel(){
+  const L = gm.cur; if (!L) return;
+  $('gLab').textContent = L.id === 'P' ? 'Puzzle' : `Level ${gm.idx + 1} of ${LEVELS.length}`;
+  $('gDots').innerHTML = LEVELS.map((_, i) => {
+    const done = gm.solved.has('L' + (i + 1));
+    return `<button type="button" class="ldot${done ? ' done' : ''}" data-l="${i}" aria-pressed="${gm.idx === i}" aria-label="Level ${i + 1}${done ? ', solved' : ''}">${i + 1}${done ? '✓' : ''}</button>`;
+  }).join('');
+  $('gGoal').textContent = L.goal; $('gTargets').innerHTML = targetWords(L);
+  renderGuess();
+  const nxt = gm.steps[gm.bi + 1];
+  $('gSurv').innerHTML = `Survivors: <b class="mono">${gm.nSurv}</b> of <b class="mono">${gm.pool.length}</b> dots <span class="muted">(bottom numbers up to ${gm.B})</span>`;
+  $('gGrow').disabled = nxt === undefined; $('gGrow').textContent = nxt === undefined ? 'The cloud is full size' : `Grow the cloud (to ${nxt})`;
+  $('gGrowNote').textContent = (gm.nSurv === 0 ? 'Nothing survives yet: grow the cloud, or let bigger bottom numbers in. ' : '') + (nxt !== undefined && nxt > 24 ? 'Past 24, only survivors are added. ' : '') + (gm.capped ? 'Capped at 4000 dots.' : '');
+  // the full par stays hidden until the level is solved; before that, only its bottom number is a hint
+  const parHint = gm.won ? `<b class="mono">${fracStr(gm.par)}</b>` : gm.par.d === 1n ? '<b>a whole number</b>' : `bottom number <b class="mono">${gm.par.d}</b>`;
+  $('gPar').innerHTML = gm.par.exact ? `Par: ${parHint} <span class="muted">${gm.won ? 'the simplest fraction that hits everything' : '(the simplest answer, shown in full once you solve it)'}</span>` : `A simple answer: <b class="mono">${fracStr(gm.par)}</b>`;
+  const last = gm.idx === LEVELS.length - 1;
+  $('gNext').disabled = !gm.won || last; $('gNext').textContent = L.id === 'P' ? 'Next puzzle' : last ? 'That was the last level' : 'Next level';
+  renderHow();
+}
+
+// ---- "Show me how" ----
+function stopHow(){ const H = gm.how; if (H && H.timer) clearInterval(H.timer); gm.how = null; }
+function toggleHow(){
+  if (gm.how){ stopHow(); renderHow(); renderStatus(); markAll(); return; }
+  const C = consOf(gm.cur), steps = [];
+  if (C.P > 1n) steps.push('mult');
+  steps.push('crt');
+  if (gm.cur.real) steps.push('comb', 'try');
+  steps.push('done');
+  gm.how = {C, steps, si:0, timer:0, ring:null, ringTag:'', ringLabel:'', teeth:[], comb:null, ans:null, shown:0, cur:null, custom:null, customMsg:''};
+  applyStep();
+}
+// show the comb {r + M t}/(P b) of one tried bottom number: red teeth near the band, and a ring on the tooth that lands
+function showEntry(e, noRing){
+  const H = gm.how, C = H.C, R = gm.cur.real, r = rvs.game; if (!R || e.skip) return;
+  H.cur = e; H.comb = {PD:e.PD, r:e.r}; H.teeth = []; H.ring = null; H.ringTag = ''; H.ringLabel = '';
+  for (let u = -3; u <= 3; u++){ const f = mkFrac(e.near + C.M*BigInt(u), e.PD); H.teeth.push(grec(f[0], f[1])); }
+  if (e.hit && !noRing){ const f = mkFrac(e.n, e.PD); H.ring = grec(f[0], f[1]); H.ringTag = 'hit'; H.ringLabel = fracStr(H.ring); }
+  const sp = Number(C.M)/Number(e.PD);
+  r.c = (R.loV + R.hiV)/2; r.span = Math.min(RV_MAX, Math.max(RV_MIN, Math.max(6*sp, 4*(R.hiV - R.loV)))); mark(cvReal);
+}
+const tryFound = H => H.shown >= H.C.tried.length;
+function lastShown(H){ for (let i = Math.min(H.shown, H.C.tried.length) - 1; i >= 0; i--) if (!H.C.tried[i].skip) return H.C.tried[i]; return H.C.tried[0]; }
+function revealNext(){                              // reveal the next allowed b (and the skipped ones before it)
+  const H = gm.how, T = H.C.tried; if (tryFound(H)) return;
+  let i = H.shown; while (i < T.length - 1 && T[i].skip) i++;
+  H.shown = i + 1; H.custom = null; H.customMsg = ''; showEntry(T[i]);
+}
+function stopPlay(){ const H = gm.how; if (H && H.timer){ clearInterval(H.timer); H.timer = 0; } }
+function startPlay(){
+  const H = gm.how; if (!H || H.timer || tryFound(H)) return;
+  const tick = () => { revealNext(); if (tryFound(H)) stopPlay(); renderHow(); markAll(); };
+  H.timer = setInterval(tick, 700); tick();
+}
+function tryOwn(){
+  const H = gm.how; if (!H) return; stopPlay();
+  const txt = $('gTryB').value.trim(), b = /^\d+$/.test(txt) ? parseInt(txt, 10) : 0;
+  if (!(b >= 1 && b <= 99999)){ H.custom = null; H.customMsg = 'Type a whole number from 1 to 99999.'; }
+  else { H.customMsg = ''; H.custom = tryB(gm.cur, H.C.P, H.C.A, H.C.M, b); if (!H.custom.skip) showEntry(H.custom); }
+  renderHow(); markAll();
+}
+function applyStep(){
+  const H = gm.how; stopPlay();
+  const s = H.steps[H.si], C = H.C, R = gm.cur.real, r = rvs.game;
+  H.ring = null; H.teeth = []; H.comb = null; H.ans = null;
+  if (s === 'crt'){
+    const f = mkFrac(C.A, C.P); H.ring = grec(f[0], f[1]); H.ringTag = C.P > 1n ? 'A/P' : 'A'; H.ringLabel = H.ringTag + ' = ' + fracStr(H.ring);
+    if (R){ const lo = Math.min(H.ring.val, R.loV), hi = Math.max(H.ring.val, R.hiV); r.c = (lo + hi)/2; r.span = Math.min(RV_MAX, Math.max(RV_MIN, (hi - lo)*1.4, 4*(R.hiV - R.loV))); }
+    else if (Math.abs(H.ring.val) > 4) r.c = H.ring.val;
+  } else if (s === 'comb'){ showEntry(C.tried[0], true); }
+  else if (s === 'try'){ if (H.shown < 1) H.shown = 1; showEntry(H.custom && !H.custom.skip ? H.custom : lastShown(H)); }
+  else if (s === 'done'){
+    H.ans = grec(C.answer[0], C.answer[1]);
+    if (R){ r.c = H.ans.val; r.span = Math.min(RV_MAX, Math.max(RV_MIN, 3*(R.hiV - R.loV), 0.3)); }
+    else if (Math.abs(H.ans.val) > 4) r.c = H.ans.val;
+  }
+  mark(cvReal); renderHow(); renderStatus(); markAll();
+}
+function triedTable(H){
+  const C = H.C, M = String(C.M), rows = [];
+  for (const e of C.tried.slice(0, H.shown)){
+    const last = rows[rows.length - 1];
+    if (e.skip){ if (last && last.kind === 'skip'){ last.lab = last.b1 + '–' + e.b; } else rows.push({kind:'skip', b1:e.b, lab:String(e.b)}); }
+    else rows.push({kind:e.hit ? 'hit' : 'miss', e, lab:String(e.b)});
+  }
+  if (rows.length > 7){                             // older misses collapse into one row so the table stays short
+    const old = rows.splice(0, rows.length - 6), bs = [];
+    old.forEach(r => { if (r.kind === 'miss') bs.push(r.lab); else if (r.kind === 'merged') bs.push(...r.bs); });
+    rows.unshift({kind:'merged', bs, lab:!bs.length ? '…' : bs.length > 5 ? bs.slice(0, 3).join(', ') + ' … ' + bs[bs.length - 1] : bs.join(', ')});
+  }
+  const cell = e => `<td>${e.r} + ${M}t</td><td>${fmt2(Number(C.M)/Number(e.PD))}</td>`;
+  const band = (e, isPar) => {
+    const f = mkFrac(e.hit ? e.n : e.near, e.PD), fs = fracStr({n:f[0], d:f[1]}), v = fmt2(Number(f[0])/Number(f[1]));
+    return e.hit ? `yes: ${fs} ≈ ${v}${isPar ? ' (par)' : ''}` : f[1] === 1n ? `no · nearest ${fs}` : `no · nearest ${fs} ≈ ${v}`;
+  };
+  const html = rows.map(r => {
+    if (r.kind === 'skip') return `<tr><td>${r.lab}</td><td colspan="3" class="muted">skip: share a prime with ${M}</td></tr>`;
+    if (r.kind === 'merged') return `<tr><td colspan="4">b = ${r.lab}: no tooth lands</td></tr>`;
+    return `<tr${r.kind === 'hit' ? ' class="best"' : ''}><td>${r.lab}</td>${cell(r.e)}<td>${band(r.e, r.kind === 'hit')}</td></tr>`;
+  });
+  const c = H.custom;
+  if (c){
+    if (c.skip) html.push(`<tr><td>${c.b} (yours)</td><td colspan="3" class="muted">skip: shares a prime with ${M}</td></tr>`);
+    else {
+      const f = mkFrac(c.n === null ? 0n : c.n, c.PD), same = c.hit && f[0] === C.answer[0] && f[1] === C.answer[1];
+      html.push(`<tr${c.hit ? ' class="best"' : ''}><td>${c.b} (yours)</td>${cell(c)}<td>${band(c, same)}${c.hit && !same ? ' (works, but not the simplest)' : ''}</td></tr>`);
+    }
+  }
+  return `<div style="overflow-x:auto"><table class="wtab trytab"><thead><tr><th>b</th><th>tops</th><th>teeth apart</th><th>in the band?</th></tr></thead><tbody>${html.join('')}</tbody></table></div>`;
+}
+function howText(s){
+  const H = gm.how, C = H.C, R = gm.cur.real, P = String(C.P), A = String(C.A), M = String(C.M);
+  if (s === 'mult'){
+    const ps = Object.keys(C.e).filter(k => C.e[k] > 0).join(' and ');
+    return `<p><b>Multiply first.</b> At least one target sits outside the whole numbers: its numbers need a factor of ${ps} in the bottom. So multiply everything by <b class="mono">P = ${P}</b>. Now y = ${P}·x has all its targets inside the whole numbers, where the Chinese remainder theorem works.</p>`;
+  }
+  if (s === 'crt'){
+    const y = C.P > 1n ? 'y' : 'x', rows = C.rows.map(r => `<li>${r.p}-adic: ${y} ≡ ${r.a} (mod ${r.mod})</li>`).join('');
+    return `<p><b>One whole number for every p-adic world.</b> ${C.P > 1n ? 'In terms of y, each' : 'Each'} target only asks for the last digits:</p><ul>${rows}</ul>` +
+      `<p>The Chinese remainder theorem glues these together. One whole number, <b class="mono">A = ${A}</b>, hits every p-adic target (it is lit up inside every teal ball).${C.P > 1n ? ` As a number, x = A/${P} = ${fracStr(H.ring)}.` : ''}</p>`;
+  }
+  if (s === 'comb'){
+    const sp = fmtNum(Number(C.M)/Number(C.P));
+    return `<p><b>Many more whole numbers work.</b> M = <b class="mono">${M}</b> is built from exactly the prime powers the targets look at, so A + M·t hits the same p-adic balls for every whole t. On the real line, x = (${A} + ${M}t)${C.P > 1n ? '/' + P : ''} makes a <b>comb</b> (the red lines) with teeth ${sp} apart.` +
+      (R ? ` The target band is only ${fmtNum(R.hiV - R.loV)} wide, ${C.tried[0].hit ? 'and a tooth already lands in it.' : 'so it falls between the teeth. A bigger bottom number would squeeze the teeth closer together.'}` : '') + '</p>';
+  }
+  if (s === 'try'){
+    const y = C.P > 1n ? 'y' : 'x', bot = C.P > 1n ? `(${P}·b)` : 'b', found = tryFound(H);
+    const ps = C.rows.map(r => r.p).join(', ');
+    return `<p><b>Try bottom numbers one at a time.</b> Write x = top / ${bot}${C.P > 1n ? ', so y = top / b' : ''}, with b a positive whole number.</p>` +
+      `<p><b>Rule:</b> x lands in every p-adic target exactly when ${y} ≡ A in each of those worlds. Multiply by b: <b class="mono">top ≡ ${A} × b (mod ${M})</b>.</p>` +
+      `<p>b must not share a prime (${ps}) with M: those fractions are too big in that world. For each allowed b, the tops form a comb with teeth M/${bot} apart, and we look for a tooth inside the band. The first b that works gives the simplest fraction.</p>` +
+      triedTable(H) +
+      (found ? `<p>Found it. Teeth get closer as b grows (M/${bot} apart), so once they are closer together than the band is wide a tooth must land. That is why there is always an answer.</p>` : '');
+  }
+  const a = C.answer, bot = String(C.P*BigInt(C.parB || 1)), top = C.tried[C.tried.length - 1].n;
+  if (!R) return `<p><b>Done.</b> There is no real target, so b = 1 and we take the whole number ≡ A (mod ${M}) that is smallest in size: ${String(top)}${C.P > 1n ? '/' + P : ''} = <b class="mono">${fracStr({n:a[0], d:a[1]})}</b>. It lands in every target (all badges ✓), and it is the simplest fraction that does (par).</p>`;
+  const fs = fracStr({n:a[0], d:a[1]}), raw = String(top) + "/" + bot;
+  return `<p><b>Done.</b> b = ${C.parB} gives top = ${String(top)}, so x = ${raw}${raw === fs ? "" : " = " + fs} ≈ ${fmtNum(Number(a[0])/Number(a[1]))}. It lands in every target (all badges ✓), and it is the simplest fraction that does (par).</p>`;
+}
+function renderHow(){
+  const box = $('gHowBox'), H = gm.how; $('gHow').textContent = H ? 'Hide the walkthrough' : 'Show me how';
+  box.hidden = !H; if (!H) return;
+  const s = H.steps[H.si], found = tryFound(H);
+  $('gHowStep').textContent = `Step ${H.si + 1} of ${H.steps.length}`;
+  $('gHowText').innerHTML = howText(s);
+  $('gTry').hidden = s !== 'try';
+  $('gTryNext').disabled = found; $('gPlay').disabled = found; $('gPlay').textContent = H.timer ? 'Pause' : 'Play';
+  $('gTryErr').hidden = !H.customMsg; $('gTryErr').textContent = H.customMsg;
+  $('gBack').disabled = H.si === 0; $('gFwd').disabled = H.si === H.steps.length - 1; $('gUse').hidden = s !== 'done';
+}
+
+// ---- wiring ----
+function submitGuess(){
+  try { const [n, d] = parseFrac($('gIn').value); $('gErr').hidden = true; setGuess(n, d); }
+  catch (e) { $('gErr').textContent = e.message; $('gErr').hidden = false; }
+}
+$('gGuess').addEventListener('click', e => { if (e.target.closest('#gWhy')) goWhy(); });
+$('gDots').addEventListener('click', e => { const b = e.target.closest('[data-l]'); if (b) loadLevel(+b.dataset.l); });
+$('gSet').addEventListener('click', submitGuess);
+$('gIn').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); submitGuess(); } });
+$('gIn').addEventListener('input', () => { $('gErr').hidden = true; });
+$('gTm').addEventListener('click', () => nudge(-1, 0)); $('gTp').addEventListener('click', () => nudge(1, 0));
+$('gBm').addEventListener('click', () => nudge(0, -1)); $('gBp').addEventListener('click', () => nudge(0, 1));
+$('gGrow').addEventListener('click', () => {
+  if (gm.bi >= gm.steps.length - 1) return;
+  gm.bi++; gm.B = gm.steps[gm.bi]; buildPool(); renderGamePanel(); renderStatus(); markAll();
+});
+$('gHow').addEventListener('click', toggleHow);
+$('gBack').addEventListener('click', () => { if (gm.how && gm.how.si > 0){ gm.how.si--; applyStep(); } });
+$('gFwd').addEventListener('click', () => {
+  const H = gm.how; if (!H) return;
+  if (H.steps[H.si] === 'try' && !tryFound(H)){ startPlay(); return; }   // pressed early: play on to the hit first
+  if (H.si < H.steps.length - 1){ H.si++; applyStep(); }
+});
+$('gTryNext').addEventListener('click', () => { if (!gm.how) return; stopPlay(); revealNext(); renderHow(); markAll(); });
+$('gPlay').addEventListener('click', () => { const H = gm.how; if (!H) return; if (H.timer){ stopPlay(); renderHow(); } else startPlay(); });
+$('gTryGo').addEventListener('click', tryOwn);
+$('gTryB').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); tryOwn(); } });
+$('gUse').addEventListener('click', () => { if (gm.how){ const a = gm.how.C.answer; setGuess(a[0], a[1]); } });
+$('gNext').addEventListener('click', () => { if (gm.won) loadLevel(gm.idx < 0 ? 'puzzle' : gm.idx + 1); });
+$('gPuz').addEventListener('click', () => loadLevel('puzzle'));
+
+// =====================================================================
+// 10. Stage 3: The Balance (the product formula)
+// =====================================================================
+const bal = {mode:'size', x:null, note:'', ents:[], blocks:[], from:[], t0:-1e9, dur:400, raf:0, inited:false, zero:false};
+const BAL_SIZE_PRE = [['12/35', '12/35'], ['1/1024', '1/1024'], ['3⁶ = 729', '729'], ['−22/7', '-22/7'], ['900/9001', '900/9001']];
+const BAL_DIST_PRE = [['1 and 1025', '1', '1025'], ['0 and 729', '0', '729'], ['1 and 9901/9001', '1', '9901/9001']];
+const cvBal = makeView($('balBox'), $('cvBal'), c => drawBal(c));
+const reducedMotion = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; } };
+
+// trial division by BigInt up to 10^6; rest > 1 is what is left, and prime says whether it is certainly prime
+function factorBig(n){
+  const f = []; let r = n, i = 5, step = 2, prime = false;
+  const take = p => { const P = BigInt(p); let e = 0; while (r % P === 0n){ r /= P; e++; } if (e) f.push([p, e]); };
+  take(2); take(3);
+  while (i <= 1000000){
+    if (r < 9007199254740992n){
+      let m = Number(r);
+      while (i <= 1000000 && i*i <= m){ if (m % i === 0){ let e = 0; while (m % i === 0){ m /= i; e++; } f.push([i, e]); } i += step; step = 6 - step; }
+      r = BigInt(m); if (i*i > m) prime = true; break;
+    }
+    const I = BigInt(i); if (I*I > r){ prime = true; break; }
+    if (r % I === 0n) take(i);
+    i += step; step = 6 - step;
+  }
+  if (r > 1n && !prime && i > 1000000 && r < 1000000000000n) prime = true;
+  if (r > 1n && prime && r <= 1000000n){ f.push([Number(r), 1]); r = 1n; }   // a last small prime is an ordinary prime world   // nothing up to 10^6 divides it, so below 10^12 it is prime
+  return {f, rest:r, prime};
+}
+// the worlds in which n/d has size other than 1; sizes exact (num/den as BigInt)
+function balEntries(n, d){
+  const a = babs(n), ents = [];
+  if (a !== d) ents.push({key:'real', kind:'real', rank:-1, name:'real', sname:'real', num:a, den:d, big:a > d, log:Math.log(Number(a)) - Math.log(Number(d)), on:true, p:0, pw:null});
+  const fa = factorBig(a), fb = factorBig(d), prim = [];
+  fa.f.forEach(([p, e]) => prim.push({p, e, small:true})); fb.f.forEach(([p, e]) => prim.push({p, e, small:false}));
+  prim.sort((x, y) => x.p - y.p);
+  for (const q of prim){
+    const P = BigInt(q.p) ** BigInt(q.e), lg = q.e*Math.log(q.p);
+    ents.push({key:'p' + q.p, kind:'p', rank:q.p, name:q.p + '-adic', sname:String(q.p), num:q.small ? 1n : P, den:q.small ? P : 1n, big:!q.small, log:q.small ? -lg : lg, on:PR.includes(q.p), p:q.p, pw:[q.p, q.e]});
+  }
+  [[fa, true], [fb, false]].forEach(([fx, small], i) => {
+    const L = fx.rest; if (L <= 1n) return;
+    const small15 = L < 1000000000000000n;
+    const name = fx.prime ? (small15 ? L + '-adic' : 'huge prime') : (small15 ? 'other primes (' + L + ')' : 'other primes (huge)');
+    ents.push({key:'x' + i, kind:'big', rank:1e7 + i, name, sname:fx.prime ? 'big prime' : 'other', num:small ? 1n : L, den:small ? L : 1n, big:!small, log:(small ? -1 : 1)*Math.log(Number(L)), on:false, p:0, pw:null, L});
+  });
+  return ents;
+}
+const fmt3 = x => (x >= 1e6 || x < 1e-4) ? x.toExponential(2).replace('e+', 'e') : String(+x.toPrecision(3) === 1 && x !== 1 ? +x.toPrecision(6) : +x.toPrecision(3));
+function sizeText(e){
+  if (e.kind === 'real'){ const t = e.den === 1n ? String(e.num) : e.num + '/' + e.den; return t.length > 20 ? '≈ ' + fmt3(Number(e.num)/Number(e.den)) : t; }
+  let t; if (e.pw){ const s = String(BigInt(e.pw[0]) ** BigInt(e.pw[1])); t = s.length > 16 ? e.pw[0] + SUP(e.pw[1]) : s; }
+  else { const s = String(e.L); t = s.length > 16 ? '≈ ' + fmtNum(Number(e.L)) : s; }
+  return e.big ? t : '1/' + t;
+}
+function balExact(){ let N = 1n, D = 1n; for (const e of bal.ents){ N *= e.num; D *= e.den; } const g = bgcd(N, D); return (N / g) + '/' + (D / g); }
+
+function balWeigh(){
+  if (bal.mode === 'size'){
+    const r = bal.x; if (!r) return {msg:'Type a fraction, or tap a dot in any world.'};
+    return {n:r.n, d:r.d, head:'x = ' + fracStr(r)};
+  }
+  const A = st.pick.A, B = st.pick.B;
+  if (!A || !B) return {msg:'Pick A and B: tap two dots, type fractions, or use a preset below.', head:''};
+  const f = mkFrac(A.n*B.d - B.n*A.d, A.d*B.d), bs = fracStr(B);
+  return {n:f[0], d:f[1], head:`A − B = ${fracStr(A)} − ${bs[0] === '−' ? '(' + bs + ')' : bs} = ${fracStr({n:f[0], d:f[1]})}`};
+}
+function renderBalance(){
+  const w = balWeigh(), out = $('balOut'); let ents = [], msg = w.msg || '';
+  bal.zero = false;
+  if (!msg){
+    if (w.n === 0n){ msg = '0 has no size to balance: the product formula is about nonzero numbers.'; bal.zero = true; }
+    else { ents = balEntries(w.n, w.d); if (!ents.length) msg = '1 has size 1 in every world, so there is nothing on the scale.'; }
+  }
+  bal.ents = ents; setBalTarget(ents);
+  let h = w.head ? `<h3 class="mono" style="overflow-wrap:anywhere">${w.head}</h3>` : '';
+  if (msg) h += `<p>${msg}</p>`;
+  else {
+    h += `<p class="eq">${ents.map(sizeText).join(' × ')} = 1</p>`;
+    h += `<table class="wtab baltab"><thead><tr><th>World</th><th>Size</th><th></th></tr></thead><tbody>` + ents.map(e => {
+      const dec = e.kind === 'real' && e.den !== 1n && !sizeText(e).startsWith('≈') ? ' ≈ ' + fmt3(Number(e.num)/Number(e.den)) : '';
+      return `<tr><td><span class="sw ${e.big ? 't' : 'c'}${e.on ? '' : ' off'}"></span>${e.name}</td><td>${sizeText(e)}${dec}</td><td>${e.big ? 'bigger' : 'smaller'}${e.on ? '' : ' · not on screen'}</td></tr>`;
+    }).join('') + `</tbody></table><p class="hint">Every other prime world has size 1. Multiply all the sizes and you get exactly 1.</p>`;
+  }
+  if (bal.mode === 'dist') h += `<p class="hint">To be close in many worlds at once, the difference has to be big in some world you aren't watching.</p>`;
+  if (bal.note) h += `<p class="remark">${bal.note}</p>`;
+  out.innerHTML = h;
+  $('cvBal').setAttribute('aria-label', ents.length ? 'Balance: ' + ents.map(e => `${e.name} ${sizeText(e)} (${e.big ? 'bigger' : 'smaller'} than 1)`).join(', ') + '. Both towers reach the same height.' : (msg || 'An empty balance'));
+}
+
+// ---- animation: blocks are {key, side, rank, frac of the available height, e} ----
+const balAnimating = () => performance.now() - bal.t0 < bal.dur;
+function curBlocks(){
+  const t = (performance.now() - bal.t0)/bal.dur; if (t >= 1) return bal.blocks;
+  const e = t <= 0 ? 0 : t < 0.5 ? 2*t*t : 1 - 2*(1 - t)*(1 - t), out = [];
+  for (const b of bal.blocks){ const fb = bal.from.find(x => x.key === b.key), f0 = fb ? fb.frac : 0; out.push({...b, frac:f0 + (b.frac - f0)*e}); }
+  for (const fb of bal.from) if (!bal.blocks.some(x => x.key === fb.key)) out.push({...fb, frac:fb.frac*(1 - e)});
+  return out;
+}
+function setBalTarget(ents){
+  const sums = {L:0, R:0}; ents.forEach(e => { sums[e.big ? 'L' : 'R'] += Math.abs(e.log); });
+  const Hs = Math.max(sums.L, sums.R, 1e-9), from = curBlocks();
+  bal.blocks = ents.map(e => ({key:(e.big ? 'L' : 'R') + e.key, side:e.big ? 'L' : 'R', rank:e.rank, frac:Math.abs(e.log)/Hs, e}));
+  bal.from = from; bal.t0 = (cvBal.W > 0 && !reducedMotion()) ? performance.now() : -1e9;
+  if (bal.raf) return;
+  const tick = () => { bal.raf = 0; mark(cvBal); if (balAnimating()) bal.raf = requestAnimationFrame(tick); };
+  bal.raf = requestAnimationFrame(tick);
+}
+function hatchPat(ctx, col){
+  const cv = document.createElement('canvas'); cv.width = cv.height = 8; const g = cv.getContext('2d');
+  g.strokeStyle = col; g.lineWidth = 1.4; g.beginPath(); g.moveTo(0, 8); g.lineTo(8, 0); g.moveTo(-2, 2); g.lineTo(2, -2); g.moveTo(6, 10); g.lineTo(10, 6); g.stroke();
+  return ctx.createPattern(cv, 'repeat');
+}
+function drawBal(c){
+  const ctx = c.ctx, W = c.W, H = c.H; ctx.setTransform(c.dpr, 0, 0, c.dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+  const cx = W/2, beamY = H - 32, avail = beamY - 34, margin = Math.min(66, W*0.19), tw = Math.max(56, Math.min(104, cx - 10 - margin));
+  const xs = {L:cx - 8 - tw, R:cx + 8}, anim = balAnimating(), blocks = curBlocks();
+  ctx.font = '500 12px "JetBrains Mono", ui-monospace, monospace'; ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.lineJoin = 'round';
+  const tops = {L:0, R:0}, thin = {L:[], R:[]}, pats = {L:hatchPat(ctx, colTarget), R:hatchPat(ctx, colHot)};
+  const fit = (opts, maxW) => { for (const o of opts) if (ctx.measureText(o).width <= maxW) return o; let s = opts[opts.length - 1]; while (s.length > 1 && ctx.measureText(s + '…').width > maxW) s = s.slice(0, -1); return s + '…'; };
+  for (const side of ['L', 'R']){
+    const col = side === 'L' ? colTarget : colHot, bs = blocks.filter(b => b.side === side).sort((p, q) => p.e.rank - q.e.rank); let y = beamY;
+    for (const b of bs){
+      const h = b.frac*avail, y1 = y - h, e = b.e; y = y1; if (h < 0.4){ if (!anim) thin[side].push({b, y:y1}); continue; }
+      if (e.on){ ctx.globalAlpha = 0.92; ctx.fillStyle = col; ctx.fillRect(xs[side], y1, tw, h); ctx.globalAlpha = 1; }
+      else { ctx.globalAlpha = 0.16; ctx.fillStyle = col; ctx.fillRect(xs[side], y1, tw, h); ctx.globalAlpha = 0.7; ctx.fillStyle = pats[side]; ctx.fillRect(xs[side], y1, tw, h); ctx.globalAlpha = 1; }
+      ctx.strokeStyle = e.on ? colPanel : col; ctx.lineWidth = e.on ? 1 : 1.5; if (h > 3) ctx.strokeRect(xs[side] + 0.5, y1 + 0.5, tw - 1, h - 1);
+      if (h >= 16){
+        // one line "5-adic: 1/25" if it fits, else world and size on two lines (tall enough blocks), else the short forms
+        const s = sizeText(e), nm = e.kind === 'real' ? 'real' : e.name, one = nm + ': ' + s;
+        const lines = ctx.measureText(one).width <= tw - 10 ? [one] : h >= 32 ? [fit([nm, e.sname || nm], tw - 10), fit([s], tw - 10)]
+          : [fit(e.kind === 'real' ? [s] : [e.sname + ': ' + s, s], tw - 10)];
+        ctx.textAlign = 'center';
+        lines.forEach((t, i) => { const ty = y1 + h/2 + 0.5 + (i - (lines.length - 1)/2)*15;
+          if (e.on){ ctx.fillStyle = colInk; ctx.fillText(t, xs[side] + tw/2, ty); }
+          else { ctx.lineWidth = 3; ctx.strokeStyle = colPanel; ctx.strokeText(t, xs[side] + tw/2, ty); ctx.fillStyle = colFg; ctx.fillText(t, xs[side] + tw/2, ty); } });
+        ctx.textAlign = 'left';
+      } else if (!anim) thin[side].push({b, y:y1 + h/2});
+    }
+    tops[side] = beamY - y;
+  }
+  // thin blocks: one label beside the tower, with leader lines
+  for (const side of ['L', 'R']){
+    const ts = thin[side]; if (!ts.length) continue;
+    const edge = side === 'L' ? xs.L : xs.R + tw, dir = side === 'L' ? -1 : 1, room = (side === 'L' ? xs.L : W - edge) - 12, ay = Math.min(Math.max(ts[0].y, 10), beamY - 8);
+    const one = ts.length === 1 ? ts[0].b.e.sname + ': ' + sizeText(ts[0].b.e) : '';
+    const t = fit(ts.length === 1 ? [one, '+1 more', '+1'] : ['+' + ts.length + ' more', '+' + ts.length], room);
+    ctx.strokeStyle = colMuted; ctx.lineWidth = 1; ctx.beginPath();
+    for (const q of ts){ ctx.moveTo(edge, q.y); ctx.lineTo(edge + dir*5, ay); }
+    ctx.moveTo(edge + dir*5, ay); ctx.lineTo(edge + dir*8, ay); ctx.stroke();
+    ctx.fillStyle = colMuted; ctx.textAlign = side === 'L' ? 'right' : 'left'; ctx.fillText(t, edge + dir*10, ay); ctx.textAlign = 'left';
+  }
+  // the dashed line across both tower tops
+  if (blocks.length){
+    const y = beamY - Math.max(tops.L, tops.R) - 0.5;
+    ctx.setLineDash([5, 4]); ctx.strokeStyle = colMuted; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(xs.L - 8, y); ctx.lineTo(xs.R + tw + 8, y); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = colMuted; ctx.textAlign = 'center'; ctx.fillText('the scale never tips', cx, Math.max(10, y - 10)); ctx.textAlign = 'left';
+  } else { ctx.fillStyle = colMuted; ctx.textAlign = 'center'; ctx.fillText(bal.zero ? 'nothing to weigh' : 'nothing on the scale', cx, beamY - 40); ctx.textAlign = 'left'; }
+  // beam, pivot, captions
+  ctx.fillStyle = colFg; ctx.fillRect(10, beamY, W - 20, 4);
+  ctx.fillStyle = colMuted; ctx.beginPath(); ctx.moveTo(cx, beamY + 4); ctx.lineTo(cx - 16, H - 5); ctx.lineTo(cx + 16, H - 5); ctx.closePath(); ctx.fill();
+  ctx.textAlign = 'right'; ctx.fillStyle = colTarget; ctx.fillText('bigger than 1', cx - 24, H - 15);
+  ctx.textAlign = 'left'; ctx.fillStyle = colHot; ctx.fillText('smaller than 1', cx + 24, H - 15);
+}
+
+// ---- controls ----
+function syncBalUI(){
+  const dist = bal.mode === 'dist';
+  $('balModes').querySelectorAll('[data-m]').forEach(b => b.setAttribute('aria-pressed', b.dataset.m === bal.mode));
+  $('balSlots').hidden = !dist; $('balLab').textContent = dist ? 'Pick A and B' : 'The fraction x';
+  $('balIn').placeholder = dist ? 'Type a fraction for the active slot' : 'Type a fraction, e.g. -22/7';
+  $('balPre').innerHTML = (dist ? BAL_DIST_PRE : BAL_SIZE_PRE).map((p, i) => `<button type="button" class="chip" data-i="${i}">${p[0]}</button>`).join('');
+  $('balErr').hidden = true; renderSlots();
+}
+function initBalance(){
+  if (bal.inited) return; bal.inited = true;
+  const [n, d] = parseFrac('12/35'); bal.x = getRec(n, d); rebuildList(); syncBalUI();
+}
+function setBalMode(m){ bal.mode = m; bal.note = ''; syncBalUI(); renderBalance(); markAll(); }
+function setBalX(rec){ bal.x = rec; bal.note = ''; renderBalance(); markAll(); }
+function balSubmit(){
+  try {
+    const [n, d] = parseFrac($('balIn').value); $('balErr').hidden = true;
+    const rec = getRec(n, d); rebuildList(); showOnReal(rec);
+    if (bal.mode === 'size') setBalX(rec); else setSlot(st.active, rec);
+  } catch (e) { $('balErr').textContent = e.message; $('balErr').hidden = false; }
+}
+$('balModes').addEventListener('click', e => { const b = e.target.closest('[data-m]'); if (b && b.dataset.m !== bal.mode) setBalMode(b.dataset.m); });
+$('balGo').addEventListener('click', balSubmit);
+$('balIn').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); balSubmit(); } });
+$('balIn').addEventListener('input', () => { $('balErr').hidden = true; });
+$('balPre').addEventListener('click', e => {
+  const b = e.target.closest('[data-i]'); if (!b) return; const i = +b.dataset.i;
+  if (bal.mode === 'dist'){ const p = BAL_DIST_PRE[i]; applyPairStr(p[1], p[2]); }
+  else { const [n, d] = parseFrac(BAL_SIZE_PRE[i][1]), rec = getRec(n, d); rebuildList(); showOnReal(rec); setBalX(rec); }
+});
+
+// =====================================================================
+// 11. Stage 4: Journeys (a sequence stepping through all five worlds at once)
+// =====================================================================
+function sqrt2in7(){                               // the 7-adic square root of 2 that ends in 3, by Newton / Hensel lifting
+  const M = 7n ** 26n; let s = 3n;
+  for (let i = 0; i < 6; i++){ const f = ((s*s - 2n) % M + M) % M; s = ((s - f*modInv(2n*s % M, M)) % M + M) % M; }
+  return s;
+}
+const verd = (k, t) => ({k, t});
+const RUNS = verd('off', 'runs off to ∞'), WAND = verd('wander', 'wanders'), JUMP = verd('jump', 'jumps out, never settles');
+const JR = [
+  {name:'Powers of 3', last:12, f:n => [3n ** BigInt(n), 1n], rule:'x = 3ⁿ: each step multiplies the last by 3.',
+   v:[RUNS, WAND, verd('conv', 'closes in on 0'), WAND, WAND], lims:[null, null, {zero:true}, null, null], rv:{c:15, span:36},
+   why:'Each step adds another factor of 3, so the 3-adic world sees it shrink: 3ⁿ ends in n zeros in base 3.'},
+  {name:'1 + 2 + 4 + 8 + …', last:14, f:n => [2n ** BigInt(n + 1) - 1n, 1n], rule:'x = 1 + 2 + 4 + … + 2ⁿ = 2ⁿ⁺¹ − 1: each step adds the next power of 2.',
+   v:[RUNS, verd('conv', 'closes in on −1'), WAND, WAND, WAND], lims:[null, {n:-1n}, null, null, null], rv:{c:16, span:40},
+   why:'s + 1 is a power of 2, so s gets 2-adically closer and closer to −1: in base 2 the sums are …1111, which is −1. It is a cousin of p-adic Warp’s …22222 = −1.'},
+  {name:'Newton’s √2 from 3', last:7, newton:true, rule:'x₀ = 3, then each new x is (x² + 2) ÷ (2x): Newton’s method for √2.',
+   v:[verd('conv', 'closes in on √2'), RUNS, WAND, WAND, verd('conv', 'closes in on √2')], lims:[{val:Math.SQRT2}, null, null, null, {sq7:true}], rv:{c:2.1, span:3.4},
+   why:'3 × 3 = 9 is 2 more than 7, so √2 exists in the 7-adic world, and Newton’s method finds it there just as on the real line. No number squares to 2 in the 3- or 5-adic worlds (no square leaves remainder 2 when divided by 3 or 5), so there it never settles; in the 2-adic world it is pushed off to infinity.'},
+  {name:'1, 1/2, 1/3, 1/4, …', last:23, f:n => [1n, BigInt(n + 1)], rule:'x = 1/(n + 1): one over the next whole number.',
+   v:[verd('conv', 'closes in on 0'), JUMP, JUMP, JUMP, JUMP], lims:[{val:0}, null, null, null, null], rv:{c:0.5, span:1.6},
+   why:'On the real line 1/n shrinks. But 1/n is big p-adically whenever n has many factors of p, and that keeps happening.'},
+];
+const jr = {idx:0, step:0, playing:false, raf:0, t:0, inited:false};
+const jrJ = () => JR[jr.idx];
+function jrBuild(J){                                // exact steps and limits (once), with windows grown to hold them
+  if (J.recs) return;
+  const steps = []; let n = 3n, d = 1n;
+  for (let i = 0; i <= J.last; i++){
+    if (J.newton){ steps.push([n, d]); const f = mkFrac(n*n + 2n*d*d, 2n*n*d); n = f[0]; d = f[1]; } else steps.push(J.f(i));
+  }
+  J.steps = steps;
+  steps.forEach(s => ensureEFor(s[0], s[1]));
+  J.recs = steps.map(s => { const r = makeRec(s[0], s[1]); jrReg.push(r); return r; });
+  J.lims = J.lims.map(l => {
+    if (!l) return null;
+    if (l.val !== undefined) return {val:l.val};
+    const r = makeRec(l.sq7 ? sqrt2in7() : l.zero ? 0n : l.n, 1n); jrReg.push(r); return {rec:r};
+  });
+}
+const limCache = new Map();
+function limW(rec, pi){ const key = pi + ':' + EP[pi]; let m = limCache.get(rec); if (!m){ m = {}; limCache.set(rec, m); } return m[key] || (m[key] = computeW(rec, pi)); }
+function jrDiskView(d){                              // ℤ_p, unless most steps live outside it: then the whole window
+  const J = jrJ(), pi = d.pi; let out = 0; J.recs.forEach(r => { if (r.w[pi].v < 0) out++; });
+  if (J.name === 'Powers of 3' && d.p === 3){       // zoom in around 0, so the steps visibly close in on it
+    const E = EP[pi], T = TDEP[3], [cx, cy] = centreOf(pi, new Array(T).fill(0), T); return {cx, cy, r:SHAPE[pi][E + 1].R*1.6};   // centred on 0 itself (0 sits at the top edge of every ball holding it)
+  }
+  return out*2 >= J.recs.length ? {cx:0, cy:0, r:FITR[pi]*1.1} : homeView(pi);
+}
+function jrFitReal(){ Object.assign(rvs.journey, jrJ().rv); mark(cvReal); }
+function jrFitAll(){ jrFitReal(); disks.forEach(d => { d.vs.journey = jrDiskView(d); mark(d.c); }); }
+
+const jrLabel = i => { const r = jrJ().recs[i]; return (r.n.toString().length > 9 || r.d.toString().length > 9) ? 'x' + SUB(i) : fracStr(r); };
+function clipSeg(a, b, W, H){                        // Liang-Barsky: keeps dashed lines short when a step is far off screen
+  let t0 = 0, t1 = 1; const dx = b[0] - a[0], dy = b[1] - a[1];
+  const ch = (p, q) => { if (p === 0) return q >= 0; const r = q/p; if (p < 0){ if (r > t1) return false; if (r > t0) t0 = r; } else { if (r < t0) return false; if (r < t1) t1 = r; } return true; };
+  return ch(-dx, a[0] + 20) && ch(dx, W + 20 - a[0]) && ch(-dy, a[1] + 20) && ch(dy, H + 20 - a[1]) ? [a[0] + t0*dx, a[1] + t0*dy, a[0] + t1*dx, a[1] + t1*dy] : null;
+}
+function jrSize(wi, rec){                            // the size of a step in one world, as short text
+  if (wi === 0) return rec.n === 0n ? '0' : fmtNum(Math.abs(rec.val));
+  const p = PR[wi - 1], v = rec.w[wi - 1].v; return v < 0 ? p + SUP(-v) : sizeOfV(p, v);
+}
+function drawJourney(c, wi, pos, posLim){            // pos(rec, i) -> [x, y] or null; posLim(lim) likewise
+  const J = jrJ(), ctx = c.ctx, W = c.W, H = c.H, k = jr.step, P = [];
+  for (let i = 0; i <= k; i++) P.push(pos(J.recs[i], i));
+  const al = i => Math.max(0.22, 1 - (k - i)*0.085);
+  ctx.save(); ctx.lineWidth = 1.5; ctx.strokeStyle = colHot; ctx.setLineDash([4, 4]);
+  for (let i = 1; i <= k; i++){
+    if (!P[i - 1] || !P[i]) continue; const s = clipSeg(P[i - 1], P[i], W, H); if (!s) continue;
+    ctx.globalAlpha = al(i)*0.85; ctx.beginPath(); ctx.moveTo(s[0], s[1]); ctx.lineTo(s[2], s[3]); ctx.stroke();
+  }
+  ctx.setLineDash([]); ctx.lineWidth = 1; ctx.strokeStyle = colPanel; ctx.fillStyle = colHot;
+  for (let i = 0; i <= k; i++){
+    const q = P[i]; if (!q || q[0] < -6 || q[0] > W + 6 || q[1] < -6 || q[1] > H + 6) continue;
+    ctx.globalAlpha = al(i); ctx.beginPath(); ctx.arc(q[0], q[1], i === k ? 5 : 4, 0, TAU); ctx.fill(); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  const lim = J.lims[wi], lq = lim && posLim(lim);   // a cross where the sequence is heading
+  if (lq && lq[0] > -8 && lq[0] < W + 8 && lq[1] > -8 && lq[1] < H + 8){
+    ctx.strokeStyle = colPanel; ctx.lineWidth = 4.5; ctx.beginPath(); ctx.moveTo(lq[0] - 5, lq[1] - 5); ctx.lineTo(lq[0] + 5, lq[1] + 5); ctx.moveTo(lq[0] - 5, lq[1] + 5); ctx.lineTo(lq[0] + 5, lq[1] - 5); ctx.stroke();
+    ctx.strokeStyle = colSel; ctx.lineWidth = 2; ctx.stroke();
+  }
+  // the current step: a ring and a label, or an edge arrow when it is off view
+  const q = P[k], rec = J.recs[k], mono = '500 12px "JetBrains Mono", ui-monospace, monospace';
+  ctx.font = mono; ctx.textBaseline = 'middle';
+  if (q && q[0] >= 6 && q[0] <= W - 6 && q[1] >= 6 && q[1] <= H - 6){
+    ctx.strokeStyle = colSel; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(q[0], q[1], 9, 0, TAU); ctx.stroke();
+    const t = jrLabel(k), tw = ctx.measureText(t).width, lx = Math.min(Math.max(q[0] + 12, 4), W - tw - 4), ly = q[1] - 14 < 30 ? q[1] + 16 : q[1] - 14;
+    ctx.textAlign = 'left'; ctx.lineWidth = 3; ctx.strokeStyle = colPanel; ctx.strokeText(t, lx, ly); ctx.fillStyle = colSel; ctx.fillText(t, lx, ly);
+  } else {
+    let ang = q ? Math.atan2(q[1] - H/2, q[0] - W/2) : -Math.PI/4; if (wi === 0) ang = q && q[0] < W/2 ? Math.PI : 0;
+    const dx = Math.cos(ang), dy = Math.sin(ang), nx = -dy, ny = dx; let ax, ay;
+    if (wi === 0){ ax = dx < 0 ? 12 : W - 12; ay = AX - 30; }
+    else {
+      const tx = dx > 1e-4 ? (W - 16 - W/2)/dx : dx < -1e-4 ? (16 - W/2)/dx : 1e9, ty = dy > 1e-4 ? (H - 54 - H/2)/dy : dy < -1e-4 ? (42 - H/2)/dy : 1e9, t = Math.min(tx, ty);
+      ax = W/2 + dx*t; ay = H/2 + dy*t;
+    }
+    ctx.fillStyle = colHot; ctx.beginPath(); ctx.moveTo(ax + dx*7, ay + dy*7); ctx.lineTo(ax - dx*3 + nx*5, ay - dy*3 + ny*5); ctx.lineTo(ax - dx*3 - nx*5, ay - dy*3 - ny*5); ctx.closePath(); ctx.fill();
+    const t = 'off view (size ' + jrSize(wi, rec) + ')', right = ax > W/2, tx2 = right ? ax - 12 : ax + 12, ty2 = Math.min(Math.max(ay, 16), H - 16);
+    ctx.textAlign = right ? 'right' : 'left'; ctx.lineWidth = 3; ctx.strokeStyle = colPanel; ctx.strokeText(t, tx2, ty2); ctx.fillStyle = colHot; ctx.fillText(t, tx2, ty2);
+  }
+  ctx.restore();
+}
+
+// ---- panel and status ----
+const jrSeen = () => jr.step >= 3;
+function renderJrStatus(){
+  const J = jrJ(), seen = jrSeen();
+  disks.forEach(d => {
+    const v = J.v[d.pi + 1], ok = v.k === 'conv' && seen;
+    d.badge.textContent = (ok ? '✓ ' : '') + `ℚ${SUB(d.p)} ${d.p}-adic`;
+    d.gstat.hidden = false; d.gstat.textContent = v.t; d.gstat.className = 'gstat' + (ok ? ' ok' : '');
+  });
+  const v = J.v[0], ok = v.k === 'conv' && seen;
+  $('realBadge').textContent = (ok ? '✓ ' : '') + 'ℝ · real line';
+  const pill = $('pill'); pill.hidden = false; pill.className = 'pill' + (ok ? ' ok' : ''); pill.textContent = v.t;
+}
+const bigTxt = b => { const s = b.toString(); return s.length > 14 ? s.slice(0, 5) + '…' + s.slice(-4) : s; };
+function renderJrPanel(){
+  const J = jrJ(), r = J.recs[jr.step], long = r.n.toString().length > 14 || r.d.toString().length > 14;
+  const xs = r.d === 1n ? bigTxt(r.n) : bigTxt(r.n) + ' / ' + bigTxt(r.d);
+  $('jrChips').querySelectorAll('[data-j]').forEach(b => b.setAttribute('aria-pressed', +b.dataset.j === jr.idx));
+  $('jrNow').innerHTML = `<h3 class="jrx">step ${jr.step}: x = ${xs}</h3>` +
+    (long ? `<p class="muted">a ${r.n.toString().length}-digit top over a ${r.d.toString().length}-digit bottom</p>` : '') +
+    `<p class="muted mono" style="margin:0">≈ ${fmtNum(r.val)} · step ${jr.step} of ${J.last}</p><p>${J.rule}</p>`;
+  const seen = jrSeen(), rows = ['Real line', '2-adic', '3-adic', '5-adic', '7-adic'].map((nm, wi) => {
+    const v = J.v[wi], ok = v.k === 'conv' && seen;
+    return `<tr><td>${nm}</td><td class="${ok ? 'okc' : ''}">${ok ? '✓ ' : ''}${v.t}</td><td>${jrSize(wi, r)}</td></tr>`;
+  });
+  $('jrSees').innerHTML = `<h3>What each world sees</h3><table class="wtab jrtab"><thead><tr><th>World</th><th>Verdict</th><th>Size now</th></tr></thead><tbody>${rows.join('')}</tbody></table>` +
+    (J.lims.some(Boolean) ? '<p class="hint">A cross marks where the sequence is heading.</p>' : '');
+  $('jrWhy').innerHTML = `<h3>Why?</h3><p>${J.why}</p>`;
+  $('jrPlay').textContent = jr.playing ? 'Pause' : 'Play';
+  $('jrStep').disabled = jr.step >= J.last;
+}
+function jrRefresh(){ renderJrPanel(); renderJrStatus(); markAll(); }
+function jrStop(){ jr.playing = false; if (jr.raf){ cancelAnimationFrame(jr.raf); jr.raf = 0; } if (jr.inited) $('jrPlay').textContent = 'Play'; }
+function jrAdvance(){ const J = jrJ(); if (jr.step < J.last) jr.step++; if (jr.step >= J.last) jrStop(); jrRefresh(); }
+function jrLoop(ts){
+  jr.raf = 0; if (!jr.playing) return;
+  if (ts - jr.t >= 900){ jr.t = ts; jrAdvance(); }
+  if (jr.playing) jr.raf = requestAnimationFrame(jrLoop);
+}
+function jrPlay(){
+  if (jr.playing){ jrStop(); renderJrPanel(); return; }
+  if (jr.step >= jrJ().last){ jr.step = 0; jrRefresh(); }
+  jr.playing = true; jr.t = performance.now() - 900; jr.raf = requestAnimationFrame(jrLoop); renderJrPanel();
+}
+function jrChoose(i){
+  jrStop(); jr.idx = Math.max(0, Math.min(JR.length - 1, i)); jr.step = 0; jrBuild(jrJ()); jrFitAll(); jrRefresh();
+}
+function initJourney(){
+  if (jr.inited) return; jr.inited = true;
+  $('jrChips').innerHTML = JR.map((j, i) => `<button type="button" class="chip" data-j="${i}" aria-pressed="false">${j.name}</button>`).join('');
+  jrChoose(0);
+}
+$('jrChips').addEventListener('click', e => { const b = e.target.closest('[data-j]'); if (b) jrChoose(+b.dataset.j); });
+$('jrPlay').addEventListener('click', jrPlay);
+$('jrStep').addEventListener('click', () => { jrStop(); jrAdvance(); });
+$('jrReset').addEventListener('click', () => { jrStop(); jr.step = 0; jrRefresh(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) { jrStop(); if (jr.inited) renderJrPanel(); } });
+
+// ---- theme ----
+const retheme = () => { readTheme(); markAll(); };
+const mq = matchMedia('(prefers-color-scheme: dark)');
+mq.addEventListener ? mq.addEventListener('change', retheme) : mq.addListener(retheme);
+new MutationObserver(retheme).observe(document.documentElement, {attributes:true, attributeFilter:['data-theme']});
+
+// ---- start ----
+renderLegend(); rebuildList(); renderCount(); renderSlots(); renderPicked(); renderNotes(); renderBrush();
+views.forEach(c => { sizeCv(c); mark(c); });
+document.fonts && document.fonts.ready.then(markAll);
+
+// ---- ?debug hook ----
+if (new URLSearchParams(location.search).has('debug')){
+  window.__am = {
+    get cloud(){ return cloud; }, get list(){ return list; }, get state(){ return st; }, worlds:{PR, TDEP, E:EP, SHAPE, S_OF}, extras,
+    padic:(a, b, p, N) => { const [n, d] = mkFrac(BigInt(a), BigInt(b)); return padicDigits(n, d, p, N); },
+    vp:(a, b, p) => { const [n, d] = mkFrac(BigInt(a), BigInt(b)); return vp(n, d, p); },
+    pick:(slot, s) => { const [n, d] = parseFrac(String(s)), r = getRec(n, d); rebuildList(); showOnReal(r); setSlot(slot, r); return r; },
+    brush:(world, ...a) => {
+      if (world === 'real') setBrush({kind:'interval', lo:a[0], hi:a[1]});
+      else { const pi = PR.indexOf(world); setBrush({kind:'ball', pi, lv:a[0], prefix:a[1].slice(0, a[0])}); }
+      return brushCount;
+    },
+    clearBrush, pair:applyPair, fmtPadic:(s, p) => { const [n, d] = parseFrac(s); return fmtPadic(makeRec(n, d), PR.indexOf(p)); },
+    redraw:() => { markAll(); flush(); },
+    E:EP,
+    balance:{
+      set:s => { setView('balance'); setBalMode('size'); const [n, d] = parseFrac(String(s)), r = getRec(n, d); rebuildList(); showOnReal(r); setBalX(r); return balExact(); },
+      setPair:(a, b) => { setView('balance'); setBalMode('dist'); applyPairStr(String(a), String(b)); return balExact(); },
+      sizes:() => bal.ents.map(e => ({world:e.kind === 'real' ? 'real' : e.kind === 'p' ? String(e.p) : (e.name === 'huge prime' || e.name.startsWith('other') ? (e.name.startsWith('other') ? 'other' : 'huge') : String(e.L)), num:String(e.num), den:String(e.den), log:e.log})),
+      product:() => bal.zero ? 'zero' : balExact(),
+      get state(){ return bal; }, factor:s => { const f = factorBig(BigInt(s)); return {f:f.f, rest:String(f.rest), prime:f.prime}; },
+    },
+    journey:{
+      list:JR.map(j => j.name),
+      choose:i => { setView('journey'); jrChoose(i); return jrJ().name; },
+      step:() => { setView('journey'); jrStop(); jrAdvance(); return jr.step; },
+      reset:() => { setView('journey'); jrStop(); jr.step = 0; jrRefresh(); return jr.step; },
+      get state(){ return jr; },
+      value:n => { const s = (jrJ().steps || [])[n]; return s ? s[0] + '/' + s[1] : null; },
+      vp:(n, p) => { const s = (jrJ().steps || [])[n]; return s ? vp(s[0], s[1], p) : null; },
+      sqrt2in7:() => String(sqrt2in7()),
+    },
+    game:{
+      levels:LEVELS,
+      load:i => { setView('game'); loadLevel(i); return gm.cur.id; },
+      guess:s => { setView('game'); const [n, d] = parseFrac(String(s)); setGuess(n, d); return hitsOf(n, d); },
+      hits:s => { setView('game'); const [n, d] = parseFrac(String(s)); return hitsOf(n, d); },
+      par:i => { const p = findPar(mkLevel(LEVELS[i], 'L' + (i + 1))); return p.n + '/' + p.d + (p.exact ? '' : ' (fallback)'); },
+      construct:i => {
+        const L = mkLevel(LEVELS[i], 'L' + (i + 1)), C = construct(L), p = findPar(L), ans = C.answer[0] + '/' + C.answer[1];
+        return {P:String(C.P), A:String(C.A), M:String(C.M), answer:ans, par:p.n + '/' + p.d, ok:C.ok && p.exact && ans === p.n + '/' + p.d,
+          tried:C.tried.map(e => ({b:e.b, r:e.skip ? null : String(e.r), skip:e.skip, hit:e.hit, n:e.n === null || e.n === undefined ? null : String(e.n)}))};
+      },
+      showStep:n => { setView('game'); if (!gm.how) toggleHow(); gm.how.si = Math.max(0, Math.min(gm.how.steps.length - 1, n)); applyStep(); return gm.how.steps[gm.how.si]; },
+      puzzle:() => { setView('game'); loadLevel('puzzle'); const L = gm.cur; return {targets:L.tg.filter(Boolean).map(t => ({p:t.p, c:t.c[0] + '/' + t.c[1], k:t.k})), real:L.real && [L.real.loS, L.real.hiS], par:gm.par.n + '/' + gm.par.d}; },
+      get state(){ return gm; },
+    },
+  };
+}
+})();
+</script>
+
+</body></html>
