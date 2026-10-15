@@ -675,7 +675,9 @@ const S = { work: Math.min(2e7, DWORK || 2e7), vcap: 99, vcapT: 99, kTime: 0, qu
 const SPEEDS = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4];
 
 const PROBE_CAP = DPCAP || (MOBILE ? 400000 : 1500000);
-const MAX_STEPS = DSTEPS || (MOBILE ? 24000 : 60000);  // per-pixel loop cap (watchdog safety)
+// per-pixel loop cap (watchdog safety). A GPU draw lasts as long as its slowest pixel, so untimed phones/tablets
+// (iPads, iPhones) get a much lower cap: 24000 steps on one pixel reset an iPad Pro 10.5 even in tiny batches
+const MAX_STEPS = DSTEPS || (MOBILE ? (gl.getExtension('EXT_disjoint_timer_query_webgl2') ? 24000 : 6000) : 60000);
 const pboPool = [];
 function probeCount(J) { return Math.ceil(J.Uend) + 2; }
 // Probes: tiny renders at every integer depth, independent of each other, read back asynchronously.
