@@ -60,7 +60,7 @@ aside{display:flex;flex-direction:column;gap:16px;min-width:0}
 .lab{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
 .chip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
-#jrChips{gap:5px}#jrChips .chip{font-size:13px;line-height:1.3;padding:4px 11px}
+#jrChips,#jrSpeed{gap:5px}#jrChips .chip,#jrSpeed .chip,#jrFollow{font-size:13px;line-height:1.3;padding:4px 11px}
 .chip.mode{font-family:var(--display);font-size:20px;line-height:1;padding:6px 16px}
 .slots{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .slot{border-radius:12px;display:flex;flex-direction:column;align-items:flex-start;gap:0;padding:8px 12px;text-align:left;min-width:0}
@@ -109,6 +109,13 @@ input[type=text]{font-family:var(--mono);font-size:14px}
 .linkrow{display:flex;margin-top:4px}
 .jrtab td:first-child{white-space:nowrap}.jrtab td:last-child{color:var(--muted);white-space:nowrap}.jrtab .okc{font-weight:500}
 .jrx{margin:0;font:500 15px/1.35 var(--mono);overflow-wrap:anywhere}
+.jrbar{display:none;position:sticky;bottom:0;z-index:20;box-sizing:border-box;margin-inline:-16px;padding:4px 8px calc(4px + env(safe-area-inset-bottom,0px));min-height:48px;background:var(--panel);border-top:1px solid var(--line);align-items:center;justify-content:center;gap:5px}
+@media (max-width:860px){.jrbar{display:flex}}
+.jrbar button{min-height:40px;padding:0 10px;font-size:13px;white-space:nowrap}
+.jrbar .jbread{font-size:12px;color:var(--muted);white-space:nowrap;padding:0 2px}
+.jrbar .chips{flex-wrap:nowrap;gap:3px}.jrbar .chips .chip{padding:0 8px;font-size:12px}
+.jrbar .jbw{display:none}
+@media (min-width:480px){.jrbar .jbw{display:inline}}
 </style>
 </head>
 <body>
@@ -127,6 +134,7 @@ input[type=text]{font-family:var(--mono);font-size:14px}
         <div class="badge" id="realBadge">ℝ · real line</div>
         <div class="zoombtns"><button id="resetReal" type="button" title="Reset the view to −3 … 3">Reset</button></div>
         <div class="pill" id="pill">Tap any dot to see it in every world</div>
+        <div class="note" id="realNote" style="top:30px;bottom:auto"></div>
       </div>
       <div class="disks" id="disks"></div>
       <p class="hint" id="hint">Drag to pan, scroll or pinch to zoom. Tap a dot to pick it. Tap empty space inside a disk to brush that ball, or shift-drag (or press and hold, then drag) along the real line to brush an interval. Esc clears.</p>
@@ -253,10 +261,23 @@ input[type=text]{font-family:var(--mono);font-size:14px}
           <button type="button" id="jrStep">Step</button>
           <button type="button" id="jrReset">Start over</button>
         </div>
+        <div class="sect">
+          <span class="lab">Speed and zoom</span>
+          <div class="chips" id="jrSpeed"></div>
+          <div class="chips"><button type="button" class="chip" id="jrFollow" aria-pressed="true" title="Zoom in on where each world is heading, as the steps close in">Follow</button></div>
+          <p class="hint">Follow zooms each world in on its limit as the steps close in. Move a picture yourself and it stops following until you press Start over.</p>
+        </div>
         <div class="readout" id="jrSees"></div>
         <div class="readout" id="jrWhy"></div>
       </div>
     </aside>
+  </div>
+  <div class="jrbar" id="jrBar" role="group" aria-label="Journey controls" hidden>
+    <button type="button" id="jbPlay" class="primary">Play</button>
+    <button type="button" id="jbStep">Step</button>
+    <button type="button" id="jbReset" aria-label="Start over" title="Start over">↺<span class="jbw"> Start over</span></button>
+    <span class="jbread mono" id="jbRead">0 / 0</span>
+    <div class="chips" id="jbSpeed"></div>
   </div>
 </div>
 
@@ -276,13 +297,19 @@ const MAXE = 12;                                // biggest window we ever build:
 const BELOW = {2:20, 3:11, 5:8, 7:7};           // digit levels kept below the whole numbers ℤ_p
 const EP = [2, 2, 2, 2];                        // per-world window: |x|_p <= p^EP, i.e. digits start at level -EP (grows when something needs it)
 const TDEP = {2:0, 3:0, 5:0, 7:0};              // digit levels kept per world = EP + BELOW (levels -E .. T-E-1)
+const TDEEP = {2:0, 3:0, 5:0, 7:0};             // deeper geometry for the Journeys view only: levels until a ball is smaller than 1e-14 (a double cannot tell them apart)
 const needFromB = B => PR.map(p => Math.max(2, Math.floor(Math.log(B)/Math.log(p) + 1e-9)));   // window needed for denominators up to B
 needFromB(10).forEach((e, i) => { EP[i] = e; });
 const HUEN = {2:10, 3:6, 5:4, 7:3};             // leading digits used for the hue
 const babs = a => a < 0n ? -a : a;
 function bgcd(a, b){ a = babs(a); b = babs(b); while (b){ [a, b] = [b, a % b]; } return a; }
 function mkFrac(n, d){ if (d < 0n){ n = -n; d = -d; } const g = bgcd(n, d); return [n / g, d / g]; }
-function vpBig(x, P){ let v = 0; x = babs(x); while (x % P === 0n){ x /= P; v++; } return v; }
+function vpBig(x, P){                           // how many times P divides x (by repeated squaring, so 2^78125 is instant)
+  x = babs(x); let v = 0; const pw = [P], ex = [1];
+  while (x % pw[pw.length - 1] === 0n){ const q = pw[pw.length - 1]; pw.push(q*q); ex.push(ex[ex.length - 1]*2); }
+  for (let j = pw.length - 2; j >= 0; j--) if (x % pw[j] === 0n){ x /= pw[j]; v += ex[j]; }
+  return v;
+}
 function vp(n, d, p){ if (n === 0n) return Infinity; const P = BigInt(p); return vpBig(n, P) - vpBig(d, P); }
 function modInv(a, m){
   let r0 = m, r1 = ((a % m) + m) % m, s0 = 0n, s1 = 1n;
@@ -292,9 +319,7 @@ function modInv(a, m){
 // x = p^v * u; digits d_v, d_(v+1), ... are the base-p digits of u mod p^N (least significant first)
 function padicDigits(n, d, p, N){
   if (n === 0n) return {v:Infinity, digits:[]};
-  const P = BigInt(p); let un = n, ud = d, v = 0;
-  while (un % P === 0n){ un /= P; v++; }
-  while (ud % P === 0n){ ud /= P; v--; }
+  const P = BigInt(p), vn = vpBig(n, P), vd = vpBig(d, P), un = n / P ** BigInt(vn), ud = d / P ** BigInt(vd), v = vn - vd;
   const M = P ** BigInt(N);
   let w = (((un % M) + M) % M) * modInv(ud, M) % M; const digits = [];
   for (let i = 0; i < N; i++){ digits.push(Number(w % P)); w /= P; }
@@ -322,11 +347,12 @@ const S_OF = {}, ANG = [], COSS = [], SINS = [], SHAPE = [], FITR = [], MINR = [
 function buildWorld(pi){                          // (re)build the nested-ball geometry of world pi for its current window EP[pi]
   const p = PR[pi], E = EP[pi], T = E + BELOW[p];
   const S = p === 2 ? 0.62 : 0.84*Math.sin(Math.PI/p)/(1 + Math.sin(Math.PI/p));
-  TDEP[p] = T; S_OF[p] = S;
-  ANG[pi] = new Float64Array(T*p); COSS[pi] = new Float64Array(T*p); SINS[pi] = new Float64Array(T*p); SHAPE[pi] = [];
-  for (let lv = 0; lv <= T; lv++){
+  const TD = Math.max(T, Math.ceil(Math.log(1e-14)/Math.log(S)) + 1);
+  TDEP[p] = T; TDEEP[p] = TD; S_OF[p] = S;
+  ANG[pi] = new Float64Array(TD*p); COSS[pi] = new Float64Array(TD*p); SINS[pi] = new Float64Array(TD*p); SHAPE[pi] = [];
+  for (let lv = 0; lv <= TD; lv++){
     const k = lv - E, sk = Math.pow(S, lv);
-    if (lv < T) for (let j = 0; j < p; j++){
+    if (lv < TD) for (let j = 0; j < p; j++){
       const a = p === 2 ? ((((k % 2) + 2) % 2) ? Math.PI/2 : 0) + (j ? 0 : Math.PI) : -Math.PI/2 + TAU*j/p;
       ANG[pi][lv*p+j] = a; COSS[pi][lv*p+j] = sk*Math.cos(a); SINS[pi][lv*p+j] = sk*Math.sin(a);
     }
@@ -357,8 +383,12 @@ function computeW(rec, pi){
   let h = 0, sc = 1/p; for (let i = 0; i < HUEN[p] && E + i < T; i++){ h += dig[E + i]*sc; sc /= p; } w.hue = h;   // colour from the digits after the point, so ℤ_p (the opening view) gets the whole rainbow
   return w;
 }
+function bigRatio(n, d){                          // n/d as a double, even when n and d are each too big for one (Newton's √2 reaches thousands of digits)
+  const a = Number(n), b = Number(d); if (isFinite(a) && isFinite(b)) return a/b;
+  const sh = BigInt(Math.max(babs(n).toString(16).length, d.toString(16).length)*4 - 900); return Number(n >> sh)/Number(d >> sh);
+}
 function makeRec(n, d){
-  const rec = {n, d, key:n + '/' + d, val:Number(n)/Number(d), den:Number(d)};
+  const rec = {n, d, key:n + '/' + d, val:bigRatio(n, d), den:Number(d)};
   rec.jit = ((Math.abs(Number(n % 1009n))*37 + Number(d % 1009n)*101) % 211) / 211;
   rec.w = PR.map((p, pi) => computeW(rec, pi));
   return rec;
@@ -545,6 +575,8 @@ const AX = 76;                                   // axis height in the strip
 const rvs = {mirror:{c:0, span:6}, game:{c:0, span:8.5}, balance:{c:0, span:6}, journey:{c:0, span:6}};   // each view keeps its own strip position
 let rv = rvs.mirror;
 const RV_MIN = 0.002, RV_MAX = 4000;
+const JR_RMIN = 2e-11, JR_SMIN = 4e-11;            // Journeys: the deepest a disk (view radius) or the strip (span) may follow before doubles run out of digits
+const rvMin = () => st.view === 'journey' ? JR_SMIN : RV_MIN;
 function realLo(c){ return rv.c - rv.span/2; }
 const cvReal = makeView($('stripBox'), $('cvReal'), drawReal);
 function niceStep(span, W){ const raw = 80*span/W, pw = Math.pow(10, Math.floor(Math.log10(raw))), m = raw/pw; return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 5 ? 5 : 10)*pw; }
@@ -585,16 +617,18 @@ function drawReal(c){
   }
   // axis and ticks
   ctx.strokeStyle = colMuted; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, AX + 0.5); ctx.lineTo(W, AX + 0.5); ctx.stroke();
-  const step = niceStep(rv.span, W), dec = Math.min(8, Math.max(0, -Math.floor(Math.log10(step) + 1e-9)));
+  const step = niceStep(rv.span, W), dec = Math.min(st.view === 'journey' ? 14 : 8, Math.max(0, -Math.floor(Math.log10(step) + 1e-9))), deep = st.view === 'journey' && dec > 6;   // deep: ticks shown as the digits after the shared start
   ctx.font = '12px "JetBrains Mono", ui-monospace, monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillStyle = colMuted;
   const i0 = Math.ceil(lo/step), i1 = Math.floor(hi/step);
   for (let i = i0; i <= i1 && i - i0 < 400; i++){
     const x = i*step, X = Math.round(sx(x)) + 0.5, zero = i === 0;
     ctx.strokeStyle = zero ? colFg : colMuted; ctx.lineWidth = zero ? 1.5 : 1;
     ctx.beginPath(); ctx.moveTo(X, AX - (zero ? 6 : 4)); ctx.lineTo(X, AX + 6); ctx.stroke();
-    const lab = (Math.abs(x) < step/2 ? 0 : x).toFixed(dec).replace('-', '−');
+    let lab = (Math.abs(x) < step/2 ? 0 : x).toFixed(dec).replace('-', '−');
+    if (deep) lab = (x < 0 ? '−…' : '…') + lab.slice(lab.indexOf('.') + 6);
     ctx.fillText(lab, X, AX + 9);
   }
+  if (deep){ ctx.fillStyle = colMuted; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText(rv.c.toFixed(5).replace('-', '−') + '…', W/2, 12); ctx.textAlign = 'left'; }
   ctx.textAlign = 'left';
   // dots
   const jy = r => AX - 9 - r.jit*(AX - 30);
@@ -617,19 +651,19 @@ function realNearest(x, y){
 }
 function realZoom(f, x){
   const ppu = cvReal.W/rv.span, val = realLo() + x/ppu;
-  rv.span = Math.min(RV_MAX, Math.max(RV_MIN, rv.span/f)); rv.c = val - (x - cvReal.W/2)/(cvReal.W/rv.span);
+  rv.span = Math.min(RV_MAX, Math.max(rvMin(), rv.span/f)); rv.c = val - (x - cvReal.W/2)/(cvReal.W/rv.span);
 }
 let selAnchor = 0;
 attachGestures(cvReal, {
-  onPan(dx){ rv.c -= dx/(cvReal.W/rv.span); mark(cvReal); },
-  onZoom(f, x){ realZoom(f, x); mark(cvReal); },
+  onPan(dx){ jrUserMoved(0); rv.c -= dx/(cvReal.W/rv.span); mark(cvReal); },
+  onZoom(f, x){ jrUserMoved(0); realZoom(f, x); mark(cvReal); },
   onTap(x, y){ const r = realNearest(x, y); if (r) pickRec(r); else if (st.view === 'mirror') clearBrush(); },
   onSelectStart(x){ if (st.view !== 'mirror') return; selAnchor = realLo() + x/(cvReal.W/rv.span); setBrush({kind:'interval', lo:selAnchor, hi:selAnchor}); },
   onSelectMove(x){ if (st.view !== 'mirror') return; const v = realLo() + x/(cvReal.W/rv.span); setBrush({kind:'interval', lo:Math.min(v, selAnchor), hi:Math.max(v, selAnchor)}); },
   onSelectEnd(){ const b = st.brush; if (st.view === 'mirror' && b && b.kind === 'interval' && (b.hi - b.lo)*cvReal.W/rv.span < 3) clearBrush(); },
 });
 cvReal.el.addEventListener('contextmenu', e => e.preventDefault());
-$('resetReal').addEventListener('click', () => { if (st.view === 'game') gameFitReal(); else if (st.view === 'journey') jrFitReal(); else { rv.c = 0; rv.span = 6; mark(cvReal); } });
+$('resetReal').addEventListener('click', () => { if (st.view === 'game') gameFitReal(); else if (st.view === 'journey'){ jrFitReal(); jrUserMoved(0); } else { rv.c = 0; rv.span = 6; mark(cvReal); } });
 function fitReal(vals){
   const lo = Math.min(...vals), hi = Math.max(...vals);
   rv.c = (lo + hi)/2; rv.span = Math.min(RV_MAX, Math.max(RV_MIN, hi > lo ? (hi - lo)*1.5 : rv.span)); mark(cvReal);
@@ -653,12 +687,12 @@ PR.forEach((p, pi) => {
   d.clamp = v => clampView(v);
   const k = () => Math.min(d.c.W, d.c.H)/2/d.view.r;
   const clampView = (v = d.view) => {
-    const lim = FITR[pi]*1.3; v.r = Math.min(FITR[pi]*1.5, Math.max(MINR[pi], v.r));
+    const lim = FITR[pi]*1.3; v.r = Math.min(FITR[pi]*1.5, Math.max(st.view === 'journey' ? JR_RMIN : MINR[pi], v.r));
     v.cx = Math.min(lim, Math.max(-lim, v.cx)); v.cy = Math.min(lim, Math.max(-lim, v.cy));
   };
   attachGestures(d.c, {
-    onPan(dx, dy){ d.view.cx -= dx/k(); d.view.cy -= dy/k(); clampView(); mark(d.c); },
-    onZoom(f, x, y){
+    onPan(dx, dy){ jrUserMoved(pi + 1); d.view.cx -= dx/k(); d.view.cy -= dy/k(); clampView(); mark(d.c); },
+    onZoom(f, x, y){ jrUserMoved(pi + 1);
       const v = d.view, k0 = k(), wx = v.cx + (x - d.c.W/2)/k0, wy = v.cy + (y - d.c.H/2)/k0;
       v.r = v.r/f; clampView(); const k1 = k(); v.cx = wx - (x - d.c.W/2)/k1; v.cy = wy - (y - d.c.H/2)/k1; clampView(); mark(d.c);
     },
@@ -669,13 +703,13 @@ PR.forEach((p, pi) => {
       const b = st.brush; if (b && b.kind === 'ball' && b.pi === pi && b.lv === hit.lv && b.prefix.every((q, i) => q === hit.prefix[i])) clearBrush(); else setBrush(hit);
     },
   });
-  box.querySelector('[data-act=reset]').addEventListener('click', () => { d.view = st.view === 'game' ? targetView(d) : st.view === 'journey' ? jrDiskView(d) : homeView(pi); mark(d.c); });
+  box.querySelector('[data-act=reset]').addEventListener('click', () => { d.view = st.view === 'game' ? targetView(d) : st.view === 'journey' ? jrDiskView(d) : homeView(pi); if (st.view === 'journey') jrUserMoved(pi + 1); mark(d.c); });
   const ex = box.querySelector('[data-act=expand]');
   ex.addEventListener('click', () => { const on = !box.classList.contains('exp'); box.classList.toggle('exp', on); ex.setAttribute('aria-pressed', on); ex.setAttribute('aria-label', (on ? 'Shrink the ' : 'Expand the ') + p + '-adic disk'); });
 });
 
 function drawDisk(d, c){
-  const {pi, p} = d, ctx = c.ctx, W = c.W, H = c.H, v = d.view, k = Math.min(W, H)/2/v.r, T = TDEP[p];
+  const {pi, p} = d, ctx = c.ctx, W = c.W, H = c.H, v = d.view, k = Math.min(W, H)/2/v.r, T = st.view === 'journey' ? TDEEP[p] : TDEP[p];   // the Journeys view follows its steps far deeper
   ctx.setTransform(c.dpr, 0, 0, c.dpr, 0, 0); ctx.clearRect(0, 0, W, H);
   // ball outlines, one path per level
   const paths = []; for (let lv = 0; lv < T; lv++) paths.push(new Path2D());
@@ -683,8 +717,12 @@ function drawDisk(d, c){
     const g = SHAPE[pi][lv], sx = (cx - v.cx)*k + W/2, sy = (cy - v.cy)*k + H/2, R = g.R*k;
     if (sx + R < 0 || sx - R > W || sy + R < 0 || sy - R > H || R < 2.5) return;
     const path = paths[lv];
-    if (p === 2) boxPath(path, sx, sy, g, k);
-    else { path.moveTo(sx + R, sy); path.arc(sx, sy, R, 0, TAU); }
+    // a ball far bigger than the canvas that holds the whole canvas has no visible outline: skip drawing it (keeps huge arcs out of the canvas)
+    const wide = R > 3000 && (p === 2 ? (() => { const [hx, hy] = boxHalf(g); return Math.abs(sx - W/2) + W/2 < hx*k - 4 && Math.abs(sy - H/2) + H/2 < hy*k - 4; })() : Math.hypot(Math.abs(sx - W/2) + W/2, Math.abs(sy - H/2) + H/2) < R - 4);
+    if (!wide){
+      if (p === 2) boxPath(path, sx, sy, g, k);
+      else { path.moveTo(sx + R, sy); path.arc(sx, sy, R, 0, TAU); }
+    }
     if (lv >= T - 1) return;
     for (let j = 0; j < p; j++) walk(lv + 1, cx + COSS[pi][lv*p + j], cy + SINS[pi][lv*p + j]);
   };
@@ -712,7 +750,7 @@ function drawDisk(d, c){
   drawRings(c, at);
   if (st.view === 'journey' && jr.inited){
     const toXY = w => w && w.inWin ? [(w.x - v.cx)*k + W/2, (w.y - v.cy)*k + H/2] : null;
-    drawJourney(c, pi + 1, r => toXY(r.w[pi]), lim => toXY(limW(lim.rec, pi)));
+    drawJourney(c, pi + 1, r => toXY(deepW(r, pi)), lim => toXY(deepW(lim.rec, pi)));
   }
 }
 function diskNearest(d, x, y){
@@ -906,9 +944,10 @@ function setView(v){
   document.querySelectorAll('[data-view]').forEach(x => { x.hidden = x.dataset.view !== st.view; });
   if (v === 'game' && !gm.inited) initGame();
   if (v === 'balance') initBalance();
-  if (v === 'journey') initJourney();
+  if (v === 'journey'){ initJourney(); jrKick(); jrNotes(); }
+  $('jrBar').hidden = v !== 'journey'; if (v !== 'journey'){ disks.forEach(d => { d.note.style.bottom = ''; }); $('realNote').textContent = ''; }
   $('hint').textContent = v === 'journey'
-    ? 'A dot for each step of the sequence, older steps fading, joined by a dashed trail; the ring marks the current step and a cross marks where it is heading. Grey dots are the usual fractions. Drag to pan, scroll or pinch to zoom; the reset buttons return to the journey.'
+    ? 'A dot for each step of the sequence, older steps fading, joined by a dashed trail; the ring marks the current step and a cross marks where it is heading. Grey dots are the usual fractions. With Follow on, each world zooms in on its limit as the steps close in. Drag to pan, scroll or pinch to zoom (that pauses Follow for the picture); the reset buttons return to the journey.'
     : v === 'balance'
     ? 'Tap a dot in any world: in "Size of x" it is weighed, in "Distance" it fills the active slot (A, then B). Drag to pan, scroll or pinch to zoom.'
     : v === 'game'
@@ -1678,12 +1717,12 @@ $('balPre').addEventListener('click', e => {
 // 11. Stage 4: Journeys (a sequence stepping through all five worlds at once)
 // =====================================================================
 function sqrt2in7(){                               // the 7-adic square root of 2 that ends in 3, by Newton / Hensel lifting
-  const M = 7n ** 26n; let s = 3n;
+  const M = 7n ** 40n; let s = 3n;
   for (let i = 0; i < 6; i++){ const f = ((s*s - 2n) % M + M) % M; s = ((s - f*modInv(2n*s % M, M)) % M + M) % M; }
   return s;
 }
 function sqrtm1in5(){                              // the 5-adic square root of −1 that ends in 2, by Newton / Hensel lifting
-  const M = 5n ** 30n; let s = 2n;
+  const M = 5n ** 40n; let s = 2n;
   for (let i = 0; i < 6; i++){ const f = ((s*s + 1n) % M + M) % M; s = ((s - f*modInv(2n*s % M, M)) % M + M) % M; }
   return s;
 }
@@ -1692,39 +1731,40 @@ const verd = (k, t, s) => ({k, t, s});               // s: a shorter wording for
 const RUNS = verd('off', 'runs off to ∞'), WAND = verd('wander', 'wanders'), JUMP = verd('jump', 'jumps out, never settles');
 const CHAOS = verd('wander', 'wanders (chaos)'), TO0 = verd('conv', 'closes in on 0'), SETTLES = verd('conv', 'settles (on a number with no known formula)', 'settles');
 const JR = [
-  {name:'Powers of 3', last:12, f:n => [3n ** BigInt(n), 1n], rule:'x = 3ⁿ: each step multiplies the last by 3.',
+  {name:'Powers of 3', last:40, f:n => [3n ** BigInt(n), 1n], rule:'x = 3ⁿ: each step multiplies the last by 3.',
    v:[RUNS, WAND, TO0, WAND, WAND], lims:[null, null, {zero:true}, null, null], rv:{c:15, span:36}, zoom0:[3],
    why:'Each step adds another factor of 3, so the 3-adic world sees it shrink: 3ⁿ ends in n zeros in base 3.'},
-  {name:'1 + 2 + 4 + 8 + …', last:14, f:n => [2n ** BigInt(n + 1) - 1n, 1n], rule:'x = 1 + 2 + 4 + … + 2ⁿ = 2ⁿ⁺¹ − 1: each step adds the next power of 2.',
+  {name:'1 + 2 + 4 + 8 + …', last:40, f:n => [2n ** BigInt(n + 1) - 1n, 1n], rule:'x = 1 + 2 + 4 + … + 2ⁿ = 2ⁿ⁺¹ − 1: each step adds the next power of 2.',
    v:[RUNS, verd('conv', 'closes in on −1'), WAND, WAND, WAND], lims:[null, {n:-1n}, null, null, null], rv:{c:16, span:40},
    why:'s + 1 is a power of 2, so s gets 2-adically closer and closer to −1: in base 2 the sums are …1111, which is −1. It is a cousin of p-adic Warp’s …22222 = −1.'},
-  {name:'Newton’s √2 from 3', last:7, newton:true, rule:'x₀ = 3, then each new x is (x² + 2) ÷ (2x): Newton’s method for √2.',
+  {name:'Newton’s √2 from 3', last:12, newton:true, rule:'x₀ = 3, then each new x is (x² + 2) ÷ (2x): Newton’s method for √2.',
    v:[verd('conv', 'closes in on √2'), RUNS, WAND, WAND, verd('conv', 'closes in on √2')], lims:[{val:Math.SQRT2}, null, null, null, {sq7:true}], rv:{c:2.1, span:3.4},
    why:'3 × 3 = 9 is 2 more than 7, so √2 exists in the 7-adic world, and Newton’s method finds it there just as on the real line. No number squares to 2 in the 3- or 5-adic worlds (no square leaves remainder 2 when divided by 3 or 5), so there it never settles; in the 2-adic world it is pushed off to infinity.'},
-  {name:'1, 1/2, 1/3, 1/4, …', last:23, f:n => [1n, BigInt(n + 1)], rule:'x = 1/(n + 1): one over the next whole number.',
+  {name:'1, 1/2, 1/3, 1/4, …', last:99, f:n => [1n, BigInt(n + 1)], rule:'x = 1/(n + 1): one over the next whole number.',
    v:[verd('conv', 'closes in on 0'), JUMP, JUMP, JUMP, JUMP], lims:[{val:0}, null, null, null, null], rv:{c:0.5, span:1.6},
    why:'On the real line 1/n shrinks. But 1/n is big p-adically whenever n has many factors of p, and that keeps happening.'},
-  {name:'Newton’s √−1 from 2', last:8, gen:() => { const s = []; let n = 2n, d = 1n; for (let i = 0; i <= 8; i++){ s.push([n, d]); const f = mkFrac(n*n - d*d, 2n*n*d); n = f[0]; d = f[1]; } return s; },
+  {name:'Newton’s √−1 from 2', last:12, gen:() => { const s = []; let n = 2n, d = 1n; for (let i = 0; i <= 12; i++){ s.push([n, d]); const f = mkFrac(n*n - d*d, 2n*n*d); n = f[0]; d = f[1]; } return s; },
    rule:'x₀ = 2, then each new x is (x² − 1) ÷ (2x): Newton’s method for √−1.',
    v:[CHAOS, RUNS, WAND, verd('conv', 'closes in on √−1'), WAND], lims:[null, null, null, {q:() => [sqrtm1in5(), 1n]}, null], rv:{c:0, span:7},
    why:'2 × 2 = 4 is one less than 5, so √−1 exists in the 5-adic world, and Newton’s method finds it calmly there. On the real line nothing squares to −1, so the same rule bounces around chaotically. It is the √2 journey turned inside out.'},
-  {name:'n!: 1, 2, 6, 24, …', last:20, f:n => { let f = 1n; for (let k = 2n; k <= BigInt(n); k++) f *= k; return [f, 1n]; }, rule:'x = n!, so each step multiplies the last by the next whole number: 0! = 1, 1! = 1, 2! = 2, 3! = 6, …',
+  {name:'n!: 1, 2, 6, 24, …', last:60, f:n => { let f = 1n; for (let k = 2n; k <= BigInt(n); k++) f *= k; return [f, 1n]; }, rule:'x = n!, so each step multiplies the last by the next whole number: 0! = 1, 1! = 1, 2! = 2, 3! = 6, …',
    v:[RUNS, TO0, TO0, TO0, TO0], lims:[null, {zero:true}, {zero:true}, {zero:true}, {zero:true}], rv:{c:70, span:150}, zoom0:[2, 3, 5, 7],
    why:'n! keeps collecting factors of 2, 3, 5 and 7, so every p-adic world sees it shrink. The opposite of 1, 1/2, 1/3, …, which settles only on the real line.'},
-  {name:'1, 11, 111, …', last:13, f:n => [(10n ** BigInt(n + 1) - 1n) / 9n, 1n], rule:'x = 11…1 (n ones) = (10ⁿ − 1) ÷ 9: each step writes one more 1 on the left.',
+  {name:'1, 11, 111, …', last:39, f:n => [(10n ** BigInt(n + 1) - 1n) / 9n, 1n], rule:'x = 11…1 (n ones) = (10ⁿ − 1) ÷ 9: each step writes one more 1 on the left.',
    v:[RUNS, verd('conv', 'closes in on −1/9'), WAND, verd('conv', 'closes in on −1/9'), WAND], lims:[null, {q:() => [-1n, 9n]}, null, {q:() => [-1n, 9n]}, null], rv:{c:60, span:140},
    why:'10 = 2 × 5, so adding another 1 on the left changes the number by a power of 10, which is tiny to both the 2-adic and the 5-adic world. Both see 111…1 heading for −1/9, because 9 × (−1/9) = −1 = …99999.'},
-  {name:'Fifth powers from 2', last:5, f:n => [2n ** (5n ** BigInt(n)), 1n], rule:'x₀ = 2, then each new x is the last one to the 5th power: x⁵.',
+  {name:'Fifth powers from 2', last:7, f:n => [2n ** (5n ** BigInt(n)), 1n], rule:'x₀ = 2, then each new x is the last one to the 5th power: x⁵.',
    v:[RUNS, TO0, WAND, verd('conv', 'closes in on √−1'), WAND], lims:[null, {zero:true}, null, {q:() => [sqrtm1in5(), 1n]}, null], rv:{c:20, span:50}, zoom0:[2],
    why:'In the 5-adic world, raising to the 5th power pulls every number toward a special point with the same last digit. Starting from 2, that point is a square root of −1: exactly where Newton’s method for √−1 ended up, reached by a completely different road.'},
-  {name:'0! + 1! + 2! + …', last:20, f:n => [factSum(BigInt(n)), 1n], rule:'x = 0! + 1! + 2! + … + N!: each step adds the next factorial.',
-   v:[RUNS, SETTLES, SETTLES, SETTLES, SETTLES], lims:[null, {q:() => [factSum(120n), 1n]}, {q:() => [factSum(120n), 1n]}, {q:() => [factSum(120n), 1n]}, {q:() => [factSum(120n), 1n]}], rv:{c:80, span:180},
+  {name:'0! + 1! + 2! + …', last:60, f:n => [factSum(BigInt(n)), 1n], rule:'x = 0! + 1! + 2! + … + N!: each step adds the next factorial.',
+   v:[RUNS, SETTLES, SETTLES, SETTLES, SETTLES], lims:[null, {q:() => [factSum(200n), 1n]}, {q:() => [factSum(200n), 1n]}, {q:() => [factSum(200n), 1n]}, {q:() => [factSum(200n), 1n]}], rv:{c:80, span:180},
    why:'Each new term N! is tiny p-adically, so the sum settles in every p-adic world at once. Where it settles is a mystery: nobody has found a formula for those limits.'},
-  {name:'1 + 3 + 9 + 27 + …', last:14, f:n => [(3n ** BigInt(n + 1) - 1n) / 2n, 1n], rule:'x = 1 + 3 + 9 + … + 3ⁿ = (3ⁿ⁺¹ − 1) ÷ 2: each step adds the next power of 3.',
+  {name:'1 + 3 + 9 + 27 + …', last:40, f:n => [(3n ** BigInt(n + 1) - 1n) / 2n, 1n], rule:'x = 1 + 3 + 9 + … + 3ⁿ = (3ⁿ⁺¹ − 1) ÷ 2: each step adds the next power of 3.',
    v:[RUNS, WAND, verd('conv', 'closes in on −1/2'), WAND, WAND], lims:[null, null, {q:() => [-1n, 2n]}, null, null], rv:{c:70, span:160},
    why:'Like 1 + 2 + 4 + … heading for −1 in the 2-adic world: here s + 1/2 is a power of 3 (halved), so the 3-adic world sees the sums close in on −1/2. In base 3 they are …1111, and 2 × …1111 + 1 = …0000.'},
 ];
-const jr = {idx:0, step:0, playing:false, raf:0, t:0, inited:false};
+const JR_SPEEDS = [{name:'Slow', ms:1400}, {name:'Normal', ms:600}, {name:'Fast', ms:200}];
+const jr = {idx:0, step:0, playing:false, raf:0, t:0, inited:false, speed:1, follow:true, pause:[false, false, false, false, false], anim:0, at:0};   // pause[wi]: the user moved that world's picture, so it stops following
 const jrJ = () => JR[jr.idx];
 function jrBuild(J){                                // exact steps and limits (once), with windows grown to hold them
   if (J.recs) return;
@@ -1743,8 +1783,17 @@ function jrBuild(J){                                // exact steps and limits (o
     ensureEFor(q[0], q[1]); const r = makeRec(q[0], q[1]); jrReg.push(r); return {rec:r};
   });
 }
-const limCache = new Map();
-function limW(rec, pi){ const key = pi + ':' + EP[pi]; let m = limCache.get(rec); if (!m){ m = {}; limCache.set(rec, m); } return m[key] || (m[key] = computeW(rec, pi)); }
+// the position of a fraction in world pi to the deep geometry (levels down to 1e-14), cached until the window grows; used for every journey step and limit
+function deepW(rec, pi){
+  const p = PR[pi], E = EP[pi], c = rec.dw || (rec.dw = [null, null, null, null]); let w = c[pi]; if (w && w.E === E) return w;
+  const TD = TDEEP[p], v = vp(rec.n, rec.d, p); w = c[pi] = {E, v, inWin:v >= -E, x:0, y:0};
+  if (!w.inWin) return w;
+  const start = v + E, dig = rec.n !== 0n && start < TD ? padicDigits(rec.n, rec.d, p, TD - start).digits : [];
+  let x = 0, y = 0; for (let lv = 0; lv < TD; lv++){ const j = lv >= start && lv - start < dig.length ? dig[lv - start] : 0; x += COSS[pi][lv*p + j]; y += SINS[pi][lv*p + j]; }
+  w.x = x; w.y = y; return w;
+}
+const limW = deepW;
+function jrStr(rec){ return rec.js || (rec.js = {n:rec.n.toString(), d:rec.d.toString()}); }   // digit strings, made once: toString on a 23 000-digit number is too slow to repeat every frame
 function jrDiskView(d){                              // ℤ_p, unless most steps live outside it: then the whole window
   const J = jrJ(), pi = d.pi; let out = 0; J.recs.forEach(r => { if (r.w[pi].v < 0) out++; });
   if (J.zoom0 && J.zoom0.includes(d.p)){            // zoom in around 0, so the steps visibly close in on it
@@ -1755,7 +1804,7 @@ function jrDiskView(d){                              // ℤ_p, unless most steps
 function jrFitReal(){ Object.assign(rvs.journey, jrJ().rv); mark(cvReal); }
 function jrFitAll(){ jrFitReal(); disks.forEach(d => { d.vs.journey = jrDiskView(d); mark(d.c); }); }
 
-const jrLabel = i => { const r = jrJ().recs[i]; return (r.n.toString().length > 9 || r.d.toString().length > 9) ? 'x' + SUB(i) : fracStr(r); };
+const jrLabel = i => { const r = jrJ().recs[i], s = jrStr(r); return (s.n.length > 9 || s.d.length > 9) ? 'x' + SUB(i) : fracStr(r); };
 function clipSeg(a, b, W, H){                        // Liang-Barsky: keeps dashed lines short when a step is far off screen
   let t0 = 0, t1 = 1; const dx = b[0] - a[0], dy = b[1] - a[1];
   const ch = (p, q) => { if (p === 0) return q >= 0; const r = q/p; if (p < 0){ if (r > t1) return false; if (r > t0) t0 = r; } else { if (r < t0) return false; if (r < t1) t1 = r; } return true; };
@@ -1763,7 +1812,7 @@ function clipSeg(a, b, W, H){                        // Liang-Barsky: keeps dash
 }
 function jrNum(rec, abs){                             // a step's real value as short text; whole numbers too big for a double get 1.99×10⁹⁴⁰ style
   if (rec.d === 1n && Math.abs(rec.val) >= 1e15){
-    const s = babs(rec.n).toString(), m = s[0] + '.' + s.slice(1, 4).replace(/0+$/, '').padEnd(1, '0');
+    const s = rec.n < 0n ? jrStr(rec).n.slice(1) : jrStr(rec).n, m = s[0] + '.' + s.slice(1, 4).replace(/0+$/, '').padEnd(1, '0');
     return (rec.n < 0n && !abs ? '−' : '') + m + '×10' + SUP(s.length - 1);
   }
   return fmtNum(abs ? Math.abs(rec.val) : rec.val);
@@ -1775,15 +1824,21 @@ function jrSize(wi, rec){                            // the size of a step in on
 function drawJourney(c, wi, pos, posLim){            // pos(rec, i) -> [x, y] or null; posLim(lim) likewise
   const J = jrJ(), ctx = c.ctx, W = c.W, H = c.H, k = jr.step, P = [];
   for (let i = 0; i <= k; i++) P.push(pos(J.recs[i], i));
-  const al = i => Math.max(0.22, 1 - (k - i)*0.085);
+  const al = i => Math.max(0.22, 1 - (k - i)*0.085), TRAIL = 25, old = k - TRAIL;   // only the last 25 steps keep a trail; older ones stay behind as faint dots
+  const inV = q => q && q[0] >= -6 && q[0] <= W + 6 && q[1] >= -6 && q[1] <= H + 6;
   ctx.save(); ctx.lineWidth = 1.5; ctx.strokeStyle = colHot; ctx.setLineDash([4, 4]);
-  for (let i = 1; i <= k; i++){
+  for (let i = Math.max(1, old + 1); i <= k; i++){
     if (!P[i - 1] || !P[i]) continue; const s = clipSeg(P[i - 1], P[i], W, H); if (!s) continue;
     ctx.globalAlpha = al(i)*0.85; ctx.beginPath(); ctx.moveTo(s[0], s[1]); ctx.lineTo(s[2], s[3]); ctx.stroke();
   }
   ctx.setLineDash([]); ctx.lineWidth = 1; ctx.strokeStyle = colPanel; ctx.fillStyle = colHot;
-  for (let i = 0; i <= k; i++){
-    const q = P[i]; if (!q || q[0] < -6 || q[0] > W + 6 || q[1] < -6 || q[1] > H + 6) continue;
+  if (old > 0){                                       // the faint older dots, all in one path
+    ctx.globalAlpha = 0.22; ctx.beginPath();
+    for (let i = 0; i <= old; i++){ const q = P[i]; if (inV(q)){ ctx.moveTo(q[0] + 4, q[1]); ctx.arc(q[0], q[1], 4, 0, TAU); } }
+    ctx.fill(); ctx.stroke();
+  }
+  for (let i = Math.max(0, old + 1); i <= k; i++){
+    const q = P[i]; if (!inV(q)) continue;
     ctx.globalAlpha = al(i); ctx.beginPath(); ctx.arc(q[0], q[1], i === k ? 5 : 4, 0, TAU); ctx.fill(); ctx.stroke();
   }
   ctx.globalAlpha = 1;
@@ -1827,13 +1882,14 @@ function renderJrStatus(){
   $('realBadge').textContent = (ok ? '✓ ' : '') + 'ℝ · real line';
   const pill = $('pill'); pill.hidden = false; pill.className = 'pill' + (ok ? ' ok' : ''); pill.textContent = v.s || v.t;
 }
-const bigTxt = b => { const s = b.toString(); return s.length > 14 ? s.slice(0, 5) + '…' + s.slice(-4) : s; };
+const bigTxt = s => { return s.length > 14 ? s.slice(0, 5) + '…' + s.slice(-4) : s; };
+function setJrPlayLabel(){ const t = jr.playing ? 'Pause' : 'Play'; $('jrPlay').textContent = t; $('jbPlay').textContent = t; }
 function renderJrPanel(){
-  const J = jrJ(), r = J.recs[jr.step], long = r.n.toString().length > 14 || r.d.toString().length > 14;
-  const xs = r.d === 1n ? bigTxt(r.n) : bigTxt(r.n) + ' / ' + bigTxt(r.d);
+  const J = jrJ(), r = J.recs[jr.step], s = jrStr(r), long = s.n.length > 14 || s.d.length > 14;
+  const xs = r.d === 1n ? bigTxt(s.n) : bigTxt(s.n) + ' / ' + bigTxt(s.d);
   $('jrChips').querySelectorAll('[data-j]').forEach(b => b.setAttribute('aria-pressed', +b.dataset.j === jr.idx));
   $('jrNow').innerHTML = `<h3 class="jrx">step ${jr.step}: x = ${xs}</h3>` +
-    (long ? `<p class="muted">a ${r.n.toString().length}-digit top over a ${r.d.toString().length}-digit bottom</p>` : '') +
+    (long ? `<p class="muted">a ${s.n.length}-digit top over a ${s.d.length}-digit bottom</p>` : '') +
     `<p class="muted mono" style="margin:0">≈ ${jrNum(r)} · step ${jr.step} of ${J.last}</p><p>${J.rule}</p>`;
   const seen = jrSeen(), rows = ['Real line', '2-adic', '3-adic', '5-adic', '7-adic'].map((nm, wi) => {
     const v = J.v[wi], ok = v.k === 'conv' && seen;
@@ -1842,34 +1898,86 @@ function renderJrPanel(){
   $('jrSees').innerHTML = `<h3>What each world sees</h3><table class="wtab jrtab"><thead><tr><th>World</th><th>Verdict</th><th>Size now</th></tr></thead><tbody>${rows.join('')}</tbody></table>` +
     (J.lims.some(Boolean) ? '<p class="hint">A cross marks where the sequence is heading.</p>' : '');
   $('jrWhy').innerHTML = `<h3>Why?</h3><p>${J.why}</p>`;
-  $('jrPlay').textContent = jr.playing ? 'Pause' : 'Play';
-  $('jrStep').disabled = jr.step >= J.last;
+  setJrPlayLabel();
+  $('jrStep').disabled = $('jbStep').disabled = jr.step >= J.last;
+  $('jbRead').textContent = jr.step + ' / ' + J.last; $('jbRead').setAttribute('aria-label', 'step ' + jr.step + ' of ' + J.last);
+  document.querySelectorAll('[data-s]').forEach(b => b.setAttribute('aria-pressed', +b.dataset.s === jr.speed));
+  $('jrFollow').setAttribute('aria-pressed', jr.follow);
 }
-function jrRefresh(){ renderJrPanel(); renderJrStatus(); markAll(); }
-function jrStop(){ jr.playing = false; if (jr.raf){ cancelAnimationFrame(jr.raf); jr.raf = 0; } if (jr.inited) $('jrPlay').textContent = 'Play'; }
+
+// ---- Follow: each world that is closing in on a limit zooms toward it as the steps proceed ----
+function jrTarget(wi){                               // the view a world should be eased to, or null to leave it alone; floor: it wants to go deeper than the picture can show
+  const J = jrJ(), lim = J.lims[wi]; if (!jr.follow || jr.pause[wi] || !lim || J.v[wi].k !== 'conv') return null;
+  const rec = J.recs[jr.step];
+  if (wi === 0){                                     // the real strip: radius = half the span
+    const r0 = J.rv.span/2, want = 3*Math.abs(rec.val - lim.val);
+    if (!(want < r0)) return {cx:J.rv.c, cy:0, r:r0, floor:false};
+    return {cx:lim.val, cy:0, r:Math.max(JR_SMIN/2, want), floor:want < JR_SMIN/2};
+  }
+  const pi = wi - 1, d = disks[pi], base = jrDiskView(d), w = deepW(rec, pi), lw = deepW(lim.rec, pi);
+  if (!w.inWin || !lw.inWin) return {cx:base.cx, cy:base.cy, r:base.r, floor:false};
+  const want = 3*Math.hypot(w.x - lw.x, w.y - lw.y);
+  if (!(want < base.r)) return {cx:base.cx, cy:base.cy, r:base.r, floor:false};
+  return {cx:lw.x, cy:lw.y, r:Math.max(JR_RMIN, want), floor:want < JR_RMIN};
+}
+function jrNotes(){                                  // "deeper than this picture can show" once a world has hit the precision floor
+  const msg = 'deeper than this picture can show';
+  for (let wi = 0; wi < 5; wi++){ const t = st.view === 'journey' && jr.inited ? jrTarget(wi) : null, el = wi === 0 ? $('realNote') : disks[wi - 1].note; el.textContent = t && t.floor ? msg : ''; if (wi) el.style.bottom = t && t.floor ? '52px' : ''; }   // above the verdict badge
+}
+function jrTick(ts){
+  jr.anim = 0; if (st.view !== 'journey' || !jr.inited) return;
+  const dt = jr.at ? Math.min(0.1, (ts - jr.at)/1000) : 0.016, a = 1 - Math.exp(-dt/0.13); jr.at = ts; let busy = false;   // about 400 ms to settle
+  for (let wi = 0; wi < 5; wi++){
+    const t = jrTarget(wi); if (!t) continue;
+    const v = wi === 0 ? rvs.journey : disks[wi - 1].vs.journey, r = wi === 0 ? v.span/2 : v.r, cx = wi === 0 ? v.c : v.cx, cy = wi === 0 ? 0 : v.cy;
+    let ex = (cx - t.cx)/r, ey = (cy - t.cy)/r;      // the offset from the target, in units of the radius, melts away while the radius shrinks in log steps
+    const lr = Math.log(r), lt = Math.log(t.r), done = Math.abs(lr - lt) < 0.004 && Math.hypot(ex, ey) < 0.004;
+    const nr = done ? t.r : Math.exp(lr + (lt - lr)*a); ex = done ? 0 : ex*(1 - a); ey = done ? 0 : ey*(1 - a);
+    if (wi === 0){ v.c = t.cx + ex*nr; v.span = 2*nr; } else { v.cx = t.cx + ex*nr; v.cy = t.cy + ey*nr; v.r = nr; }
+    mark(wi === 0 ? cvReal : disks[wi - 1].c); if (!done) busy = true;
+  }
+  if (busy) jr.anim = requestAnimationFrame(jrTick);
+}
+function jrKick(){ if (st.view === 'journey' && jr.inited && !jr.anim){ jr.at = 0; jr.anim = requestAnimationFrame(jrTick); } }
+function jrUserMoved(wi){ if (st.view !== 'journey' || !jr.inited || jr.pause[wi]) return; jr.pause[wi] = true; jrNotes(); }   // your own pan or zoom pauses following for that world, until Start over
+function jrRestart(){ jr.step = 0; jr.pause.fill(false); jrFitAll(); jrRefresh(); }
+
+function jrRefresh(){ renderJrPanel(); renderJrStatus(); jrNotes(); markAll(); jrKick(); }
+function jrStop(){ jr.playing = false; if (jr.raf){ cancelAnimationFrame(jr.raf); jr.raf = 0; } if (jr.inited) setJrPlayLabel(); }
 function jrAdvance(){ const J = jrJ(); if (jr.step < J.last) jr.step++; if (jr.step >= J.last) jrStop(); jrRefresh(); }
+const jrMs = () => JR_SPEEDS[jr.speed].ms;
 function jrLoop(ts){
   jr.raf = 0; if (!jr.playing) return;
-  if (ts - jr.t >= 900){ jr.t = ts; jrAdvance(); }
+  if (ts - jr.t >= jrMs()){ jr.t = ts; jrAdvance(); }
   if (jr.playing) jr.raf = requestAnimationFrame(jrLoop);
 }
 function jrPlay(){
   if (jr.playing){ jrStop(); renderJrPanel(); return; }
-  if (jr.step >= jrJ().last){ jr.step = 0; jrRefresh(); }
-  jr.playing = true; jr.t = performance.now() - 900; jr.raf = requestAnimationFrame(jrLoop); renderJrPanel();
+  if (jr.step >= jrJ().last) jrRestart();
+  jr.playing = true; jr.t = performance.now() - jrMs(); jr.raf = requestAnimationFrame(jrLoop); renderJrPanel();
 }
 function jrChoose(i){
-  jrStop(); jr.idx = Math.max(0, Math.min(JR.length - 1, i)); jr.step = 0; jrBuild(jrJ()); jrFitAll(); jrRefresh();
+  jrStop(); jr.idx = Math.max(0, Math.min(JR.length - 1, i)); jr.step = 0; jr.pause.fill(false); jrBuild(jrJ()); jrFitAll(); jrRefresh();
 }
 function initJourney(){
   if (jr.inited) return; jr.inited = true;
   $('jrChips').innerHTML = JR.map((j, i) => `<button type="button" class="chip" data-j="${i}" aria-pressed="false">${j.name}</button>`).join('');
+  const sp = JR_SPEEDS.map((s, i) => `<button type="button" class="chip" data-s="${i}" aria-pressed="false">${s.name}</button>`).join('');
+  $('jrSpeed').innerHTML = sp; $('jbSpeed').innerHTML = sp;
   jrChoose(0);
 }
 $('jrChips').addEventListener('click', e => { const b = e.target.closest('[data-j]'); if (b) jrChoose(+b.dataset.j); });
-$('jrPlay').addEventListener('click', jrPlay);
-$('jrStep').addEventListener('click', () => { jrStop(); jrAdvance(); });
-$('jrReset').addEventListener('click', () => { jrStop(); jr.step = 0; jrRefresh(); });
+for (const [pl, stp, rs] of [['jrPlay', 'jrStep', 'jrReset'], ['jbPlay', 'jbStep', 'jbReset']]){
+  $(pl).addEventListener('click', jrPlay);
+  $(stp).addEventListener('click', () => { jrStop(); jrAdvance(); });
+  $(rs).addEventListener('click', () => { jrStop(); jrRestart(); });
+}
+for (const id of ['jrSpeed', 'jbSpeed']) $(id).addEventListener('click', e => { const b = e.target.closest('[data-s]'); if (b){ jr.speed = +b.dataset.s; renderJrPanel(); } });
+$('jrFollow').addEventListener('click', () => {
+  jr.follow = !jr.follow; jr.pause.fill(false);
+  if (!jr.follow) jrFitAll();                        // off: back to the journey's own views
+  renderJrPanel(); jrNotes(); markAll(); jrKick();
+});
 document.addEventListener('visibilitychange', () => { if (document.hidden) { jrStop(); if (jr.inited) renderJrPanel(); } });
 
 // ---- theme ----
@@ -1909,7 +2017,8 @@ if (new URLSearchParams(location.search).has('debug')){
       list:JR.map(j => j.name),
       choose:i => { setView('journey'); jrChoose(i); return jrJ().name; },
       step:() => { setView('journey'); jrStop(); jrAdvance(); return jr.step; },
-      reset:() => { setView('journey'); jrStop(); jr.step = 0; jrRefresh(); return jr.step; },
+      reset:() => { setView('journey'); jrStop(); jrRestart(); return jr.step; },
+      speeds:JR_SPEEDS, setSpeed:i => { jr.speed = i; renderJrPanel(); return jrMs(); }, deepW:(n, pi) => { const w = deepW(jrJ().recs[n], pi); return {x:w.x, y:w.y, inWin:w.inWin}; }, target:wi => jrTarget(wi), tick:ts => jrTick(ts), view:wi => wi === 0 ? rvs.journey : disks[wi - 1].vs.journey,
       get state(){ return jr; },
       value:n => { const s = (jrJ().steps || [])[n]; return s ? s[0] + '/' + s[1] : null; },
       vp:(n, p) => { const s = (jrJ().steps || [])[n]; return s ? vp(s[0], s[1], p) : null; },
