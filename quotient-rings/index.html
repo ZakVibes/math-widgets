@@ -1,0 +1,1682 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Quotient Rings</title>
+<link rel="manifest" href="../manifest.json"><link rel="icon" href="../icons/icon-192.png"><link rel="apple-touch-icon" href="../icons/icon-180.png"><meta name="apple-mobile-web-app-title" content="Math Widgets"><script>if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("../sw.js"));</script>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Quotient Rings: pick a base ring, type f, see R[x]/(f) split into pieces by the Chinese Remainder Theorem. */
+:root{
+  color-scheme: light;
+  --bg:#f5f3ee; --panel:#ffffff; --soft:#f0ede6; --line:#ddd8cb;
+  --fg:#1c2430; --muted:#5b6676; --accent:#2b5fd9; --on-accent:#fff;
+  --teal:#13897c; --purple:#7048c4; --coral:#d8553b;
+  --u:#2f9e5f; --zd:#d99a14; --nil:#d24433; --zero:#8c95a1;
+  --font-display:"Fraunces", Georgia, "Times New Roman", serif;
+  --font-body:"Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono:"JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --bg:#101318; --panel:#181d24; --soft:#212831; --line:#2f3743;
+    --fg:#e8ecf2; --muted:#9ba7b8; --accent:#7aa2ff; --on-accent:#0c1220;
+    --teal:#3cc4b3; --purple:#a58cf2; --coral:#f48a70;
+    --u:#4cc27f; --zd:#ecb94a; --nil:#f06b59; --zero:#6e7987;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#101318; --panel:#181d24; --soft:#212831; --line:#2f3743;
+  --fg:#e8ecf2; --muted:#9ba7b8; --accent:#7aa2ff; --on-accent:#0c1220;
+  --teal:#3cc4b3; --purple:#a58cf2; --coral:#f48a70;
+  --u:#4cc27f; --zd:#ecb94a; --nil:#f06b59; --zero:#6e7987;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 var(--font-body);overflow-x:hidden}
+.wrap{max-width:1120px;margin:0 auto;padding:22px 16px 56px}
+h1{font:600 clamp(30px,6vw,46px)/1.05 var(--font-display);margin:0 0 8px;letter-spacing:-.01em}
+h2{font:600 19px/1.2 var(--font-display);margin:0 0 12px}
+.lede{margin:0 0 20px;color:var(--muted);max-width:60ch}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:16px;min-width:0}
+sub,sup{line-height:0;font-size:.72em}
+.mono,.poly{font-family:var(--font-mono)}
+.poly{font-size:.95em;letter-spacing:-.01em}
+.row{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center}
+button{font:inherit;color:inherit;cursor:pointer}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:var(--soft)}
+.seg button{border:0;background:transparent;padding:7px 18px;font-size:16px;min-height:40px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent);font-weight:600}
+select,input[type=text]{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:7px 10px;min-height:40px}
+select:focus,input:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.fline{display:flex;align-items:center;gap:8px;margin:14px 0 8px;font-size:18px}
+.fline .pre{white-space:nowrap}
+.fline input{flex:1;min-width:0;font-family:var(--font-mono);font-size:17px}
+.keys{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.keys button,.presets button{border:1px solid var(--line);background:var(--soft);border-radius:8px;padding:4px 11px;min-height:34px;font-size:14px}
+.keys button{font-family:var(--font-mono);min-width:36px}
+.keys button:hover,.presets button:hover{border-color:var(--accent)}
+.presets{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.presets .lab{font-size:13px;color:var(--muted);margin-right:2px}
+.presets button .poly{font-size:13px}
+.presets button small{display:block;font-size:11px;color:var(--muted);line-height:1.2}
+.err{color:var(--nil);min-height:0;font-size:14.5px;margin-top:6px}
+.err:empty{display:none}
+.layout{display:grid;grid-template-columns:minmax(0,1fr);gap:0 16px}
+@media (min-width:900px){ .layout.two{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr)} }
+.ringbox{display:inline-block;background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:8px 16px;font-size:20px}
+.note{color:var(--muted);font-size:14px;margin:8px 0}
+.factoring{font-size:18px;margin:12px 0 4px;line-height:2.1;overflow-wrap:anywhere}
+.fac{display:inline-block;border-radius:8px;padding:0 8px;border:1.5px solid var(--c);background:color-mix(in srgb,var(--c) 12%,var(--panel));margin:0 2px}
+.base{--c:var(--teal)} .ext{--c:var(--purple)} .fat{--c:var(--coral)}
+.crt{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px;margin:6px 0 0}
+.crt::before,.crt::after{content:"";flex:1;height:1px;background:var(--line)}
+.arrowrow{text-align:center;color:var(--muted);line-height:1;font-size:20px;margin:2px 0 4px}
+.pieces{display:flex;flex-wrap:wrap;align-items:stretch;gap:10px 6px}
+.times{align-self:center;color:var(--muted);font-size:22px;padding:0 2px}
+.card{position:relative;flex:1 1 190px;max-width:100%;border:1.5px solid var(--c);border-top-width:5px;border-radius:12px;padding:10px 12px;background:color-mix(in srgb,var(--c) 7%,var(--panel));transition:box-shadow .15s}
+.card.hit{box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 45%,transparent)}
+.card .tag{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--c);font-weight:600}
+.card .rn{font-size:21px;margin:2px 0 4px;overflow-wrap:anywhere}
+.card p{margin:3px 0;font-size:13.5px;color:var(--muted)}
+.card p b{color:var(--fg);font-weight:500}
+.card .crd{margin-top:6px;padding-top:6px;border-top:1px dashed var(--line);font-size:13.5px}
+.card .more{margin-top:8px;border-top:1px dashed var(--line);padding-top:4px}
+.card .more>summary{cursor:pointer;color:var(--c);font-weight:600;font-size:14px;min-height:40px;display:flex;align-items:center;gap:6px;list-style:none}
+.card .more>summary::-webkit-details-marker{display:none}
+.card .more>summary::before{content:"\25B8";display:inline-block;transition:transform .15s}
+.card .more[open]>summary::before{transform:rotate(90deg)}
+.card .more .mb{font-size:14px;line-height:1.55;max-width:68ch}
+.card .more .mb h4{margin:12px 0 2px;font:600 12px/1.3 var(--font-body);letter-spacing:.06em;text-transform:uppercase;color:var(--c)}
+.card .more .mb p,.card .more .mb li{font-size:14px;color:var(--fg);margin:3px 0}
+.card .more .mb ul{margin:3px 0;padding-left:20px}
+.card .more .mb .mh{font:600 18px/1.3 var(--font-display);margin:4px 0 0;overflow-wrap:anywhere}
+.card .more .mb .big{margin:6px 0;padding:6px 10px;border-radius:8px;background:color-mix(in srgb,var(--c) 10%,var(--panel));overflow-wrap:anywhere}
+.card .more .mb .note{font-size:13px;color:var(--muted)}
+.m{font-family:var(--font-display);font-style:italic}
+@media (min-width:561px){ .card:has(.more[open]){flex-basis:100%} }
+.part{border:1px solid var(--line);border-radius:14px;padding:10px 12px 12px;margin:12px 0;background:var(--soft)}
+.part .parthead{font-size:17px;margin:0 0 2px;overflow-wrap:anywhere}
+.part .factoring{margin-top:6px}
+.split{margin:12px 0 0;font-size:17px;overflow-wrap:anywhere}
+.iso{margin-top:14px;padding:10px 14px;background:var(--soft);border-radius:12px;font-size:18px;overflow-wrap:anywhere}
+.badges{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.badge{border:1px solid var(--line);background:var(--soft);border-radius:999px;padding:3px 12px;font-size:14px}
+.badge b{font-weight:600}
+.badge.yes{border-color:var(--teal)}
+.facts dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:14.5px}
+.facts dt{color:var(--muted)} .facts dd{margin:0;overflow-wrap:anywhere}
+.facts .expr{display:block;font-family:var(--font-mono);font-size:12.5px;color:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--muted);margin:2px 0 10px}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:4px;margin-right:6px;vertical-align:-1px;background:var(--c);border:1px solid var(--c)}
+.legend .base i,.legend .ext i,.legend .fat i{background:var(--c)}
+.legend .lu{--c:var(--u)} .legend .lz{--c:var(--zd)} .legend .ln{--c:var(--nil)} .legend .l0{--c:var(--zero)}
+.egrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--tw,54px),1fr));gap:4px}
+.tile{--c:var(--zero);border:1.5px solid var(--c);background:color-mix(in srgb,var(--c) 20%,var(--panel));border-radius:8px;padding:3px 2px;min-height:38px;font:11px/1.2 var(--font-mono);display:flex;align-items:center;justify-content:center;text-align:center;overflow:hidden;color:var(--fg)}
+.tile.u{--c:var(--u)} .tile.d{--c:var(--zd)} .tile.n{--c:var(--nil)} .tile.z{--c:var(--zero)}
+.tile.dim{opacity:.38}
+.tile.reach{outline:2.5px solid var(--accent);outline-offset:1px;opacity:1}
+.tile.sel{outline:3px solid var(--fg);outline-offset:1px;opacity:1;background:color-mix(in srgb,var(--c) 45%,var(--panel))}
+.detail{margin-top:14px;padding:12px 14px;background:var(--soft);border-radius:12px;font-size:15px}
+.detail p{margin:4px 0}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.chip{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:1px 9px;font:12px/1.6 var(--font-mono)}
+.hint{color:var(--muted);font-size:13.5px;margin:10px 0 0}
+.plot svg{width:100%;height:auto;max-height:520px;display:block}
+.plot .ax{stroke:var(--muted);stroke-width:1.2}
+.plot .gr{stroke:var(--line);stroke-width:1}
+.plot text{fill:var(--muted);font:11px var(--font-body)}
+.plot .root{--c:var(--teal);transition:opacity .15s}
+.plot .root.ext{--c:var(--purple)} .plot .root.fat{--c:var(--coral)} .plot .root.base{--c:var(--teal)}
+.plot .root.dim{opacity:.2}
+.plot .root circle{stroke:var(--c);fill:none;stroke-width:2}
+.plot .root circle.dot{fill:var(--c)}
+.plot .root text{fill:var(--c);font-weight:600;font-size:12px}
+.special{font-size:18px}
+.special .big{font:600 24px/1.2 var(--font-display);margin-bottom:6px}
+@media (max-width:560px){
+  .wrap{padding:14px 16px 40px}
+  .egrid{--tw:44px}
+  .tile{font-size:9.5px;min-height:34px}
+  .fline{font-size:16px}
+  .card{flex-basis:100%}
+  .times{width:100%;text-align:center;padding:0}
+}
+@media (prefers-reduced-motion: reduce){ *{transition:none!important} }
+</style>
+</head>
+
+<div class="wrap">
+  <header>
+    <a href="../index.html" style="display:table;margin-bottom:6px;font-size:13px;color:#d0457f;font-weight:500;text-decoration:none">← All widgets</a>
+    <h1>Quotient rings</h1>
+    <p class="lede">Choose a base ring R and type a polynomial f: this page shows what R[x]/(f) really is, as a product of simpler rings, and lets you poke at its elements.</p>
+  </header>
+
+  <section class="panel">
+    <div class="row">
+      <div class="seg" role="group" aria-label="Base ring">
+        <button type="button" data-ring="Fp" aria-pressed="true">F<sub>p</sub></button>
+        <button type="button" data-ring="R" aria-pressed="false">ℝ</button>
+        <button type="button" data-ring="C" aria-pressed="false">ℂ</button>
+        <button type="button" data-ring="Zn" aria-pressed="false">ℤ/n</button>
+      </div>
+      <label id="primeWrap">prime p <select id="prime" aria-label="Prime p"></select></label>
+      <label id="nWrap" style="display:none">modulus n <select id="nsel" aria-label="Modulus n"></select></label>
+    </div>
+    <div class="fline"><span class="pre" id="pre"></span><input type="text" id="f" aria-label="Polynomial f" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="e.g. (x+1)^2(x^2+1)"><span>)</span></div>
+    <div class="keys" id="keys"></div>
+    <div class="err" id="err" role="alert"></div>
+    <div class="presets" id="presets"></div>
+  </section>
+
+  <div id="out"></div>
+</div>
+
+<script>
+/* ===================== ENGINE (pure, no DOM) ===================== */
+"use strict";
+const QR = (function(){
+class QErr extends Error{}
+const fail = m => { throw new QErr(m); };
+
+/* ---- exact rationals (BigInt) ---- */
+function bgcd(a,b){ if(a<0n)a=-a; if(b<0n)b=-b; while(b){ const t=a%b; a=b; b=t; } return a; }
+function Q(n,d){ if(d===undefined)d=1n; if(d===0n) throw new Error('zero denominator'); if(d<0n){n=-n;d=-d;} const g=bgcd(n,d); if(g>1n){n/=g;d/=g;} return {n,d}; }
+const Q0=Q(0n), Q1=Q(1n);
+const qadd=(a,b)=>Q(a.n*b.d+b.n*a.d,a.d*b.d);
+const qsub=(a,b)=>Q(a.n*b.d-b.n*a.d,a.d*b.d);
+const qmul=(a,b)=>Q(a.n*b.n,a.d*b.d);
+const qinv=a=>{ if(a.n===0n) throw new Error('inverse of 0'); return Q(a.d,a.n); };
+const qneg=a=>({n:-a.n,d:a.d});
+const qz=a=>a.n===0n;
+const qeq=(a,b)=>a.n===b.n&&a.d===b.d;
+const qabs=a=>a.n<0n?qneg(a):a;
+function qfloat(a){
+  const neg=a.n<0n, n=neg?-a.n:a.n;
+  if(n.toString(2).length<1000 && a.d.toString(2).length<1000) return (neg?-1:1)*Number(n)/Number(a.d);
+  return (neg?-1:1)*Number((n*10n**30n)/a.d)/1e30;
+}
+function qstr(a){ return a.d===1n ? a.n.toString() : a.n.toString()+'/'+a.d.toString(); }
+const FQ={zero:Q0,one:Q1,add:qadd,sub:qsub,mul:qmul,neg:qneg,inv:qinv,isZero:qz,eq:qeq,fromInt:n=>Q(BigInt(n))};
+
+/* ---- Gaussian rationals Q(i) ---- */
+const C=(r,i)=>({r:r||Q0,i:i||Q0});
+const FC={
+  zero:C(Q0,Q0), one:C(Q1,Q0),
+  add:(a,b)=>C(qadd(a.r,b.r),qadd(a.i,b.i)),
+  sub:(a,b)=>C(qsub(a.r,b.r),qsub(a.i,b.i)),
+  mul:(a,b)=>C(qsub(qmul(a.r,b.r),qmul(a.i,b.i)),qadd(qmul(a.r,b.i),qmul(a.i,b.r))),
+  neg:a=>C(qneg(a.r),qneg(a.i)),
+  inv:a=>{ const n=qadd(qmul(a.r,a.r),qmul(a.i,a.i)); if(qz(n)) throw new Error('inverse of 0'); const k=qinv(n); return C(qmul(a.r,k),qneg(qmul(a.i,k))); },
+  isZero:a=>qz(a.r)&&qz(a.i),
+  eq:(a,b)=>qeq(a.r,b.r)&&qeq(a.i,b.i),
+  fromInt:n=>C(Q(BigInt(n)),Q0)
+};
+
+/* ---- F_p ---- */
+const fpCache={};
+function makeFp(p){
+  const inv=new Array(p).fill(0);
+  for(let a=1;a<p;a++) for(let b=1;b<p;b++) if(a*b%p===1) inv[a]=b;
+  return {p,zero:0,one:1,add:(a,b)=>(a+b)%p,sub:(a,b)=>(a-b+p)%p,mul:(a,b)=>a*b%p,neg:a=>(p-a)%p,inv:a=>inv[a],isZero:a=>a===0,eq:(a,b)=>a===b,fromInt:n=>((n%p)+p)%p};
+}
+
+/* ---- generic polynomials over a field F (arrays, low degree first, trimmed) ---- */
+function makePoly(F){
+  const trim=a=>{ let n=a.length; while(n>0&&F.isZero(a[n-1])) n--; return n===a.length?a:a.slice(0,n); };
+  const deg=a=>trim(a).length-1;
+  const add=(a,b)=>{ const n=Math.max(a.length,b.length), r=[]; for(let k=0;k<n;k++) r.push(F.add(k<a.length?a[k]:F.zero,k<b.length?b[k]:F.zero)); return trim(r); };
+  const sub=(a,b)=>{ const n=Math.max(a.length,b.length), r=[]; for(let k=0;k<n;k++) r.push(F.sub(k<a.length?a[k]:F.zero,k<b.length?b[k]:F.zero)); return trim(r); };
+  const mul=(a,b)=>{ a=trim(a); b=trim(b); if(!a.length||!b.length) return []; const r=new Array(a.length+b.length-1).fill(F.zero); for(let i=0;i<a.length;i++) for(let j=0;j<b.length;j++) r[i+j]=F.add(r[i+j],F.mul(a[i],b[j])); return trim(r); };
+  const scale=(a,c)=>trim(a.map(x=>F.mul(x,c)));
+  const divmod=(a,b)=>{
+    a=trim(a); b=trim(b); if(!b.length) throw new Error('division by zero polynomial');
+    const db=b.length-1, il=F.inv(b[db]); const r=a.slice();
+    const q=new Array(Math.max(0,a.length-db)).fill(F.zero);
+    for(let k=r.length-1;k>=db;k--){
+      if(F.isZero(r[k])) continue;
+      const c=F.mul(r[k],il); q[k-db]=c;
+      for(let j=0;j<=db;j++) r[k-db+j]=F.sub(r[k-db+j],F.mul(c,b[j]));
+    }
+    return [trim(q),trim(r.slice(0,db))];
+  };
+  const rem=(a,b)=>divmod(a,b)[1];
+  const monic=a=>{ a=trim(a); if(!a.length) return a; const il=F.inv(a[a.length-1]); return a.map(x=>F.mul(x,il)); };
+  const gcd=(a,b)=>{ a=trim(a); b=trim(b); while(b.length){ const t=rem(a,b); a=b; b=t; } return monic(a); };
+  const deriv=a=>trim(a.slice(1).map((c,k)=>F.mul(c,F.fromInt(k+1))));
+  const ev=(a,x)=>{ let r=F.zero; for(let k=a.length-1;k>=0;k--) r=F.add(F.mul(r,x),a[k]); return r; };
+  const pow=(a,e)=>{ let r=[F.one]; for(let k=0;k<e;k++) r=mul(r,a); return r; };
+  const powmod=(a,e,m)=>{ let r=[F.one], b=rem(a,m); while(e>0n){ if(e&1n) r=rem(mul(r,b),m); b=rem(mul(b,b),m); e>>=1n; } return r; };
+  const eq=(a,b)=>{ a=trim(a); b=trim(b); if(a.length!==b.length) return false; for(let k=0;k<a.length;k++) if(!F.eq(a[k],b[k])) return false; return true; };
+  return {F,trim,deg,add,sub,mul,scale,divmod,rem,monic,gcd,deriv,ev,pow,powmod,eq};
+}
+const PQ=makePoly(FQ), PC=makePoly(FC);
+function getFp(p){ if(!fpCache[p]){ const F=makeFp(p); fpCache[p]=makePoly(F); } return fpCache[p]; }
+
+/* ===================== parser ===================== */
+const SUPMAP={'⁰':0,'¹':1,'²':2,'³':3,'⁴':4,'⁵':5,'⁶':6,'⁷':7,'⁸':8,'⁹':9};
+function tokenize(src){
+  const s=src.replace(/[−–—‒]/g,'-').replace(/[×·⋅∗]/g,'*').replace(/ /g,' ');
+  const toks=[]; let i=0;
+  while(i<s.length){
+    const c=s[i];
+    if(/\s/.test(c)){ i++; continue; }
+    if(/[0-9.]/.test(c)){
+      const m=/^(\d+\.?\d*|\.\d+)/.exec(s.slice(i));
+      if(!m) fail("A lone '.' isn't a number.");
+      const t=m[1]; let v;
+      if(t.indexOf('.')>=0){ const [a,b]=t.split('.'); v=Q(BigInt((a||'0')+(b||'')),10n**BigInt((b||'').length)); }
+      else v=Q(BigInt(t));
+      toks.push({t:'num',v,s:t,pos:i}); i+=t.length; continue;
+    }
+    if(c in SUPMAP){ let n=0,j=i; while(j<s.length&&(s[j] in SUPMAP)){ n=n*10+SUPMAP[s[j]]; j++; if(n>100000) fail('That exponent is too large.'); } toks.push({t:'sup',v:n,pos:i}); i=j; continue; }
+    if(c==='⁻') fail('Exponents must be non-negative whole numbers.');
+    if(c==='x'||c==='X'){ toks.push({t:'x',pos:i}); i++; continue; }
+    if(c==='i'){ toks.push({t:'i',pos:i}); i++; continue; }
+    if(c==='*'&&s[i+1]==='*'){ toks.push({t:'^',pos:i}); i+=2; continue; }
+    if('+-*/^()'.indexOf(c)>=0){ toks.push({t:c,pos:i}); i++; continue; }
+    if(c==='['||c==='{') { toks.push({t:'(',pos:i}); i++; continue; }
+    if(c===']'||c==='}') { toks.push({t:')',pos:i}); i++; continue; }
+    if(/[a-zA-Z]/.test(c)) fail("I don't know the symbol '"+c+"'. The variable is x"+" (and i is the imaginary unit in ℂ).");
+    fail("I don't understand '"+c+"'. Use digits, x, + - * / ^ and parentheses.");
+  }
+  return toks;
+}
+/* parse to a polynomial over Q(i) */
+function parseExact(src, ring){
+  const toks=tokenize(src); let k=0;
+  const peek=()=>toks[k], next=()=>toks[k++];
+  const cst=z=>[z];
+  const chk=a=>{ if(PC.deg(a)>200) fail('That expression gets far too large (degree above 200).'); return a; };
+  function isConst(a){ return PC.deg(a)<=0; }
+  function startsFactor(t){ return t&&(t.t==='num'||t.t==='x'||t.t==='i'||t.t==='('); }
+  function expr(){
+    let acc=term();
+    while(peek()&&(peek().t==='+'||peek().t==='-')){ const op=next().t; const t=term(); acc=op==='+'?PC.add(acc,t):PC.sub(acc,t); }
+    return acc;
+  }
+  function term(){
+    let sign=1;
+    while(peek()&&(peek().t==='+'||peek().t==='-')){ if(next().t==='-') sign=-sign; }
+    if(!peek()) fail('The expression ends too early: something is missing after the last operator.');
+    let v=power();
+    for(;;){
+      const t=peek();
+      if(!t) break;
+      if(t.t==='*'){ next(); if(!peek()) fail("Something is missing after '*'."); v=chk(PC.mul(v,power())); }
+      else if(t.t==='/'){
+        next(); if(!peek()) fail("Something is missing after '/'.");
+        const d=power();
+        if(!isConst(d)) fail('You can only divide by a number, not by a polynomial in x.');
+        if(!d.length) fail('Division by zero.');
+        v=PC.scale(v,FC.inv(d[0]));
+      }
+      else if(startsFactor(t)){
+        if(t.t==='num' && toks[k-1].t==='num') fail('Put an operator (such as *) between two numbers.');
+        v=chk(PC.mul(v,power()));
+      }
+      else break;
+    }
+    return sign<0?PC.scale(v,FC.neg(FC.one)):v;
+  }
+  function exponent(){
+    let t=peek(); if(!t) fail("Something is missing after '^'.");
+    if(t.t==='+'){ next(); t=peek(); }
+    if(t&&t.t==='-') fail('Exponents must be non-negative whole numbers (negative powers are not polynomials).');
+    if(t&&t.t==='num'){
+      next();
+      if(t.v.d!==1n) fail('Exponents must be whole numbers, not '+t.s+'.');
+      if(t.v.n>200n) fail('That exponent is too large.');
+      return Number(t.v.n);
+    }
+    if(t&&t.t==='('){
+      next(); const e=expr(); const c=next();
+      if(!c||c.t!==')') fail("Missing a closing parenthesis ')'.");
+      if(!isConst(e)||(e.length&&(!qz(e[0].i)||e[0].r.d!==1n||e[0].r.n<0n))) fail('Exponents must be non-negative whole numbers.');
+      const v=e.length?e[0].r.n:0n; if(v>200n) fail('That exponent is too large.');
+      return Number(v);
+    }
+    fail("After '^' I expect a non-negative whole number.");
+  }
+  function power(){
+    let base=atom();
+    const t=peek();
+    if(t&&t.t==='^'){ next(); const e=exponent(); base=powPoly(base,e); }
+    else if(t&&t.t==='sup'){ next(); base=powPoly(base,t.v); }
+    const t2=peek();
+    if(t2&&(t2.t==='^'||t2.t==='sup')) fail('Chained exponents like x^2^3 are ambiguous: use parentheses.');
+    return base;
+  }
+  function powPoly(a,e){
+    if(PC.deg(a)*e>200) fail('That expression gets far too large (degree above 200).');
+    return PC.pow(a,e);
+  }
+  function atom(){
+    const t=next();
+    if(!t) fail('The expression ends too early.');
+    if(t.t==='num') return cst(C(t.v,Q0));
+    if(t.t==='x') return [FC.zero,FC.one];
+    if(t.t==='i'){ if(ring!=='C') fail("i is the imaginary unit and only exists in ℂ: switch the ring to ℂ to use it."); return cst(C(Q0,Q1)); }
+    if(t.t==='('){
+      const e=expr(); const c=next();
+      if(!c||c.t!==')') fail("Missing a closing parenthesis ')'.");
+      return e;
+    }
+    if(t.t===')') fail("There is a ')' with no matching '('.");
+    fail("I did not expect '"+t.t+"' here.");
+  }
+  const r=expr();
+  if(k<toks.length){ const t=toks[k]; fail(t.t===')'?"There is a ')' with no matching '('.":"I did not expect '"+(t.s||t.t)+"' here."); }
+  return PC.trim(r);
+}
+const FPSUP=n=>String(n).replace(/\d/g,d=>'⁰¹²³⁴⁵⁶⁷⁸⁹'[d]);
+function toFp(poly,p){
+  const out=poly.map(z=>{
+    if(!qz(z.i)) fail('Complex numbers do not live in F'+'₀₁₂₃₄₅₆₇₈₉'.charAt(0)+'.');
+    const P=BigInt(p); const dm=z.r.d%P;
+    if(dm===0n) fail('The fraction '+qstr(z.r)+' has a denominator divisible by '+p+', which is 0 in F'+sub(p)+'.');
+    const nm=((z.r.n%P)+P)%P; const inv=getFp(p).F.inv(Number(dm));
+    return (Number(nm)*inv)%p;
+  });
+  return getFp(p).trim(out);
+}
+function sub(n){ return String(n).replace(/\d/g,d=>'₀₁₂₃₄₅₆₇₈₉'[d]); }
+
+/* ===================== F_p factoring ===================== */
+function rng(seed){ let a=seed>>>0; return ()=>{ a=(a+0x6D2B79F5)>>>0; let t=a; t=Math.imul(t^(t>>>15),t|1); t^=t+Math.imul(t^(t>>>7),t|61); return ((t^(t>>>14))>>>0)/4294967296; }; }
+function fpSqfree(P,p,f){
+  const res=[];
+  let c=P.gcd(f,P.deriv(f)); let w=P.divmod(f,c)[0]; let i=1;
+  while(P.deg(w)>0){
+    const y=P.gcd(w,c); const z=P.divmod(w,y)[0];
+    if(P.deg(z)>0) res.push([z,i]);
+    w=y; c=P.divmod(c,y)[0]; i++;
+  }
+  if(P.deg(c)>0){
+    const r=[]; for(let k=0;k<c.length;k+=p) r.push(c[k]);
+    for(const [g,e] of fpSqfree(P,p,P.monic(r))) res.push([g,e*p]);
+  }
+  return res;
+}
+function fpDdf(P,p,h){
+  const out=[]; const X=[0,1]; let xp=X; let d=1;
+  while(P.deg(h)>=2*d){
+    xp=P.powmod(xp,BigInt(p),h);
+    const g=P.gcd(h,P.sub(xp,X));
+    if(P.deg(g)>0){ out.push([g,d]); h=P.divmod(h,g)[0]; xp=P.rem(xp,h); }
+    d++;
+  }
+  if(P.deg(h)>0) out.push([h,P.deg(h)]);
+  return out;
+}
+function fpEdf(P,p,g,d,rand){
+  const n=P.deg(g);
+  if(n===d) return [g];
+  const bigExp=(BigInt(p)**BigInt(d)-1n)/2n;
+  for(let tries=0;tries<500;tries++){
+    const a=[]; for(let k=0;k<n;k++) a.push(Math.floor(rand()*p));
+    const aa=P.trim(a); if(P.deg(aa)<1) continue;
+    let h;
+    if(p===2){ let t=aa, s=aa; for(let k=1;k<d;k++){ s=P.rem(P.mul(s,s),g); t=P.add(t,s); } h=t; }
+    else h=P.sub(P.powmod(aa,bigExp,g),[1]);
+    const u=P.gcd(g,h);
+    if(P.deg(u)>0&&P.deg(u)<n){ return fpEdf(P,p,u,d,rand).concat(fpEdf(P,p,P.divmod(g,u)[0],d,rand)); }
+  }
+  throw new Error('equal-degree splitting failed');
+}
+function polyCmp(a,b){ if(a.length!==b.length) return a.length-b.length; for(let k=a.length-1;k>=0;k--) if(a[k]!==b[k]) return a[k]-b[k]; return 0; }
+/* f nonzero, degree >= 1 over F_p. Returns {lead, factors:[{g,e,d}]} with g monic irreducible, sorted. */
+function fpFactor(p,f){
+  const P=getFp(p); f=P.trim(f);
+  const lead=f[f.length-1]; const fm=P.monic(f);
+  const rand=rng(p*7919+f.length*104729+(f[0]||0));
+  const res=[];
+  for(const [s,e] of fpSqfree(P,p,fm)) for(const [h,d] of fpDdf(P,p,s)) for(const g of fpEdf(P,p,h,d,rand)) res.push({g,e,d});
+  res.sort((a,b)=>polyCmp(a.g,b.g)); // by degree then coefficients
+  return {lead,factors:res};
+}
+function fpIsIrreducible(p,g){
+  const P=getFp(p); g=P.trim(g); const n=P.deg(g);
+  if(n<1) return false; if(n===1) return true;
+  const half=Math.floor(n/2);
+  if(Math.pow(p,half)<=4000){
+    // brute-force trial division by all monic polynomials of degree 1..n/2
+    for(let dd=1;dd<=half;dd++){
+      const cnt=Math.pow(p,dd);
+      for(let m=0;m<cnt;m++){ const q=[]; let t=m; for(let k=0;k<dd;k++){ q.push(t%p); t=Math.floor(t/p); } q.push(1); if(P.rem(g,q).length===0) return false; }
+    }
+    return true;
+  }
+  // Rabin test
+  const X=[0,1]; const gm=P.monic(g);
+  let xp=X; const pows=[]; // pows[k]=x^(p^k) mod g
+  pows[0]=X;
+  for(let k=1;k<=n;k++){ xp=P.powmod(xp,BigInt(p),gm); pows[k]=xp; }
+  if(!P.eq(P.rem(pows[n],gm),X)) return false;
+  const primes=[]; let m=n; for(let q=2;q<=m;q++){ if(m%q===0){ primes.push(q); while(m%q===0) m/=q; } }
+  for(const q of primes){ const h=P.gcd(gm,P.sub(pows[n/q],X)); if(P.deg(h)>0) return false; }
+  return true;
+}
+
+/* ===================== R / C engine ===================== */
+function yun(P,f){
+  const out=[]; const fd=P.deriv(f); const a0=P.gcd(f,fd);
+  let b=P.divmod(f,a0)[0], c=P.divmod(fd,a0)[0];
+  let d=P.sub(c,P.deriv(b)); let i=1;
+  while(P.deg(b)>0){
+    const a=P.gcd(b,d);
+    if(P.deg(a)>0) out.push([a,i]);
+    b=P.divmod(b,a)[0]; c=P.divmod(d,a)[0]; d=P.sub(c,P.deriv(b)); i++;
+    if(i>400) throw new Error('Yun did not terminate');
+  }
+  return out;
+}
+/* number of distinct real roots of a squarefree real polynomial (coefs in Q(i) with zero imaginary part), exact (Sturm) */
+function sturmCount(a){
+  const q0=PQ.trim(a.map(z=>z.r)); const seq=[q0, PQ.deriv(q0)];
+  for(;;){
+    const n=seq.length; let r=PQ.rem(seq[n-2],seq[n-1]);
+    if(!r.length) break;
+    r=r.map(qneg); const l=qabs(r[r.length-1]); r=r.map(c=>qmul(c,qinv(l)));
+    seq.push(r);
+  }
+  const sg=q=>q.n>0n?1:-1;
+  const changes=arr=>{ let c=0,prev=0; for(const s of arr){ if(prev!==0&&s!==prev) c++; prev=s; } return c; };
+  const pos=seq.map(s=>sg(s[s.length-1]));
+  const neg=seq.map(s=>sg(s[s.length-1])*((s.length-1)%2?-1:1));
+  return changes(neg)-changes(pos);
+}
+/* floats: complex numbers as [re,im] */
+const cmul=(a,b)=>[a[0]*b[0]-a[1]*b[1],a[0]*b[1]+a[1]*b[0]];
+const cdiv=(a,b)=>{ const d=b[0]*b[0]+b[1]*b[1]; return [(a[0]*b[0]+a[1]*b[1])/d,(a[1]*b[0]-a[0]*b[1])/d]; };
+const csub=(a,b)=>[a[0]-b[0],a[1]-b[1]];
+const cabs=a=>Math.hypot(a[0],a[1]);
+function hornerPD(c,z){ // value and derivative
+  let p=[0,0], d=[0,0];
+  for(let k=c.length-1;k>=0;k--){ d=cmul(d,z); d=[d[0]+p[0],d[1]+p[1]]; p=cmul(p,z); p=[p[0]+c[k][0],p[1]+c[k][1]]; }
+  return [p,d];
+}
+function aberth(c){ // c: [[re,im],...] low->high, leading nonzero
+  const m=c.length-1; if(m<1) return [];
+  const lead=c[m]; c=c.map(z=>cdiv(z,lead));
+  if(m===1) return [[-c[0][0],-c[0][1]]];
+  let R=0; for(let k=1;k<=m;k++) R=Math.max(R,Math.pow(cabs(c[m-k]),1/k));
+  R=R||1;
+  const z=[]; for(let k=0;k<m;k++){ const th=2*Math.PI*k/m+0.5; z.push([R*Math.cos(th)*0.7,R*Math.sin(th)*0.7]); }
+  for(let it=0;it<2000;it++){
+    let mx=0;
+    for(let k=0;k<m;k++){
+      const [p,d]=hornerPD(c,z[k]);
+      if(p[0]===0&&p[1]===0) continue;
+      const ratio=cdiv(p,d);
+      let s=[0,0]; for(let j=0;j<m;j++) if(j!==k){ const df=csub(z[k],z[j]); const iv=cdiv([1,0],df); s=[s[0]+iv[0],s[1]+iv[1]]; }
+      const den=csub([1,0],cmul(ratio,s));
+      const w=cdiv(ratio,den);
+      z[k]=csub(z[k],w); mx=Math.max(mx,cabs(w)/(1+cabs(z[k])));
+    }
+    if(mx<1e-16) break;
+  }
+  for(let k=0;k<m;k++) for(let it=0;it<6;it++){ const [p,d]=hornerPD(c,z[k]); if(d[0]===0&&d[1]===0) break; const w=cdiv(p,d); if(!isFinite(w[0])||!isFinite(w[1])) break; z[k]=csub(z[k],w); }
+  return z;
+}
+function snapQ(x,maxDen){
+  maxDen=maxDen||5000;
+  if(!isFinite(x)) return null;
+  const s=x<0?-1:1, v=Math.abs(x), tol=1e-9*Math.max(1,v);
+  let h0=1,h1=Math.floor(v),k0=0,k1=1,r=v-Math.floor(v);
+  for(let it=0;it<40;it++){
+    if(Math.abs(v-h1/k1)<tol) return Q(BigInt(s*h1),BigInt(k1));
+    if(r<1e-14) break;
+    const iv=1/r, a=Math.floor(iv); r=iv-a;
+    const nh=a*h1+h0, nk=a*k1+k0; h0=h1;h1=nh;k0=k1;k1=nk;
+    if(k1>maxDen||h1>1e15) return null;
+  }
+  return Math.abs(v-h1/k1)<tol?Q(BigInt(s*h1),BigInt(k1)):null;
+}
+const rnQ=q=>({q,f:qfloat(q)});
+const rnF=f=>({q:null,f});
+const rnNeg=r=>({q:r.q?qneg(r.q):null,f:-r.f});
+function decomposeChar0(f,isReal){
+  const P=PC; f=P.trim(f); const m=P.deg(f);
+  const lead=f[m]; const fm=P.monic(f);
+  const sq=yun(P,fm); const pieces=[];
+  for(const [a,e] of sq){
+    const roots=aberth(a.map(z=>[qfloat(z.r),qfloat(z.i)]));
+    if(!isReal){
+      for(const z of roots){
+        const qr=snapQ(z[0]), qi=snapQ(z[1]);
+        let re=rnF(z[0]), im=rnF(z[1]);
+        if(qr&&qi&&P.F.isZero(P.ev(a,C(qr,qi)))){ re=rnQ(qr); im=rnQ(qi); }
+        else if(Math.abs(z[1])<1e-11){ im=rnF(0); }
+        pieces.push({kind:'lin',e,d:1,re,im,sortKey:[z[0],z[1]]});
+      }
+    } else {
+      const N=sturmCount(a);
+      const idx=roots.map((_,k)=>k).sort((u,v)=>Math.abs(roots[u][1])-Math.abs(roots[v][1]));
+      const realIdx=idx.slice(0,N), rest=idx.slice(N);
+      for(const k of realIdx){
+        // real Newton polish on the real polynomial
+        const cf=a.map(z=>qfloat(z.r)); let x=roots[k][0];
+        for(let it=0;it<8;it++){ let p=0,d=0; for(let j=cf.length-1;j>=0;j--){ d=d*x+p; p=p*x+cf[j]; } if(d===0) break; const w=p/d; if(!isFinite(w)) break; x-=w; }
+        const q=snapQ(x);
+        let re=rnF(x);
+        if(q&&P.F.isZero(P.ev(a,C(q,Q0)))) re=rnQ(q);
+        pieces.push({kind:'real',e,d:1,re,im:rnF(0),sortKey:[x,0]});
+      }
+      const reps=rest.slice().sort((u,v)=>roots[v][1]-roots[u][1]).slice(0,Math.floor(rest.length/2));
+      for(const k of reps){
+        const z=roots[k]; const u=z[0], v=Math.abs(z[1]);
+        const sq_=snapQ(2*u), tq=snapQ(u*u+v*v);
+        let S=rnF(2*u), T=rnF(u*u+v*v);
+        if(sq_&&tq){
+          const qd=[C(tq,Q0),C(qneg(sq_),Q0),FC.one];
+          if(P.rem(a,qd).length===0){ S=rnQ(sq_); T=rnQ(tq); }
+        }
+        const uu=S.f/2, vv=Math.sqrt(Math.max(T.f-uu*uu,0));
+        pieces.push({kind:'pair',e,d:2,S,T,re:rnF(uu),im:rnF(vv),sortKey:[uu,vv]});
+      }
+    }
+  }
+  const rank=p=>p.kind==='pair'?1:0;
+  pieces.sort((a,b)=>rank(a)-rank(b)||a.sortKey[0]-b.sortKey[0]||a.sortKey[1]-b.sortKey[1]);
+  return {lead,fm,pieces};
+}
+
+/* ===================== finite rings F_p[x]/(f) ===================== */
+function elemFromIndex(p,n,idx){ const a=[]; for(let k=0;k<n;k++){ a.push(idx%p); idx=Math.floor(idx/p); } let L=a.length; while(L>0&&a[L-1]===0) L--; return a.slice(0,L); }
+function indexOfElem(p,a){ let r=0,m=1; for(let k=0;k<a.length;k++){ r+=a[k]*m; m*=p; } return r; }
+function mulMod(p,fm,a,b){ const P=getFp(p); return P.rem(P.mul(a,b),fm); }
+function classifyElem(p,fm,pieces,a){
+  const P=getFp(p); a=P.trim(a);
+  if(!a.length) return 'zero';
+  if(P.deg(P.gcd(a,fm))===0) return 'unit';
+  return pieces.every(pc=>P.rem(a,pc.g).length===0)?'nil':'zd';
+}
+function ringCounts(p,pieces,n){
+  const size=BigInt(p)**BigInt(n); let units=1n, nil=1n; const uTerms=[], nTerms=[];
+  for(const pc of pieces){
+    const hi=BigInt(p)**BigInt(pc.d*pc.e), lo=BigInt(p)**BigInt(pc.d*(pc.e-1));
+    units*=hi-lo; nil*=lo; uTerms.push(hi.toString()+' − '+lo.toString()); nTerms.push(lo.toString());
+  }
+  return {size,units,nil,zd:size-units-1n,uTerms,nTerms};
+}
+function bruteCounts(p,fm){
+  const n=getFp(p).deg(fm), size=Math.pow(p,n); const P=getFp(p);
+  const els=[]; for(let i=0;i<size;i++) els.push(elemFromIndex(p,n,i));
+  let units=0,nil=0,zd=0; const cls=[];
+  for(let i=0;i<size;i++){
+    const a=els[i]; let isUnit=false, isZd=false;
+    for(let j=0;j<size;j++){
+      const pr=mulMod(p,fm,a,els[j]);
+      if(pr.length===1&&pr[0]===1) isUnit=true;
+      if(!pr.length&&els[j].length) isZd=true;
+    }
+    let pw=[1], isNil=false;
+    for(let k=0;k<=n+1;k++){ pw=mulMod(p,fm,pw,a); if(!pw.length){ isNil=true; break; } }
+    if(!a.length){ isNil=true; }
+    if(isUnit) units++;
+    if(isNil) nil++;
+    if(isZd&&a.length) zd++; // zero divisors are nonzero by definition here
+    cls.push(isUnit?'unit':!a.length?'zero':isNil?'nil':isZd?'zd':'other');
+  }
+  return {units,nil,zd,cls,size};
+}
+
+/* ===================== Z/n: Hensel lifting and the rings Z/n[x]/(f) ===================== */
+function makeZm(m){
+  const inv=new Array(m).fill(0);
+  for(let a=1;a<m;a++) for(let b=1;b<m;b++) if(a*b%m===1){ inv[a]=b; break; }
+  return {p:m,zero:0,one:1,add:(a,b)=>(a+b)%m,sub:(a,b)=>(a-b+m)%m,mul:(a,b)=>a*b%m,neg:a=>(m-a)%m,inv:a=>inv[a],isZero:a=>a===0,eq:(a,b)=>a===b,fromInt:n=>((n%m)+m)%m};
+}
+const zmCache={};
+/* polynomial arithmetic over Z/m (m any integer >= 2). Division only by monic polynomials; gcd/monic must not be used. */
+function getZm(m){ if(!zmCache[m]) zmCache[m]=makePoly(makeZm(m)); return zmCache[m]; }
+function factorInt(n){
+  const out=[]; let r=n;
+  for(let p=2;p*p<=r;p++) if(r%p===0){ let k=0,q=1; while(r%p===0){ r/=p; k++; q*=p; } out.push({p,k,m:q}); }
+  if(r>1) out.push({p:r,k:1,m:r});
+  return out;
+}
+/* inverse of c modulo n, or null if c is not a unit */
+function znInv(n,c){
+  c=((c%n)+n)%n; let r0=n,r1=c,t0=0,t1=1;
+  while(r1){ const q=Math.floor(r0/r1); let t=r0-q*r1; r0=r1; r1=t; t=t0-q*t1; t0=t1; t1=t; }
+  return r0===1?((t0%n)+n)%n:null;
+}
+function toZn(poly,n){
+  const N=BigInt(n);
+  const out=poly.map(z=>{
+    if(!qz(z.i)) fail('Complex numbers do not live in Z/'+n+'.');
+    const inv=znInv(n,Number(z.r.d%N));
+    if(inv===null) fail('The fraction '+qstr(z.r)+' has a denominator that is not invertible modulo '+n+' (it shares a factor with '+n+').');
+    return Number(((z.r.n%N)+N)%N)*inv%n;
+  });
+  return getZm(n).trim(out);
+}
+/* inverse of a modulo m over a field polynomial ring P (extended Euclid); a, m coprime */
+function invModP(P,a,m){
+  let r0=m, r1=P.rem(a,m), t0=[], t1=[P.F.one];
+  for(let it=0;it<400&&r1.length;it++){
+    const [q,r]=P.divmod(r0,r1); const t2=P.sub(t0,P.mul(q,t1));
+    r0=r1; r1=r; t0=t1; t1=t2;
+  }
+  if(P.deg(r0)!==0) throw new Error('not invertible');
+  return P.rem(P.scale(t0,P.F.inv(r0[0])),m);
+}
+/* f monic over Z/p^k with f = a0*b0 mod p (a0, b0 monic, coprime, degree >= 1): lift to monic a, b over Z/p^k, a*b = f, a = a0, b = b0 mod p */
+function henselPair(p,k,f,a0,b0){
+  const Pp=getFp(p); const s=invModP(Pp,a0,b0); // s*a0 = 1 mod b0
+  let a=a0.slice(), b=b0.slice(), pj=p;
+  for(let j=1;j<k;j++){
+    const M=pj*p, PM=getZm(M);
+    const diff=PM.sub(PM.trim(f.map(c=>c%M)),PM.mul(a,b));
+    const e=Pp.trim(diff.map(c=>{ if(c%pj) throw new Error('Hensel step: not divisible by p^j'); return (c/pj)%p; }));
+    const beta=Pp.rem(Pp.mul(s,e),b0);
+    const alpha=Pp.divmod(Pp.sub(e,Pp.mul(a0,beta)),b0)[0];
+    const addS=(x,y)=>{ const r=[]; for(let i=0;i<Math.max(x.length,y.length);i++) r.push(((x[i]||0)+pj*(y[i]||0))%M); return PM.trim(r); };
+    a=addS(a,alpha); b=addS(b,beta); pj=M;
+  }
+  return [a,b];
+}
+/* hs: monic pairwise coprime polys over F_p whose product is f mod p. Returns monic F_i over Z/p^k with prod F_i = f, F_i = h_i mod p. */
+function henselLift(p,k,f,hs){
+  if(hs.length===1) return [f.slice()];
+  const Pp=getFp(p); const rest=hs.slice(1).reduce((x,y)=>Pp.mul(x,y));
+  const [A,B]=henselPair(p,k,f,hs[0],rest);
+  return [A].concat(henselLift(p,k,B,hs.slice(1)));
+}
+/* fm monic over Z/n, degree >= 1. Returns the CRT parts (one per prime power p^k || n), each with its lifted factors. */
+function znDecompose(n,fm){
+  const parts=[];
+  for(const {p,k,m} of factorInt(n)){
+    const Pp=getFp(p), PM=getZm(m);
+    const fmod=PM.trim(fm.map(c=>c%m)), fbar=Pp.trim(fm.map(c=>c%p));
+    const {factors}=fpFactor(p,fbar);
+    const hs=factors.map(x=>Pp.pow(x.g,x.e));
+    const Fs=henselLift(p,k,fmod,hs);
+    let prod=[1]; for(const F of Fs) prod=PM.mul(prod,F);
+    if(!PM.eq(prod,fmod)) throw new Error('Hensel lift: the product of the lifted factors differs from f');
+    Fs.forEach((F,i)=>{ if(F[F.length-1]!==1) throw new Error('Hensel lift: factor not monic'); if(!Pp.eq(Pp.trim(F.map(c=>c%p)),hs[i])) throw new Error('Hensel lift: factor does not reduce to g^e'); });
+    parts.push({p,k,m,fmod,fbar,factors:factors.map((x,i)=>({g:x.g,e:x.e,d:x.d,F:Fs[i]}))});
+  }
+  return parts;
+}
+/* a: trimmed element (coefficients in Z/n). unit iff nonzero mod (p,g) for every p | n and every factor g of f mod p */
+function znClassify(parts,a){
+  if(!a.length) return 'zero';
+  let anyIn=false, anyOut=false;
+  for(const pt of parts){
+    const Pp=getFp(pt.p); const ap=Pp.trim(a.map(c=>c%pt.p));
+    for(const f of pt.factors){ if(Pp.rem(ap,f.g).length===0) anyIn=true; else anyOut=true; }
+  }
+  return !anyIn?'unit':!anyOut?'nil':'zd';
+}
+function znCounts(parts,deg,n){
+  const size=BigInt(n)**BigInt(deg); let units=1n, nil=1n, prodSize=1n; const uTerms=[], nTerms=[];
+  for(const pt of parts) for(const f of pt.factors){
+    const A=BigInt(pt.p)**BigInt(pt.k*f.d*f.e), lo=A/(BigInt(pt.p)**BigInt(f.d));
+    units*=A-lo; nil*=lo; prodSize*=A; uTerms.push(A.toString()+' − '+lo.toString()); nTerms.push(lo.toString());
+  }
+  if(prodSize!==size) throw new Error('piece sizes do not multiply to n^deg');
+  return {size,units,nil,zd:size-units-1n,uTerms,nTerms};
+}
+/* largest k with a^k = 0 needed over all nilpotents a (including 0, which needs k = 1), brute force over Z/m[x]/(fm). cand(a) may pre-filter. */
+function znNilIndex(m,fm,cand){
+  const P=getZm(m), n=P.deg(fm), size=Math.pow(m,n); let best=1;
+  for(let i=0;i<size;i++){
+    const a=elemFromIndex(m,n,i); if(cand&&!cand(a)) continue;
+    let pw=a, k=1; while(pw.length&&k<=300){ pw=P.rem(P.mul(pw,a),fm); k++; }
+    if(!pw.length&&k>best) best=k;
+  }
+  return best;
+}
+/* full brute force of Z/n[x]/(fm): counts, per-element classes, idempotents, nilpotency index */
+function znBrute(n,fm){
+  const P=getZm(n), deg=P.deg(fm), size=Math.pow(n,deg);
+  const els=[]; for(let i=0;i<size;i++) els.push(elemFromIndex(n,deg,i));
+  let units=0,nil=0,zd=0,idem=0,index=1; const cls=[];
+  for(let i=0;i<size;i++){
+    const a=els[i]; let isUnit=false, isZd=false;
+    for(let j=0;j<size;j++){
+      const pr=P.rem(P.mul(a,els[j]),fm);
+      if(pr.length===1&&pr[0]===1) isUnit=true;
+      if(!pr.length&&els[j].length) isZd=true;
+    }
+    let pw=a, k=1; while(pw.length&&k<=300){ pw=P.rem(P.mul(pw,a),fm); k++; }
+    const isNil=!pw.length; if(isNil&&k>index) index=k;
+    const sq=P.rem(P.mul(a,a),fm); if(P.eq(sq,a)) idem++;
+    if(isUnit) units++; if(isNil) nil++; if(isZd&&a.length) zd++;
+    cls.push(isUnit?'unit':!a.length?'zero':isNil?'nil':isZd?'zd':'other');
+  }
+  return {units,nil,zd,idem,index,cls,size};
+}
+
+return {QErr,Q,Q0,Q1,qadd,qsub,qmul,qinv,qneg,qz,qeq,qabs,qfloat,qstr,C,FQ,FC,PQ,PC,getFp,makePoly,
+  parseExact,toFp,tokenize,fpFactor,fpIsIrreducible,fpSqfree,yun,sturmCount,aberth,snapQ,decomposeChar0,
+  elemFromIndex,indexOfElem,mulMod,classifyElem,ringCounts,bruteCounts,rnQ,rnF,rnNeg,sub,FPSUP,rng,
+  getZm,factorInt,znInv,toZn,invModP,henselPair,henselLift,znDecompose,znClassify,znCounts,znNilIndex,znBrute};
+})();
+</script>
+<script>
+/* ===================== UI + analysis ===================== */
+(function(){
+"use strict";
+const {QErr,Q,Q0,Q1,qz,qfloat,qstr,qabs,qneg,PQ,makePoly,C,FC,PC,getFp,parseExact,toFp,fpFactor,decomposeChar0,
+  elemFromIndex,indexOfElem,mulMod,classifyElem,ringCounts,bruteCounts,rnQ,rnF,rnNeg,sub,FPSUP,
+  getZm,znInv,toZn,znDecompose,znClassify,znCounts,znNilIndex}=QR;
+const DEG_CAP=12;
+const PRIMES=[2,3,5,7,11,13,17,19,23,29,31,37,41,43,47];
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---------- number / polynomial display ---------- */
+function fmtNum(x){ if(Math.abs(x)<1e-10) return '0'; return String(Number(x.toPrecision(4))); }
+function rnStr(r){ return r.q?qstr(qabs(r.q)):fmtNum(Math.abs(r.f)); }
+function rnZero(r){ return r.q?qz(r.q):Math.abs(r.f)<1e-10; }
+function rnNegQ(r){ return r.q?r.q.n<0n:r.f<0; }
+function cfRN(r){ if(rnZero(r)) return null; return {neg:rnNegQ(r),mag:rnStr(r),wrap:!!(r.q&&r.q.d!==1n)}; }
+function cfComplex(re,im){
+  if(rnZero(im)) return cfRN(re);
+  const iv=Math.abs(im.q?qfloat(im.q):im.f);
+  const imag=(im.q&&im.q.n===1n&&im.q.d===1n||im.q&&im.q.n===-1n&&im.q.d===1n)?'i':(im.q&&im.q.d!==1n?'('+rnStr(im)+')i':rnStr(im)+'i');
+  if(rnZero(re)) return {neg:rnNegQ(im),mag:imag,wrap:false};
+  return {neg:false,mag:'('+(rnNegQ(re)?'−':'')+rnStr(re)+(rnNegQ(im)?' − ':' + ')+imag+')',wrap:false};
+}
+function cfCI(z){ return cfComplex(rnQ(z.r),rnQ(z.i)); }
+function cfFp(c,p,sym){ if(c===0) return null; if(sym&&c>p/2) return {neg:true,mag:String(p-c)}; return {neg:false,mag:String(c)}; }
+function polyHtml(cf,opt){
+  opt=opt||{}; const v=opt.v||'x'; const parts=[];
+  for(let k=cf.length-1;k>=0;k--){
+    const c=cf[k]; if(!c) continue;
+    let coef=(k>0&&c.mag==='1')?'':c.mag;
+    if(coef&&c.wrap&&k>0) coef='('+coef+')';
+    const t=coef+(k===0?'':v+(k>1?'<sup>'+k+'</sup>':''));
+    parts.push({neg:c.neg,t:k===0&&!coef?'1':t});
+  }
+  if(!parts.length) return '0';
+  let s='';
+  parts.forEach((p,j)=>{
+    if(j===0) s+=(p.neg?'−':'')+p.t;
+    else if(opt.compact) s+='<wbr>'+(p.neg?'−':'+')+p.t;
+    else s+=(p.neg?' − ':' + ')+p.t;
+  });
+  return s;
+}
+const fpHtml=(a,p,sym,opt)=>polyHtml(a.map(c=>cfFp(c,p,sym)),opt);
+const ciHtml=(a,opt)=>polyHtml(a.map(cfCI),opt);
+const ringName=(ring,p)=>ring==='Fp'?'F<sub>'+p+'</sub>':ring==='Zn'?'ℤ/'+p:ring==='R'?'ℝ':'ℂ';
+const gcdInt=(a,b)=>{ while(b){ const t=a%b; a=b; b=t; } return a; };
+const SUPD='⁰¹²³⁴⁵⁶⁷⁸⁹', SUBD='₀₁₂₃₄₅₆₇₈₉';
+function plainText(h){
+  const unsup=s=>Number(s.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]/g,c=>SUPD.indexOf(c)));
+  return h.replace(/<sub>(\d+)([⁰¹²³⁴⁵⁶⁷⁸⁹]+)<\/sub>/g,(_,p,d)=>String(Math.pow(+p,unsup(d))).replace(/\d/g,c=>SUBD[c]))
+    .replace(/<sup>(\d+)<\/sup>/g,(_,d)=>d.replace(/\d/g,c=>SUPD[c])).replace(/<sub>(\d+)<\/sub>/g,(_,d)=>d.replace(/\d/g,c=>SUBD[c]))
+    .replace(/<wbr>/g,'').replace(/<[^>]+>/g,'').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&');
+}
+const fieldName=(p,d)=>d===1?'F<sub>'+p+'</sub>':'F<sub>'+p+FPSUP(d)+'</sub>';
+const yring=(fld,e)=>fld+'[y]/(y<sup>'+e+'</sup>)';
+const bigFmt=b=>b.toString().replace(/\B(?=(\d{3})+(?!\d))/g,',');
+
+/* ---------- analysis: text -> result object ---------- */
+function analyze(ring,p,text){
+  text=text.trim();
+  if(!text) return {kind:'empty'};
+  let ex;
+  try{ ex=parseExact(text,ring); }catch(e){ if(e instanceof QErr) return {kind:'error',msg:e.message}; throw e; }
+  if(ring==='Fp'){
+    let poly;
+    try{ poly=toFp(ex,p); }catch(e){ if(e instanceof QErr) return {kind:'error',msg:e.message}; throw e; }
+    if(!poly.length) return {kind:'zero',ring,p,note:ex.length?'This polynomial is 0 modulo '+p+'.':''};
+    if(poly.length===1) return {kind:'unit',ring,p};
+    if(poly.length-1>DEG_CAP) return {kind:'error',msg:'Degree '+(poly.length-1)+' is above the cap of '+DEG_CAP+'.'};
+    return analyzeFp(p,poly);
+  }
+  if(ring==='Zn'){
+    const n=p; let poly;
+    try{ poly=toZn(ex,n); }catch(e){ if(e instanceof QErr) return {kind:'error',msg:e.message}; throw e; }
+    if(!poly.length) return {kind:'zero',ring,p:n,note:ex.length?'This polynomial is 0 modulo '+n+'.':''};
+    if(poly.length===1){
+      if(znInv(n,poly[0])!==null) return {kind:'unit',ring,p:n};
+      const g=gcdInt(poly[0],n);
+      return {kind:'error',msg:'Modulo '+n+', f is the constant '+poly[0]+', which is neither 0 nor invertible. Then ℤ/'+n+'[x]/('+poly[0]+') is just ℤ/'+g+'[x], the infinite ring of all polynomials with coefficients in ℤ/'+g+'. This widget does not support that case; it needs a non-constant f.'};
+    }
+    if(poly.length-1>DEG_CAP) return {kind:'error',msg:'Degree '+(poly.length-1)+' is above the cap of '+DEG_CAP+'.'};
+    const lead=poly[poly.length-1];
+    if(znInv(n,lead)===null) return {kind:'error',msg:'Modulo '+n+', the leading coefficient of f is '+lead+', which is not invertible in ℤ/'+n+'. With a non-invertible leading coefficient (for example 2x² + 1 over ℤ/4) the quotient no longer has the nice basis 1, x, …, x^(deg−1): the highest power of x cannot be rewritten using the lower ones. So this widget only accepts polynomials whose leading coefficient is invertible (a unit) modulo '+n+'.'};
+    return analyzeZn(n,poly,ex.length>poly.length);
+  }
+  if(!ex.length) return {kind:'zero',ring,p,note:''};
+  if(ex.length===1) return {kind:'unit',ring,p};
+  if(ex.length-1>DEG_CAP) return {kind:'error',msg:'Degree '+(ex.length-1)+' is above the cap of '+DEG_CAP+'.'};
+  return analyzeC0(ring,ex);
+}
+function pieceRole(e,d,over){ return e>1?'fat':(d>1?'ext':'base'); }
+function analyzeFp(p,poly){
+  const P=getFp(p); const n=poly.length-1;
+  const {lead,factors}=fpFactor(p,poly); const fm=P.monic(poly);
+  const pieces=factors.map(({g,e,d})=>({
+    g,e,d,role:pieceRole(e,d),gPow:P.pow(g,e),
+    gHtml:fpHtml(g,p,true), field:fieldName(p,d),
+    root: d===1?(p-g[0])%p:null
+  }));
+  const cnt=ringCounts(p,pieces,n);
+  const idx=pieces.reduce((m,pc)=>Math.max(m,pc.e),1);
+  return {kind:'ok',ring:'Fp',p,n,poly,fm,lead,pieces,cnt,idx,m:p,PP:P,classify:a=>classifyElem(p,fm,pieces,a),
+    fHtml:fpHtml(poly,p,true),fmHtml:fpHtml(fm,p,true),leadHtml:lead!==1?String(lead>p/2?'−'+(p-lead):lead):'',
+    monicChanged:lead!==1};
+}
+/* Z/n[x]/(f): poly = f reduced mod n (trimmed, degree >= 1, unit leading coefficient) */
+function analyzeZn(n,poly,dropped){
+  const PZ=getZm(n); const deg=poly.length-1;
+  const lead=poly[deg], li=znInv(n,lead);
+  const fm=PZ.trim(poly.map(c=>c*li%n));
+  const parts=znDecompose(n,fm);
+  const pieces=[];
+  parts.forEach((pt,pi)=>{
+    const {p,k,m}=pt; const Pp=getFp(p);
+    pt.fbarHtml=fpHtml(pt.fbar,p,true); pt.fmodHtml=fpHtml(pt.fmod,m,true);
+    pt.pieces=pt.factors.map(fc=>{
+      const {g,e,d,F}=fc; const role=pieceRole(e,d);
+      const size=BigInt(p)**BigInt(k*d*e);
+      const pc={part:pi,p,k,m,g,e,d,F,role,gHtml:fpHtml(g,p,true),FHtml:fpHtml(F,m,true),gPow:Pp.pow(g,e),field:fieldName(p,d),size,
+        root:d===1?(p-g[0])%p:null};
+      if(k>1){
+        pc.name=role==='base'?'ℤ/'+m:role==='ext'?'GR('+m+', '+d+')':'ℤ/'+m+'['+'x]/('+pc.FHtml+')';
+        if(role==='base') pc.rootM=(m-F[0])%m;
+        if(size<=20000n) pc.idx=znNilIndex(m,F,a=>Pp.rem(Pp.trim(a.map(c=>c%p)),g).length===0);
+        else pc.idx=null;
+      } else { pc.name=e>1?yring(pc.field,e):pc.field; pc.idx=e; }
+      pieces.push(pc);
+      return pc;
+    });
+  });
+  pieces.forEach((pc,i)=>{ pc.gi=i; });
+  const cnt=znCounts(parts,deg,n);
+  const idx=pieces.every(pc=>pc.idx!=null)?pieces.reduce((m,pc)=>Math.max(m,pc.idx),1):null;
+  const leadHtml=lead!==1?String(lead>n/2?'−'+(n-lead):lead):'';
+  return {kind:'ok',ring:'Zn',p:n,nmod:n,n:deg,poly,fm,lead,parts,pieces,cnt,idx,dropped,
+    fHtml:fpHtml(poly,n,true),fmHtml:fpHtml(fm,n,true),leadHtml,monicChanged:lead!==1,
+    m:n,PP:PZ,classify:a=>znClassify(parts,a)};
+}
+function analyzeC0(ring,ex){
+  const isReal=ring==='R'; const n=ex.length-1;
+  const {lead,fm,pieces:raw}=decomposeChar0(ex,isReal);
+  const pieces=raw.map(r=>{
+    let gHtml,field,role,roots=[];
+    if(r.kind==='pair'){
+      gHtml=polyHtml([cfRN(r.T),cfRN(rnNeg(r.S)),{neg:false,mag:'1'}]); field='ℂ'; role=r.e>1?'fat':'ext';
+      roots=[[r.re.f,r.im.f],[r.re.f,-r.im.f]];
+    } else if(r.kind==='real'){
+      gHtml=polyHtml([cfRN(rnNeg(r.re)),{neg:false,mag:'1'}]); field='ℝ'; role=r.e>1?'fat':'base'; roots=[[r.re.f,0]];
+    } else {
+      gHtml=polyHtml([cfComplex(rnNeg(r.re),rnNeg(r.im)),{neg:false,mag:'1'}]); field='ℂ'; role=r.e>1?'fat':'base'; roots=[[r.re.f,r.im.f]];
+    }
+    return {e:r.e,d:r.d,role,gHtml,field,roots,raw:r};
+  });
+  const leadHtml=FC.eq(lead,FC.one)?'':polyHtml([cfCI(lead)]);
+  return {kind:'ok',ring,n,poly:ex,pieces,lead,leadHtml,monicChanged:!FC.eq(lead,FC.one),
+    fHtml:ciHtml(ex),fmHtml:ciHtml(fm)};
+}
+
+/* ---------- state ---------- */
+const STATE={ring:'Fp',p:2,n:4,text:'x^3+x',sel:null,key:'',open:{}};
+const NS=[4,8,9,6];
+const modOf=()=>STATE.ring==='Zn'?STATE.n:STATE.p;
+let RES=null;
+
+/* ---------- presets ---------- */
+function polyStr(a){ // plain text with ^ from an F_p coefficient array (symmetric)
+  const p=STATE.p; const t=[];
+  for(let k=a.length-1;k>=0;k--){ const c=a[k]; if(!c) continue; const neg=c>p/2, m=neg?p-c:c; const body=k===0?String(m):(m===1?'':String(m))+'x'+(k>1?'^'+k:''); t.push((neg?'-':(t.length?'+':''))+body); }
+  return t.join('')||'0';
+}
+function fpPresets(p){
+  const P=getFp(p);
+  const hasRoot=g=>{ for(let r=0;r<p;r++) if(P.ev(g,r)===0) return true; return false; };
+  const irr=(d)=>{ const total=Math.pow(p,d); for(let m=0;m<total;m++){ const g=[]; let t=m; for(let k=0;k<d;k++){ g.push(t%p); t=Math.floor(t/p); } g.push(1); if(!hasRoot(g)&&(d<4)) return g; } return null; };
+  const q2=irr(2), q3=irr(3); const out=[];
+  const lin=p===2?'x(x+1)':(p===3?'x(x-1)(x+1)':'x(x-1)(x-2)');
+  out.push({s:lin,l:'splits into linear factors'});
+  out.push({s:polyStr(q2),l:'irreducible: a field with '+(p*p)+' elements'});
+  out.push({s:polyStr(q3),l:'irreducible cubic'});
+  out.push({s:p===2?'x^3+x':'x^2(x-1)',l:'repeated factor: a fat point'});
+  out.push({s:'('+polyStr(q2)+')^2',l:'fat point over an extension'});
+  out.push({s:'x('+polyStr(q2)+')(x-1)^2',l:'a bit of everything'});
+  return out;
+}
+const PRESETS={
+  R:[{s:'x^2-2',l:'ℝ × ℝ'},{s:'x^2+1',l:'ℂ'},{s:'x^3-x^2+x-1',l:'ℝ × ℂ'},{s:'(x^2+1)^2',l:'ℂ[y]/(y²)'},{s:'x^2',l:'ℝ[y]/(y²)'}],
+  C:[{s:'x^2+1',l:'ℂ × ℂ'},{s:'x^3-1',l:'three roots of unity'},{s:'(x-i)^2(x+1)',l:'fat point and a point'}]
+};
+const ZN_PRESETS={
+  4:['x-1','x^2+x+1','x^2','x^2+2','x^2+1','x^3-x'],
+  8:['x^2+x+1','x^2-1','x-3','x^3+x+1'],
+  9:['x^2+1','x^2-1','x^2','x^2-3'],
+  6:['x^2+1','x^2-x','x^2+x+1','x^3-x']
+};
+/* labels come from what the engine returns for each f */
+function znPresets(n){
+  return (ZN_PRESETS[n]||['x^2+x+1','x^2-1','x^2']).map(s=>{
+    let r; try{ r=analyze('Zn',n,s); }catch(e){ r=null; }
+    return {s,l:r&&r.kind==='ok'?r.pieces.map(pc=>plainText(pc.name)).join(' × '):''};
+  });
+}
+function renderPresets(){
+  const list=STATE.ring==='Fp'?fpPresets(STATE.p):STATE.ring==='Zn'?znPresets(STATE.n):PRESETS[STATE.ring];
+  $('presets').innerHTML='<span class="lab">Try:</span>'+list.map((x,k)=>'<button type="button" data-k="'+k+'"><span class="poly">'+esc(x.s.replace(/-/g,'−')).replace(/\^(\d+)/g,'<sup>$1</sup>')+'</span><small>'+esc(x.l)+'</small></button>').join('');
+  $('presets')._list=list;
+}
+
+/* ---------- rendering ---------- */
+function cardHtml(pc,k,res,sel){
+  const ring=res.ring, p=res.p;
+  const baseName=ringName(ring,p);
+  const ringHtml=pc.e>1?yring(pc.field,pc.e):pc.field;
+  let tag, desc='';
+  if(pc.role==='base') tag=res.partOf?'field, same as ℤ/'+p+' (part of the base)':'field, same as the base';
+  else if(pc.role==='ext') tag='bigger field';
+  else tag='fat point';
+  const fac='<span class="poly">('+pc.gHtml+')'+(pc.e>1?'<sup>'+pc.e+'</sup>':'')+'</span>';
+  if(pc.role==='base'){
+    if(ring==='Fp') desc='<p>The factor is linear, so this is evaluation at <span class="poly">x = '+pc.root+'</span>.</p>';
+    else if(pc.roots[0]) desc='<p>Evaluation at the root <span class="poly">x = '+rootText(pc.roots[0],pc.raw)+'</span>.</p>';
+  } else if(pc.role==='ext'){
+    if(ring==='Fp') desc='<p>A field with <b>'+bigFmt(BigInt(p)**BigInt(pc.d))+'</b> elements, of degree <b>'+pc.d+'</b> over '+baseName+'. Here <span class="poly">x</span> becomes a root of the irreducible factor.</p>';
+    else desc='<p>ℂ is a degree 2 extension of ℝ: the two conjugate roots <span class="poly">'+rootText(pc.roots[0],pc.raw)+'</span>, <span class="poly">'+rootText(pc.roots[1],pc.raw)+'</span> are glued into one piece.</p>';
+  } else {
+    desc='<p>Write <span class="poly">y = '+pc.gHtml+'</span>: then y<sup>'+pc.e+'</sup> = 0 but y'+(pc.e>2?'<sup>'+(pc.e-1)+'</sup>':'')+' ≠ 0. Residue field '+pc.field+'.</p>';
+  }
+  let stats='';
+  if(ring==='Fp'){
+    const q=BigInt(p)**BigInt(pc.d);
+    stats='<p><b>'+bigFmt(q**BigInt(pc.e))+'</b> elements'+(pc.e>1?', <b>'+bigFmt(q**BigInt(pc.e)-q**BigInt(pc.e-1))+'</b> units, <b>'+bigFmt(q**BigInt(pc.e-1))+'</b> nilpotent':', all nonzero ones are units')+'.</p>';
+  } else stats='<p>Dimension <b>'+(pc.d*pc.e)+'</b> over '+baseName+'.</p>';
+  let crd='';
+  if(sel&&sel.coords){
+    const c=sel.coords[k];
+    crd='<div class="crd">image of <span class="poly">a</span>: <span class="poly">'+c.html+'</span><br><span style="color:var(--muted)">'+c.note+'</span></div>';
+  }
+  return '<div class="card '+pc.role+(sel?' hit':'')+'" data-piece="'+k+'"><div class="tag">'+tag+'</div><div class="rn">'+ringHtml+'</div><p>from the factor '+fac+'</p>'+desc+stats+crd+(pc.role==='fat'?moreHtml(pc,k,res):'')+'</div>';
+}
+/* ---------- "More about this piece" (fat points) ---------- */
+const FL={zero:0,one:1,add:(a,b)=>a+b,sub:(a,b)=>a-b,mul:(a,b)=>a*b,neg:a=>-a,inv:a=>1/a,isZero:a=>Math.abs(a)<1e-9,eq:(a,b)=>Math.abs(a-b)<1e-9,fromInt:n=>n};
+const PF=makePoly(FL);
+function invMod(P,a,m){ // inverse of a modulo m (extended Euclid)
+  let r0=m, r1=P.rem(a,m), t0=[], t1=[P.F.one];
+  for(let it=0;it<400&&r1.length;it++){
+    const [q,r]=P.divmod(r0,r1); const t2=P.sub(t0,P.mul(q,t1));
+    r0=r1; r1=r; t0=t1; t1=t2;
+  }
+  if(P.deg(r0)!==0) throw new Error('not invertible');
+  return P.rem(P.scale(t0,P.F.inv(r0[0])),m);
+}
+/* Newton lift: find w in P[x]/(g^e) with g(w)=0 exactly and w = x mod g. Returns {omega,ok,steps,P,g,ge}. */
+function newtonLift(P,g,e){
+  const ge=P.pow(g,e), X=[P.F.zero,P.F.one], gp=P.deriv(g);
+  const evalMod=(h,w)=>{ let r=[]; for(let k=h.length-1;k>=0;k--) r=P.rem(P.add(P.mul(r,w),[h[k]]),ge); return r; };
+  let w=P.rem(X,ge), steps=0; const maxSteps=Math.ceil(Math.log2(e))+2;
+  while(steps<=maxSteps){
+    const v=evalMod(g,w); if(!v.length) break;
+    w=P.rem(P.sub(w,P.rem(P.mul(v,invMod(P,evalMod(gp,w),ge)),ge)),ge); steps++;
+  }
+  return {omega:w,ok:!evalMod(g,w).length&&!P.rem(P.sub(w,X),g).length,steps,P,g,ge,evalMod};
+}
+/* piece (from analyze) -> lift, or null if not applicable */
+function liftRoot(pc,res){
+  if(pc.e<2) return null;
+  let P,g,exact=true;
+  if(res.ring==='Fp'){ P=getFp(res.p); g=pc.g; }
+  else {
+    const r=pc.raw; if(!r||r.kind!=='pair') return null;
+    if(r.S.q&&r.T.q){ P=PQ; g=[r.T.q,qneg(r.S.q),Q1]; } else { P=PF; g=[r.T.f,-r.S.f,1]; exact=false; }
+  }
+  const L=newtonLift(P,g,pc.e); L.exact=exact; L.kind=res.ring==='Fp'?'Fp':(exact?'Q':'float'); return L;
+}
+function bigLcm(a,b){ let x=a,y=b; while(y){ const t=x%y; x=y; y=t; } return a/x*b; }
+function omegaHtml(L,res){
+  const w=L.omega;
+  if(L.kind==='Fp') return '<span class="poly">'+fpHtml(w,res.p,true)+'</span>';
+  if(L.kind==='float') return '<span class="poly">'+polyHtml(w.map(c=>cfRN(rnF(c))))+'</span>';
+  let D=1n; w.forEach(q=>{ D=bigLcm(D,q.d); });
+  if(D===1n) return '<span class="poly">'+polyHtml(w.map(q=>cfRN(rnQ(q))))+'</span>';
+  const ints=w.map(q=>cfRN(rnQ(Q(q.n*(D/q.d),1n))));
+  return '<span class="poly">('+polyHtml(ints)+')/'+D+'</span>';
+}
+function isqrtBig(n){ if(n<2n) return n; let x=BigInt(Math.floor(Math.sqrt(Number(n)))); while(x*x>n) x--; while((x+1n)*(x+1n)<=n) x++; return x; }
+/* the root (upper half plane) of a degree 2 real factor, as text: {t,approx} */
+function pairRootText(pc){
+  const r=pc.raw;
+  if(r.S.q&&r.T.q){
+    const S=r.S.q, T=r.T.q;
+    const re=Q(S.n,2n*S.d);
+    const D=Q(T.n*S.d*S.d*4n-S.n*S.n*T.d, 4n*S.d*S.d*T.d); // T - S^2/4 (positive)
+    const sn=isqrtBig(D.n), sd=isqrtBig(D.d);
+    if(sn*sn===D.n&&sd*sd===D.d) return {t:polyHtml([cfComplex(rnQ(re),rnQ(Q(sn,sd)))]).replace(/^\(|\)$/g,''),approx:false};
+  }
+  return {t:rootText(pc.roots[0],null),approx:true};
+}
+function moreHtml(pc,k,res){
+  const e=pc.e, d=pc.d, ring=res.ring, p=res.p;
+  const eps='<i class="m">ε</i>', K='<i class="m">K</i>';
+  const ePow=n=>eps+'<sup>'+n+'</sup>';
+  const ai=n=>'<i class="m">a</i><sub>'+n+'</sub>';
+  const sumOf=L=>{ const t=n=>'<i class="m">'+L+'</i><sub>'+n+'</sub>'+(n===0?'':n===1?eps:ePow(n)); return e<=4?Array.from({length:e},(_,n)=>t(n)).join(' + '):t(0)+' + '+t(1)+' + … + '+t(e-1); };
+  const gPoly='<span class="poly">'+pc.gHtml+'</span>';
+  const rough=ring!=='Fp'&&(d===1?!(pc.raw.re.q&&(pc.raw.kind==='real'||pc.raw.im.q)):!(pc.raw.S.q&&pc.raw.T.q));
+  let h='<details class="more" data-more="'+k+'"'+(STATE.open[k]?' open':'')+'><summary>More about this piece</summary><div class="mb">';
+  // 1. heading
+  h+='<p class="mh">'+pc.field+'['+eps+']/('+ePow(e)+')'+(e===2?', the “dual numbers” over '+pc.field:'')+'</p>';
+  // 2. what it is
+  let kdef;
+  if(d===1) kdef=K+' = '+pc.field+' (the constants)';
+  else if(ring==='Fp') kdef=K+' = '+ringName('Fp',p)+'[x]/('+gPoly+'), a field with '+bigFmt(BigInt(p)**BigInt(d))+' elements';
+  else kdef=K+' = ℝ[x]/('+gPoly+'), which is a copy of ℂ';
+  h+='<h4>What it is</h4><p>Here '+kdef+'. Take '+K+' and add one new element '+eps+' with '+ePow(e)+' = 0, even though '
+    +(e===2?eps+' itself isn’t 0':ePow(e-1)+' ≠ 0')+'. Here '+eps+' is <span class="poly">g(x)</span> '+(rough?'≈':'=')+' '+gPoly+(rough?' (coefficients rounded to 4 digits)':'')+'. The card above calls it <i class="m">y</i>.</p>';
+  if(e===2) h+='<p>Every element is <i class="m">a</i> + <i class="m">b</i>'+eps+' with <i class="m">a</i>, <i class="m">b</i> in '+K+'. To multiply, expand and drop '+ePow(2)+':</p><p class="big">(<i class="m">a</i> + <i class="m">b</i>'+eps+')(<i class="m">c</i> + <i class="m">d</i>'+eps+') = <i class="m">ac</i> + (<i class="m">ad</i> + <i class="m">bc</i>)'+eps+'</p>';
+  else h+='<p>Every element is '+sumOf('a')+' with each '+ai('<i class="m">i</i>')+' in '+K+'. To multiply, expand as usual and drop '+ePow(e)+' and all higher powers.</p>';
+  // 3. what it remembers
+  h+='<h4>What it remembers</h4>';
+  const cc=n=>'<i class="m">c</i><sub>'+n+'</sub>';
+  const taylorExtra=e>=3?(d===1?' The next coefficient'+(e===3?' '+cc(2)+' is':'s '+cc(2)+', …, '+cc(e-1)+' are')+' the next Taylor coefficient'+(e===3?'':'s')+' (after the slope).':(e===3?' It also keeps the next Taylor coefficient at that point.':' It also keeps the next '+(e-2)+' Taylor coefficients at that point.')):'';
+  if(d===1){
+    let rv, approx=false;
+    if(ring==='Fp') rv=String(pc.root);
+    else { rv=rootText(pc.roots[0],pc.raw); approx=!(pc.raw.re.q&&(pc.raw.kind==='real'||pc.raw.im.q)); }
+    const lin=pc.gHtml==='x'?'x':'('+pc.gHtml+')';
+    const pw=n=>n===1?lin:lin+'<sup>'+n+'</sup>';
+    const terms=[cc(0),cc(1)+pw(1)].concat(e>2?[cc(2)+pw(2)]:[]);
+    h+='<p>Reducing a polynomial <i class="m">p</i>(x) modulo '+(pc.gHtml==='x'?'x<sup>'+e+'</sup>':'<span class="poly">('+pc.gHtml+')<sup>'+e+'</sup></span>')+' keeps the first '+e+' coefficients of <i class="m">p</i> written in powers of '+lin
+      +' (the point is <i class="m">r</i> '+(approx?'≈':'=')+' <span class="poly">'+rv+'</span>): <i class="m">p</i> = '+terms.join(' + ')+' + …. Here '+cc(0)+' = <i class="m">p</i>(<i class="m">r</i>) is the value and '+cc(1)+' = <i class="m">p</i>′(<i class="m">r</i>) is the slope.'+taylorExtra
+      +' An ordinary point (exponent 1) remembers only the value; the extra information is the “fat”.</p>';
+  } else {
+    let where, pt;
+    if(ring==='Fp'){ pt='<i class="m">α</i>'; where='at a root <i class="m">α</i> of <span class="poly">g</span>, which lives in '+K; }
+    else { pt='<i class="m">z</i>'; const z=pairRootText(pc); where='at the complex root <i class="m">z</i> '+(z.approx?'≈':'=')+' <span class="poly">'+z.t+'</span> (the conjugate root carries the same information, mirrored)'; }
+    h+='<p>It remembers the value <i class="m">p</i>('+pt+') and the slope <i class="m">p</i>′('+pt+') of a polynomial <i class="m">p</i> '+where+'.'+taylorExtra
+      +' An ordinary point remembers only the value; the extra information is the “fat”.</p>';
+  }
+  // 4. why not split
+  h+='<h4>Why it doesn’t split further</h4><ul>'
+    +'<li>The Chinese Remainder Theorem only splits along factors with no common factor, and every factor of <span class="poly">g</span><sup>'+e+'</sup> is a power of <span class="poly">g</span>: they all share <span class="poly">g</span>.</li>'
+    +'<li>Any product <i class="m">A</i> × <i class="m">B</i> contains (1, 0), which equals its own square without being 0 or 1. Here the only elements <i class="m">u</i> with <i class="m">u</i><sup>2</sup> = <i class="m">u</i> are 0 and 1.</li>'
+    +'<li>An element is a unit exactly when its '+eps+'-free part '+ai(0)+' is nonzero, and nilpotent otherwise. Nothing in between, so this is a single (fat) point.</li></ul>';
+  // 5. not a field
+  h+='<h4>Why it isn’t a field</h4><p>'+eps+' ≠ 0 but '+ePow(e)+' = 0'+(e>2?' (so '+eps+'·'+ePow(e-1)+' = 0 with both factors nonzero)':'')+', so '+eps+' has no inverse. In a field, nonzero elements never multiply to 0.</p>';
+  // 6. copy of K
+  if(d>1){
+    let L=null; try{ L=liftRoot(pc,res); }catch(err){ L=null; }
+    h+='<h4>A copy of '+K+' hides inside</h4>';
+    if(L&&L.ok){
+      const approx=!L.exact;
+      let like;
+      if(ring==='Fp') like='a root of <span class="poly">g</span>';
+      else { const z=pairRootText(pc); like='the complex root <i class="m">z</i> '+(z.approx?'≈':'=')+' <span class="poly">'+z.t+'</span>'; }
+      h+='<p>The element <i class="m">ω</i> '+(approx?'≈':'=')+' '+omegaHtml(L,res)+' satisfies <span class="poly">g</span>(<i class="m">ω</i>) = 0 '+(approx?'(up to rounding)':'exactly')+', not just up to multiples of <span class="poly">g</span>. So it behaves '+(approx?'(up to rounding) ':'exactly ')+'like '+like+', and every element can be written as '+sumOf('z')+' with each <i class="m">z</i><sub><i class="m">i</i></sub> in '+K+'.</p>'
+        +'<p class="note">Found by Newton’s method: start at <i class="m">ω</i> = x and repeatedly correct it by <span class="poly">g</span>(<i class="m">ω</i>)/<span class="poly">g</span>′(<i class="m">ω</i>) (computed modulo <span class="poly">g</span><sup>'+e+'</sup>); it took '+L.steps+' step'+(L.steps===1?'':'s')+(approx?', in floating point, so only the first 4 digits are shown':'')+'.</p>';
+    } else h+='<p class="note">The lift could not be computed for this piece.</p>';
+  }
+  return h+'</div></details>';
+}
+/* ---------- pieces of Z/n[x]/(f) over a prime power p^k, k >= 2 ---------- */
+const symNum=(r,m)=>r>m/2?'−'+(m-r):String(r);
+function cardZn(pc,k,res,sel){
+  const {p,k:kk,m,d,e}=pc; const Zm='ℤ/'+m;
+  let tag, desc='';
+  if(pc.role==='base') tag=(m===res.nmod?'copy of the base':'copy of '+Zm+' (part of the base)')+', not a field';
+  else if(pc.role==='ext') tag='bigger ring (Galois ring)';
+  else tag='fat point';
+  const fac='<span class="poly">('+pc.FHtml+')</span>';
+  const nilp=BigInt(p)**BigInt((kk*d*e)-d);
+  if(pc.role==='base'){
+    desc='<p>Evaluation at <span class="poly">x = '+symNum(pc.rootM,m)+'</span> in '+Zm+' (the root '+pc.root+' mod '+p+', lifted). Still not a field: '+p+' is nilpotent ('+p+' · '+(m/p)+' = 0 in '+Zm+').</p>';
+  } else if(pc.role==='ext'){
+    desc='<p>The '+Zm+' version of '+fieldName(p,d)+': every element is a unit or a multiple of '+p+', and reducing mod '+p+' gives '+fieldName(p,d)+'. Degree <b>'+d+'</b> over '+Zm+'.</p>';
+  } else {
+    desc='<p>A local ring: maximal ideal <span class="poly">('+p+', '+pc.gHtml+')</span>, residue field '+fieldName(p,d)+'. Modulo '+p+' the factor is <span class="poly">('+pc.gHtml+')</span><sup>'+e+'</sup>.</p>';
+  }
+  const stats='<p><b>'+bigFmt(pc.size)+'</b> elements, <b>'+bigFmt(pc.size-nilp)+'</b> units, <b>'+bigFmt(nilp)+'</b> nilpotent'+(pc.idx!=null?'; nilpotency index <b>'+pc.idx+'</b>':'')+'.</p>';
+  let crd='';
+  if(sel&&sel.coords){ const c=sel.coords[k]; crd='<div class="crd">image of <span class="poly">a</span>: <span class="poly">'+c.html+'</span><br><span style="color:var(--muted)">'+c.note+'</span></div>'; }
+  return '<div class="card '+pc.role+(sel?' hit':'')+'" data-piece="'+k+'"><div class="tag">'+tag+'</div><div class="rn">'+pc.name+'</div><p>from the factor '+fac+'</p>'+desc+stats+crd+moreZn(pc,k,res)+'</div>';
+}
+function moreZn(pc,k,res){
+  const {p,k:kk,m,d,e}=pc; const Zm='ℤ/'+m, Fd=fieldName(p,d);
+  const F='<span class="poly">'+pc.FHtml+'</span>', g='<span class="poly">'+pc.gHtml+'</span>';
+  const mm=m/p; // p^(k-1)
+  let h='<details class="more" data-more="'+k+'"'+(STATE.open[k]?' open':'')+'><summary>More about this piece</summary><div class="mb">';
+  const notField='<p>'+p+' · '+mm+' = 0 in '+Zm+' although neither factor is 0, so '+p+' has no inverse. In a field, nonzero elements never multiply to 0.</p>';
+  if(pc.role==='base'){
+    h+='<p class="mh">'+Zm+'</p>';
+    h+='<h4>What it is</h4><p>The factor is <span class="poly">x − r</span> with <i class="m">r</i> = <b>'+symNum(pc.rootM,m)+'</b> in '+Zm+'. This <i class="m">r</i> is the root '+pc.root+' of the factor modulo '+p+', lifted step by step to '+Zm+' (Hensel’s lemma). Substituting <span class="poly">x = r</span> turns a polynomial <i class="m">p</i>(x) into the number <i class="m">p</i>(<i class="m">r</i>); since <span class="poly">x − r</span> divides <i class="m">p</i>(x) − <i class="m">p</i>(<i class="m">r</i>), this is a bijection. So the piece is just '+Zm+': each element is one number from 0 to '+(m-1)+'.</p>';
+    h+='<h4>Why it isn’t a field</h4>'+notField;
+    h+='<h4>Why it doesn’t split further</h4><ul>'
+      +'<li>The only elements <i class="m">u</i> with <i class="m">u</i><sup>2</sup> = <i class="m">u</i> are 0 and 1: <i class="m">u</i>(<i class="m">u</i> − 1) = 0, and <i class="m">u</i> and <i class="m">u</i> − 1 are never both multiples of '+p+', so one of them is a unit and the other must be 0. A product <i class="m">A</i> × <i class="m">B</i> would contain (1, 0), so this is not a product.</li>'
+      +'<li>An element is a unit exactly when it is not divisible by '+p+' ('+bigFmt(pc.size-pc.size/BigInt(p))+' of them), and nilpotent otherwise (the multiples of '+p+'). Nothing in between.</li></ul>';
+  } else if(pc.role==='ext'){
+    h+='<p class="mh">GR('+m+', '+d+') = '+Zm+'[x]/('+F+')</p>';
+    h+='<h4>What it is</h4><p>The Galois ring GR('+m+', '+d+') is the '+Zm+' version of '+Fd+'. Its elements are <i class="m">a</i><sub>0</sub> + <i class="m">a</i><sub>1</sub>x'+(d>2?' + … + <i class="m">a</i><sub>'+(d-1)+'</sub>x<sup>'+(d-1)+'</sup>':'')+' with every <i class="m">a</i><sub><i class="m">i</i></sub> in '+Zm+', so there are '+m+'<sup>'+d+'</sup> = '+bigFmt(pc.size)+' of them. The element x satisfies '+F+' = 0, where this polynomial is monic and reduces modulo '+p+' to the irreducible '+g+'. (Any other monic lift of '+g+' gives an isomorphic ring.)</p>';
+    h+='<h4>Reducing mod '+p+'</h4><p>Reduce every coefficient modulo '+p+' and you get a ring map onto '+Fd+' = '+ringName('Fp',p)+'[x]/('+g+'), whose kernel is the multiples of '+p+'. An element is a unit exactly when its reduction is nonzero in '+Fd+', that is, when not all its coefficients are divisible by '+p+'. Every other element is a multiple of '+p+'. So everything is either a unit or a multiple of '+p+'.</p>';
+    h+='<h4>Why it isn’t a field</h4>'+notField;
+    h+='<h4>Why it doesn’t split further</h4><ul>'
+      +'<li>The factor '+g+' is irreducible modulo '+p+', so there is no coprime factorization for the Chinese Remainder Theorem / Hensel’s lemma to use.</li>'
+      +'<li>The only elements <i class="m">u</i> with <i class="m">u</i><sup>2</sup> = <i class="m">u</i> are 0 and 1: a unit with <i class="m">u</i><sup>2</sup> = <i class="m">u</i> must be 1 (cancel one <i class="m">u</i>), and a non-unit is a multiple of '+p+', hence nilpotent, and a nilpotent with <i class="m">u</i><sup>2</sup> = <i class="m">u</i> must be 0.</li></ul>';
+  } else {
+    h+='<p class="mh">'+Zm+'[x]/('+F+')</p>';
+    h+='<h4>What it is</h4><p>The factor '+F+' reduces modulo '+p+' to <span class="poly">('+pc.gHtml+')</span><sup>'+e+'</sup>, a power of the irreducible '+g+'. The piece is a <b>local ring</b> with '+bigFmt(pc.size)+' elements: its maximal ideal is <span class="poly">('+p+', '+pc.gHtml+')</span> (the multiples of '+p+' together with the multiples of '+g+'), and modulo that ideal what is left is the residue field '+Fd+'. Elements that are in the maximal ideal are exactly the non-units, and each of them is nilpotent: there are '+bigFmt(pc.size/(BigInt(p)**BigInt(d)))+' of them (including 0), so '+bigFmt(pc.size-pc.size/(BigInt(p)**BigInt(d)))+' units.</p>';
+    h+='<h4>Why it doesn’t split further</h4><ul>'
+      +'<li>Hensel’s lemma splits '+Zm+'[x]/(f) only along factors that are coprime modulo '+p+'. Here the only irreducible factor modulo '+p+' is '+g+', so there is nothing to separate.</li>'
+      +'<li>The only elements <i class="m">u</i> with <i class="m">u</i><sup>2</sup> = <i class="m">u</i> are 0 and 1: a unit with this property is 1, and a non-unit is nilpotent, so it is 0. A product <i class="m">A</i> × <i class="m">B</i> would contain (1, 0), so this is not a product.</li>'
+      +'<li>An element is a unit exactly when its image in the residue field '+Fd+' is nonzero, and nilpotent otherwise. Nothing in between.</li></ul>';
+    h+='<h4>Why it isn’t a field</h4>'+notField.replace('</p>',' The element '+g+' is nonzero here too, and it is nilpotent.</p>');
+    h+='<h4>Same size, different ring</h4><p>Unlike over a field, the residue field and the exponent don’t pin the ring down: over ℤ/4, x<sup>2</sup> and x<sup>2</sup> + 2 both reduce to x<sup>2</sup> mod 2, but in the second x<sup>2</sup> = −2, so x<sup>4</sup> = 0 while x<sup>3</sup> ≠ 0.'
+      +(pc.idx!=null?' For this piece, the nilpotency index (the largest <i class="m">k</i> needed for <i class="m">a</i><sup><i class="m">k</i></sup> = 0 over all nilpotents <i class="m">a</i>) is <b>'+pc.idx+'</b>.':'')+'</p>';
+  }
+  return h+'</div></details>';
+}
+function rootText(r,raw){
+  if(!r) return '';
+  const re=r[0], im=r[1];
+  if(raw&&raw.kind==='real'&&raw.re.q) return qstr(raw.re.q).replace('-','−');
+  if(raw&&raw.kind==='lin'&&raw.re.q&&raw.im.q){
+    return polyHtml([cfComplex(raw.re,raw.im)]).replace(/^\(|\)$/g,'');
+  }
+  if(Math.abs(im)<1e-10) return fmtNum(re).replace('-','−');
+  const imS=fmtNum(Math.abs(im)), imT=(imS==='1'?'':imS)+'i';
+  if(fmtNum(re)==='0') return (im<0?'−':'')+imT;
+  return fmtNum(re).replace('-','−')+(im<0?' − ':' + ')+imT;
+}
+function plotSvg(res){
+  const roots=[]; res.pieces.forEach((pc,k)=>pc.roots.forEach(r=>roots.push({k,pc,x:r[0],y:r[1]})));
+  let M=1; roots.forEach(r=>{ M=Math.max(M,Math.abs(r.x),Math.abs(r.y)); }); M*=1.35;
+  const raw=M/4; const mag=Math.pow(10,Math.floor(Math.log10(raw))); let step=mag; for(const m of [1,2,5,10]){ step=m*mag; if(step>=raw) break; }
+  const lim=Math.ceil(M/step)*step;
+  const W=400, pad=26, S=(W-2*pad)/(2*lim);
+  const X=v=>W/2+v*S, Y=v=>W/2-v*S;
+  let s='<svg viewBox="0 0 '+W+' '+W+'" role="img" aria-label="Roots of f in the complex plane">';
+  for(let t=-lim;t<=lim+1e-9;t+=step){
+    const v=Math.round(t/step)*step;
+    s+='<line class="gr" x1="'+X(v)+'" y1="'+pad+'" x2="'+X(v)+'" y2="'+(W-pad)+'"/><line class="gr" x1="'+pad+'" y1="'+Y(v)+'" x2="'+(W-pad)+'" y2="'+Y(v)+'"/>';
+    if(Math.abs(v)>1e-9){ s+='<text x="'+X(v)+'" y="'+(W/2+14)+'" text-anchor="middle">'+fmtNum(v).replace('-','−')+'</text><text x="'+(W/2-5)+'" y="'+(Y(v)+4)+'" text-anchor="end">'+fmtNum(v).replace('-','−')+'i</text>'; }
+  }
+  s+='<line class="ax" x1="'+pad+'" y1="'+W/2+'" x2="'+(W-pad)+'" y2="'+W/2+'"/><line class="ax" x1="'+W/2+'" y1="'+pad+'" x2="'+W/2+'" y2="'+(W-pad)+'"/>';
+  s+='<text x="'+(W-pad)+'" y="'+(W/2-6)+'" text-anchor="end">Re</text><text x="'+(W/2+6)+'" y="'+(pad+4)+'">Im</text>';
+  roots.forEach(r=>{
+    const cx=X(r.x), cy=Y(r.y), e=r.pc.e;
+    s+='<g class="root '+r.pc.role+'" data-piece="'+r.k+'"><title>'+rootText([r.x,r.y],null).replace(/<[^>]*>/g,'')+(e>1?' (multiplicity '+e+')':'')+'</title>';
+    if(e===1) s+='<circle class="dot" cx="'+cx+'" cy="'+cy+'" r="5.5"/>';
+    else { s+='<circle class="dot" cx="'+cx+'" cy="'+cy+'" r="3"/>'; for(let j=1;j<=e&&j<=4;j++) s+='<circle cx="'+cx+'" cy="'+cy+'" r="'+(3+5*j)+'"/>'; s+='<text x="'+(cx+Math.min(3+5*Math.min(e,4),24)+2)+'" y="'+(cy-6)+'">×'+e+'</text>'; }
+    s+='</g>';
+  });
+  return s+'</svg>';
+}
+function basisHtml(n){ const t=k=>k===0?'1':k===1?'x':'x<sup>'+k+'</sup>'; return n<=4?Array.from({length:n},(_,k)=>t(k)).join(', '):'1, x, …, '+t(n-1); }
+function factsHtml(res){
+  const pcs=res.pieces; const isField=pcs.length===1&&pcs[0].e===1&&(pcs[0].k||1)===1; const reduced=pcs.every(p=>p.e===1&&(p.k||1)===1);
+  let h='<div class="badges">'
+   +'<span class="badge'+(isField?' yes':'')+'">field: <b>'+(isField?'yes':'no')+'</b></span>'
+   +'<span class="badge'+(reduced?' yes':'')+'">reduced (no nilpotents): <b>'+(reduced?'yes':'no')+'</b></span>'
+   +'<span class="badge">pieces: <b>'+pcs.length+'</b></span></div><dl>';
+  if(res.ring==='Zn') h+='<dt>rank</dt><dd><b>'+res.n+'</b> over '+ringName(res.ring,res.p)+' (basis '+basisHtml(res.n)+')</dd>';
+  else h+='<dt>dimension</dt><dd><b>'+res.n+'</b> over '+ringName(res.ring,res.p)+' (basis '+basisHtml(res.n)+')</dd>';
+  if(res.ring==='Fp'||res.ring==='Zn'){
+    const c=res.cnt;
+    h+='<dt>elements</dt><dd><b>'+bigFmt(c.size)+'</b> = '+res.p+'<sup>'+res.n+'</sup></dd>';
+    h+='<dt>units</dt><dd><b>'+bigFmt(c.units)+'</b><span class="expr">'+c.uTerms.map(t=>'('+t+')').join(' · ')+'</span></dd>';
+    h+='<dt>nilpotents</dt><dd><b>'+bigFmt(c.nil)+'</b> (including 0)<span class="expr">'+c.nTerms.join(' · ')+'</span></dd>';
+    h+='<dt>zero divisors</dt><dd><b>'+bigFmt(c.zd)+'</b> (nonzero non-units)<span class="expr">'+bigFmt(c.size)+' − '+bigFmt(c.units)+' − 1</span></dd>';
+    if(res.idx!=null) h+='<dt>nilpotency index</dt><dd><b>'+res.idx+'</b>'+(res.idx===1?' (only 0 is nilpotent)':'')+'<span class="expr">the largest k needed for a^k = 0 over all nilpotents a'+(res.ring==='Zn'&&pcs.length>1?' (the largest over the pieces)':'')+'</span></dd>';
+  } else {
+    const rd=res.pieces.reduce((s,p)=>s+p.d,0);
+    h+='<dt>nilpotents</dt><dd>'+(reduced?'only 0':'a subspace of dimension <b>'+(res.n-rd)+'</b>')+'</dd>';
+    h+='<dt>units</dt><dd>elements that are nonzero in every piece</dd>';
+  }
+  return h+'</dl>';
+}
+function selDetail(res,sel){
+  const p=res.p, a=sel.a;
+  let kindTxt='';
+  const aH='<span class="poly">'+fpHtml(a,p,false)+'</span>';
+  if(sel.cls==='zero') kindTxt='The zero element. It is nilpotent (0<sup>1</sup> = 0) but we do not count it as a zero divisor.';
+  else if(sel.cls==='unit') kindTxt='<b>A unit.</b> '+aH+' · <span class="poly">'+fpHtml(sel.partner,p,false)+'</span> = 1, so its inverse is <span class="poly">'+fpHtml(sel.partner,p,false)+'</span>.';
+  else if(sel.cls==='nil') kindTxt='<b>Nilpotent.</b> '+(a.filter(c=>c).length>1?'('+aH+')':aH)+'<sup>'+sel.k+'</sup> = 0 (first at k = '+sel.k+'). Hence it is a zero divisor too: '+aH+' ·<span class="poly">'+fpHtml(sel.partner,p,false)+'</span> = 0.';
+  else kindTxt='<b>A zero divisor</b> (not nilpotent). '+aH+' · <span class="poly">'+fpHtml(sel.partner,p,false)+'</span> = 0 although neither factor is 0.';
+  let h='<div class="detail"><p>'+kindTxt+'</p><p>The multiples <span class="poly">a·R</span> (outlined in the grid) number <b>'+sel.reach.size+'</b>'+(sel.cls==='unit'?' (everything, since a unit reaches all of R)':'')+'.</p>';
+  if(res.cnt.size<=32n){
+    h+='<div class="chips">'+sel.products.map(([b,c])=>'<span class="chip">'+fpHtml(b,p,false).replace(/<[^>]+>/g,m=>m)+' ↦ '+fpHtml(c,p,false)+'</span>').join('')+'</div>';
+  }
+  return h+'</div>';
+}
+function computeSel(res,idx){
+  const p=res.p, n=res.n, P=res.PP, m=res.m, size=Math.pow(m,n);
+  const mul=(x,y)=>P.rem(P.mul(x,y),res.fm);
+  const a=elemFromIndex(m,n,idx); const cls=res.classify(a);
+  const sel={idx,a,cls,reach:new Set(),products:[],partner:[],k:0};
+  for(let j=0;j<size;j++){ const b=elemFromIndex(m,n,j); const c=mul(a,b); sel.reach.add(indexOfElem(m,c)); sel.products.push([b,c]); }
+  if(cls==='unit'){ for(const [b,c] of sel.products) if(c.length===1&&c[0]===1){ sel.partner=b; break; } }
+  else if(cls==='nil'){ let pw=a, k=1; while(pw.length){ pw=mul(pw,a); k++; } sel.k=k; } // loop ends with pw = a^k = 0
+  else if(cls==='zd'){ for(const [b,c] of sel.products) if(!c.length&&b.length){ sel.partner=b; break; } }
+  if(cls==='nil'){ // partner = a^(k-1) (nonzero) when k>=2
+    let pw=[1]; for(let t=0;t<sel.k-1;t++) pw=mul(pw,a); sel.partner=pw;
+  }
+  // CRT coordinates
+  if(res.ring==='Zn'){
+    sel.coords=res.pieces.map(pc=>{
+      const PM=getZm(pc.m), Pp=getFp(pc.p);
+      const r=PM.rem(PM.trim(a.map(c=>c%pc.m)),pc.F); const inG=Pp.rem(Pp.trim(a.map(c=>c%pc.p)),pc.g).length===0;
+      let note;
+      if(!r.length) note='zero in this piece';
+      else if(!inG) note='a unit in this piece';
+      else note='nilpotent in this piece (in the maximal ideal)';
+      const lab=pc.k>1?'('+pc.FHtml+') in ℤ/'+pc.m:'('+pc.gHtml+')'+(pc.e>1?'<sup>'+pc.e+'</sup>':'')+' over F<sub>'+pc.p+'</sub>';
+      return {html:fpHtml(r,pc.m,false),note:'a mod '+lab+': '+note};
+    });
+    return sel;
+  }
+  sel.coords=res.pieces.map(pc=>{
+    const r=P.rem(a,pc.gPow); const inG=P.rem(a,pc.g).length===0;
+    let note;
+    if(!r.length) note='zero in this piece';
+    else if(!inG) note='a unit in this piece';
+    else note='nilpotent in this piece (a multiple of the factor)';
+    return {html:fpHtml(r,p,false),note:'a mod ('+pc.gHtml+')'+(pc.e>1?'<sup>'+pc.e+'</sup>':'')+': '+note};
+  });
+  return sel;
+}
+function gridHtml(res,sel){
+  const p=res.p,n=res.n,size=Math.pow(p,n); let tiles='';
+  const maxLen=Math.max(1,n*3);
+  for(let i=0;i<size;i++){
+    const a=elemFromIndex(p,n,i); const cls=res.classify(a);
+    const c={zero:'z',unit:'u',nil:'n',zd:'d'}[cls];
+    const extra=sel?(sel.idx===i?' sel':(sel.reach.has(i)?' reach':' dim')):'';
+    tiles+='<button type="button" class="tile '+c+extra+'" data-idx="'+i+'" title="'+cls+'" aria-pressed="'+(sel&&sel.idx===i)+'">'+fpHtml(a,p,false,{compact:true})+'</button>';
+  }
+  const tw=(n<=3?54:n<=4?60:n<=5?72:80)+(res.ring==="Zn"&&p>=6?8:0);
+  return '<div class="legend"><span class="lu"><i></i>unit</span><span class="lz"><i></i>zero divisor</span><span class="ln"><i></i>nilpotent</span><span class="l0"><i></i>zero</span></div>'
+   +'<div class="egrid" style="--tw:'+tw+'px">'+tiles+'</div>'
+   +(sel?selDetail(res,sel):'<p class="hint">Click an element to see what kind it is and why, which elements it can reach by multiplication, and where it lands in each piece.</p>');
+}
+const LEGEND_HTML='<div class="legend"><span class="base"><i></i>same as the base</span><span class="ext"><i></i>bigger (extension)</span><span class="fat"><i></i>fat point (extra nilpotents)</span></div>';
+function pieceCardZn(pc,res,sel){
+  if(pc.k>1) return cardZn(pc,pc.gi,res,sel);
+  return cardHtml(pc,pc.gi,{ring:'Fp',p:pc.p,partOf:res.parts.length>1?res.nmod:0},sel);
+}
+function facLine(pt,lifted){
+  const one=pt.pieces.length===1;
+  return pt.pieces.map(pc=>{
+    const body=lifted?pc.FHtml:pc.gHtml; const par=lifted?!one:(!one||pc.e>1);
+    return '<span class="fac '+pc.role+'" data-piece="'+pc.gi+'"><span class="poly">'+(par?'(':'')+body+(par?')':'')+(!lifted&&pc.e>1?'<sup>'+pc.e+'</sup>':'')+'</span></span>';
+  }).join(' · ');
+}
+function partZn(res,pt,pi,sel){
+  const multi=res.parts.length>1, Zm='ℤ/'+pt.m;
+  let h='';
+  if(multi) h+='<div class="part"><div class="parthead"><b>Part '+(pi+1)+':</b> <span class="poly">'+Zm+'[x] / (f mod '+pt.m+')</span></div>';
+  h+='<div class="factoring"><span class="poly">f mod '+pt.p+'</span> = '+facLine(pt,false)+' <span class="note">over '+ringName('Fp',pt.p)+(multi&&pt.k===1?'':'')+'</span></div>';
+  if(pt.k>1){
+    h+='<div class="crt">Hensel’s lemma: coprime factors mod '+pt.p+' lift to '+Zm+'</div>';
+    h+='<div class="factoring"><span class="poly">f</span> = '+facLine(pt,true)+' <span class="note">in '+Zm+'[x]</span></div>';
+    const c=pt.m/pt.p; const x2=pt.p===2?'(x + '+c+')(x + '+c+')':'(x + '+c+')(x − '+c+')';
+    h+='<p class="note">'+(pt.pieces.length>1?'Each lifted factor reduces mod '+pt.p+' to the matching factor above, and the lifted factors are unique given coprime reductions. ':'There is only one factor mod '+pt.p+', so nothing needs lifting: the piece is the whole of '+Zm+'[x]/(f). ')
+      +'(Factoring in '+Zm+'[x] in general is not unique: <span class="poly">x<sup>2</sup> = x · x = '+x2+'</span>.)</p>';
+  }
+  h+='<div class="crt">'+(pt.k>1?'then the pieces':'Chinese Remainder Theorem')+'</div><div class="arrowrow">↓</div><div class="pieces">'
+    +pt.pieces.map((pc,j)=>(j?'<span class="times">×</span>':'')+pieceCardZn(pc,res,sel)).join('')+'</div>';
+  if(multi) h+='</div>';
+  return h;
+}
+function renderZn(res,sel){
+  const out=$('out'); const n=res.nmod, rn='ℤ/'+n;
+  let note='';
+  if(res.dropped) note+='<p class="note">Terms whose coefficient is a multiple of '+n+' vanish in '+rn+' and have been dropped.</p>';
+  if(res.monicChanged) note+='<p class="note">The leading coefficient <span class="poly">'+res.leadHtml+'</span> is a unit in '+rn+', so multiplying f by its inverse does not change the ideal (f). The monic version <span class="poly">'+res.fmHtml+'</span> is what gets decomposed.</p>';
+  const multi=res.parts.length>1;
+  let split='';
+  if(multi){
+    const fs=res.parts.map(pt=>'ℤ/'+pt.m+'[x]/(f mod '+pt.m+')').join(' × ');
+    split='<div class="crt">CRT on '+n+' = '+res.parts.map(pt=>pt.m).join(' · ')+'</div><p class="split">'+rn+'[x]/(f) ≅ <span class="poly">'+fs+'</span></p>';
+  }
+  const iso=rn+'[x]/(<span class="poly">'+res.fHtml+'</span>) ≅ '+res.pieces.map(pc=>pc.name).join(' × ');
+  const decomp='<section class="panel"><h2>The decomposition</h2><div class="ringbox">'+rn+'[x] / (<span class="poly">'+(res.monicChanged?res.fmHtml:res.fHtml)+'</span>)</div>'+note+split
+    +res.parts.map((pt,pi)=>partZn(res,pt,pi,sel)).join('')
+    +'<div class="iso">'+iso+'</div>'+LEGEND_HTML
+    +(res.pieces.length>6?'<p class="hint">Many pieces: the cards wrap onto several rows.</p>':'')+'</section>';
+  const side='<section class="panel facts"><h2>Facts</h2>'+factsHtml(res)+'</section>';
+  let grid;
+  if(res.cnt.size<=256n) grid='<section class="panel"><h2>Every element ('+bigFmt(res.cnt.size)+')</h2>'+gridHtml(res,sel)+'</section>';
+  else grid='<section class="panel"><h2>Elements</h2><p>The ring has '+bigFmt(res.cnt.size)+' elements: too many to draw (the grid shows rings of up to 256). The counts above still follow from the decomposition: '+bigFmt(res.cnt.units)+' units, '+bigFmt(res.cnt.nil)+' nilpotents (including 0), '+bigFmt(res.cnt.zd)+' zero divisors.</p></section>';
+  const focusIdx=document.activeElement&&document.activeElement.classList&&document.activeElement.classList.contains('tile')?document.activeElement.dataset.idx:null;
+  out.innerHTML='<div class="layout two"><div>'+decomp+'</div><div>'+side+'</div></div>'+grid;
+  if(focusIdx!=null){ const t=out.querySelector('.tile[data-idx="'+focusIdx+'"]'); if(t) t.focus(); }
+}
+function render(){
+  const out=$('out'); const res=RES;
+  const err=$('err'); err.textContent='';
+  if(res.kind==='error'){ err.textContent=res.msg; out.innerHTML=''; return; }
+  if(res.kind==='empty'){ out.innerHTML='<section class="panel special"><p>Type a polynomial in x above, or pick one of the examples.</p></section>'; return; }
+  const rn=ringName(res.ring,res.p);
+  if(res.kind==='zero'){
+    out.innerHTML='<section class="panel special"><div class="big">'+rn+'[x] itself</div><p>f = 0, so the ideal (0) contains nothing but 0 and nothing is quotiented out: '+rn+'[x]/(0) ≅ '+rn+'[x], an infinite polynomial ring.'+(res.note?' '+esc(res.note):'')+'</p></section>'; return;
+  }
+  if(res.kind==='unit'){
+    out.innerHTML='<section class="panel special"><div class="big">the zero ring {0}</div><p>A nonzero constant is a unit, so the ideal (f) is everything and the quotient '+rn+'[x]/(f) collapses to the zero ring {0}, where 1 = 0.</p></section>'; return;
+  }
+  const sel=(res.kind==='ok'&&(res.ring==='Fp'||res.ring==='Zn')&&STATE.sel!=null&&res.cnt.size<=256n)?computeSel(res,STATE.sel):null;
+  if(res.ring==='Zn'){ renderZn(res,sel); return; }
+  // factoring line
+  const facs=res.pieces.map((pc,k)=>'<span class="fac '+pc.role+'" data-piece="'+k+'"><span class="poly">'+(res.pieces.length>1||pc.e>1?'(':'')+pc.gHtml+(res.pieces.length>1||pc.e>1?')':'')+(pc.e>1?'<sup>'+pc.e+'</sup>':'')+'</span></span>').join(' · ');
+  const fTxt='<span class="poly">'+(res.monicChanged?res.fmHtml:res.fHtml)+'</span>';
+  let note='';
+  if(res.monicChanged) note='<p class="note">Over a field, scaling f by a nonzero constant does not change the ideal (f). Dividing by the leading coefficient'+(res.leadHtml?' <span class="poly">'+res.leadHtml+'</span>':'')+' gives the same ideal as the monic version <span class="poly">'+res.fmHtml+'</span>, which is what gets factored.</p>';
+  if(res.n===1) note+='<p class="note">Degree 1: the quotient is just a copy of '+rn+' (substitute the root for x).</p>';
+  const isoParts=res.pieces.map(pc=>pc.e>1?yring(pc.field,pc.e):pc.field);
+  const iso=rn+'[x]/(<span class="poly">'+res.fHtml+'</span>) ≅ '+isoParts.join(' × ');
+  const pcs=res.pieces.map((pc,k)=>(k?'<span class="times">×</span>':'')+cardHtml(pc,k,res,sel)).join('');
+  const legend='<div class="legend"><span class="base"><i></i>same as the base</span><span class="ext"><i></i>bigger (extension)</span><span class="fat"><i></i>fat point (extra nilpotents)</span></div>';
+  const decomp='<section class="panel"><h2>The decomposition</h2><div class="ringbox">'+rn+'[x] / (<span class="poly">'+res.fHtml+'</span>)</div>'+note
+    +'<div class="factoring">'+(res.monicChanged?'':'')+fTxt+' = '+(res.monicChanged&&res.leadHtml?'':'')+facs+'</div>'
+    +'<div class="crt">Chinese Remainder Theorem</div><div class="arrowrow">↓</div><div class="pieces">'+pcs+'</div>'
+    +'<div class="iso">'+iso+'</div>'+legend
+    +(res.pieces.length>6?'<p class="hint">Many pieces: the cards wrap onto several rows.</p>':'')+'</section>';
+  let side;
+  if(res.ring==='Fp') side='<section class="panel facts"><h2>Facts</h2>'+factsHtml(res)+'</section>';
+  else side='<section class="panel plot"><h2>Roots in the complex plane</h2>'+plotSvg(res)+'<p class="hint">Dots are simple roots; rings and a label show the multiplicity. Colors match the pieces.</p></section><section class="panel facts"><h2>Facts</h2>'+factsHtml(res)+'</section>';
+  let grid='';
+  if(res.ring==='Fp'){
+    if(res.cnt.size<=256n) grid='<section class="panel"><h2>Every element ('+bigFmt(res.cnt.size)+')</h2>'+gridHtml(res,sel)+'</section>';
+    else grid='<section class="panel"><h2>Elements</h2><p>The ring has '+bigFmt(res.cnt.size)+' elements: too many to draw (the grid shows rings of up to 256). The counts above still follow from the decomposition: '+bigFmt(res.cnt.units)+' units, '+bigFmt(res.cnt.nil)+' nilpotents (including 0), '+bigFmt(res.cnt.zd)+' zero divisors.</p></section>';
+  }
+  const focusIdx=document.activeElement&&document.activeElement.classList&&document.activeElement.classList.contains('tile')?document.activeElement.dataset.idx:null;
+  out.innerHTML='<div class="layout two"><div>'+decomp+'</div><div>'+side+'</div></div>'+grid;
+  if(focusIdx!=null){ const t=out.querySelector('.tile[data-idx="'+focusIdx+'"]'); if(t) t.focus(); }
+}
+function update(resetSel){
+  const key=STATE.ring+'|'+modOf()+'|'+STATE.text;
+  if(key!==STATE.key){ STATE.sel=null; STATE.open={}; STATE.key=key; }
+  try{ RES=analyze(STATE.ring,modOf(),STATE.text); }
+  catch(e){ console.error(e); RES={kind:'error',msg:'Something went wrong: '+e.message}; }
+  render();
+}
+
+/* ---------- wiring ---------- */
+function setRing(r){
+  STATE.ring=r;
+  document.querySelectorAll('.seg button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.ring===r)));
+  $('primeWrap').style.display=r==='Fp'?'':'none';
+  $('nWrap').style.display=r==='Zn'?'':'none';
+  $('pre').innerHTML=ringName(r,modOf())+'[x] / (';
+  const keys=['x','^','(',')','+','−','*','/'].concat(r==='C'?['i']:[]);
+  $('keys').innerHTML=keys.map(k=>'<button type="button" data-k="'+esc(k)+'" aria-label="insert '+esc(k)+'">'+esc(k)+'</button>').join('');
+  renderPresets();
+}
+let timer=null;
+function init(){
+  $('prime').innerHTML=PRIMES.map(p=>'<option value="'+p+'">'+p+'</option>').join('');
+  $('nsel').innerHTML=NS.map(n=>'<option value="'+n+'">'+n+'</option>').join('');
+  $('nsel').addEventListener('change',e=>{ STATE.n=+e.target.value; $('pre').innerHTML=ringName('Zn',STATE.n)+'[x] / ('; renderPresets(); update(); });
+  $('f').value=STATE.text;
+  document.querySelectorAll('.seg button').forEach(b=>b.addEventListener('click',()=>{ setRing(b.dataset.ring); update(); }));
+  $('prime').addEventListener('change',e=>{ STATE.p=+e.target.value; $('pre').innerHTML=ringName('Fp',STATE.p)+'[x] / ('; renderPresets(); update(); });
+  $('f').addEventListener('input',e=>{ STATE.text=e.target.value; clearTimeout(timer); timer=setTimeout(update,200); });
+  $('presets').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; const it=$('presets')._list[+b.dataset.k]; STATE.text=it.s; $('f').value=it.s; update(); });
+  $('keys').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; const f=$('f'); const s=f.selectionStart,t=f.selectionEnd; const v=b.dataset.k; f.value=f.value.slice(0,s)+v+f.value.slice(t); f.focus(); f.setSelectionRange(s+v.length,s+v.length); STATE.text=f.value; clearTimeout(timer); timer=setTimeout(update,200); });
+  $('out').addEventListener('click',e=>{
+    const t=e.target.closest('.tile'); if(t){ const i=+t.dataset.idx; STATE.sel=(STATE.sel===i)?null:i; render(); return; }
+  });
+  $('out').addEventListener('toggle',e=>{ const dt=e.target; if(dt&&dt.dataset&&dt.dataset.more!=null){ if(dt.open) STATE.open[dt.dataset.more]=true; else delete STATE.open[dt.dataset.more]; } },true);
+  $('out').addEventListener('mouseover',e=>{
+    const c=e.target.closest('[data-piece]'); const svg=$('out').querySelector('.plot svg'); if(!svg) return;
+    const k=c?c.dataset.piece:null;
+    svg.querySelectorAll('.root').forEach(g=>g.classList.toggle('dim',k!==null&&g.dataset.piece!==k));
+  });
+  setRing('Fp'); update();
+}
+init();
+
+/* ---------- debug hook ---------- */
+if(/[?&]debug/.test(location.search)){
+  const E=QR;
+  function randPoly(r,p,maxDeg){ const d=1+Math.floor(r()*maxDeg); const a=[]; for(let k=0;k<d;k++) a.push(Math.floor(r()*p)); a.push(1+Math.floor(r()*(p-1))); return getFp(p).trim(a); }
+  function selfTest(){
+    const R={passed:0,failed:0,failures:[],sections:{}};
+    const ok=(sec,cond,msg)=>{ R.sections[sec]=R.sections[sec]||{passed:0,failed:0}; if(cond){ R.passed++; R.sections[sec].passed++; } else { R.failed++; R.sections[sec].failed++; if(R.failures.length<40) R.failures.push(sec+': '+msg); } };
+    const r=E.rng(12345);
+    // 1. F_p factoring
+    for(const p of [2,3,5,7,11,47]){
+      const P=getFp(p); const trials=p===47?60:150;
+      for(let t=0;t<trials;t++){
+        let f;
+        const mode=t%3;
+        if(mode===0) f=randPoly(r,p,p===47?6:10);
+        else { // built from random pieces to force repeated factors
+          f=[1]; const parts=1+Math.floor(r()*3);
+          for(let q=0;q<parts;q++){ const g=randPoly(r,p,p===47?2:3); f=P.mul(f,P.pow(g,1+Math.floor(r()*(mode===1?3:p<=3?4:2)))); if(P.deg(f)>12) break; }
+        }
+        if(P.deg(f)<1||P.deg(f)>12) continue;
+        let res; try{ res=E.fpFactor(p,f); }catch(e){ ok('fpFactor',false,'p='+p+' f='+JSON.stringify(f)+' threw '+e.message); continue; }
+        let prod=[res.lead];
+        for(const {g,e} of res.factors) prod=P.mul(prod,P.pow(g,e));
+        ok('fpFactor',P.eq(prod,f),'product mismatch p='+p+' f='+JSON.stringify(f));
+        let allIrr=true, distinct=true;
+        res.factors.forEach(({g,e},k)=>{ if(g[g.length-1]!==1||!E.fpIsIrreducible(p,g)) allIrr=false; for(let j=0;j<k;j++) if(P.eq(res.factors[j].g,g)) distinct=false; });
+        ok('fpFactor',allIrr&&distinct,'irreducibility/distinct p='+p+' f='+JSON.stringify(f));
+      }
+    }
+    // special polynomials (derivative zero in char p)
+    const spec=[[2,[1,0,0,0,1]],[3,[2,0,0,0,0,0,0,0,0,1]],[5,[4,0,0,0,0,1]],[2,[0,1,0,1]],[7,[6,0,0,0,0,0,0,1]],[2,[1,0,0,0,0,0,0,0,1]]];
+    for(const [p,f] of spec){ const P=getFp(p); const res=E.fpFactor(p,f); let prod=[res.lead]; for(const {g,e} of res.factors) prod=P.mul(prod,P.pow(g,e)); ok('fpSpecial',P.eq(prod,f)&&res.factors.every(x=>E.fpIsIrreducible(p,x.g)),'special p='+p+' f='+JSON.stringify(f)); }
+    // 2. finite ring counts vs brute force
+    for(const [p,maxN] of [[2,8],[3,5],[5,3],[7,2],[11,2],[13,2]]){
+      for(let t=0;t<14;t++){
+        const n=1+Math.floor(r()*maxN); const a=[]; for(let k=0;k<n;k++) a.push(Math.floor(r()*p)); a.push(1);
+        const P=getFp(p); const f=P.trim(a);
+        const res=analyzeFp(p,f); const bf=bruteCounts(p,res.fm);
+        ok('counts',BigInt(bf.units)===res.cnt.units&&BigInt(bf.nil)===res.cnt.nil&&BigInt(bf.zd)===res.cnt.zd,'p='+p+' f='+JSON.stringify(f)+' formula '+res.cnt.units+'/'+res.cnt.nil+'/'+res.cnt.zd+' brute '+bf.units+'/'+bf.nil+'/'+bf.zd);
+        let agree=true; const size=bf.size;
+        for(let i=0;i<size;i++){ const c=classifyElem(p,res.fm,res.pieces,elemFromIndex(p,res.n,i)); const b=bf.cls[i]; if(!((c==='unit'&&b==='unit')||(c==='zero'&&b==='zero')||(c==='nil'&&b==='nil')||(c==='zd'&&b==='zd'))) agree=false; }
+        ok('classify',agree,'per-element classification p='+p+' f='+JSON.stringify(f));
+      }
+    }
+    // 3. R / C
+    const mk=(roots)=>{ let f=[FC.one]; for(const [z,m] of roots) for(let k=0;k<m;k++) f=PC.mul(f,[FC.neg(z),FC.one]); return f; };
+    const ci=(a,b)=>C(Q(BigInt(a)),Q(BigInt(b||0)));
+    const quad=(b,c,m)=>[[b,c],m];
+    const same=(a,b)=>Math.abs(a-b)<1e-6;
+    // (x-1)^3 (x^2+1)^2
+    {
+      let f=mk([[ci(1),3]]); const q=[ci(1),ci(0),ci(1)]; f=PC.mul(f,PC.mul(q,q));
+      const d=analyzeC0('R',f);
+      const real=d.pieces.filter(p=>p.raw.kind==='real'), pairs=d.pieces.filter(p=>p.raw.kind==='pair');
+      ok('R',d.pieces.length===2&&real.length===1&&real[0].e===3&&pairs.length===1&&pairs[0].e===2,'(x-1)^3(x^2+1)^2 over R: '+JSON.stringify(d.pieces.map(p=>[p.raw.kind,p.e])));
+      const dc=analyzeC0('C',f);
+      const mm=dc.pieces.map(p=>p.e).sort().join(',');
+      ok('C',dc.pieces.length===3&&mm==='2,2,3','(x-1)^3(x^2+1)^2 over C: '+mm);
+    }
+    for(let t=0;t<120;t++){
+      // random real: real roots + irreducible quadratics (b^2<4c)
+      const nr=Math.floor(r()*4), nq=Math.floor(r()*3); const used=new Set(); const expect=[]; let f=[FC.one];
+      for(let k=0;k<nr;k++){ const rt=Math.floor(r()*9)-4; if(used.has('r'+rt)) continue; used.add('r'+rt); const m=1+Math.floor(r()*3); expect.push({kind:'real',x:rt,e:m}); f=PC.mul(f,PC.pow([ci(-rt),ci(1)],m)); }
+      for(let k=0;k<nq;k++){ const b=Math.floor(r()*5)-2, c=1+Math.floor(r()*4); if(b*b>=4*c) continue; const key='q'+b+','+c; if(used.has(key)) continue; used.add(key); const m=1+Math.floor(r()*2); expect.push({kind:'pair',b,c,e:m}); f=PC.mul(f,PC.pow([ci(c),ci(b),ci(1)],m)); }
+      if(PC.deg(f)<1||PC.deg(f)>12) continue;
+      // scramble the leading coefficient
+      const lc=ci(1+Math.floor(r()*3)); f=PC.scale(f,lc);
+      const d=analyzeC0('R',f);
+      let good=d.pieces.length===expect.length;
+      for(const ex of expect){
+        const hit=d.pieces.find(p=>p.e===ex.e&&((ex.kind==='real'&&p.raw.kind==='real'&&same(p.raw.re.f,ex.x))||(ex.kind==='pair'&&p.raw.kind==='pair'&&same(p.raw.S.f,-ex.b)&&same(p.raw.T.f,ex.c))));
+        if(!hit) good=false;
+      }
+      ok('R',good,'random real polynomial '+PC.deg(f)+' expected '+JSON.stringify(expect)+' got '+JSON.stringify(d.pieces.map(p=>[p.raw.kind,p.e,p.raw.re.f])));
+      // sturm count
+      const nrealExpected=expect.filter(e=>e.kind==='real').length;
+      // check exactness snapping happened for rational real roots
+      ok('R',d.pieces.filter(p=>p.raw.kind==='real').every(p=>p.raw.re.q!==null),'real roots not snapped exactly');
+      // C mode
+      const dc=analyzeC0('C',f);
+      const exC=[]; expect.forEach(e=>{ if(e.kind==='real') exC.push(e.e); else { exC.push(e.e); exC.push(e.e); } });
+      ok('C',dc.pieces.map(p=>p.e).sort().join()===exC.sort().join(),'C multiplicities mismatch');
+    }
+    for(let t=0;t<80;t++){
+      const nz=1+Math.floor(r()*4); const used=new Set(); const roots=[]; const expect=[];
+      for(let k=0;k<nz;k++){ const a=Math.floor(r()*5)-2,b=Math.floor(r()*5)-2; const key=a+','+b; if(used.has(key)) continue; used.add(key); const m=1+Math.floor(r()*3); roots.push([ci(a,b),m]); expect.push({a,b,e:m}); }
+      const f=mk(roots); if(PC.deg(f)>12) continue;
+      const d=analyzeC0('C',f);
+      let good=d.pieces.length===expect.length;
+      for(const ex of expect) if(!d.pieces.find(p=>p.e===ex.e&&same(p.raw.re.f,ex.a)&&same(p.raw.im.f,ex.b)&&p.raw.re.q!==null)) good=false;
+      ok('C',good,'Gaussian roots '+JSON.stringify(expect)+' got '+JSON.stringify(d.pieces.map(p=>[p.raw.re.f,p.raw.im.f,p.e])));
+    }
+    // sturm / irrational roots
+    {
+      const f=[ci(-2),ci(0),ci(1)]; const d=analyzeC0('R',f);
+      ok('R',d.pieces.length===2&&d.pieces.every(p=>p.raw.kind==='real'&&p.e===1&&p.raw.re.q===null),'x^2-2 over R: two irrational real roots');
+      const g=PC.mul([ci(-3),ci(0),ci(0),ci(1)],[ci(1),ci(1)]); // (x^3-3)(x+1)
+      const d2=analyzeC0('R',g); ok('R',d2.pieces.length===3&&d2.pieces.filter(p=>p.raw.kind==='pair').length===1,'(x^3-3)(x+1) over R');
+      ok('R',E.sturmCount(PC.mul([ci(-2),ci(1)],[ci(-1),ci(1)]))===2,'sturm (x-2)(x-1)');
+    }
+    // 4. parser
+    const P1=(s,ring)=>{ try{ return E.PC.trim(E.parseExact(s,ring||'R')); }catch(e){ return 'ERR:'+e.message; } };
+    const eqs=(s,expectCoefs,ring)=>{ const v=P1(s,ring); const w=expectCoefs.map(c=>C(Q(BigInt(c[0]),BigInt(c[1]||1)),Q(BigInt(c[2]||0),BigInt(c[3]||1)))); ok('parse',typeof v!=='string'&&PC.eq(v,PC.trim(w)),s+' -> '+JSON.stringify(typeof v==='string'?v:v.map(z=>E.qstr(z.r)+'+'+E.qstr(z.i)+'i'))); };
+    eqs('2x',[[0],[2]]); eqs('3(x+1)',[[3],[3]]); eqs('(x+1)(x-1)',[[-1],[0],[1]]); eqs('x²+1',[[1],[0],[1]]);
+    eqs('1/2',[[1,2]]); eqs('0.5x',[[0],[1,2]]); eqs('x^3-x',[[0],[-1],[0],[1]]); eqs('-x^2',[[0],[0],[-1]]); eqs('(x+1)^2(x^2+1)',[[1],[2],[2],[2],[1]]);
+    eqs('x/2+3/4',[[3,4],[1,2]]); eqs('2^3',[[8]]); eqs('x−2',[[-2],[1]]); eqs('(x-i)(x+i)',[[1],[0],[1]],'C');
+    for(const bad of ['x^','x^-1','x^1.5','(x+1','x+1)','x/x','1/0','2 3','y+1','x^2^3','x*','+']) ok('parse',typeof P1(bad)==='string','should be an error: '+bad+' got '+JSON.stringify(P1(bad)));
+    ok('parse',typeof P1('i','R')==='string','i in R should error');
+    ok('parse',analyze('Fp',5,'1/5').kind==='error','1/5 in F5 should error');
+    ok('edge',analyze('Fp',2,'0').kind==='zero'&&analyze('R',2,'0').kind==='zero','f=0');
+    ok('edge',analyze('C',2,'5').kind==='unit'&&analyze('Fp',3,'3').kind==='zero','constants');
+    ok('edge',analyze('Fp',2,'x^13').kind==='error','degree cap');
+    // 5. Newton lift of a root inside F[x]/(g^e), and the "More about this piece" explainer
+    {
+      const check=(sec,P,g,e,L,label)=>{ // independent check of g(w)=0 mod g^e and w=x mod g
+        const ge=P.pow(g,e); let v=[]; for(let k=g.length-1;k>=0;k--) v=P.rem(P.add(P.mul(v,L.omega),[g[k]]),ge);
+        ok(sec,L.ok&&!v.length&&!P.rem(P.sub(L.omega,[P.F.zero,P.F.one]),g).length&&P.deg(L.omega)<g.length*e,label+' g(w)=0 mod g^e / w=x mod g');
+      };
+      for(const p of [2,3,5,7]){
+        const P=getFp(p);
+        for(const d of [2,3]) for(let e=2;e<=4;e++) for(let t=0;t<3;t++){
+          let g; for(let tries=0;tries<500;tries++){ const a=[]; for(let k=0;k<d;k++) a.push(Math.floor(r()*p)); a.push(1); g=P.trim(a); if(E.fpIsIrreducible(p,g)) break; g=null; }
+          if(!g) continue;
+          const res=analyzeFp(p,P.pow(g,e)); const pc=res.pieces[0];
+          const L=liftRoot(pc,res);
+          ok('lift',!!L&&pc.e===e&&pc.d===d,'piece shape p='+p+' g='+JSON.stringify(g)+' e='+e);
+          if(L) check('lift',P,g,e,L,'p='+p+' g='+JSON.stringify(g)+' e='+e);
+          const html=cardHtml(pc,0,res,null);
+          ok('explainer',html.indexOf('More about this piece')>=0&&html.indexOf('A copy of')>=0&&html.indexOf('ω')>=0,'explainer d>1 p='+p);
+        }
+      }
+      const exactR=['(x^2+1)^2','(x^2+1)^3','(x^2+x+1)^2','(x^2-2x+5)^4'];
+      for(const s of exactR){
+        const res=analyzeC0('R',E.parseExact(s,'R')); const pc=res.pieces[0]; const L=liftRoot(pc,res);
+        ok('lift',!!L&&L.exact&&L.kind==='Q',s+' exact rational');
+        if(L){ const g=[pc.raw.T.q,E.qneg(pc.raw.S.q),E.Q1]; check('lift',E.PQ,g,pc.e,L,s); }
+      }
+      {
+        const res=analyzeC0('R',E.parseExact('(x^2+1)^2','R')); const L=liftRoot(res.pieces[0],res);
+        const q=(n,d)=>E.Q(BigInt(n),BigInt(d));
+        ok('lift',L&&E.PQ.eq(L.omega,[E.Q0,q(3,2),E.Q0,q(1,2)]),'(x^2+1)^2: omega=(x^3+3x)/2');
+        const w2=L&&E.PQ.rem(E.PQ.mul(L.omega,L.omega),L.ge); ok('lift',w2&&E.PQ.eq(w2,[q(-1,1)]),'omega^2=-1 exactly');
+        const h=cardHtml(res.pieces[0],0,res,null);
+        ok('explainer',h.indexOf('the “dual numbers”')>=0&&h.indexOf('= <i class="m">i</i>')<0&&h.indexOf('z</i> = <span class="poly">i</span>')>=0&&h.indexOf('(x<sup>3</sup> + 3x)/2')>=0,'(x^2+1)^2 card text');
+      }
+      {
+        const res=analyzeC0('R',E.parseExact('(x^3-2)^2','R')); const pc=res.pieces.find(x=>x.raw.kind==='pair'); const L=liftRoot(pc,res);
+        ok('lift',!!L&&!L.exact&&L.kind==='float'&&L.ok,'(x^3-2)^2 quadratic factor: float lift');
+        ok('explainer',cardHtml(pc,0,res,null).indexOf('≈')>=0,'(x^3-2)^2 card shows ≈');
+        const res3=analyzeC0('R',E.parseExact('(x^3-2)^3','R')); const pc3=res3.pieces.find(x=>x.raw.kind==='pair'); const L3=liftRoot(pc3,res3); ok('lift',!!L3&&L3.ok,'(x^3-2)^3 float lift');
+      }
+      { // d = 1 cases
+        const res=analyzeC0('R',E.parseExact('(x^2-2)^3','R')); const h=cardHtml(res.pieces[0],0,res,null);
+        ok('explainer',res.pieces.length===2&&h.indexOf('More about this piece')>=0&&h.indexOf('A copy of')<0&&h.indexOf('≈')>=0&&h.indexOf('Taylor')>=0,'(x^2-2)^3 d=1 irrational root');
+        const r2=analyzeC0('R',E.parseExact('x^2','R')); const h2=cardHtml(r2.pieces[0],0,r2,null);
+        ok('explainer',h2.indexOf('dual numbers')>=0&&h2.indexOf('Taylor')<0&&h2.indexOf('A copy of')<0&&h2.indexOf('(<i class="m">a</i> + <i class="m">b</i>')>=0,'x^2 e=2 d=1');
+        const r4=analyzeFp(2,[0,0,0,0,1]); const h4=cardHtml(r4.pieces[0],0,r4,null);
+        ok('explainer',h4.indexOf('dual numbers')<0&&h4.indexOf('<i class="m">ε</i><sup>4</sup>')>=0&&h4.indexOf('A copy of')<0,'F2 x^4 e=4 d=1');
+        const rc=analyzeC0('C',E.parseExact('(x-i)^2','C')); const hc=cardHtml(rc.pieces[0],0,rc,null);
+        ok('explainer',hc.indexOf('More about this piece')>=0&&hc.indexOf('A copy of')<0,'C (x-i)^2');
+        ok('explainer',cardHtml(res.pieces[1],1,res,null).indexOf('<details')>=0,'second fat piece has explainer');
+        const rb=analyzeC0('R',E.parseExact('x^2-2','R')); ok('explainer',rb.pieces.every((x,j)=>cardHtml(x,j,rb,null).indexOf('<details')<0),'no explainer on non-fat pieces');
+      }
+    }
+    // 6. Z/n rings: Hensel lifting, decomposition, brute-force checks
+    {
+      const sum=sec=>sec;
+      const unitsOf=n=>{ const u=[]; for(let c=1;c<n;c++) if(E.znInv(n,c)!==null) u.push(c); return u; };
+      const randZn=(n,deg,mode)=>{
+        const PZ=E.getZm(n), U=unitsOf(n);
+        if(mode===0){ const a=[]; for(let k=0;k<deg;k++) a.push(Math.floor(r()*n)); a.push(U[Math.floor(r()*U.length)]); return PZ.trim(a); }
+        // product of small random monic polynomials (forces repeated factors and shared roots)
+        let f=[1]; const parts=1+Math.floor(r()*3);
+        for(let q=0;q<parts;q++){ const dq=1+Math.floor(r()*2); const g=[]; for(let k=0;k<dq;k++) g.push(Math.floor(r()*n)); g.push(1); const ex=1+Math.floor(r()*2); f=PZ.mul(f,PZ.pow(g,ex)); if(PZ.deg(f)>=deg) break; }
+        return PZ.mul(f,[U[Math.floor(r()*U.length)]]);
+      };
+      const maxBrute=n=>({4:4,8:2,9:2,6:3,12:2,25:1,27:1}[n]);
+      for(const n of [4,8,9,6,12,25,27]){
+        const PZ=E.getZm(n);
+        for(let t=0;t<70;t++){
+          const deg=1+Math.floor(r()*(t<35?7:maxBrute(n)));
+          let poly=randZn(n,deg,t%2); if(PZ.deg(poly)<1||PZ.deg(poly)>8) continue;
+          const li=E.znInv(n,poly[poly.length-1]); const fm=PZ.trim(poly.map(c=>c*li%n));
+          let parts; try{ parts=E.znDecompose(n,fm); }catch(err){ ok('hensel',false,'n='+n+' f='+JSON.stringify(fm)+' threw '+err.message); continue; }
+          let allOk=true, why='';
+          let degSum=0;
+          for(const pt of parts){
+            const Pp=getFp(pt.p), PM=E.getZm(pt.m); let prod=[1];
+            pt.factors.forEach((fc,i)=>{
+              prod=PM.mul(prod,fc.F);
+              if(fc.F[fc.F.length-1]!==1){ allOk=false; why='not monic'; }
+              if(!Pp.eq(Pp.trim(fc.F.map(c=>c%pt.p)),Pp.pow(fc.g,fc.e))){ allOk=false; why='not g^e mod p'; }
+              for(let j=0;j<i;j++) if(Pp.deg(Pp.gcd(Pp.pow(pt.factors[j].g,pt.factors[j].e),Pp.pow(fc.g,fc.e)))!==0){ allOk=false; why='not coprime'; }
+              if(PM.deg(fc.F)!==fc.d*fc.e){ allOk=false; why='degree'; }
+              degSum+=fc.d*fc.e;
+            });
+            if(!PM.eq(prod,PM.trim(fm.map(c=>c%pt.m)))){ allOk=false; why='product != f mod p^k'; }
+          }
+          ok('hensel',allOk&&degSum===PZ.deg(fm)*parts.length,'n='+n+' f='+JSON.stringify(fm)+' '+why);
+          if(Math.pow(n,PZ.deg(fm))>256) continue;
+          // analysis + brute force
+          const res=analyzeZn(n,poly,false); const bf=E.znBrute(n,res.fm);
+          ok('znCounts',BigInt(bf.units)===res.cnt.units&&BigInt(bf.nil)===res.cnt.nil&&BigInt(bf.zd)===res.cnt.zd,'n='+n+' f='+JSON.stringify(fm)+' formula '+res.cnt.units+'/'+res.cnt.nil+'/'+res.cnt.zd+' brute '+bf.units+'/'+bf.nil+'/'+bf.zd);
+          ok('znIdempotents',bf.idem===Math.pow(2,res.pieces.length),'n='+n+' f='+JSON.stringify(fm)+' idempotents '+bf.idem+' vs 2^'+res.pieces.length);
+          let agree=true; for(let i=0;i<bf.size;i++){ if(res.classify(elemFromIndex(n,res.n,i))!==bf.cls[i]) agree=false; }
+          ok('znClassify',agree,'per-element classes n='+n+' f='+JSON.stringify(fm));
+          ok('znIndex',res.idx===bf.index,'nilpotency index n='+n+' f='+JSON.stringify(fm)+' shown '+res.idx+' brute '+bf.index);
+          ok('znCards',res.pieces.every(pc=>{ const h=pieceCardZn(pc,res,null); return (pc.k>1||pc.role==='fat')===(h.indexOf('More about this piece')>=0); }),'More toggle on every k>=2 piece, n='+n+' f='+JSON.stringify(fm));
+        }
+      }
+      // specific facts
+      const an=(n,s)=>analyze('Zn',n,s);
+      const idxOf=(n,s)=>an(n,s).idx;
+      ok('znFacts',idxOf(4,'x^2')===2,'Z/4 x^2 index 2: '+idxOf(4,'x^2'));
+      ok('znFacts',idxOf(4,'x^2+2')===4,'Z/4 x^2+2 index 4: '+idxOf(4,'x^2+2'));
+      {
+        const a=an(4,'x^2'), b=an(4,'x^2+2'), c=an(4,'x^2+1');
+        ok('znFacts',a.cnt.size===b.cnt.size&&a.cnt.units===b.cnt.units&&a.cnt.nil===b.cnt.nil,'x^2 and x^2+2 agree on size and unit counts');
+        ok('znFacts',a.pieces.length===1&&a.pieces[0].role==='fat'&&b.pieces[0].role==='fat'&&c.pieces[0].role==='fat','fat pieces over Z/4');
+        ok('znFacts',an(4,'x-1').pieces[0].name==='ℤ/4'&&an(4,'x^2+x+1').pieces[0].name==='GR(4, 2)','names: Z/4 and GR(4, 2)');
+        const t=an(4,'x^3-x'); ok('znFacts',t.pieces.length===2&&t.pieces[0].role==='base'&&t.pieces[1].role==='fat','Z/4 x^3-x = Z/4 x fat: '+t.pieces.map(p=>p.role));
+        const s6=an(6,'x^2+1'); ok('znFacts',s6.parts.length===2&&plainText(s6.pieces.map(p=>p.name).join(' × '))==='F₂[y]/(y²) × F₉','Z/6 x^2+1: '+plainText(s6.pieces.map(p=>p.name).join(' × ')));
+        ok('znFacts',an(6,'x^2-x').pieces.length===4,'Z/6 x^2-x has four pieces');
+      }
+      { const PZ=E.getZm(8); let cnt=0; for(let c=0;c<8;c++) if(PZ.ev([7,0,1],c)===0) cnt++; ok('znFacts',cnt===4,'x^2-1 has 4 roots in Z/8'); }
+      // errors and edge cases
+      ok('znEdge',an(4,'2x^2+1').kind==='error'&&/leading coefficient/.test(an(4,'2x^2+1').msg),'2x^2+1 over Z/4 errors');
+      ok('znEdge',an(6,'3x+1').kind==='error','3x+1 over Z/6 errors');
+      ok('znEdge',an(4,'2').kind==='error'&&/constant/.test(an(4,'2').msg),'constant 2 over Z/4 errors');
+      ok('znEdge',an(4,'3').kind==='unit'&&an(4,'4x').kind==='zero'&&an(4,'0').kind==='zero','Z/4 constants');
+      ok('znEdge',an(6,'x/2').kind==='error'&&an(9,'x/2+1').kind==='ok','denominators must be units');
+      ok('znEdge',an(4,'4x^2+x+1').kind==='ok'&&an(4,'4x^2+x+1').n===1,'leading terms vanishing mod n drop off');
+      ok('znEdge',an(4,'3x^2+x').kind==='ok'&&an(4,'3x^2+x').monicChanged,'monic scaling over Z/4');
+      for(const n of [4,8,9,6]) ok('znPresets',znPresets(n).every(x=>an(n,x.s).kind==='ok'&&x.l.length>0),'all presets of Z/'+n+' are fine');
+    }
+    return R;
+  }
+  window.__qr={liftRoot,newtonLift,moreHtml,cardHtml,engine:QR,computeSel,parse:(s,ring)=>QR.parseExact(s,ring||'R'),fpFactor:QR.fpFactor,analyze,analyzeFp,analyzeC0,decomposeChar0:QR.decomposeChar0,
+    classifyElem,bruteCounts,mulMod,ringCounts,state:STATE,selfTest,analyzeZn,znPresets,pieceCardZn,plainText,renderZn,fpIsIrreducible:QR.fpIsIrreducible,polyHtml};
+}
+})();
+</script>
