@@ -1594,8 +1594,16 @@ function drawSketch(ctx, cw, dpr) {
 // The pitches always come from the shape, except Song, which deliberately tunes them to a scale. A voice only
 // changes how each pitch rings: how long it lasts, how hard the mallet is, a click or not, room reverb and stereo width.
 // Tuned plays only a few of the drum's true notes, one after another; see playTuned.
+// How the Tuned voice rings. A hidden sound tester (add ?lab to the address) switches between these to compare by ear.
+var TUNE_PRESETS = [
+  { name: 'A · Now',               tau: 1.2,  cap: 3,   reverb: 0.32, hum: true },
+  { name: 'B · No hum',            tau: 1.2,  cap: 3,   reverb: 0.32, hum: false },
+  { name: 'C · Short, no hum',     tau: 0.6,  cap: 1.5, reverb: 0.2,  hum: false },
+  { name: 'D · Very short, no hum', tau: 0.35, cap: 1,   reverb: 0.12, hum: false }
+];
+var TUNE = TUNE_PRESETS[0];
 var VOICES = {
-  tuned:   { name: 'Tuned',   dur: 4.5, tau: function (r) { return 1.2 * Math.pow(r, 0.8); }, soft: 0.11, attack: 0.005,
+  tuned:   { name: 'Tuned',   dur: 4.5, tau: function (r) { return TUNE.tau * Math.pow(r, 0.8); }, soft: 0.11, attack: 0.005,
              stick: false, shimmer: 0, reverb: 0.32, width: 0.4 },
   singing: { name: 'Singing', dur: 7, tau: function (r) { return 3.4 * Math.pow(r, 0.45); }, soft: 0.11, attack: 0.012,
              stick: false, shimmer: 0.32, reverb: 0.42, width: 0.55 },
@@ -1784,7 +1792,7 @@ function tunedNotes(a, sol, max) {
 // Tuned voice: a brief thump of the whole drum, then its strongest true notes strummed one at a time as pure sines.
 function playTuned(a, sol, delay, opts) {
   var o = opts || {}, max = o.max || 4, gap = o.gap || 0.075, d = delay || 0, V = VOICES.tuned, sr = audio.ctx.sampleRate;
-  var ring = o.ring || 1, cap = ring > 1 ? 0 : 3;   // taps stop within 3 s; the game's and twins' tunes ring a little longer
+  var ring = o.ring || 1, cap = ring > 1 ? 0 : TUNE.cap;   // taps stop within TUNE.cap s; the game's and twins' tunes ring a little longer
   var f0 = sol.f[0], notes = tunedNotes(a, sol, max), body = [], k;
   for (k = 0; k < sol.K; k++) body.push({ f: sol.f[k], a: a[k], tau: 0.22 * Math.pow(f0 / sol.f[k], 0.5), pan: panOf(k, V) });
   playJob(soundJob(body, sr, V, 1.2), d, 0.22);   // every pattern, a quarter-second each: the full spectrum, then it is gone
@@ -1792,7 +1800,7 @@ function playTuned(a, sol, delay, opts) {
     var pan = clamp((Math.log2(nt.f / f0) - 1) * 0.35, -0.6, 0.6);
     playJob(soundJob([{ f: nt.f, a: 1, tau: tauOf(sol, nt.k, V) * ring, pan: pan }], sr, V, cap || undefined), d + i * gap, 0.6 * (0.35 + 0.65 * nt.w));
   });
-  droneTouch(f0 / 2, f0, 'sine', 3000);            // an octave below the drum's lowest note, and that note
+  if (TUNE.hum) droneTouch(f0 / 2, f0, 'sine', 3000);   // an octave below the drum's lowest note, and that note
   lastTuned = notes.map(function (nt) { return { text: noteOf(nt.f).text, mode: nt.k + 1 }; });
 }
 function playStrike(a, sol, delay, maxDur) {      // sol, delay and maxDur (seconds) are optional
@@ -1835,7 +1843,8 @@ function playMode(k, sol) {
   var V = VOICES[voiceKey];
   if (voiceKey === 'tuned') {                      // the pattern's own pitch, a single pure sine
     playJob(soundJob([{ f: sol.f[k], a: 1, tau: 2, pan: 0 }], audio.ctx.sampleRate, V), 0, 0.6);
-    droneTouch(sol.f[0] / 2, sol.f[0], 'sine', 3000); return;
+    if (TUNE.hum) droneTouch(sol.f[0] / 2, sol.f[0], 'sine', 3000);
+    return;
   }
   if (voiceKey === 'music') { playNote(quantize(sol.f[k]), 0.6); droneTouch(midiToHz(SCALES[scaleKey].root - 12), midiToHz(SCALES[scaleKey].root - 5), 'triangle'); return; }
   playJob(soundJob([{ f: sol.f[k], a: 1, tau: tauOf(sol, k, V) * 1.3, pan: 0 }], audio.ctx.sampleRate, V));
@@ -3517,6 +3526,25 @@ blBuild();
 sizeStage(); sizeSpec();
 updateCaption();
 loadShape(SHAPES[0]);
+
+if (location.search.indexOf('lab') >= 0) (function () {   // hidden sound tester: compare the Tuned presets on any device
+  var bar = document.createElement('div'), btns = [];
+  bar.style.cssText = 'position:fixed;left:8px;right:8px;bottom:8px;z-index:50;display:flex;flex-wrap:wrap;gap:6px;justify-content:center;padding:8px;border-radius:14px;background:var(--panel);border:1px solid var(--accent)';
+  TUNE_PRESETS.forEach(function (p) {
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'chip plain'; b.textContent = p.name;
+    b.addEventListener('click', function () {
+      TUNE = p; VOICES.tuned.reverb = p.reverb;
+      if (audio && audio.drone && !p.hum) audio.drone.g.gain.setTargetAtTime(0, audio.ctx.currentTime, 0.2);
+      btns.forEach(function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); });
+      if (voiceKey !== 'tuned') $('voice-tuned').click();
+      var sol = state.view === 'twins' && TD[0].sol ? TD[0].sol : state.sol;
+      if (sol && ensureAudio()) { var c = centrePoint(sol, state.shape.poly); playStrike(strikeAmps(sol, c.x, c.y).a, sol); }
+    });
+    btns.push(b); bar.appendChild(b);
+  });
+  btns[0].setAttribute('aria-pressed', 'true');
+  document.body.appendChild(bar); document.body.style.paddingBottom = '120px';
+})();
 
 if (DEBUG) {
   window.__drum = {
