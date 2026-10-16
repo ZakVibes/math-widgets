@@ -60,6 +60,7 @@ aside{display:flex;flex-direction:column;gap:16px;min-width:0}
 .lab{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
 .chip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+#jrChips{gap:5px}#jrChips .chip{font-size:13px;line-height:1.3;padding:4px 11px}
 .chip.mode{font-family:var(--display);font-size:20px;line-height:1;padding:6px 16px}
 .slots{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .slot{border-radius:12px;display:flex;flex-direction:column;align-items:flex-start;gap:0;padding:8px 12px;text-align:left;min-width:0}
@@ -1681,11 +1682,18 @@ function sqrt2in7(){                               // the 7-adic square root of 
   for (let i = 0; i < 6; i++){ const f = ((s*s - 2n) % M + M) % M; s = ((s - f*modInv(2n*s % M, M)) % M + M) % M; }
   return s;
 }
-const verd = (k, t) => ({k, t});
+function sqrtm1in5(){                              // the 5-adic square root of −1 that ends in 2, by Newton / Hensel lifting
+  const M = 5n ** 30n; let s = 2n;
+  for (let i = 0; i < 6; i++){ const f = ((s*s + 1n) % M + M) % M; s = ((s - f*modInv(2n*s % M, M)) % M + M) % M; }
+  return s;
+}
+const factSum = N => { let f = 1n, s = 1n; for (let k = 1n; k <= N; k++){ f *= k; s += f; } return s; };   // 0! + 1! + … + N!
+const verd = (k, t, s) => ({k, t, s});               // s: a shorter wording for the small badges, when t is long
 const RUNS = verd('off', 'runs off to ∞'), WAND = verd('wander', 'wanders'), JUMP = verd('jump', 'jumps out, never settles');
+const CHAOS = verd('wander', 'wanders (chaos)'), TO0 = verd('conv', 'closes in on 0'), SETTLES = verd('conv', 'settles (on a number with no known formula)', 'settles');
 const JR = [
   {name:'Powers of 3', last:12, f:n => [3n ** BigInt(n), 1n], rule:'x = 3ⁿ: each step multiplies the last by 3.',
-   v:[RUNS, WAND, verd('conv', 'closes in on 0'), WAND, WAND], lims:[null, null, {zero:true}, null, null], rv:{c:15, span:36},
+   v:[RUNS, WAND, TO0, WAND, WAND], lims:[null, null, {zero:true}, null, null], rv:{c:15, span:36}, zoom0:[3],
    why:'Each step adds another factor of 3, so the 3-adic world sees it shrink: 3ⁿ ends in n zeros in base 3.'},
   {name:'1 + 2 + 4 + 8 + …', last:14, f:n => [2n ** BigInt(n + 1) - 1n, 1n], rule:'x = 1 + 2 + 4 + … + 2ⁿ = 2ⁿ⁺¹ − 1: each step adds the next power of 2.',
    v:[RUNS, verd('conv', 'closes in on −1'), WAND, WAND, WAND], lims:[null, {n:-1n}, null, null, null], rv:{c:16, span:40},
@@ -1696,30 +1704,51 @@ const JR = [
   {name:'1, 1/2, 1/3, 1/4, …', last:23, f:n => [1n, BigInt(n + 1)], rule:'x = 1/(n + 1): one over the next whole number.',
    v:[verd('conv', 'closes in on 0'), JUMP, JUMP, JUMP, JUMP], lims:[{val:0}, null, null, null, null], rv:{c:0.5, span:1.6},
    why:'On the real line 1/n shrinks. But 1/n is big p-adically whenever n has many factors of p, and that keeps happening.'},
+  {name:'Newton’s √−1 from 2', last:8, gen:() => { const s = []; let n = 2n, d = 1n; for (let i = 0; i <= 8; i++){ s.push([n, d]); const f = mkFrac(n*n - d*d, 2n*n*d); n = f[0]; d = f[1]; } return s; },
+   rule:'x₀ = 2, then each new x is (x² − 1) ÷ (2x): Newton’s method for √−1.',
+   v:[CHAOS, RUNS, WAND, verd('conv', 'closes in on √−1'), WAND], lims:[null, null, null, {q:() => [sqrtm1in5(), 1n]}, null], rv:{c:0, span:7},
+   why:'2 × 2 = 4 is one less than 5, so √−1 exists in the 5-adic world, and Newton’s method finds it calmly there. On the real line nothing squares to −1, so the same rule bounces around chaotically. It is the √2 journey turned inside out.'},
+  {name:'n!: 1, 2, 6, 24, …', last:20, f:n => { let f = 1n; for (let k = 2n; k <= BigInt(n); k++) f *= k; return [f, 1n]; }, rule:'x = n!, so each step multiplies the last by the next whole number: 0! = 1, 1! = 1, 2! = 2, 3! = 6, …',
+   v:[RUNS, TO0, TO0, TO0, TO0], lims:[null, {zero:true}, {zero:true}, {zero:true}, {zero:true}], rv:{c:70, span:150}, zoom0:[2, 3, 5, 7],
+   why:'n! keeps collecting factors of 2, 3, 5 and 7, so every p-adic world sees it shrink. The opposite of 1, 1/2, 1/3, …, which settles only on the real line.'},
+  {name:'1, 11, 111, …', last:13, f:n => [(10n ** BigInt(n + 1) - 1n) / 9n, 1n], rule:'x = 11…1 (n ones) = (10ⁿ − 1) ÷ 9: each step writes one more 1 on the left.',
+   v:[RUNS, verd('conv', 'closes in on −1/9'), WAND, verd('conv', 'closes in on −1/9'), WAND], lims:[null, {q:() => [-1n, 9n]}, null, {q:() => [-1n, 9n]}, null], rv:{c:60, span:140},
+   why:'10 = 2 × 5, so adding another 1 on the left changes the number by a power of 10, which is tiny to both the 2-adic and the 5-adic world. Both see 111…1 heading for −1/9, because 9 × (−1/9) = −1 = …99999.'},
+  {name:'Fifth powers from 2', last:5, f:n => [2n ** (5n ** BigInt(n)), 1n], rule:'x₀ = 2, then each new x is the last one to the 5th power: x⁵.',
+   v:[RUNS, TO0, WAND, verd('conv', 'closes in on √−1'), WAND], lims:[null, {zero:true}, null, {q:() => [sqrtm1in5(), 1n]}, null], rv:{c:20, span:50}, zoom0:[2],
+   why:'In the 5-adic world, raising to the 5th power pulls every number toward a special point with the same last digit. Starting from 2, that point is a square root of −1: exactly where Newton’s method for √−1 ended up, reached by a completely different road.'},
+  {name:'0! + 1! + 2! + …', last:20, f:n => [factSum(BigInt(n)), 1n], rule:'x = 0! + 1! + 2! + … + N!: each step adds the next factorial.',
+   v:[RUNS, SETTLES, SETTLES, SETTLES, SETTLES], lims:[null, {q:() => [factSum(120n), 1n]}, {q:() => [factSum(120n), 1n]}, {q:() => [factSum(120n), 1n]}, {q:() => [factSum(120n), 1n]}], rv:{c:80, span:180},
+   why:'Each new term N! is tiny p-adically, so the sum settles in every p-adic world at once. Where it settles is a mystery: nobody has found a formula for those limits.'},
+  {name:'1 + 3 + 9 + 27 + …', last:14, f:n => [(3n ** BigInt(n + 1) - 1n) / 2n, 1n], rule:'x = 1 + 3 + 9 + … + 3ⁿ = (3ⁿ⁺¹ − 1) ÷ 2: each step adds the next power of 3.',
+   v:[RUNS, WAND, verd('conv', 'closes in on −1/2'), WAND, WAND], lims:[null, null, {q:() => [-1n, 2n]}, null, null], rv:{c:70, span:160},
+   why:'Like 1 + 2 + 4 + … heading for −1 in the 2-adic world: here s + 1/2 is a power of 3 (halved), so the 3-adic world sees the sums close in on −1/2. In base 3 they are …1111, and 2 × …1111 + 1 = …0000.'},
 ];
 const jr = {idx:0, step:0, playing:false, raf:0, t:0, inited:false};
 const jrJ = () => JR[jr.idx];
 function jrBuild(J){                                // exact steps and limits (once), with windows grown to hold them
   if (J.recs) return;
-  const steps = []; let n = 3n, d = 1n;
-  for (let i = 0; i <= J.last; i++){
+  let steps = []; let n = 3n, d = 1n;
+  if (J.gen) steps = J.gen();
+  else for (let i = 0; i <= J.last; i++){
     if (J.newton){ steps.push([n, d]); const f = mkFrac(n*n + 2n*d*d, 2n*n*d); n = f[0]; d = f[1]; } else steps.push(J.f(i));
   }
   J.steps = steps;
   steps.forEach(s => ensureEFor(s[0], s[1]));
-  J.recs = steps.map(s => { const r = makeRec(s[0], s[1]); jrReg.push(r); return r; });
+  J.recs = steps.map(s => { const r = makeRec(s[0], s[1]); if (!isFinite(r.val)) r.val = (s[0] < 0n ? -1 : 1)*1e200; jrReg.push(r); return r; });   // a number too big for a double still sits far off the real strip
   J.lims = J.lims.map(l => {
     if (!l) return null;
     if (l.val !== undefined) return {val:l.val};
-    const r = makeRec(l.sq7 ? sqrt2in7() : l.zero ? 0n : l.n, 1n); jrReg.push(r); return {rec:r};
+    let q = [l.sq7 ? sqrt2in7() : l.zero ? 0n : l.n, 1n]; if (l.q) q = mkFrac(...l.q());
+    ensureEFor(q[0], q[1]); const r = makeRec(q[0], q[1]); jrReg.push(r); return {rec:r};
   });
 }
 const limCache = new Map();
 function limW(rec, pi){ const key = pi + ':' + EP[pi]; let m = limCache.get(rec); if (!m){ m = {}; limCache.set(rec, m); } return m[key] || (m[key] = computeW(rec, pi)); }
 function jrDiskView(d){                              // ℤ_p, unless most steps live outside it: then the whole window
   const J = jrJ(), pi = d.pi; let out = 0; J.recs.forEach(r => { if (r.w[pi].v < 0) out++; });
-  if (J.name === 'Powers of 3' && d.p === 3){       // zoom in around 0, so the steps visibly close in on it
-    const E = EP[pi], T = TDEP[3], [cx, cy] = centreOf(pi, new Array(T).fill(0), T); return {cx, cy, r:SHAPE[pi][E + 1].R*1.6};   // centred on 0 itself (0 sits at the top edge of every ball holding it)
+  if (J.zoom0 && J.zoom0.includes(d.p)){            // zoom in around 0, so the steps visibly close in on it
+    const E = EP[pi], T = TDEP[d.p], [cx, cy] = centreOf(pi, new Array(T).fill(0), T); return {cx, cy, r:SHAPE[pi][E + 1].R*1.6};   // centred on 0 itself (0 sits at the top edge of every ball holding it)
   }
   return out*2 >= J.recs.length ? {cx:0, cy:0, r:FITR[pi]*1.1} : homeView(pi);
 }
@@ -1732,9 +1761,16 @@ function clipSeg(a, b, W, H){                        // Liang-Barsky: keeps dash
   const ch = (p, q) => { if (p === 0) return q >= 0; const r = q/p; if (p < 0){ if (r > t1) return false; if (r > t0) t0 = r; } else { if (r < t0) return false; if (r < t1) t1 = r; } return true; };
   return ch(-dx, a[0] + 20) && ch(dx, W + 20 - a[0]) && ch(-dy, a[1] + 20) && ch(dy, H + 20 - a[1]) ? [a[0] + t0*dx, a[1] + t0*dy, a[0] + t1*dx, a[1] + t1*dy] : null;
 }
+function jrNum(rec, abs){                             // a step's real value as short text; whole numbers too big for a double get 1.99×10⁹⁴⁰ style
+  if (rec.d === 1n && Math.abs(rec.val) >= 1e15){
+    const s = babs(rec.n).toString(), m = s[0] + '.' + s.slice(1, 4).replace(/0+$/, '').padEnd(1, '0');
+    return (rec.n < 0n && !abs ? '−' : '') + m + '×10' + SUP(s.length - 1);
+  }
+  return fmtNum(abs ? Math.abs(rec.val) : rec.val);
+}
 function jrSize(wi, rec){                            // the size of a step in one world, as short text
-  if (wi === 0) return rec.n === 0n ? '0' : fmtNum(Math.abs(rec.val));
-  const p = PR[wi - 1], v = rec.w[wi - 1].v; return v < 0 ? p + SUP(-v) : sizeOfV(p, v);
+  if (wi === 0) return rec.n === 0n ? '0' : jrNum(rec, true);
+  const p = PR[wi - 1], v = rec.w[wi - 1].v; return v < 0 ? p + SUP(-v) : v > 20 && v !== Infinity ? '1/' + p + SUP(v) : sizeOfV(p, v);
 }
 function drawJourney(c, wi, pos, posLim){            // pos(rec, i) -> [x, y] or null; posLim(lim) likewise
   const J = jrJ(), ctx = c.ctx, W = c.W, H = c.H, k = jr.step, P = [];
@@ -1785,11 +1821,11 @@ function renderJrStatus(){
   disks.forEach(d => {
     const v = J.v[d.pi + 1], ok = v.k === 'conv' && seen;
     d.badge.textContent = (ok ? '✓ ' : '') + `ℚ${SUB(d.p)} ${d.p}-adic`;
-    d.gstat.hidden = false; d.gstat.textContent = v.t; d.gstat.className = 'gstat' + (ok ? ' ok' : '');
+    d.gstat.hidden = false; d.gstat.textContent = v.s || v.t; d.gstat.className = 'gstat' + (ok ? ' ok' : '');
   });
   const v = J.v[0], ok = v.k === 'conv' && seen;
   $('realBadge').textContent = (ok ? '✓ ' : '') + 'ℝ · real line';
-  const pill = $('pill'); pill.hidden = false; pill.className = 'pill' + (ok ? ' ok' : ''); pill.textContent = v.t;
+  const pill = $('pill'); pill.hidden = false; pill.className = 'pill' + (ok ? ' ok' : ''); pill.textContent = v.s || v.t;
 }
 const bigTxt = b => { const s = b.toString(); return s.length > 14 ? s.slice(0, 5) + '…' + s.slice(-4) : s; };
 function renderJrPanel(){
@@ -1798,7 +1834,7 @@ function renderJrPanel(){
   $('jrChips').querySelectorAll('[data-j]').forEach(b => b.setAttribute('aria-pressed', +b.dataset.j === jr.idx));
   $('jrNow').innerHTML = `<h3 class="jrx">step ${jr.step}: x = ${xs}</h3>` +
     (long ? `<p class="muted">a ${r.n.toString().length}-digit top over a ${r.d.toString().length}-digit bottom</p>` : '') +
-    `<p class="muted mono" style="margin:0">≈ ${fmtNum(r.val)} · step ${jr.step} of ${J.last}</p><p>${J.rule}</p>`;
+    `<p class="muted mono" style="margin:0">≈ ${jrNum(r)} · step ${jr.step} of ${J.last}</p><p>${J.rule}</p>`;
   const seen = jrSeen(), rows = ['Real line', '2-adic', '3-adic', '5-adic', '7-adic'].map((nm, wi) => {
     const v = J.v[wi], ok = v.k === 'conv' && seen;
     return `<tr><td>${nm}</td><td class="${ok ? 'okc' : ''}">${ok ? '✓ ' : ''}${v.t}</td><td>${jrSize(wi, r)}</td></tr>`;
@@ -1878,6 +1914,8 @@ if (new URLSearchParams(location.search).has('debug')){
       value:n => { const s = (jrJ().steps || [])[n]; return s ? s[0] + '/' + s[1] : null; },
       vp:(n, p) => { const s = (jrJ().steps || [])[n]; return s ? vp(s[0], s[1], p) : null; },
       sqrt2in7:() => String(sqrt2in7()),
+      sqrtm1in5:() => String(sqrtm1in5()),
+      lims:() => jrJ().lims.map(l => l && (l.rec ? l.rec.n + '/' + l.rec.d : 'val ' + l.val)),
     },
     game:{
       levels:LEVELS,
