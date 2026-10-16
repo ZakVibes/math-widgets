@@ -215,25 +215,19 @@ input[type=range]:disabled{opacity:.45;cursor:default}
     <div class="tabs" id="tabs" role="tablist" aria-label="Choose a view"></div>
     <div class="vsel">
       <label><span class="vlab">Sound</span><select id="voiceSel">
-        <option value="tuned">Tuned</option><option value="singing">Singing</option><option value="glass">Glass</option><option value="drum">Drum</option><option value="music">Song</option>
+        <option value="marimba">Marimba</option><option value="kalimba">Kalimba</option><option value="piano">Felt piano</option><option value="drum">Real drum</option>
       </select></label>
-      <label id="scaleSelWrap" hidden><span class="vlab">Scale</span><select id="scaleSel">
-        <option value="pentatonic">Pentatonic</option><option value="handpan">Handpan</option><option value="dreamy">Dreamy</option>
+      <label><span class="vlab">Tuning</span><select id="tuneSel">
+        <option value="gentle">Gentle</option><option value="exact">Exact</option>
       </select></label>
     </div>
     <div class="voices" role="group" aria-labelledby="voiceLab">
       <span class="vlab" id="voiceLab">Sound</span>
-      <button class="chip plain" type="button" id="voice-tuned" aria-pressed="true">Tuned</button>
-      <button class="chip plain" type="button" id="voice-singing" aria-pressed="false">Singing</button>
-      <button class="chip plain" type="button" id="voice-glass" aria-pressed="false">Glass</button>
-      <button class="chip plain" type="button" id="voice-drum" aria-pressed="false">Drum</button>
-      <button class="chip plain" type="button" id="voice-music" aria-pressed="false">Song</button>
-    </div>
-    <div class="voices" id="scales" hidden role="group" aria-labelledby="scaleLab">
-      <span class="vlab" id="scaleLab">Scale</span>
-      <button class="chip plain" type="button" id="scale-pentatonic" aria-pressed="true">Pentatonic</button>
-      <button class="chip plain" type="button" id="scale-handpan" aria-pressed="false">Handpan</button>
-      <button class="chip plain" type="button" id="scale-dreamy" aria-pressed="false">Dreamy</button>
+      <button class="chip plain" type="button" id="voice-marimba" aria-pressed="true">Marimba</button>
+      <button class="chip plain" type="button" id="voice-kalimba" aria-pressed="false">Kalimba</button>
+      <button class="chip plain" type="button" id="voice-piano" aria-pressed="false">Felt piano</button>
+      <button class="chip plain" type="button" id="voice-drum" aria-pressed="false">Real drum</button>
+      <button class="chip plain" type="button" id="tuneChip" aria-pressed="true">Gentle tuning</button>
     </div>
   </div>
 
@@ -1262,7 +1256,7 @@ function setBusy(on, p, sfx) {                     // sfx: '' for the single sta
 function loadShape(shape) {
   var id = ++solveId;
   state.shape = shape; state.sol = null; state.solving = true; state.progress = 0;
-  state.hits = []; state.selMode = 0; state.lastAmps = null; state.ripple = null; lastTuned = null;
+  state.hits = []; state.selMode = 0; state.lastAmps = null; state.ripple = null; lastNote = null;
   clearStageCaches(); setBusy(true, 0); syncChips(); updateReadouts(); updateCaption(); updatePill(); drawSpectrum(); scheduleDraw();
   $('shapeMsg').textContent = '';
   if (worker) { worker.terminate(); worker = null; }
@@ -1591,38 +1585,22 @@ function drawSketch(ctx, cw, dpr) {
 /* ===================================================================
    Audio
    =================================================================== */
-// The pitches always come from the shape, except Song, which deliberately tunes them to a scale. A voice only
-// changes how each pitch rings: how long it lasts, how hard the mallet is, a click or not, room reverb and stereo width.
-// Tuned plays only a few of the drum's true notes, one after another; see playTuned.
-// How the Tuned voice rings. A hidden sound tester (add ?lab to the address) switches between these to compare by ear.
-var TUNE_PRESETS = [
-  { name: 'A · Now',               tau: 1.2,  cap: 3,   reverb: 0.32, hum: true },
-  { name: 'B · No hum',            tau: 1.2,  cap: 3,   reverb: 0.32, hum: false },
-  { name: 'C · Short, no hum',     tau: 0.6,  cap: 1.5, reverb: 0.2,  hum: false },
-  { name: 'D · Very short, no hum', tau: 0.35, cap: 1,   reverb: 0.12, hum: false }
-];
-var TUNE = TUNE_PRESETS[0];
-var LAB = { on: false, inst: 'kalimba', snap: true };   // hidden tester (?lab): one instrument note per tap, optionally nudged to semitones
+// The notes are the drum's own patterns. The instruments (Marimba, Kalimba, Felt piano) play one pattern per tap, the one that
+// moves most where you hit, and add their own overtones; gentle tuning nudges each pitch to the nearest semitone above the
+// drum's lowest note, by at most half a semitone. Real drum is the unprocessed physics: every pattern at its exact pitch at once.
+// A voice changes how each pitch rings: how long it lasts, how hard the mallet is, a click or not, room reverb and stereo width.
+var SOUND = { inst: 'marimba', snap: true, real: false };
 var VOICES = {
-  tuned:   { name: 'Tuned',   dur: 4.5, tau: function (r) { return TUNE.tau * Math.pow(r, 0.8); }, soft: 0.11, attack: 0.005,
-             stick: false, shimmer: 0, reverb: 0.32, width: 0.4 },
-  singing: { name: 'Singing', dur: 7, tau: function (r) { return 3.4 * Math.pow(r, 0.45); }, soft: 0.11, attack: 0.012,
-             stick: false, shimmer: 0.32, reverb: 0.42, width: 0.55 },
-  glass:   { name: 'Glass',   dur: 6, tau: function (r) { return 2.8 * Math.pow(r, 0.2); },  soft: 0.035, attack: 0.002,
-             stick: false, shimmer: 0.12, reverb: 0.34, width: 0.75 },
-  drum:    { name: 'Drum',    dur: 2.5, tau: function (r) { return 1.4 * Math.pow(r, 0.7); }, soft: 0.06, attack: 0.0015,
-             stick: true, shimmer: 0, reverb: 0.1, width: 0.25 },
-  music:   { name: 'Music',   dur: 6, tau: function (r) { return 3.4 * Math.pow(r, 0.45); }, soft: 0.11, attack: 0.005,
-             stick: false, shimmer: 0.22, reverb: 0.5, width: 0.4 }
+  drum: { name: 'Real drum', dur: 2.5, tau: function (r) { return 1.4 * Math.pow(r, 0.7); }, soft: 0.06, attack: 0.0015,
+          stick: true, shimmer: 0, reverb: 0.1, width: 0.25 }
 };
-// Song voice (key 'music'): the drum's own patterns choose the notes, then each pitch is tuned to the nearest note of a scale.
-var SCALES = {
-  pentatonic: { name: 'Pentatonic', root: 62, steps: [0, 2, 4, 7, 9] },        // D major pentatonic: every pair of notes agrees
-  handpan:    { name: 'Handpan',    root: 62, steps: [0, 2, 3, 5, 7, 8, 10] }, // D minor, the "Kurd" tuning of many handpans
-  dreamy:     { name: 'Dreamy',     root: 65, steps: [0, 2, 4, 6, 7, 9, 11] }  // F Lydian: bright and floating
+// Instruments: each note is one soundJob of decaying sines. up = register shift (2 = one octave up).
+var INSTS = {
+  marimba: { name: 'Marimba', dur: 2.0, attack: 0.006, stick: false, shimmer: 0, reverb: 0.18, width: 0, soft: 0.11, tau: function () { return 1; }, up: 1 },
+  kalimba: { name: 'Kalimba', dur: 2.6, attack: 0.002, stick: true, shimmer: 0, reverb: 0.28, width: 0, soft: 0.11, tau: function () { return 1; }, up: 2 },
+  piano:   { name: 'Felt piano', dur: 3, attack: 0.009, stick: false, shimmer: 0, reverb: 0.3, width: 0, soft: 0.11, tau: function () { return 1; }, up: 1 }
 };
-var scaleKey = 'pentatonic', MUSIC_LO = 57, MUSIC_HI = 86, lastMusic = null, lastTuned = null;
-var voiceKey = 'tuned';
+var lastNote = null;                               // caption item for the last instrument tap
 var audio = null;
 function makeImpulse(ctx, secs) {                  // a generated room: two channels of darkening, decaying noise
   var sr = ctx.sampleRate, n = Math.floor(secs * sr), buf = ctx.createBuffer(2, n, sr), seed = 12345;
@@ -1645,12 +1623,13 @@ function ensureAudio() {
     var ctx = new AC(), master = ctx.createGain(), comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -10; comp.knee.value = 8; comp.ratio.value = 4; comp.attack.value = 0.004; comp.release.value = 0.25;
     master.gain.value = 0.9; master.connect(comp); comp.connect(ctx.destination);   // long overlapping rings never clip
+    var lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3200; lp.Q.value = 0.5; lp.connect(master);   // instruments only: softens the top
     var verb = ctx.createConvolver(); verb.normalize = true; verb.buffer = makeImpulse(ctx, 3.2); verb.connect(master);
-    audio = { ctx: ctx, master: master, verb: verb, pending: [] };
+    audio = { ctx: ctx, master: master, lp: lp, verb: verb, pending: [], live: [] };
     ctx.addEventListener('statechange', function () {   // sounds asked for before Safari let audio start play now, if still fresh
       if (ctx.state !== 'running') return;
       var p = audio.pending, now = performance.now(); audio.pending = [];
-      p.forEach(function (j) { if (now - j.t < 1500) playJob(j.job, j.delay, j.vol); });
+      p.forEach(function (j) { if (now - j.t < 1500) playJob(j.job, j.delay, j.vol, j.inst); });
     });
     if (ctx.resume) ctx.resume();
   } catch (e) { audio = null; }
@@ -1662,7 +1641,7 @@ function ensureAudio() {
 // still being computed.
 var HEAD_SECS = 0.6;
 function soundJob(parts, sr, voice, maxDur) {
-  var V = voice || VOICES[voiceKey], dur = Math.min(V.dur, maxDur || V.dur);
+  var V = voice || VOICES.drum, dur = Math.min(V.dur, maxDur || V.dur);
   var n = Math.floor(dur * sr), osc = [], p;
   function add(f, a, tau, pan) {
     if (f > 0.45 * sr || Math.abs(a) < 1e-7) return;
@@ -1711,12 +1690,13 @@ function renderSound(parts, sr, voice, maxDur) {   // whole sound at once (used 
   L.set(head.L); R.set(head.R); L.set(tail.L, head.L.length); R.set(tail.R, head.R.length);
   return { L: L, R: R, reverb: job.reverb };
 }
-function playJob(job, delay, vol) {                // play the head now, then compute the tail and butt it on sample-exactly
+function playJob(job, delay, vol, inst) {          // inst: an instrument note (low-passed, and damped when newer notes arrive)
   if (!audio) return;
-  if (audio.ctx.state !== 'running') { audio.pending.push({ job: job, delay: delay, vol: vol, t: performance.now() }); return; }
+  if (audio.ctx.state !== 'running') { audio.pending.push({ job: job, delay: delay, vol: vol, inst: inst, t: performance.now() }); return; }
   var ctx = audio.ctx, g = ctx.createGain(), send = ctx.createGain();
-  g.gain.value = vol === undefined ? 1 : vol; send.gain.value = job.reverb; g.connect(audio.master); g.connect(send); send.connect(audio.verb);
+  g.gain.value = vol === undefined ? 1 : vol; send.gain.value = job.reverb; g.connect(inst ? audio.lp : audio.master); g.connect(send); send.connect(audio.verb);
   var t0 = ctx.currentTime + 0.02 + (delay || 0), nh = Math.min(job.n, Math.floor(HEAD_SECS * job.sr));
+  if (inst) dampOthers(g, t0, t0 + job.n / job.sr);
   function sched(chunk, at, last) {
     if (!chunk.L.length) return;
     var buf = ctx.createBuffer(2, chunk.L.length, job.sr); buf.copyToChannel(chunk.L, 0); buf.copyToChannel(chunk.R, 1);
@@ -1726,53 +1706,18 @@ function playJob(job, delay, vol) {                // play the head now, then co
   sched(job.render(0, nh), t0, nh >= job.n);
   if (nh < job.n) setTimeout(function () { sched(job.render(nh, job.n), t0 + nh / job.sr, true); }, 0);
 }
-function tauOf(sol, k, V) { return (V || VOICES[voiceKey]).tau(sol.f[0] / sol.f[k]); }
-function panOf(k, V) { return k ? (V || VOICES[voiceKey]).width * Math.sin(k * 2.39996) : 0; }   // golden-angle spread; the fundamental sits in the middle
-function midiToHz(m) { return 440 * Math.pow(2, (m - 69) / 12); }
-function quantize(f) {                             // fold into a comfortable register, then snap to the scale
-  var S = SCALES[scaleKey], m = 69 + 12 * Math.log2(f / 440), best = 0, bd = 1e9;
-  while (m > MUSIC_HI) m -= 12; while (m < MUSIC_LO) m += 12;
-  for (var n = Math.round(m) - 4; n <= Math.round(m) + 4; n++) {
-    var pc = ((n - S.root) % 12 + 12) % 12;
-    if (S.steps.indexOf(pc) >= 0 && Math.abs(n - m) < bd) { bd = Math.abs(n - m); best = n; }
+function dampOthers(g, t0, end) {                  // like a marimba player's hand: only the two newest notes keep ringing
+  var now = audio.ctx.currentTime, live = audio.live = audio.live.filter(function (e) { return e.end > now; }), i;
+  live.push({ g: g, start: t0, end: end, damped: false });
+  live.sort(function (p, q) { return q.start - p.start; });   // newest first, new note included
+  for (i = 2; i < live.length; i++) {
+    var e = live[i];
+    if (!e.damped && e.start < t0) { e.g.gain.setTargetAtTime(0, t0, 0.07); e.damped = true; }   // at the new note's start, so arpeggios damp in rhythm
   }
-  return best;
 }
-function playNote(midi, vol, delay) {             // a pitched tone: fundamental, soft harmonics and a faint bell partial
-  var f = midiToHz(midi), pan = clamp((midi - 72) / 18, -0.6, 0.6);
-  var parts = [{ f: f, a: 1, tau: 3.6, pan: pan }, { f: 2 * f, a: 0.18, tau: 1.5, pan: pan }, { f: 3 * f, a: 0.06, tau: 0.8, pan: pan }, { f: 5.4 * f, a: 0.025, tau: 0.35, pan: pan }];
-  playJob(soundJob(parts, audio.ctx.sampleRate, VOICES.music), delay, vol);
-}
-function droneTouch(fLow, fHigh, type2, hold) {    // a soft two-note hum that swells while you play, then fades `hold` ms after the last touch
-  var ctx = audio.ctx, now = ctx.currentTime, D = audio.drone;
-  if (!D) {
-    D = audio.drone = { g: ctx.createGain(), lp: ctx.createBiquadFilter(), o1: ctx.createOscillator(), o2: ctx.createOscillator(), send: ctx.createGain() };
-    D.lp.type = 'lowpass'; D.lp.frequency.value = 900; D.g.gain.value = 0; D.send.gain.value = 0.6;
-    D.o1.type = 'sine'; D.o2.type = 'triangle';
-    D.o1.connect(D.lp); D.o2.connect(D.lp); D.lp.connect(D.g); D.g.connect(audio.master); D.g.connect(D.send); D.send.connect(audio.verb);
-    D.o1.frequency.value = fLow; D.o2.frequency.value = fHigh;
-    D.o1.start(); D.o2.start();
-  }
-  D.o2.type = type2;
-  D.o1.frequency.setTargetAtTime(fLow, now, 0.3); D.o2.frequency.setTargetAtTime(fHigh, now, 0.3);
-  D.g.gain.cancelScheduledValues(now); D.g.gain.setTargetAtTime(0.045, now, 0.6);
-  clearTimeout(D.timer); D.timer = setTimeout(function () { D.g.gain.setTargetAtTime(0, ctx.currentTime, hold ? 0.8 : 1.6); }, hold || 8000);
-}
-function playMusic(a, sol, delay) {                // the spot you hit picks the patterns; their pitches, in tune, make a strum
-  var idx = [], k, mx = 0, notes = [], used = {};
-  for (k = 0; k < sol.K; k++) { idx.push(k); mx = Math.max(mx, Math.abs(a[k])); }
-  idx.sort(function (i, j) { return Math.abs(a[j]) - Math.abs(a[i]); });
-  for (var t = 0; t < idx.length && notes.length < 3; t++) {
-    k = idx[t]; var w = mx > 0 ? Math.abs(a[k]) / mx : 0; if (w < 0.15) break;
-    var m = quantize(sol.f[k]); if (used[m]) continue; used[m] = 1;
-    notes.push({ m: m, w: w, k: k });
-  }
-  notes.sort(function (p, q) { return p.m - q.m; });
-  notes.forEach(function (nt, i) { playNote(nt.m, 0.6 * (0.35 + 0.65 * nt.w), (delay || 0) + i * 0.075); });
-  droneTouch(midiToHz(SCALES[scaleKey].root - 12), midiToHz(SCALES[scaleKey].root - 5), 'triangle');   // root and fifth of the scale
-  lastMusic = notes.map(function (nt) { var nm = noteOf(midiToHz(nt.m)).name; return { name: nm, mode: nt.k + 1 }; });
-}
-// Tuned notes: the few patterns that move most at the hit point, as [{k, f, w}] by rising pitch. f is always the drum's
+function tauOf(sol, k, V) { return (V || VOICES.drum).tau(sol.f[0] / sol.f[k]); }
+function panOf(k, V) { return k ? (V || VOICES.drum).width * Math.sin(k * 2.39996) : 0; }   // golden-angle spread; the fundamental sits in the middle
+// Instrument notes: the few patterns that move most at the hit point, as [{k, f, w}] by rising pitch. f is always the drum's
 // own sol.f[k]. Patterns within 12 cents of one already chosen are folded into it (a circle's twin pairs differ by ~2 cents).
 function tunedNotes(a, sol, max) {
   var idx = [], k, mx = 0, notes = [];
@@ -1790,34 +1735,8 @@ function tunedNotes(a, sol, max) {
   notes.sort(function (p, q) { return p.f - q.f; });
   return notes;
 }
-// Tuned voice: a brief thump of the whole drum, then its strongest true notes strummed one at a time as pure sines.
-function playTuned(a, sol, delay, opts) {
-  if (LAB.on) {                                    // lab: one instrument note per tap, or an ascending arpeggio
-    var lo = opts || {}, ld = delay || 0, arp = (lo.max || 0) > 1, ln = tunedNotes(a, sol, arp ? lo.max : 1);
-    if (!arp) ln = ln.slice(0, 1);
-    lastTuned = ln.map(function (nt, i) { return labNote(sol, nt.k, ld + (arp ? i * 0.26 : 0), arp ? 0.55 : 0.7); });
-    return;
-  }
-  var o = opts || {}, max = o.max || 4, gap = o.gap || 0.075, d = delay || 0, V = VOICES.tuned, sr = audio.ctx.sampleRate;
-  var ring = o.ring || 1, cap = ring > 1 ? 0 : TUNE.cap;   // taps stop within TUNE.cap s; the game's and twins' tunes ring a little longer
-  var f0 = sol.f[0], notes = tunedNotes(a, sol, max), body = [], k;
-  for (k = 0; k < sol.K; k++) body.push({ f: sol.f[k], a: a[k], tau: 0.22 * Math.pow(f0 / sol.f[k], 0.5), pan: panOf(k, V) });
-  playJob(soundJob(body, sr, V, 1.2), d, 0.22);   // every pattern, a quarter-second each: the full spectrum, then it is gone
-  notes.forEach(function (nt, i) {
-    var pan = clamp((Math.log2(nt.f / f0) - 1) * 0.35, -0.6, 0.6);
-    playJob(soundJob([{ f: nt.f, a: 1, tau: tauOf(sol, nt.k, V) * ring, pan: pan }], sr, V, cap || undefined), d + i * gap, 0.6 * (0.35 + 0.65 * nt.w));
-  });
-  if (TUNE.hum) droneTouch(f0 / 2, f0, 'sine', 3000);   // an octave below the drum's lowest note, and that note
-  lastTuned = notes.map(function (nt) { return { text: noteOf(nt.f).text, mode: nt.k + 1 }; });
-}
-// Lab instruments: each note is one soundJob of decaying sines. up = register shift (2 = one octave up).
-var LAB_VOICES = {
-  kalimba: { name: 'Kalimba', dur: 2.6, attack: 0.002, stick: true, shimmer: 0, reverb: 0.28, width: 0, soft: 0.11, tau: function () { return 1; }, up: 2 },
-  marimba: { name: 'Marimba', dur: 2.2, attack: 0.003, stick: true, shimmer: 0, reverb: 0.25, width: 0, soft: 0.11, tau: function () { return 1; }, up: 1 },
-  piano:   { name: 'Felt piano', dur: 3, attack: 0.009, stick: false, shimmer: 0, reverb: 0.3, width: 0, soft: 0.11, tau: function () { return 1; }, up: 1 }
-};
 function labFreq(sol, k) {                         // gentle tuning: nearest semitone relative to the drum's own lowest note
-  if (!LAB.snap) return sol.f[k];
+  if (!SOUND.snap) return sol.f[k];
   return sol.f[0] * Math.pow(2, Math.round(12 * Math.log2(sol.f[k] / sol.f[0])) / 12);
 }
 function labParts(inst, f) {                       // [freq, amp, tau] per partial
@@ -1828,7 +1747,7 @@ function labParts(inst, f) {                       // [freq, amp, tau] per parti
   }
   if (inst === 'marimba') {
     d = clamp(Math.sqrt(400 / f), 0.45, 1.5);
-    return [[f, 1, 0.95 * d], [4 * f, 0.3, 0.14 * d], [9.9 * f, 0.1, 0.035]];
+    return [[f, 1, 0.9 * d], [2 * f, 0.05, 0.25 * d], [4 * f, 0.14, 0.12 * d], [9.9 * f, 0.03, 0.03]];
   }
   d = clamp(Math.sqrt(300 / f), 0.5, 1.4);
   var out = [], n, tau;
@@ -1840,63 +1759,64 @@ function labParts(inst, f) {                       // [freq, amp, tau] per parti
   return out;
 }
 function labNote(sol, k, delay, vol) {             // one instrument note for pattern k; returns the caption item
-  var LV = LAB_VOICES[LAB.inst], f0 = sol.f[0], fs = labFreq(sol, k), fp = fs * LV.up;
+  var inst = SOUND.real ? 'marimba' : SOUND.inst, LV = INSTS[inst], f0 = sol.f[0], fs = labFreq(sol, k), fp = fs * LV.up;   // Real drum borrows the marimba for tunes
   var pan = clamp((Math.log2(fs / f0) - 1) * 0.3, -0.5, 0.5);
-  var parts = labParts(LAB.inst, fp).map(function (q) { return { f: q[0], a: q[1], tau: q[2], pan: pan }; });
-  playJob(soundJob(parts, audio.ctx.sampleRate, LV), delay, vol);
-  var text = noteOf(fp).text;
-  if (LAB.snap) {
+  var parts = labParts(inst, fp).map(function (q) { return { f: q[0], a: q[1], tau: q[2], pan: pan }; });
+  playJob(soundJob(parts, audio.ctx.sampleRate, LV), delay, vol, true);
+  var text = SOUND.snap ? noteOf(fp).name : noteOf(fp).text;
+  if (SOUND.snap) {
     var s = 12 * Math.log2(sol.f[k] / f0), cents = Math.round((Math.round(s) - s) * 100);
     if (Math.abs(cents) >= 1) text += ' (nudged ' + (cents < 0 ? '−' : '+') + Math.abs(cents) + '¢)';
   }
   return { text: text, mode: k + 1 };
 }
+function playTune(a, sol, delay, max) {            // the drum's first `max` (default 8) notes, rising, 0.26 s apart
+  var d = delay || 0;
+  tunedNotes(a, sol, max || 8).forEach(function (nt, i) { labNote(sol, nt.k, d + i * 0.26, 0.55); });
+  lastNote = null;
+}
 function playStrike(a, sol, delay, maxDur) {      // sol, delay and maxDur (seconds) are optional
   if (!ensureAudio()) return;
   sol = sol || state.sol;
-  if (voiceKey === 'tuned') { playTuned(a, sol, delay); return; }
-  if (voiceKey === 'music') { playMusic(a, sol, delay); return; }
-  var V = VOICES[voiceKey], parts = [], extra = V.soft * V.soft - SIGMA2;   // the voice's mallet: softer (or harder) than the picture's
+  if (!SOUND.real) {                               // one note per tap: the pattern that moves most here
+    var n1 = tunedNotes(a, sol, 1);
+    lastNote = n1.length ? labNote(sol, n1[0].k, delay || 0, 0.7) : null;
+    return;
+  }
+  var V = VOICES.drum, parts = [], extra = V.soft * V.soft - SIGMA2;   // the voice's mallet: softer (or harder) than the picture's
   for (var k = 0; k < sol.K; k++) parts.push({ f: sol.f[k], a: a[k] * Math.exp(Math.min(1, -sol.lam[k] * extra)), tau: tauOf(sol, k, V), pan: panOf(k, V) });   // a hard mallet brightens by at most e×
   playJob(soundJob(parts, audio.ctx.sampleRate, V, maxDur), delay);
 }
-Object.keys(VOICES).forEach(function (key) {      // the Sound switch: pick a voice, hear it at once on the current drum
+function soundDemo() {                             // after a Sound/Tuning change: instruments play 6 rising notes, Real drum one strike
+  if (state.view === 'guess') return;              // the game plays its own tunes
+  var sol = state.view === 'twins' && TD[0].sol ? TD[0].sol : state.sol;
+  if (!sol || !ensureAudio()) return;
+  var a = new Float64Array(sol.K); for (var k = 0; k < sol.K; k++) a[k] = 1 / Math.sqrt(k + 1);
+  if (SOUND.real) playStrike(a, sol); else playTune(a, sol, 0, 6);
+}
+function syncSound() {
+  ['marimba', 'kalimba', 'piano', 'drum'].forEach(function (k) {
+    document.getElementById('voice-' + k).setAttribute('aria-pressed', (SOUND.real ? k === 'drum' : k === SOUND.inst) ? 'true' : 'false');
+  });
+  document.getElementById('voiceSel').value = SOUND.real ? 'drum' : SOUND.inst;
+  document.getElementById('tuneChip').setAttribute('aria-pressed', SOUND.snap ? 'true' : 'false');
+  document.getElementById('tuneSel').value = SOUND.snap ? 'gentle' : 'exact';
+  lastNote = null; updateCaption(); gsCaption();
+}
+['marimba', 'kalimba', 'piano', 'drum'].forEach(function (key) {   // the Sound switch: pick a sound, hear it at once on the current drum
   document.getElementById('voice-' + key).addEventListener('click', function () {
-    voiceKey = key;
-    Object.keys(VOICES).forEach(function (k2) { document.getElementById('voice-' + k2).setAttribute('aria-pressed', k2 === key ? 'true' : 'false'); });
-    document.getElementById('scales').hidden = key !== 'music';
-    document.getElementById('scaleSelWrap').hidden = key !== 'music'; document.getElementById('voiceSel').value = key;
-    if (key !== 'music' && key !== 'tuned' && audio && audio.drone) audio.drone.g.gain.setTargetAtTime(0, audio.ctx.currentTime, 0.4);
-    lastMusic = null; lastTuned = null; updateCaption(); gsCaption();
-    if (state.view === 'guess') return;               // the game plays its own true pitches
-    var sol = state.view === 'twins' && TD[0].sol ? TD[0].sol : state.sol;
-    if (sol && ensureAudio()) { var a = new Float64Array(sol.K); for (var k = 0; k < sol.K; k++) a[k] = 1 / Math.sqrt(k + 1); playStrike(a, sol); }
+    SOUND.real = key === 'drum'; if (!SOUND.real) SOUND.inst = key;
+    syncSound(); soundDemo();
   });
 });
-Object.keys(SCALES).forEach(function (key) {      // the Scale picker (Music voice only): retune and play a short phrase
-  document.getElementById('scale-' + key).addEventListener('click', function () {
-    scaleKey = key; document.getElementById('scaleSel').value = key;
-    Object.keys(SCALES).forEach(function (k2) { document.getElementById('scale-' + k2).setAttribute('aria-pressed', k2 === key ? 'true' : 'false'); });
-    if (!ensureAudio()) return;
-    var S = SCALES[key], ph = [0, 2, 4, 2, 5].map(function (d) { var o = Math.floor(d / S.steps.length); return S.root + S.steps[d % S.steps.length] + 12 * o; });
-    ph.forEach(function (m, i) { playNote(m, 0.45, i * 0.16); });
-    droneTouch(midiToHz(S.root - 12), midiToHz(S.root - 5), 'triangle');
-  });
-});
-document.getElementById('voiceSel').addEventListener('change', function () { document.getElementById('voice-' + this.value).click(); });   // phone selects drive the chips
-document.getElementById('scaleSel').addEventListener('change', function () { document.getElementById('scale-' + this.value).click(); });
+document.getElementById('tuneChip').addEventListener('click', function () { SOUND.snap = !SOUND.snap; syncSound(); soundDemo(); });
+document.getElementById('voiceSel').addEventListener('change', function () { document.getElementById('voice-' + this.value).click(); });   // phone selects drive the same state
+document.getElementById('tuneSel').addEventListener('change', function () { SOUND.snap = this.value === 'gentle'; syncSound(); soundDemo(); });
 function playMode(k, sol) {
   if (!ensureAudio()) return;
   sol = sol || state.sol;
-  var V = VOICES[voiceKey];
-  if (voiceKey === 'tuned' && LAB.on) { labNote(sol, k, 0, 0.55); return; }
-  if (voiceKey === 'tuned') {                      // the pattern's own pitch, a single pure sine
-    playJob(soundJob([{ f: sol.f[k], a: 1, tau: 2, pan: 0 }], audio.ctx.sampleRate, V), 0, 0.6);
-    if (TUNE.hum) droneTouch(sol.f[0] / 2, sol.f[0], 'sine', 3000);
-    return;
-  }
-  if (voiceKey === 'music') { playNote(quantize(sol.f[k]), 0.6); droneTouch(midiToHz(SCALES[scaleKey].root - 12), midiToHz(SCALES[scaleKey].root - 5), 'triangle'); return; }
-  playJob(soundJob([{ f: sol.f[k], a: 1, tau: tauOf(sol, k, V) * 1.3, pan: 0 }], audio.ctx.sampleRate, V));
+  if (!SOUND.real) { labNote(sol, k, 0, 0.55); return; }
+  playJob(soundJob([{ f: sol.f[k], a: 1, tau: tauOf(sol, k, VOICES.drum) * 1.3, pan: 0 }], audio.ctx.sampleRate, VOICES.drum));   // exact pitch, as the physics gives it
 }
 
 /* ===================================================================
@@ -2103,16 +2023,10 @@ function updateCaption() {
   back.hidden = !state.selMode;
   if (state.drawing.on) el.textContent = 'Draw any closed outline. A bigger drawing means a lower note.';
   else if (state.selMode && state.sol) { el.textContent = ''; var cb = document.createElement('b'); cb.className = 'num'; cb.textContent = modeCaption(state.selMode); el.appendChild(cb); }
-  else if (voiceKey === 'tuned' && lastTuned && lastTuned.length) {
-    el.textContent = 'You heard ' + lastTuned.map(function (n) { return n.text; }).join(' · ') + ': the drum’s own notes, at their true pitch. They come from patterns ' +
-      lastTuned.map(function (n) { return n.mode; }).join(', ') + ', the ones that move most where you hit.';
+  else if (!SOUND.real && lastNote) {
+    el.textContent = 'You heard ' + lastNote.text + ': pattern ' + lastNote.mode + ', the one that moves most where you hit. Tap around the drum to play its notes.';
   }
-  else if (voiceKey === 'tuned') el.textContent = 'Tap anywhere. You’ll hear the patterns that move most at that spot, at their true pitches, one after another.';
-  else if (voiceKey === 'music' && lastMusic && lastMusic.length) {
-    el.textContent = 'You played ' + lastMusic.map(function (n) { return n.name; }).join(' · ') + '. The patterns that move most where you hit (' +
-      lastMusic.map(function (n) { return n.mode; }).join(', ') + ') choose the notes, tuned to the ' + SCALES[scaleKey].name.toLowerCase() + ' scale.';
-  }
-  else if (voiceKey === 'music') el.textContent = 'Song mode: each spot picks the patterns that move most there, then moves their pitches onto a scale so every tap fits. These are not the drum’s true notes.';
+  else if (!SOUND.real) el.textContent = 'Tap anywhere. Each spot plays the drum’s note that moves most there, so tapping around plays a tune made only of this drum’s notes.';
   else if (!state.tapped) el.textContent = 'Tap near the rim, then the centre. Each spot wakes the vibration patterns differently.';
   else el.textContent = 'Strike a different spot. Hit a still line of a pattern and that pattern falls silent.';
   var sc = $('specCaption');
@@ -2286,7 +2200,7 @@ $('backBtn').addEventListener('click', backToDrum);
    Each triangle is [Px,Py, Ax,Ay, Bx,By]: the right angle at P, the legs running to A and B.
    World coordinates are x*0.3 and -y*0.3 (the page's y points down), so each drum has area 1.26.
    =================================================================== */
-var TW_SCALE = 0.3, TW_N = 32, TW_K = 40, TW_MODES = 20, TW_RING_GAP = 3.2;
+var TW_SCALE = 0.3, TW_N = 32, TW_K = 40, TW_MODES = 20;
 var DRISCOLL = [2.53794, 3.65550, 5.17555936, 6.53755, 7.24807];     // lowest eigenvalues, original units (Driscoll 1997)
 var GWW = {
   A: { poly: [[-3, -3], [-3, -1], [1, 3], [1, 1], [3, 1], [1, -1], [-1, -1], [-1, -3]],
@@ -2506,15 +2420,14 @@ function twStrike(td, x, y) {
 function twRing(which) {
   if (!TW.solved) return;
   ensureAudio();
-  var tun = voiceKey === 'tuned', gapAB = tun ? (LAB.on ? 8 * 0.26 + 1.0 : 8 * 0.16 + 1.2) : TW_RING_GAP;   // Tuned: B waits for A's 8-note arpeggio, plus a breath
+  var gapAB = 8 * 0.26 + 1.0;                      // B waits for A's 8-note tune, plus a breath
   var seq = which === 'AB' ? [[0, 0], [1, gapAB]] : [[which === 'A' ? 0 : 1, 0]], now = performance.now();
   seq.forEach(function (s) {
     var td = TD[s[0]], sol = td.sol, a = new Float64Array(sol.K), act = [], sq = 0;
     for (var k = 0; k < sol.K; k++) { a[k] = 1 / Math.sqrt(k + 1); act.push(k); sq += a[k] * a[k]; }
     td.hits.push({ t0: now + s[1] * 1000, a: a, active: act, rms0: Math.sqrt(sq / sol.area) });
     if (td.hits.length > 3) td.hits.shift();
-    if (tun) playTuned(a, sol, s[1], { max: 8, gap: 0.16, ring: 1.5 });   // a slow ascending arpeggio of the first 8 notes, not a crash
-    else playStrike(a, sol, s[1], which === 'AB' && !s[1] ? TW_RING_GAP : 0);   // in "A, then B", A fades out as B begins
+    playTune(a, sol, s[1]);                        // the first 8 notes, ascending (separate notes are easy to compare)
   });
   TD.forEach(function (td) { td.lastAmps = null; });
   TW.showMode = false; twSync(); scheduleDraw();
@@ -3346,16 +3259,16 @@ function gsFinish() {
   $('gsScore').textContent = 'You heard ' + G.score + ' of ' + GS_N + '.';
   $('gsEndH').focus();
 }
-function gsArp(sol) {                              // the whole drum as an 8-note ascending arpeggio, always at true pitch
+function gsArp(sol) {                              // the whole drum as an 8-note ascending tune
   if (!ensureAudio()) return;
   var a = new Float64Array(sol.K); for (var k = 0; k < sol.K; k++) a[k] = 1 / Math.sqrt(k + 1);
-  playTuned(a, sol, 0, { max: 8, gap: 0.16, ring: 1.5 });
+  playTune(a, sol, 0);
 }
 function gsListen(c) { var sol = gsSolOf(c); if (G.ready && sol) gsArp(sol); }
 
 /* ---------- screen ---------- */
 function gsCaption() {
-  $('gsCaption').textContent = 'Then listen to each shape and pick the one that matches.' + (voiceKey === 'music' ? ' (The game always plays true pitches.)' : '');
+  $('gsCaption').textContent = 'Then listen to each shape and pick the one that matches.' + (SOUND.snap ? ' Notes are gently tuned (by at most half a semitone).' : '');
 }
 function gsBuildCards() {
   var box = $('gsCards'), rd = G.R[G.round], def = gsDef(G.round);
@@ -3576,39 +3489,10 @@ sizeStage(); sizeSpec();
 updateCaption();
 loadShape(SHAPES[0]);
 
-if (location.search.indexOf('lab') >= 0) (function () {   // hidden sound tester: instrument notes, one at a time
-  var bar = document.createElement('div'), row1 = document.createElement('div'), row2 = document.createElement('div'), chips = {}, tg;
-  var rowCss = 'display:flex;flex-wrap:wrap;gap:6px;justify-content:center;width:100%';
-  bar.style.cssText = 'position:fixed;left:8px;right:8px;bottom:8px;z-index:50;display:flex;flex-wrap:wrap;gap:6px;justify-content:center;padding:8px;border-radius:14px;background:var(--panel);border:1px solid var(--accent)';
-  row1.style.cssText = rowCss; row2.style.cssText = rowCss;
-  function chip(label, row) { var b = document.createElement('button'); b.type = 'button'; b.className = 'chip plain'; b.textContent = label; row.appendChild(b); return b; }
-  function sync() {
-    Object.keys(chips).forEach(function (k) { chips[k].setAttribute('aria-pressed', k === LAB.inst ? 'true' : 'false'); });
-    tg.textContent = 'Gentle tuning: ' + (LAB.snap ? 'on' : 'off'); tg.setAttribute('aria-pressed', LAB.snap ? 'true' : 'false');
-  }
-  function demo() {                                // the drum's first 6 notes, rising
-    if (voiceKey !== 'tuned') $('voice-tuned').click();
-    var sol = state.view === 'twins' && TD[0].sol ? TD[0].sol : state.sol;
-    if (!sol || !ensureAudio()) return;
-    var a = new Float64Array(sol.K); for (var k = 0; k < sol.K; k++) a[k] = 1 / Math.sqrt(k + 1);
-    playTuned(a, sol, 0, { max: 6, gap: 0.26, ring: 1.5 });
-  }
-  Object.keys(LAB_VOICES).forEach(function (key) {
-    chips[key] = chip(LAB_VOICES[key].name, row1);
-    chips[key].addEventListener('click', function () { LAB.inst = key; sync(); demo(); });
-  });
-  tg = chip('', row2);
-  tg.addEventListener('click', function () { LAB.snap = !LAB.snap; sync(); demo(); });
-  bar.appendChild(row1); bar.appendChild(row2); sync();
-  LAB.on = true;
-  if (voiceKey !== 'tuned') $('voice-tuned').click();
-  document.body.appendChild(bar); document.body.style.paddingBottom = '150px';
-})();
-
 if (DEBUG) {
   window.__drum = {
     state: state, SHAPES: SHAPES, solve: loadShape, strike: strikeAt, selectMode: selectMode, backToDrum: backToDrum,
-    setDrawing: setDrawing, finishDrawing: finishDrawing, rdp: rdp, noteOf: noteOf, LAB: LAB, labFreq: labFreq, renderSound: renderSound, tunedNotes: tunedNotes,
+    setDrawing: setDrawing, finishDrawing: finishDrawing, rdp: rdp, noteOf: noteOf, SOUND: SOUND, labFreq: labFreq, renderSound: renderSound, tunedNotes: tunedNotes,
     ensureAudio: ensureAudio, stage: S, thumb: thumb, setView: setView, VIEWS: VIEWS, workerSource: workerMain.toString(),
     TW: TW, TD: TD, twSolve: twSolve, compareTwins: compareTwins, twinCheck: twinCheck, twRing: twRing, twSetMode: twSetMode, twStrike: twStrike
   };
