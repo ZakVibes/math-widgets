@@ -314,7 +314,7 @@ const VS=`#version 300 es
 layout(location=0) in vec2 p; void main(){gl_Position=vec4(p,0.,1.);}`;
 const FS_INIT=`#version 300 es
 precision highp float;
-uniform vec2 uC,uFix; uniform float uSpan,uRes,uM2,uL2; uniform int uSpace;
+uniform vec2 uC,uFix; uniform float uSpan,uRes,uM2,uL2,uLim; uniform int uSpace,uUse; uniform sampler2D uLoad;
 layout(location=0) out vec4 st; layout(location=1) out vec4 inf; layout(location=2) out vec4 tw;
 void main(){
   vec2 uv=gl_FragCoord.xy/uRes;
@@ -328,6 +328,8 @@ void main(){
   float V=-(1.+uM2)*cos(th.x)-uM2*uL2*cos(th.y);
   float need=min(-(1.+uM2)+uM2*uL2,(1.+uM2)-uM2*uL2);
   inf=vec4(KE+V<need?-2.:-1.,0.,0.,1.);
+  // Reusing a finished run of this exact view: take its flip times (ones past the current horizon count as no flip).
+  if(uUse==1){float m=texelFetch(uLoad,ivec2(gl_FragCoord.xy),0).x; if(m>=0.&&m<=uLim) inf.x=m;}
 }`;
 const FS_STEP=`#version 300 es
 precision highp float;
@@ -530,7 +532,7 @@ function makeGPU(canvas){
     // The new snapshot already contains everything an older one of this exact view knew, so drop that one now.
     for(let i=caches.length-1;i>=0;i--){const c=caches[i];
       if(c.kind===kind&&c.key===key&&c.cx===SV.cx&&c.cy===SV.cy&&c.span===SV.span){gl.deleteTexture(c.tex);caches.splice(i,1);}}
-    caches.push({kind,key,tex:t,cx:SV.cx,cy:SV.cy,span:SV.span,res,seq:++seq});
+    caches.push({kind,key,tex:t,cx:SV.cx,cy:SV.cy,span:SV.span,res,t:sim.t,seq:++seq});
     // Remember at most 3 slices; forget the one used longest ago.
     const keys=[...new Set(caches.map(c=>c.key))];
     if(keys.length>3){const last=k=>Math.max(...caches.filter(c=>c.key===k).map(c=>c.seq));
@@ -550,7 +552,12 @@ function makeGPU(canvas){
       gl.uniform2f(PI_.u('uC'),S.cx,S.cy);gl.uniform1f(PI_.u('uSpan'),S.span);gl.uniform1f(PI_.u('uRes'),res);
       gl.uniform1f(PI_.u('uM2'),m2());gl.uniform1f(PI_.u('uL2'),l2());
       gl.uniform1i(PI_.u('uSpace'),S.space==='mom'?1:0);gl.uniform2f(PI_.u('uFix'),fixNow()[0],fixNow()[1]);key=sliceKey();
-      gl.drawArrays(gl.TRIANGLES,0,3);return true;
+      // Flip-time mode on a view memory has already finished (e.g. the full map after zooming out): load those
+      // answers instead of simulating it all again. Returns 'mem' so the caller can mark the run done.
+      const c=S.mode==='flip'?caches.find(c=>c.kind==='flip'&&c.key===key&&c.res===res&&c.t>=S.tmax&&sameView(c,S)):null;
+      gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,c?c.tex:dummy);gl.uniform1i(PI_.u('uLoad'),0);
+      gl.uniform1i(PI_.u('uUse'),c?1:0);gl.uniform1f(PI_.u('uLim'),S.tmax+0.5*S.dt);   // a flip at the last step can land a hair past tmax
+      gl.drawArrays(gl.TRIANGLES,0,3);return c?'mem':true;
     },
     step(n,t){
       gl.bindFramebuffer(gl.FRAMEBUFFER,FB[1-cur]);gl.viewport(0,0,res,res);gl.useProgram(PS);bindSrc(PS);
@@ -640,8 +647,9 @@ simCanvas.addEventListener('webglcontextrestored',()=>{gpu=makeGPU(simCanvas);re
 const remember=()=>{if(gpu) gpu.snapshot();}, forget=()=>{if(gpu) gpu.clearMemory();};
 function restart(){
   DV=null;
-  sim.t=0;sim.done=false;sim.dirty=true;sim.skipped=false;
-  if(gpu){ clearFences(); if(!gpu.init(S.res)){gpu=null;} }
+  sim.t=0;sim.done=false;sim.dirty=true;sim.skipped=false;sim.mem=false;
+  if(gpu){ clearFences(); const r=gpu.init(S.res); if(!r) gpu=null;
+    else if(r==='mem'){sim.t=S.tmax;sim.done=true;sim.skipped=true;sim.mem=true;} }   // answered from memory: nothing to simulate
   if(!gpu&&cpu) cpu.init(Math.min(S.res,400));
   drawOverlay();updateViewInfo();updateLegend();
 }
@@ -954,7 +962,7 @@ function syncInputs(){
 }
 $('selRes').onchange=e=>{S.res=+e.target.value;savePrefs();remember();restart();};
 $('selT').onchange=e=>{const nt=+e.target.value;const grow=nt>S.tmax&&gpu;S.tmax=nt;savePrefs();
-  if(grow&&sim.t>0){sim.done=false;sim.dirty=true;updateLegend();}else{remember();restart();}loadPendulum();};
+  if(grow&&sim.t>0&&!sim.mem){sim.done=false;sim.dirty=true;updateLegend();}else{remember();restart();}loadPendulum();};
 $('rngM').oninput=e=>{S.mv=+e.target.value;$('outM').textContent=m2().toFixed(2);};
 $('rngL').oninput=e=>{S.lv=+e.target.value;$('outL').textContent=l2().toFixed(2);};
 $('rngM').onchange=$('rngL').onchange=()=>{savePrefs();forget();restart();loadPendulum();};
