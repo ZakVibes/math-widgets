@@ -1629,7 +1629,7 @@ function ensureAudio() {
     ctx.addEventListener('statechange', function () {   // sounds asked for before Safari let audio start play now, if still fresh
       if (ctx.state !== 'running') return;
       var p = audio.pending, now = performance.now(); audio.pending = [];
-      p.forEach(function (j) { if (now - j.t < 1500) playJob(j.job, j.delay, j.vol, j.inst); });
+      p.forEach(function (j) { if (now - j.t < 1500) playJob(j.job, j.delay, j.vol, j.inst); });   // inst = {f, tune}: registered for damping when it really plays
     });
     if (ctx.resume) ctx.resume();
   } catch (e) { audio = null; }
@@ -1690,13 +1690,13 @@ function renderSound(parts, sr, voice, maxDur) {   // whole sound at once (used 
   L.set(head.L); R.set(head.R); L.set(tail.L, head.L.length); R.set(tail.R, head.R.length);
   return { L: L, R: R, reverb: job.reverb };
 }
-function playJob(job, delay, vol, inst) {          // inst: an instrument note (low-passed, and damped when newer notes arrive)
+function playJob(job, delay, vol, inst) {          // inst: {f, tune} for an instrument note (low-passed; damped by clashing newer notes), else falsy
   if (!audio) return;
   if (audio.ctx.state !== 'running') { audio.pending.push({ job: job, delay: delay, vol: vol, inst: inst, t: performance.now() }); return; }
   var ctx = audio.ctx, g = ctx.createGain(), send = ctx.createGain();
   g.gain.value = vol === undefined ? 1 : vol; send.gain.value = job.reverb; g.connect(inst ? audio.lp : audio.master); g.connect(send); send.connect(audio.verb);
   var t0 = ctx.currentTime + 0.02 + (delay || 0), nh = Math.min(job.n, Math.floor(HEAD_SECS * job.sr));
-  if (inst) dampOthers(g, t0, t0 + job.n / job.sr);
+  if (inst) dampOthers(g, t0, t0 + job.n / job.sr, inst.f, inst.tune);
   function sched(chunk, at, last) {
     if (!chunk.L.length) return;
     var buf = ctx.createBuffer(2, chunk.L.length, job.sr); buf.copyToChannel(chunk.L, 0); buf.copyToChannel(chunk.R, 1);
@@ -1706,14 +1706,26 @@ function playJob(job, delay, vol, inst) {          // inst: an instrument note (
   sched(job.render(0, nh), t0, nh >= job.n);
   if (nh < job.n) setTimeout(function () { sched(job.render(nh, job.n), t0 + nh / job.sr, true); }, 0);
 }
-function dampOthers(g, t0, end) {                  // like a marimba player's hand: only the two newest notes keep ringing
+var CONSONANT = [0, 300, 400, 500, 700, 800, 900];   // cents mod 1200: unison/octave, thirds, fourth, fifth, sixths
+function clashes(f1, f2, tol) {                    // true if the interval is not within tol (default 35) cents of a consonance
+  var t = tol || 35, r = Math.abs(1200 * Math.log2(f1 / f2)) % 1200;
+  if (r > 1200 - t) r = 0;
+  for (var i = 0; i < CONSONANT.length; i++) if (Math.abs(r - CONSONANT[i]) <= t) return false;
+  return true;
+}
+function dampOthers(g, t0, end, f, tune) {         // like a player's hand: a new note stops only the ringing notes it clashes with; at most 3 ring
   var now = audio.ctx.currentTime, live = audio.live = audio.live.filter(function (e) { return e.end > now; }), i;
-  live.push({ g: g, start: t0, end: end, damped: false });
-  live.sort(function (p, q) { return q.start - p.start; });   // newest first, new note included
-  for (i = 2; i < live.length; i++) {
+  var me = { g: g, start: t0, end: end, f: f, tune: !!tune, damped: false };
+  function stop(e, tc) { e.g.gain.setTargetAtTime(0, t0, tc); e.damped = true; }   // at the new note's start, so arpeggios damp in rhythm
+  for (i = 0; i < live.length; i++) {
     var e = live[i];
-    if (!e.damped && e.start < t0) { e.g.gain.setTargetAtTime(0, t0, 0.07); e.damped = true; }   // at the new note's start, so arpeggios damp in rhythm
+    if (e.damped || e.start >= t0) continue;       // notes not yet started are left alone
+    if (tune && e.tune) stop(e, 0.08);             // tunes: one note at a time
+    else if (clashes(f, e.f)) stop(e, 0.06);
   }
+  live.push(me);
+  var ring = live.filter(function (e) { return !e.damped && e.start <= t0; }).sort(function (p, q) { return p.start - q.start; });
+  for (i = 0; i < ring.length - 3; i++) if (ring[i] !== me) stop(ring[i], 0.06);
 }
 function tauOf(sol, k, V) { return (V || VOICES.drum).tau(sol.f[0] / sol.f[k]); }
 function panOf(k, V) { return k ? (V || VOICES.drum).width * Math.sin(k * 2.39996) : 0; }   // golden-angle spread; the fundamental sits in the middle
@@ -1758,11 +1770,11 @@ function labParts(inst, f) {                       // [freq, amp, tau] per parti
   }
   return out;
 }
-function labNote(sol, k, delay, vol) {             // one instrument note for pattern k; returns the caption item
+function labNote(sol, k, delay, vol, tune) {             // one instrument note for pattern k; returns the caption item
   var inst = SOUND.real ? 'marimba' : SOUND.inst, LV = INSTS[inst], f0 = sol.f[0], fs = labFreq(sol, k), fp = fs * LV.up;   // Real drum borrows the marimba for tunes
   var pan = clamp((Math.log2(fs / f0) - 1) * 0.3, -0.5, 0.5);
   var parts = labParts(inst, fp).map(function (q) { return { f: q[0], a: q[1], tau: q[2], pan: pan }; });
-  playJob(soundJob(parts, audio.ctx.sampleRate, LV), delay, vol, true);
+  playJob(soundJob(parts, audio.ctx.sampleRate, LV), delay, vol, { f: fp, tune: !!tune });
   var text = SOUND.snap ? noteOf(fp).name : noteOf(fp).text;
   if (SOUND.snap) {
     var s = 12 * Math.log2(sol.f[k] / f0), cents = Math.round((Math.round(s) - s) * 100);
@@ -1770,9 +1782,9 @@ function labNote(sol, k, delay, vol) {             // one instrument note for pa
   }
   return { text: text, mode: k + 1 };
 }
-function playTune(a, sol, delay, max) {            // the drum's first `max` (default 8) notes, rising, 0.26 s apart
+function playTune(a, sol, delay, max) {            // the drum's first `max` (default 8) notes, rising, 0.3 s apart, one ringing at a time
   var d = delay || 0;
-  tunedNotes(a, sol, max || 8).forEach(function (nt, i) { labNote(sol, nt.k, d + i * 0.26, 0.55); });
+  tunedNotes(a, sol, max || 8).forEach(function (nt, i) { labNote(sol, nt.k, d + i * 0.3, 0.55, true); });
   lastNote = null;
 }
 function playStrike(a, sol, delay, maxDur) {      // sol, delay and maxDur (seconds) are optional
@@ -1787,12 +1799,31 @@ function playStrike(a, sol, delay, maxDur) {      // sol, delay and maxDur (seco
   for (var k = 0; k < sol.K; k++) parts.push({ f: sol.f[k], a: a[k] * Math.exp(Math.min(1, -sol.lam[k] * extra)), tau: tauOf(sol, k, V), pan: panOf(k, V) });   // a hard mallet brightens by at most e×
   playJob(soundJob(parts, audio.ctx.sampleRate, V, maxDur), delay);
 }
-function soundDemo() {                             // after a Sound/Tuning change: instruments play 6 rising notes, Real drum one strike
+function nicePhrase(sol, n) {                      // up to n modes from the first 16 whose pitches are all consonant with the lowest and each other
+  var tol, K = Math.min(16, sol.K), out, k, m, ok, f;
+  for (tol = 35; tol <= 60; tol += 25) {
+    out = [0];
+    for (k = 1; k < K && out.length < n; k++) {
+      f = labFreq(sol, k); ok = true;
+      for (m = 0; m < out.length; m++) if (Math.abs(1200 * Math.log2(f / labFreq(sol, out[m]))) < 12 || clashes(f, labFreq(sol, out[m]), tol)) { ok = false; break; }   // twins (<12 cents) add nothing
+      if (ok) out.push(k);
+    }
+    if (out.length >= 3) break;
+  }
+  return out.map(function (k) { return { k: k, f: labFreq(sol, k) }; });
+}
+function playPhrase(sol) {                         // consonant notes rising 0.18 s apart, then the lowest again, softly
+  var ph = nicePhrase(sol, 5);
+  ph.forEach(function (nt, i) { labNote(sol, nt.k, i * 0.18, 0.55); });
+  labNote(sol, 0, (ph.length - 1) * 0.18 + 0.35, 0.4);
+  lastNote = null;
+}
+function soundDemo() {                             // after a Sound/Tuning change: instruments play a consonant phrase, Real drum one strike
   if (state.view === 'guess') return;              // the game plays its own tunes
   var sol = state.view === 'twins' && TD[0].sol ? TD[0].sol : state.sol;
   if (!sol || !ensureAudio()) return;
   var a = new Float64Array(sol.K); for (var k = 0; k < sol.K; k++) a[k] = 1 / Math.sqrt(k + 1);
-  if (SOUND.real) playStrike(a, sol); else playTune(a, sol, 0, 6);
+  if (SOUND.real) playStrike(a, sol); else playPhrase(sol);
 }
 function syncSound() {
   ['marimba', 'kalimba', 'piano', 'drum'].forEach(function (k) {
@@ -2420,7 +2451,7 @@ function twStrike(td, x, y) {
 function twRing(which) {
   if (!TW.solved) return;
   ensureAudio();
-  var gapAB = 8 * 0.26 + 1.0;                      // B waits for A's 8-note tune, plus a breath
+  var gapAB = 8 * 0.3 + 1.0;                      // B waits for A's 8-note tune, plus a breath
   var seq = which === 'AB' ? [[0, 0], [1, gapAB]] : [[which === 'A' ? 0 : 1, 0]], now = performance.now();
   seq.forEach(function (s) {
     var td = TD[s[0]], sol = td.sol, a = new Float64Array(sol.K), act = [], sq = 0;
@@ -3492,7 +3523,7 @@ loadShape(SHAPES[0]);
 if (DEBUG) {
   window.__drum = {
     state: state, SHAPES: SHAPES, solve: loadShape, strike: strikeAt, selectMode: selectMode, backToDrum: backToDrum,
-    setDrawing: setDrawing, finishDrawing: finishDrawing, rdp: rdp, noteOf: noteOf, SOUND: SOUND, labFreq: labFreq, renderSound: renderSound, tunedNotes: tunedNotes,
+    setDrawing: setDrawing, finishDrawing: finishDrawing, rdp: rdp, noteOf: noteOf, SOUND: SOUND, labFreq: labFreq, nicePhrase: nicePhrase, clashes: clashes, renderSound: renderSound, tunedNotes: tunedNotes,
     ensureAudio: ensureAudio, stage: S, thumb: thumb, setView: setView, VIEWS: VIEWS, workerSource: workerMain.toString(),
     TW: TW, TD: TD, twSolve: twSolve, compareTwins: compareTwins, twinCheck: twinCheck, twRing: twRing, twSetMode: twSetMode, twStrike: twStrike
   };
