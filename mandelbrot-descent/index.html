@@ -529,6 +529,8 @@ class BlaSet { // validity radii for one frame scale (coefficients live with the
 // start-up veil) and recycled forever. A keyframe rendered at lower resolution just uses the lower-left
 // part of its slot, so changing resolution never allocates or frees GPU memory mid-zoom.
 const MOBILE = matchMedia('(pointer: coarse)').matches || Math.min(screen.width, screen.height) < 700;
+// iPhones/iPads (iPadOS Safari reports a Mac user agent, but with touch): their GPU watchdog is far stricter than Android's
+const IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 let RING_N = DRING || (MOBILE ? 8 : 9);
 const CAPAREA = DAREA || (MOBILE ? 2.2e6 : 6.5e6);
 const ring = { W: 0, H: 0, gen: 0, free: [], count: 0 };
@@ -675,9 +677,9 @@ const S = { work: Math.min(2e7, DWORK || 2e7), vcap: 99, vcapT: 99, kTime: 0, qu
 const SPEEDS = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4];
 
 const PROBE_CAP = DPCAP || (MOBILE ? 400000 : 1500000);
-// per-pixel loop cap (watchdog safety). A GPU draw lasts as long as its slowest pixel, so untimed phones/tablets
-// (iPads, iPhones) get a much lower cap: 24000 steps on one pixel reset an iPad Pro 10.5 even in tiny batches
-const MAX_STEPS = DSTEPS || (MOBILE ? (gl.getExtension('EXT_disjoint_timer_query_webgl2') ? 24000 : 6000) : 60000);
+// per-pixel loop cap (watchdog safety). A GPU draw lasts as long as its slowest pixel, so iPhones/iPads get a
+// much lower cap: 24000 steps on one pixel reset an iPad Pro 10.5 even in tiny batches
+const MAX_STEPS = DSTEPS || (IOS ? 6000 : MOBILE ? 24000 : 60000);
 const pboPool = [];
 function probeCount(J) { return Math.ceil(J.Uend) + 2; }
 // Probes: tiny renders at every integer depth, independent of each other, read back asynchronously.
@@ -802,6 +804,7 @@ function pump(budget) {
   let spent = 0;
   if (S.cur && !probesDone(S.cur)) return pumpProbes(S.cur, S.cur.shown ? budget * 0.5 : budget) + (S.cur.shown ? pumpKeys(budget * 0.5) : 0);
   if (S.next && !probesDone(S.next)) {
+    if (S.advance) return spent + pumpProbes(S.next, budget);   // leaving: the zoom on screen can stall, charting gets it all
     const urgent = S.cur && S.cur.shown && leadOf(S.cur) < 1.2;
     if (urgent) { spent += pumpKeys(budget * 0.75); spent += pumpProbes(S.next, Math.max(0, budget - spent)); }
     else { spent += pumpProbes(S.next, budget * (S.advance ? 0.6 : 0.3)); spent += pumpKeys(budget - spent); }
@@ -862,8 +865,8 @@ function leadOf(J) {
 // ---------- GPU pacing ----------
 const tq = gl.getExtension('EXT_disjoint_timer_query_webgl2');
 const WORK_MIN = 1e6, WORK_MAX = 3e9;
-// phones/tablets with no timer (iPad Pro 10.5: ~20M work took ~100 ms and two stacked frames reset the GPU): small fixed ceiling
-const WORK_NT = MOBILE && !tq ? 6e6 : WORK_MAX; S.work = Math.min(S.work, WORK_NT);
+// iPhones/iPads have no timer (iPad Pro 10.5: ~20M work took ~100 ms and two stacked frames reset the GPU): small fixed ceiling
+const WORK_NT = IOS && !tq ? 6e6 : WORK_MAX; S.work = Math.min(S.work, WORK_NT);
 // rate: work units per GPU ms (timer queries); dispMs: GPU cost of drawing the screen; ceil: the work
 // level at which frames last dropped (used when no timer is available, so we stop re-overshooting)
 const gp = { pending: [], rate: 0, dispMs: 0, inflight: [], ceil: Infinity };
@@ -893,9 +896,9 @@ function gpuSchedule(dt) {
     const sliceMs = shown ? clamp(S.refresh * 0.72 - gp.dispMs - 2, 1, S.refresh * 0.5) : 30;
     S.work = clamp(gp.rate * sliceMs, WORK_MIN, WORK_MAX);
   } else if (frameCount > 5) {
-    // no timer (all iPhones/iPads): slow frames mean the GPU is behind, so back off, before the first picture
-    // too; phones also get a hard cap so no single submission runs long enough to trip iOS's GPU watchdog
-    if (shown ? dt * 1000 > S.refresh * 1.5 : dt > 0.05) { gp.ceil = S.work; S.work = Math.max(WORK_MIN, S.work * 0.7); }
+    // no timer: slow frames mean the GPU is behind, so back off; iPhones/iPads do so before the first picture
+    // too, and have a hard cap so no single submission runs long enough to trip iOS's GPU watchdog
+    if (shown ? dt * 1000 > S.refresh * 1.5 : IOS && dt > 0.05) { gp.ceil = S.work; S.work = Math.max(WORK_MIN, S.work * 0.7); }
     else { S.work = Math.min(WORK_NT, S.work * (shown ? 1.03 : 1.15), shown ? gp.ceil * 0.85 : Infinity); gp.ceil *= 1.002; }
   }
   if (DWORK) S.work = Math.min(S.work, DWORK);   // debug: hard cap on per-frame work
@@ -1197,7 +1200,8 @@ function frame(now) {
     const K = { u: C.u, state: 0, still: true }; const i = C.keys.findIndex(k => k.u > C.u); C.keys.splice(i < 0 ? C.keys.length : i, 0, K);
   }
   // journey end → hold, then dissolve into the next location
-  if (C && C.Uend - C.u < 7) prepareNext();
+  // chart the next location in the background once this zoom is comfortably ahead, so NEXT is quick
+  if (C && C.shown && (leadOf(C) > 1.6 || C.Uend - C.u < 7)) prepareNext();
   if (C && C.Uend - C.u < 0.03) { if (!S.paused) S.hold += dt; if (S.hold > 3.5) S.advance = true; }
   if (S.advance && S.next && readyToShow(S.next) && S.fade === 0) { S.fade = 1e-6; swapName(S.next.loc.name); }
   if (S.fade > 0) {
@@ -1241,7 +1245,11 @@ function togglePause() {
   $('pauseIcon').innerHTML = S.paused ? '<path d="M5 3.5l7 4.5-7 4.5z"/>' : '<path d="M5.5 3.5v9M10.5 3.5v9"/>';
   $('pause').setAttribute('aria-label', S.paused ? 'Play' : 'Pause'); $('pause').title = S.paused ? 'Play (Space)' : 'Pause (Space)';
 }
-function goNext() { prepareNext(); S.advance = true; }
+function goNext() {
+  prepareNext(); S.advance = true;
+  // drop the current zoom's half-rendered keyframe: its GPU time now belongs to the next location
+  const j = S.job; if (j && j.J === S.cur && !j.K.still) { if (j.prev) j.prev.pin--; if (j.K.tex) releaseKeyTex(j.K.tex); j.K.tex = null; j.K.state = 0; S.job = null; }
+}
 $('pause').onclick = togglePause; $('slower').onclick = () => setSpeed(S.speedIdx - 1); $('faster').onclick = () => setSpeed(S.speedIdx + 1);
 $('speed').onclick = () => setSpeed(S.speedIdx === 3 ? 0 : 3); $('next').onclick = goNext;
 addEventListener('keydown', (e) => {
