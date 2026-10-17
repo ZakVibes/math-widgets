@@ -3,112 +3,87 @@
 <link rel="manifest" href="../manifest.json"><link rel="icon" href="../icons/icon-192.png"><link rel="apple-touch-icon" href="../icons/icon-180.png"><meta name="apple-mobile-web-app-title" content="Math Widgets"><script>if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("../sw.js"));</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@1,500&display=swap">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../controls.css">
 <style>
 /* Layout: an instrument bench — wide plot on the left (position + momentum readouts), a narrow control rail on the right; stacks on phones. */
 :root{
-  --bg:#EDF0F5; --panel:#FFFFFF; --plot:#FAFBFD; --ink:#141A26; --muted:#5A6477; --line:#D5DBE5;
+  --bg:#EDF0F5; --panel:#FFFFFF; --plot:#FAFBFD; --fg:#141A26; --muted:#5A6477; --line:#D5DBE5;
   --accent:#2C57CF; --accent-soft:rgba(44,87,207,.14); --im:#B5307A;
   --pot:#E1E6EF; --potline:#7A869F; --absorb:rgba(122,134,159,.12); --grid:rgba(20,26,38,.06);
   --phase-l:48%; --phase-s:78%;
-  --f-sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
-  --f-mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
-  --f-math:"IBM Plex Serif",Georgia,"Times New Roman",serif;
+  --font-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  --font-math:"IBM Plex Serif",Georgia,"Times New Roman",serif;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#0C111B; --panel:#131A27; --plot:#0F1521; --ink:#E3E8F1; --muted:#8C97AC; --line:#253046;
+  --bg:#0C111B; --panel:#131A27; --plot:#0F1521; --fg:#E3E8F1; --muted:#8C97AC; --line:#253046;
   --accent:#7FA0FF; --accent-soft:rgba(127,160,255,.16); --im:#F07AB7;
   --pot:#1B2435; --potline:#6F7D9A; --absorb:rgba(140,151,172,.10); --grid:rgba(227,232,241,.05);
   --phase-l:60%; --phase-s:75%; color-scheme:dark }}
 :root[data-theme="dark"]{
-  --bg:#0C111B; --panel:#131A27; --plot:#0F1521; --ink:#E3E8F1; --muted:#8C97AC; --line:#253046;
+  --bg:#0C111B; --panel:#131A27; --plot:#0F1521; --fg:#E3E8F1; --muted:#8C97AC; --line:#253046;
   --accent:#7FA0FF; --accent-soft:rgba(127,160,255,.16); --im:#F07AB7;
   --pot:#1B2435; --potline:#6F7D9A; --absorb:rgba(140,151,172,.10); --grid:rgba(227,232,241,.05);
   --phase-l:60%; --phase-s:75%; color-scheme:dark }
 
-*{box-sizing:border-box}
-[hidden]{display:none!important}
-body{background:var(--bg);color:var(--ink);font-family:var(--f-sans);font-size:14px;line-height:1.45;margin:0;padding:20px 16px 32px}
-@media (min-width:700px){body{padding-inline:24px}}
-.wrap{max-width:1280px;margin:0 auto;display:grid;gap:16px}
-header{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px}
-h1{font-size:22px;font-weight:600;margin:0;letter-spacing:-.01em;text-wrap:balance}
-h1 i{font-family:var(--f-math);font-weight:500}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:var(--text-base);line-height:1.45;margin:0;padding:20px var(--space-4) 32px}
+@media (min-width:700px){body{padding-inline:var(--space-5)}}
+.wrap{max-width:1280px;margin:0 auto;display:grid;gap:var(--space-4)}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:var(--space-2) var(--space-4)}
+h1{font-size:var(--text-2xl);font-weight:600;margin:0;letter-spacing:-.01em;text-wrap:balance}
+h1 i{font-family:var(--font-math);font-weight:500}
 .sub{color:var(--muted);margin:0}
-.sub code{font-family:var(--f-mono);font-size:12.5px}
-.app{display:grid;gap:16px;grid-template-columns:minmax(0,1fr)}
+.sub code{font-family:var(--font-mono);font-size:var(--text-sm)}
+.app{display:grid;gap:var(--space-4);grid-template-columns:minmax(0,1fr)}
 @media (min-width:980px){.app{grid-template-columns:minmax(0,1fr) 320px}}
-.bench{align-self:start;align-content:start;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;display:grid;gap:8px;min-width:0}
-.readout{display:flex;flex-wrap:wrap;gap:4px 18px;font-family:var(--f-mono);font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
-.readout b{color:var(--ink);font-weight:500}
-canvas{display:block;width:100%;border-radius:6px;background:var(--plot)}
+.bench{align-self:start;align-content:start;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-lg);padding:var(--space-3);display:grid;gap:var(--space-2);min-width:0}
+canvas{display:block;width:100%;border-radius:var(--radius-md);background:var(--plot)}
 #main{height:clamp(280px,54vh,520px);touch-action:none;cursor:crosshair}
 #mom{height:104px;cursor:pointer;touch-action:none}
-.hint{font-size:13px;color:var(--muted);margin:0}
-.rail{display:grid;gap:14px;align-content:start;min-width:0}
-.group{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;display:grid;gap:10px}
-.group h2{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin:0}
-.seg{display:flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
-.seg button{flex:1;min-width:0;border:0;background:transparent;color:var(--ink);font:inherit;font-size:13px;padding:7px 4px;cursor:pointer;border-left:1px solid var(--line)}
-.seg button:first-child{border-left:0}
-.seg button[aria-pressed="true"]{background:var(--accent);color:var(--panel);font-weight:500}
-.chips{display:flex;flex-wrap:wrap;gap:6px}
-.chips button{border:1px solid var(--line);background:transparent;color:var(--ink);font:inherit;font-size:12.5px;padding:5px 9px;border-radius:999px;cursor:pointer}
-.chips button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--ink)}
-.chips button:hover{border-color:var(--accent)}
-button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.row{display:flex;align-items:center;gap:10px}
-.row label{flex:0 0 auto;font-size:13px}
-.row input[type=range]{flex:1;min-width:0;accent-color:var(--accent)}
-.val{font-family:var(--f-mono);font-size:12.5px;min-width:44px;text-align:right;font-variant-numeric:tabular-nums}
-.check{display:flex;gap:8px;align-items:center;font-size:13px;cursor:pointer}
-.check input{accent-color:var(--accent);margin:0}
-.btns{display:flex;gap:8px}
-.btn{flex:1;border:1px solid var(--line);background:transparent;color:var(--ink);font:inherit;font-size:13px;padding:7px 10px;border-radius:7px;cursor:pointer}
-.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--panel);font-weight:500}
-.legend{display:flex;align-items:center;gap:8px;font-family:var(--f-mono);font-size:11.5px;color:var(--muted)}
-.legend .bar{flex:1;height:10px;border-radius:3px}
-.note{font-size:12.5px;color:var(--muted);margin:0}
-.note i{font-family:var(--f-math)}
-.topbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 14px}
-.tbtns{display:flex;gap:6px}
+.rail{display:grid;gap:var(--space-4);align-content:start;min-width:0}
+.btns{display:flex;gap:var(--space-2)}
+.btns .btn{flex:1}
+.legend{display:flex;align-items:center;gap:var(--space-2);font-family:var(--font-mono);font-size:var(--text-xs);color:var(--muted)}
+.legend .bar{flex:1;height:10px;border-radius:var(--radius-sm)}
+.note i{font-family:var(--font-math)}
+.topbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--space-2) var(--space-4)}
+.tbtns{display:flex;gap:var(--space-2)}
 .readout{flex:1;min-width:0}
-.tbtns .btn{flex:0 0 auto;padding:5px 12px;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.tbtns .btn{flex:0 0 auto;padding:var(--space-1) var(--space-3);display:inline-flex;align-items:center;justify-content:center;gap:6px}
 .tbtns svg{display:block}
 .hint-m{display:none}
-.ctl{display:grid;gap:8px}
-.sym{font-family:var(--f-math);font-style:italic;font-size:15px !important;width:20px}
-input[type=number]{width:66px;flex:0 0 auto;font-family:var(--f-mono);font-size:12.5px;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:5px;padding:4px 6px;font-variant-numeric:tabular-nums}
-.tabs{display:none;gap:4px;border-bottom:1px solid var(--line)}
-.tabs button{flex:1;border:0;background:transparent;color:var(--muted);font:inherit;font-size:13.5px;font-weight:500;padding:10px 4px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
-.tabs button[aria-pressed="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.ctl{display:grid;gap:var(--space-2)}
+.sym{font-family:var(--font-math);font-style:italic;font-size:var(--text-lg) !important;width:20px}
+input[type=number]{width:66px;flex:0 0 auto}
+.tabs{display:none}
 @media (max-width:979px){
   body{padding-top:14px}
-  .sub{font-size:13px}
+  .sub{font-size:var(--text-md)}
   .tabs{display:flex}
-  .rail{gap:10px}
+  .rail{gap:var(--space-3)}
   .group{display:none}
   .group.active{display:grid}
   .group h2{display:none}
-  #main{height:clamp(230px,44vh,420px)}
   #mom{height:76px}
-  .seg button{min-height:40px}
-  .chips button{padding:8px 12px;font-size:13px}
-  .btn{min-height:38px}
+  .seg button{min-height:var(--tap)}
+  .chips button{padding:var(--space-2) var(--space-3);font-size:var(--text-md)}
+  .btn{min-height:var(--tap)}
   .row{min-height:34px}
   .bench .hint{display:none}
   .hint-m{display:block}
   #main{height:clamp(220px,38vh,400px)}
-  .readout{font-size:11.5px;gap:2px 12px}
+  .readout{font-size:var(--text-xs);gap:2px var(--space-3)}
   .tbtns .btn span{display:none}
-  .tbtns .btn{min-width:42px;min-height:36px;padding:4px 10px}
+  .tbtns .btn{min-width:42px;min-height:var(--tap);padding:var(--space-1) var(--space-3)}
 }
 </style>
 
 <div class="wrap">
   <header>
-    <a href="../index.html" style="display:table;flex-basis:100%;margin-bottom:6px;font-size:13px;color:#d0457f;font-weight:500;text-decoration:none">← All widgets</a>
+    <a class="back-link" href="../index.html">← All widgets</a>
     <h1>Schrödinger Sandbox</h1>
-    <p class="sub">One particle on a line, <code>ħ = m = 1</code>, box of length 40. Press the plot to place a state; it evolves under <i style="font-family:var(--f-math)">i∂ψ/∂t = Hψ</i>.</p>
+    <p class="sub">One particle on a line, <code>ħ = m = 1</code>, box of length 40. Press the plot to place a state; it evolves under <i style="font-family:var(--font-math)">i∂ψ/∂t = Hψ</i>.</p>
   </header>
 
   <div class="app">
@@ -411,7 +386,7 @@ new ResizeObserver(fit).observe(cvM);
 let C = {};
 function readTokens() {
   const cs = getComputedStyle(document.documentElement), g = n => cs.getPropertyValue(n).trim();
-  C = { plot: g("--plot"), ink: g("--ink"), muted: g("--muted"), line: g("--line"), accent: g("--accent"), soft: g("--accent-soft"), im: g("--im"),
+  C = { plot: g("--plot"), ink: g("--fg"), muted: g("--muted"), line: g("--line"), accent: g("--accent"), soft: g("--accent-soft"), im: g("--im"),
         pot: g("--pot"), potline: g("--potline"), absorb: g("--absorb"), grid: g("--grid"), L: g("--phase-l"), Sa: g("--phase-s") };
   phaseBar();
 }
@@ -529,7 +504,7 @@ function drawMain() {
     c.strokeStyle = C.accent; c.fillStyle = C.accent; c.lineWidth = 2;
     c.beginPath(); c.moveTo(px0, ya); c.lineTo(pxk, ya); c.stroke();
     if (Math.abs(pxk - px0) > 4) { const d = Math.sign(pxk - px0); c.beginPath(); c.moveTo(pxk + d * 6, ya); c.lineTo(pxk - d * 2, ya - 5); c.lineTo(pxk - d * 2, ya + 5); c.closePath(); c.fill(); }
-    c.font = "500 12px " + getFont("--f-mono"); c.fillStyle = C.ink; c.textAlign = "center"; c.textBaseline = "alphabetic";
+    c.font = "500 12px " + getFont("--font-mono"); c.fillStyle = C.ink; c.textAlign = "center"; c.textBaseline = "alphabetic";
     c.fillText(`x₀ = ${showGhost.x0.toFixed(1)}  k₀ = ${k.toFixed(2)}  σ = ${sg.toFixed(2)}`, Math.min(Math.max(px0, x0 + 120), x0 + w - 120), ya - 10);
   }
   // Gaussian bump preview
@@ -537,21 +512,21 @@ function drawMain() {
     c.setLineDash([5, 3]); c.strokeStyle = C.accent; c.lineWidth = 1.8; c.beginPath();
     for (let i = 0; i < N; i++) { const u = (X[i] - drag.x0) / S.bw, v = Math.min(WALL, Vtot[i] + drag.A * Math.exp(-0.5 * u * u)); const py = Math.max(y0 - 4, Math.min(yB + 2, eToPy(v))); i ? c.lineTo(xToPx(X[i]), py) : c.moveTo(xToPx(X[i]), py); }
     c.stroke(); c.setLineDash([]);
-    c.font = "500 12px " + getFont("--f-mono"); c.fillStyle = C.ink; c.textAlign = "center"; c.textBaseline = "alphabetic";
+    c.font = "500 12px " + getFont("--font-mono"); c.fillStyle = C.ink; c.textAlign = "center"; c.textBaseline = "alphabetic";
     const px0 = xToPx(drag.x0), py0 = eToPy(drag.A);
     c.fillText(`x₀ = ${drag.x0.toFixed(1)}  V₀ = ${drag.A.toFixed(2)}  w = ${S.bw.toFixed(2)}`, Math.min(Math.max(px0, x0 + 110), x0 + w - 110), Math.max(y0 + 16, Math.min(yB - 30, py0 - 12)));
   }
   c.restore();
 
   // axes labels
-  c.font = "11px " + getFont("--f-mono"); c.fillStyle = C.muted;
+  c.font = "11px " + getFont("--font-mono"); c.fillStyle = C.muted;
   c.textAlign = "center"; c.textBaseline = "top";
   for (let x = -20; x <= 20; x += 5) c.fillText(String(x), Math.min(Math.max(xToPx(x), 10), WM - PAD.r - 8), yB + 6);
   c.textAlign = "left"; c.textBaseline = "middle";
   for (let E = Math.ceil(view[0] / es) * es; E <= view[1] + 1e-9; E += es) { const py = eToPy(E); if (py > y0 + 12) c.fillText(fmt(E), x0 + w + 6, py); }
   c.textBaseline = "top"; c.fillText("E", x0 + w + 6, y0 - 4);
   if (S.mode === "energy" && hoverLevel >= 0) {
-    c.textAlign = "left"; c.fillStyle = C.accent; c.font = "500 12px " + getFont("--f-mono");
+    c.textAlign = "left"; c.fillStyle = C.accent; c.font = "500 12px " + getFont("--font-mono");
     c.fillText(`n = ${hoverLevel}   E = ${levels[hoverLevel].toFixed(3)}`, x0 + 8, y0 + 6);
   }
 }
@@ -574,7 +549,7 @@ function drawMom() {
   for (const j of kOrder) { if (Math.abs(K[j]) > KVIEW) continue; const px = kToPx(K[j]), py = yB - (wr[j] * wr[j] + wi[j] * wi[j]) * sc; if (first) { c.moveTo(px, yB); first = false; } c.lineTo(px, py); }
   c.lineTo(kToPx(KVIEW), yB); c.closePath(); c.fillStyle = C.soft; c.fill(); c.strokeStyle = C.accent; c.lineWidth = 1.3; c.stroke();
   if (obs.norm >= 1e-3) { const px = kToPx(Math.max(-KVIEW, Math.min(KVIEW, obs.p))); c.setLineDash([4, 3]); c.strokeStyle = C.ink; c.globalAlpha = 0.55; c.beginPath(); c.moveTo(px, PPAD.t); c.lineTo(px, yB); c.stroke(); c.setLineDash([]); c.globalAlpha = 1; }
-  c.font = "11px " + getFont("--f-mono"); c.fillStyle = C.muted; c.textAlign = "center"; c.textBaseline = "top";
+  c.font = "11px " + getFont("--font-mono"); c.fillStyle = C.muted; c.textAlign = "center"; c.textBaseline = "top";
   for (let k = -20; k <= 20; k += 10) c.fillText(String(k), kToPx(k), yB + 5);
   c.textAlign = "left"; c.fillText("k", WP - PPAD.r + 6, yB + 5);
   c.textBaseline = "top"; c.fillText("|φ(k)|²", PPAD.l + 6, PPAD.t + 2);

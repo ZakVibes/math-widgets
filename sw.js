@@ -5,7 +5,7 @@
 // When you add a widget: add its folder name to WIDGETS below (it needs previews/<name>.jpg too)
 // and bump VERSION, so phones that already have the app download the new list.
 
-const VERSION = "v7";
+const VERSION = "v8";
 const CACHE = "math-widgets-" + VERSION;
 const FONTS = "math-widgets-fonts";
 const SLOW_MS = 4000;
@@ -19,7 +19,7 @@ const WIDGETS = [
   "quotient-rings",
 ];
 const FILES = [
-  "./", "index.html", "manifest.json",
+  "./", "index.html", "manifest.json", "site.css", "controls.css",
   "icons/icon-192.png", "icons/icon-512.png", "icons/icon-180.png",
   ...WIDGETS.flatMap(w => [w + "/index.html", "previews/" + w + ".jpg"]),
 ];

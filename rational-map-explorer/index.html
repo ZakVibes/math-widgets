@@ -3,35 +3,34 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Rational map explorer: z^n + c/z^m</title>
 <link rel="manifest" href="../manifest.json"><link rel="icon" href="../icons/icon-192.png"><link rel="apple-touch-icon" href="../icons/icon-180.png"><meta name="apple-mobile-web-app-title" content="Math Widgets"><script>if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("../sw.js"));</script>
+<link rel="stylesheet" href="../site.css">
 <style>
-:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#f1f4f3;--fg:#141a19;--muted:#5a6866;--line:rgba(20,26,25,.18);--card:#fff;--acc:#0f8a7a;--gut:0px}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1514;--fg:#e6eeec;--muted:#93a6a2;--line:rgba(230,238,236,.2);--card:#192120;--acc:#4fd1b8}}
-:root[data-theme="dark"]{--bg:#0f1514;--fg:#e6eeec;--muted:#93a6a2;--line:rgba(230,238,236,.2);--card:#192120;--acc:#4fd1b8}
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#f1f4f3;--fg:#141a19;--muted:#5a6866;--line:rgba(20,26,25,.18);--panel:#fff;--accent:#0f8a7a;--gut:0px}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1514;--fg:#e6eeec;--muted:#93a6a2;--line:rgba(230,238,236,.2);--panel:#192120;--accent:#4fd1b8}}
+:root[data-theme="dark"]{--bg:#0f1514;--fg:#e6eeec;--muted:#93a6a2;--line:rgba(230,238,236,.2);--panel:#192120;--accent:#4fd1b8}
 html{scroll-padding-top:env(safe-area-inset-top,0px);-webkit-text-size-adjust:100%;text-size-adjust:100%}
-*,*::before,*::after{box-sizing:border-box}
-[hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:16px}
 .wrap{max-width:1100px;margin:0 auto}
 h1{font-size:20px;font-weight:500;margin:0 0 4px}
-.hint{margin:0 0 14px;color:var(--muted);font-size:13px}
+.hint{margin:0 0 14px;color:var(--muted);font-size:var(--text-md)}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:14px}
-.cap{font-size:13px;color:var(--muted);margin:0 var(--gut) 6px;display:flex;justify-content:space-between;gap:8px}
-.view{position:relative;aspect-ratio:1;overflow:hidden;margin:0 var(--gut);border-radius:10px;border:1px solid var(--line);background:#0b0d0d;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;cursor:grab}
+.cap{font-size:var(--text-md);color:var(--muted);margin:0 var(--gut) 6px;display:flex;justify-content:space-between;gap:8px}
+.view{position:relative;aspect-ratio:1;overflow:hidden;margin:0 var(--gut);border-radius:var(--radius-md);border:1px solid var(--line);background:#0b0d0d;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;cursor:grab}
 .view canvas{position:absolute;left:0;top:0;width:100%;height:100%;transform-origin:0 0;display:block}
 #mk{position:absolute;width:44px;height:44px;transform:translate(-50%,-50%);cursor:pointer;touch-action:none}
 #mk::before{content:"";position:absolute;left:50%;top:50%;width:14px;height:14px;margin:-7px 0 0 -7px;border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 1.5px #000}
 .ctl{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:10px 18px;margin-top:16px}
 .row{display:flex;align-items:center;gap:10px}
-.row label{min-width:80px;font-size:14px;color:var(--muted)}
-.row input{flex:1;min-width:0;height:28px;accent-color:var(--acc)}
-.row output{min-width:54px;text-align:right;font-size:14px;font-variant-numeric:tabular-nums}
+.row label{min-width:80px;font-size:var(--text-base);color:var(--muted)}
+.row input{flex:1;min-width:0;height:28px;accent-color:var(--accent)}
+.row output{min-width:54px;text-align:right;font-size:var(--text-base);font-variant-numeric:tabular-nums}
 .bar{display:flex;gap:8px 10px;align-items:center;flex-wrap:wrap;margin-top:14px}
-.bar label{font-size:14px;color:var(--muted)}
-select,button{font:inherit;font-size:14px;min-height:36px;padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg);cursor:pointer}
+.bar label{font-size:var(--text-base);color:var(--muted)}
+select,button{font:inherit;font-size:var(--text-base);min-height:36px;padding:6px 12px;border-radius:var(--radius-md);border:1px solid var(--line);background:var(--panel);color:var(--fg);cursor:pointer}
 input,select,button{touch-action:manipulation}
 button:disabled{opacity:.5;cursor:default}
-button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
-.st{min-height:20px;margin-top:10px;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.st{min-height:20px;margin-top:10px;font-size:var(--text-md);color:var(--muted);font-variant-numeric:tabular-nums}
 /* Phones: side gutters leave room to scroll the page with a finger (the panels capture touch for pan and zoom),
    16px form text stops iOS zooming into a menu on focus, and controls get finger-sized targets. */
 @media (max-width:600px){
@@ -41,11 +40,11 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid 
  .ctl{gap:2px 18px}
  .row{min-height:44px}
  .row input{height:36px}
- select,button{font-size:16px;min-height:44px}
+ select,button{font-size:var(--text-lg);min-height:44px}
 }
 </style></head><body>
 <div class="wrap">
-<a href="../index.html" style="display:table;flex-basis:100%;margin-bottom:6px;font-size:13px;color:#d0457f;font-weight:500;text-decoration:none">← All widgets</a>
+<a class="back-link" href="../index.html">← All widgets</a>
 <h1>Rational map explorer: z<sup>n</sup> + c / z<sup>m</sup></h1>
 <p class="hint">The parameter plane (c) shows where the critical orbit stays bounded; the dynamical plane (z) shows the dynamics for the c you pick. Tap the parameter plane or drag its marker to set c. On both panels, drag to pan and pinch or scroll to zoom; double-tap or double-click the dynamical plane to reset it. Try n = 2, m = 3 and a small c. Set m = 0 for the ordinary z<sup>n</sup> + c (Mandelbrot and Julia sets). Both panels zoom far beyond normal precision (the zoom label shows "deep"); deep views usually need more iterations. Animate c moves the marker around the centre of the parameter plane view; Path sets the shape of the loop.</p>
 <div class="grid">

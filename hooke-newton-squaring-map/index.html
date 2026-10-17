@@ -8,58 +8,57 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,500;1,400;1,500&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../site.css">
 <style>
 :root{
-  --bg:#EDF0F2; --panel:#F8F9FA; --ink:#1B2430; --muted:#5B6875; --grid:#DCE2E7; --rule:#C9D1D8;
+  --bg:#EDF0F2; --panel:#F8F9FA; --fg:#1B2430; --muted:#5B6875; --grid:#DCE2E7; --rule:#C9D1D8;
   --osc:#23638A; --kep:#A8323E;
-  box-sizing:border-box;
   padding-top:env(safe-area-inset-top,0px);
   padding-bottom:env(safe-area-inset-bottom,0px);
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --bg:#12161B; --panel:#181D23; --ink:#DDE3E9; --muted:#8E9AA6; --grid:#262E37; --rule:#323B45;
+    --bg:#12161B; --panel:#181D23; --fg:#DDE3E9; --muted:#8E9AA6; --grid:#262E37; --rule:#323B45;
     --osc:#78B7DC; --kep:#EE8892;
   }
 }
 :root[data-theme="dark"]{
-  --bg:#12161B; --panel:#181D23; --ink:#DDE3E9; --muted:#8E9AA6; --grid:#262E37; --rule:#323B45;
+  --bg:#12161B; --panel:#181D23; --fg:#DDE3E9; --muted:#8E9AA6; --grid:#262E37; --rule:#323B45;
   --osc:#78B7DC; --kep:#EE8892;
 }
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
-*,*::before,*::after{box-sizing:inherit}
-body{margin:0;background:var(--bg);color:var(--ink);
-  font-family:"Public Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:15px;line-height:1.5}
+body{margin:0;background:var(--bg);color:var(--fg);
+  font-family:"Public Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:var(--text-lg);line-height:1.5}
 main{max-width:1120px;margin:0 auto;padding:28px 20px 44px}
 h1{font-family:"Spectral",Georgia,"Times New Roman",serif;font-weight:500;font-size:clamp(1.7rem,3.4vw,2.4rem);
   line-height:1.15;margin:0 0 .35em;letter-spacing:-.01em}
-.lede{font-family:"Spectral",Georgia,serif;font-size:1.07rem;line-height:1.6;max-width:70ch;color:var(--muted);margin:0 0 24px}
-.lede i, .note i{color:var(--ink)}
-.planes{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:18px;align-items:center}
-.plane h2{font-family:"Spectral",Georgia,serif;font-weight:500;font-size:1.12rem;margin:0 0 6px;display:flex;gap:.5em;align-items:baseline;flex-wrap:wrap}
-.plane h2 small{font-family:"Public Sans",system-ui,sans-serif;font-size:.82rem;color:var(--muted);font-weight:400}
+.lede{font-family:"Spectral",Georgia,serif;font-size:var(--text-xl);line-height:1.6;max-width:70ch;color:var(--muted);margin:0 0 24px}
+.lede i, .note i{color:var(--fg)}
+.planes{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:var(--space-4);align-items:center}
+.plane h2{font-family:"Spectral",Georgia,serif;font-weight:500;font-size:var(--text-xl);margin:0 0 6px;display:flex;gap:.5em;align-items:baseline;flex-wrap:wrap}
+.plane h2 small{font-family:"Public Sans",system-ui,sans-serif;font-size:var(--text-md);color:var(--muted);font-weight:400}
 .dot{width:10px;height:10px;border-radius:50%;display:inline-block;align-self:center}
-.canvas-wrap{aspect-ratio:1;background:var(--panel);border:1px solid var(--rule);border-radius:4px;overflow:hidden;touch-action:none;cursor:crosshair}
+.canvas-wrap{aspect-ratio:1;background:var(--panel);border:1px solid var(--rule);border-radius:var(--radius-sm);overflow:hidden;touch-action:none;cursor:crosshair}
 canvas{display:block;width:100%;height:100%}
 .map{font-family:"Spectral",Georgia,serif;font-style:italic;font-size:1.35rem;text-align:center;white-space:nowrap;padding-top:28px}
 .map b{display:block;font-weight:400;font-style:normal;font-size:2.2rem;line-height:1;color:var(--muted)}
 .map .down{display:none}
-.note{min-height:3.4em;margin:18px 0 6px;font-family:"Spectral",Georgia,serif;font-size:1.04rem;line-height:1.6;max-width:78ch}
+.note{min-height:3.4em;margin:18px 0 6px;font-family:"Spectral",Georgia,serif;font-size:var(--text-lg);line-height:1.6;max-width:78ch}
 .controls{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:32px;margin-top:14px;border-top:1px solid var(--rule);padding-top:20px}
-.slider{display:grid;grid-template-columns:11em minmax(0,1fr) 4.6em;gap:12px;align-items:center;margin-bottom:9px}
-.slider label{font-size:.92rem}
-.slider output{font-variant-numeric:tabular-nums;text-align:right;font-size:.92rem}
+.slider{display:grid;grid-template-columns:11em minmax(0,1fr) 4.6em;gap:var(--space-3);align-items:center;margin-bottom:var(--space-2)}
+.slider label{font-size:var(--text-base)}
+.slider output{font-variant-numeric:tabular-nums;text-align:right;font-size:var(--text-base)}
 input[type=range]{width:100%;accent-color:var(--osc)}
-.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:14px 0 4px}
-.row .lbl{font-size:.88rem;color:var(--muted);margin-right:4px}
-button{font:inherit;font-size:.88rem;color:var(--ink);background:var(--panel);border:1px solid var(--rule);border-radius:3px;padding:5px 11px;cursor:pointer}
+.row{display:flex;flex-wrap:wrap;gap:var(--space-2);align-items:center;margin:14px 0 4px}
+.row .lbl{font-size:var(--text-base);color:var(--muted);margin-right:4px}
+button{font:inherit;font-size:var(--text-base);color:var(--fg);background:var(--panel);border:1px solid var(--rule);border-radius:var(--radius-sm);padding:5px var(--space-3);cursor:pointer}
 button:hover{border-color:var(--muted)}
-button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
 button:focus-visible,input:focus-visible{outline:2px solid var(--osc);outline-offset:2px}
-dl{display:grid;grid-template-columns:auto 1fr;gap:6px 18px;margin:0;font-size:.93rem}
+dl{display:grid;grid-template-columns:auto 1fr;gap:6px var(--space-4);margin:0;font-size:var(--text-base)}
 dt{color:var(--muted)}
 dd{margin:0;font-variant-numeric:tabular-nums}
-.foot{margin-top:26px;font-size:.86rem;color:var(--muted);max-width:78ch}
+.foot{margin-top:26px;font-size:var(--text-base);color:var(--muted);max-width:78ch}
 @media (max-width:760px){
   .planes{grid-template-columns:minmax(0,1fr)}
   .map{padding-top:0}
@@ -72,7 +71,7 @@ dd{margin:0;font-variant-numeric:tabular-nums}
 </head>
 <body>
 <main>
-  <a href="../index.html" style="display:table;flex-basis:100%;margin-bottom:6px;font-size:13px;color:#d0457f;font-weight:500;text-decoration:none">← All widgets</a>
+  <a class="back-link" href="../index.html">← All widgets</a>
   <h1>Hooke’s oscillator, squared, is Newton’s orbit</h1>
   <p class="lede">The left plane shows a particle in the potential <i>−E|w|²</i>. Squaring every point, <i>z = w²</i>, gives a Kepler orbit with energy <i>E</i> and coupling <i>k</i> equal to the oscillator’s energy. Drag in either plane to move the starting point, or use the sliders.</p>
 
@@ -261,7 +260,7 @@ function drawPlane(cv,isZ,col){
   const nr=isZ?6:12;
   for(let i=0;i<nr;i++){const th=i*2*Math.PI/nr;ctx.beginPath();ctx.moveTo(c,c);ctx.lineTo(c+Math.cos(th)*W,c-Math.sin(th)*W);ctx.stroke();}
 
-  const hue=col(isZ?'--kep':'--osc'), ink=col('--ink'), muted=col('--muted');
+  const hue=col(isZ?'--kep':'--osc'), ink=col('--fg'), muted=col('--muted');
   ctx.fillStyle=muted; ctx.font=`italic ${16*d}px Spectral, Georgia, serif`; ctx.fillText(isZ?'z':'w',12*d,22*d);
 
   if(orbit.kind==='orbit'){

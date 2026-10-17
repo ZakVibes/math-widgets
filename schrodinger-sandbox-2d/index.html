@@ -3,97 +3,74 @@
 <link rel="manifest" href="../manifest.json"><link rel="icon" href="../icons/icon-192.png"><link rel="apple-touch-icon" href="../icons/icon-180.png"><meta name="apple-mobile-web-app-title" content="Math Widgets"><script>if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("../sw.js"));</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@1,500&display=swap">
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../controls.css">
 <style>
 /* Layout: same instrument bench as the 1D sandbox — square field view with a momentum map and energy ladder beside it, control rail on the right; tabs on phones. */
 :root{
-  --bg:#EDF0F5; --panel:#FFFFFF; --plot:#FAFBFD; --ink:#141A26; --muted:#5A6477; --line:#D5DBE5;
+  --bg:#EDF0F5; --panel:#FFFFFF; --plot:#FAFBFD; --fg:#141A26; --muted:#5A6477; --line:#D5DBE5;
   --accent:#2C57CF; --accent-soft:rgba(44,87,207,.14); --im:#B5307A;
   --pot-tint:#B4BED0; --wall:#5D6981; --grid:rgba(20,26,38,.07);
   --phase-l:48%; --phase-s:78%;
-  --f-sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
-  --f-mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
-  --f-math:"IBM Plex Serif",Georgia,"Times New Roman",serif;
+  --font-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  --font-math:"IBM Plex Serif",Georgia,"Times New Roman",serif;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#0C111B; --panel:#131A27; --plot:#0D121D; --ink:#E3E8F1; --muted:#8C97AC; --line:#253046;
+  --bg:#0C111B; --panel:#131A27; --plot:#0D121D; --fg:#E3E8F1; --muted:#8C97AC; --line:#253046;
   --accent:#7FA0FF; --accent-soft:rgba(127,160,255,.16); --im:#F07AB7;
   --pot-tint:#2C3854; --wall:#8995B0; --grid:rgba(227,232,241,.06);
   --phase-l:60%; --phase-s:75%; color-scheme:dark }}
 :root[data-theme="dark"]{
-  --bg:#0C111B; --panel:#131A27; --plot:#0D121D; --ink:#E3E8F1; --muted:#8C97AC; --line:#253046;
+  --bg:#0C111B; --panel:#131A27; --plot:#0D121D; --fg:#E3E8F1; --muted:#8C97AC; --line:#253046;
   --accent:#7FA0FF; --accent-soft:rgba(127,160,255,.16); --im:#F07AB7;
   --pot-tint:#2C3854; --wall:#8995B0; --grid:rgba(227,232,241,.06);
   --phase-l:60%; --phase-s:75%; color-scheme:dark }
 
-*{box-sizing:border-box}
-[hidden]{display:none!important}
-body{background:var(--bg);color:var(--ink);font-family:var(--f-sans);font-size:14px;line-height:1.45;margin:0;padding:20px 16px 32px}
-@media (min-width:700px){body{padding-inline:24px}}
-.wrap{max-width:1360px;margin:0 auto;display:grid;gap:16px}
-header{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px}
-h1{font-size:22px;font-weight:600;margin:0;letter-spacing:-.01em;text-wrap:balance}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:var(--text-base);line-height:1.45;margin:0;padding:20px var(--space-4) 32px}
+@media (min-width:700px){body{padding-inline:var(--space-5)}}
+.wrap{max-width:1360px;margin:0 auto;display:grid;gap:var(--space-4)}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:var(--space-2) var(--space-4)}
+h1{font-size:var(--text-2xl);font-weight:600;margin:0;letter-spacing:-.01em;text-wrap:balance}
 .sub{color:var(--muted);margin:0}
-.sub code{font-family:var(--f-mono);font-size:12.5px}
-.app{display:grid;gap:16px;grid-template-columns:minmax(0,1fr)}
+.sub code{font-family:var(--font-mono);font-size:var(--text-sm)}
+.app{display:grid;gap:var(--space-4);grid-template-columns:minmax(0,1fr)}
 @media (min-width:1080px){.app{grid-template-columns:minmax(0,1fr) 320px}}
-.bench{align-self:start;align-content:start;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;display:grid;gap:10px;min-width:0}
-.topbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 14px}
-.readout{flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:4px 16px;font-family:var(--f-mono);font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
-.readout b{color:var(--ink);font-weight:500}
-.tbtns{display:flex;gap:6px}
-.stage{display:grid;gap:10px;grid-template-columns:minmax(0,1fr) 210px;align-items:stretch}
+.bench{align-self:start;align-content:start;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-lg);padding:var(--space-3);display:grid;gap:var(--space-3);min-width:0}
+.topbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--space-2) var(--space-4)}
+.readout{flex:1;min-width:0}
+.tbtns{display:flex;gap:var(--space-2)}
+.stage{display:grid;gap:var(--space-3);grid-template-columns:minmax(0,1fr) 210px;align-items:stretch}
 .fieldbox{min-width:0;display:flex;justify-content:center}
-canvas{display:block;border-radius:6px;background:var(--plot)}
+canvas{display:block;border-radius:var(--radius-md);background:var(--plot)}
 #field{width:min(100%,74vh);aspect-ratio:1;max-width:100%;touch-action:none;cursor:crosshair}
-.side{display:flex;flex-direction:column;gap:10px;min-width:0}
+.side{display:flex;flex-direction:column;gap:var(--space-3);min-width:0}
 #mom{width:100%;aspect-ratio:1;max-width:100%;cursor:pointer;touch-action:none}
 #ladder{width:100%;flex:1 1 0;min-height:180px;cursor:pointer;touch-action:none}
-.hint{font-size:13px;color:var(--muted);margin:0}
-.rail{display:grid;gap:14px;align-content:start;min-width:0}
-.group{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;display:grid;gap:10px}
-.group h2{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin:0}
-.lbl{font-size:12px;color:var(--muted);margin:0 0 -4px}
-.seg{display:flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
-.seg button{flex:1;min-width:0;border:0;background:transparent;color:var(--ink);font:inherit;font-size:13px;padding:7px 4px;cursor:pointer;border-left:1px solid var(--line)}
-.seg button:first-child{border-left:0}
-.seg button[aria-pressed="true"]{background:var(--accent);color:var(--panel);font-weight:500}
-.chips{display:flex;flex-wrap:wrap;gap:6px}
-.chips button{border:1px solid var(--line);background:transparent;color:var(--ink);font:inherit;font-size:12.5px;padding:5px 9px;border-radius:999px;cursor:pointer}
-.chips button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
-.chips button:hover{border-color:var(--accent)}
-button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.ctl{display:grid;gap:8px}
-.row{display:flex;align-items:center;gap:10px}
-.row label{flex:0 0 auto;font-size:13px}
-.row input[type=range]{flex:1;min-width:0;accent-color:var(--accent)}
-.sym{font-family:var(--f-math);font-style:italic;font-size:15px !important;width:22px}
-input[type=number]{width:66px;flex:0 0 auto;font-family:var(--f-mono);font-size:12.5px;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:5px;padding:4px 6px;font-variant-numeric:tabular-nums}
-.val{font-family:var(--f-mono);font-size:12.5px;min-width:44px;text-align:right;font-variant-numeric:tabular-nums}
-.check{display:flex;gap:8px;align-items:center;font-size:13px;cursor:pointer}
-.check input{accent-color:var(--accent);margin:0}
-.btns{display:flex;gap:8px}
-.btn{flex:1;border:1px solid var(--line);background:transparent;color:var(--ink);font:inherit;font-size:13px;padding:7px 10px;border-radius:7px;cursor:pointer}
+.rail{display:grid;gap:var(--space-4);align-content:start;min-width:0}
+.lbl{font-size:var(--text-sm);color:var(--muted);margin:0 0 -4px}
+.ctl{display:grid;gap:var(--space-2)}
+.sym{font-family:var(--font-math);font-style:italic;font-size:var(--text-lg) !important;width:22px}
+input[type=number]{width:66px;flex:0 0 auto}
+.btns{display:flex;gap:var(--space-2)}
+.btn{flex:1}
 .btn:disabled{opacity:.45;cursor:default}
-.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--panel);font-weight:500}
-.tbtns .btn{flex:0 0 auto;padding:5px 12px;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.tbtns .btn{flex:0 0 auto;padding:var(--space-1) var(--space-3);display:inline-flex;align-items:center;justify-content:center;gap:6px}
 .tbtns svg{display:block}
-.legend{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--muted)}
+.legend{display:flex;align-items:center;gap:var(--space-3);font-size:var(--text-sm);color:var(--muted)}
 .wheel{width:34px;height:34px;border-radius:50%;flex:0 0 auto}
-.note{font-size:12.5px;color:var(--muted);margin:0}
 .hint-m{display:none}
-.tabs{display:none;gap:4px;border-bottom:1px solid var(--line)}
-.tabs button{flex:1;border:0;background:transparent;color:var(--muted);font:inherit;font-size:13.5px;font-weight:500;padding:10px 4px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
-.tabs button[aria-pressed="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.tabs{display:none}
 @media (max-width:1079px){
   .tabs{display:flex}
-  .rail{gap:10px}
+  .rail{gap:var(--space-3)}
   .group{display:none}
   .group.active{display:grid}
   .group h2{display:none}
 }
 @media (max-width:760px){
   body{padding-top:14px}
-  .sub{font-size:13px}
+  .sub{font-size:var(--text-md)}
   .stage{grid-template-columns:minmax(0,1fr)}
   #field{width:100%}
   .side{flex-direction:row;height:128px}
@@ -101,19 +78,19 @@ input[type=number]{width:66px;flex:0 0 auto;font-family:var(--f-mono);font-size:
   #ladder{flex:1 1 0;min-width:0;height:128px;min-height:0}
   .bench .hint{display:none}
   .hint-m{display:block}
-  .readout{font-size:11.5px;gap:2px 12px}
+  .readout{font-size:var(--text-xs);gap:2px var(--space-3)}
   .tbtns .btn span{display:none}
-  .tbtns .btn{min-width:42px;min-height:36px;padding:4px 10px}
-  .seg button{min-height:40px}
-  .chips button{padding:8px 12px;font-size:13px}
-  .btn{min-height:38px}
+  .tbtns .btn{min-width:42px;min-height:var(--tap);padding:var(--space-1) var(--space-3)}
+  .seg button{min-height:var(--tap)}
+  .chips button{padding:var(--space-2) var(--space-3);font-size:var(--text-md)}
+  .btn{min-height:var(--tap)}
   .row{min-height:34px}
 }
 </style>
 
 <div class="wrap">
   <header>
-    <a href="../index.html" style="display:table;flex-basis:100%;margin-bottom:6px;font-size:13px;color:#d0457f;font-weight:500;text-decoration:none">← All widgets</a>
+    <a class="back-link" href="../index.html">← All widgets</a>
     <h1>Schrödinger Sandbox 2D</h1>
     <p class="sub">One particle in a plane, <code>ħ = m = 1</code>, square box of side 20. Press the field to place a state.</p>
   </header>
@@ -470,9 +447,9 @@ function hexRGB(h) { h = h.replace("#", ""); if (h.length === 3) h = h.split("")
 function hslRGB(h, s, l) { s /= 100; l /= 100; const k = m => (m + h / 30) % 12, a = s * Math.min(l, 1 - l), f = m => l - a * Math.max(-1, Math.min(k(m) - 3, Math.min(9 - k(m), 1))); return [255 * f(0), 255 * f(8), 255 * f(4)]; }
 function readTokens() {
   const cs = getComputedStyle(document.documentElement), g = v => cs.getPropertyValue(v).trim();
-  C = { plot: g("--plot"), ink: g("--ink"), muted: g("--muted"), line: g("--line"), accent: g("--accent"), im: g("--im"), grid: g("--grid"), wall: g("--wall"),
-        rPlot: hexRGB(g("--plot")), rTint: hexRGB(g("--pot-tint")), rWall: hexRGB(g("--wall")), rAcc: hexRGB(g("--accent")), rIm: hexRGB(g("--im")), rInk: hexRGB(g("--ink")),
-        L: parseFloat(g("--phase-l")), Sa: parseFloat(g("--phase-s")), mono: g("--f-mono") };
+  C = { plot: g("--plot"), ink: g("--fg"), muted: g("--muted"), line: g("--line"), accent: g("--accent"), im: g("--im"), grid: g("--grid"), wall: g("--wall"),
+        rPlot: hexRGB(g("--plot")), rTint: hexRGB(g("--pot-tint")), rWall: hexRGB(g("--wall")), rAcc: hexRGB(g("--accent")), rIm: hexRGB(g("--im")), rInk: hexRGB(g("--fg")),
+        L: parseFloat(g("--phase-l")), Sa: parseFloat(g("--phase-s")), mono: g("--font-mono") };
   for (let h = 0; h < 360; h++) { const c = hslRGB(h, C.Sa, C.L); HUE[h * 3] = c[0]; HUE[h * 3 + 1] = c[1]; HUE[h * 3 + 2] = c[2]; }
   const stops = []; for (let a = 0; a <= 360; a += 30) stops.push(`hsl(${(360 - a) % 360} ${C.Sa}% ${C.L}%) ${a}deg`);
   document.getElementById("wheel").style.background = `conic-gradient(from 90deg, ${stops.join(",")})`;

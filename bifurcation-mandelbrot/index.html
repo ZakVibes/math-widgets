@@ -8,96 +8,94 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../site.css">
 <style>
 :root{
-  --bg:#0a0c11; --panel:#0f1219; --card:#141822; --ink:#ebe6dc; --muted:#9a9db0; --line:rgba(235,230,220,.12);
+  --bg:#0a0c11; --panel:#0f1219; --card:#141822; --fg:#ebe6dc; --muted:#9a9db0; --line:rgba(235,230,220,.12);
   --chip:rgba(235,230,220,.05); --sel:rgba(235,230,220,.15); --accent:#f2b45a; --tagbg:rgba(15,18,25,.72);
-  --sans:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif; --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+  --font-body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif; --font-mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
   color-scheme:dark;
 }
 :root[data-theme="light"]{
-  --bg:#efece4; --panel:#fbfaf6; --card:#ffffff; --ink:#1d1f27; --muted:#5d6070; --line:rgba(29,31,39,.14);
+  --bg:#efece4; --panel:#fbfaf6; --card:#ffffff; --fg:#1d1f27; --muted:#5d6070; --line:rgba(29,31,39,.14);
   --chip:rgba(29,31,39,.04); --sel:rgba(29,31,39,.11); --accent:#b9741a; --tagbg:rgba(251,250,246,.8);
   color-scheme:light;
 }
-*,*::before,*::after{box-sizing:border-box}
 html,body{margin:0}
-body{background:var(--bg);color:var(--ink);font:400 14px/1.45 var(--sans);-webkit-font-smoothing:antialiased}
+body{background:var(--bg);color:var(--fg);font:400 var(--text-base)/1.45 var(--font-body);-webkit-font-smoothing:antialiased}
 button{font:inherit}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.wrap{max-width:1500px;margin:0 auto;padding:calc(env(safe-area-inset-top,0px) + 12px) 16px 32px}
+.wrap{max-width:1500px;margin:0 auto;padding:calc(env(safe-area-inset-top,0px) + 12px) var(--space-4) 32px}
 
-.top{display:flex;align-items:center;gap:6px 14px;flex-wrap:wrap}
-.back{color:#d0457f;font-weight:500;text-decoration:none;font-size:13px;flex-basis:100%}
-.back:hover{text-decoration:underline}
+.top{display:flex;align-items:center;gap:6px var(--space-4);flex-wrap:wrap}
 h1{font-size:20px;font-weight:600;margin:0;letter-spacing:-.01em;flex:1}
-.icon{appearance:none;border:1px solid var(--line);background:var(--chip);color:var(--ink);border-radius:10px;padding:6px 11px;cursor:pointer;font-size:13px}
+.icon{appearance:none;border:1px solid var(--line);background:var(--chip);color:var(--fg);border-radius:var(--radius-md);padding:6px var(--space-3);cursor:pointer;font-size:var(--text-md)}
 .icon:hover{background:var(--sel)}
 
-.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
-.seg{display:inline-flex;padding:3px;border-radius:10px;background:var(--chip);border:1px solid var(--line)}
-.seg button{appearance:none;border:0;background:transparent;color:var(--muted);font-size:13px;font-weight:500;padding:6px 11px;border-radius:7px;cursor:pointer;white-space:nowrap}
-.seg button:hover{color:var(--ink)}
-.seg button[aria-pressed="true"]{background:var(--sel);color:var(--ink)}
-.btn{appearance:none;font-size:13px;font-weight:500;color:var(--ink);background:var(--chip);border:1px solid var(--line);border-radius:10px;padding:7px 12px;cursor:pointer;white-space:nowrap}
+.toolbar{display:flex;flex-wrap:wrap;gap:var(--space-2);align-items:center;margin-top:10px}
+.seg{display:inline-flex;padding:3px;border-radius:var(--radius-md);background:var(--chip);border:1px solid var(--line)}
+.seg button{appearance:none;border:0;background:transparent;color:var(--muted);font-size:var(--text-md);font-weight:500;padding:6px var(--space-3);border-radius:7px;cursor:pointer;white-space:nowrap}
+.seg button:hover{color:var(--fg)}
+.seg button[aria-pressed="true"]{background:var(--sel);color:var(--fg)}
+.btn{appearance:none;font-size:var(--text-md);font-weight:500;color:var(--fg);background:var(--chip);border:1px solid var(--line);border-radius:var(--radius-md);padding:7px var(--space-3);cursor:pointer;white-space:nowrap}
 .btn:hover{background:var(--sel)}
-.tog{display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;color:var(--ink);padding:0 4px}
+.tog{display:inline-flex;align-items:center;gap:var(--space-2);font-size:var(--text-md);cursor:pointer;color:var(--fg);padding:0 4px}
 .tog input{appearance:none;-webkit-appearance:none;margin:0;width:32px;height:19px;border-radius:10px;background:var(--sel);border:1px solid var(--line);position:relative;flex:none;cursor:pointer;transition:background .2s}
 .tog input::after{content:"";position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:var(--muted);transition:transform .2s,background .2s}
 .tog input:checked{background:var(--accent);border-color:transparent}
 .tog input:checked::after{transform:translateX(13px);background:var(--panel)}
 .presets{display:flex;gap:6px;margin-top:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
 .presets::-webkit-scrollbar{display:none}
-.presets .btn{border-radius:999px;padding:6px 12px;font-size:12.5px}
+.presets .btn{border-radius:var(--radius-pill);padding:6px var(--space-3);font-size:var(--text-sm)}
 
-.layout{display:grid;gap:14px;margin-top:12px}
+.layout{display:grid;gap:var(--space-4);margin-top:var(--space-3)}
 @media (min-width:1000px){ .layout{grid-template-columns:minmax(0,1fr) 340px;align-items:start} }
 
 /* The two top panels and the axis share one width so their x-axes line up pixel for pixel */
 .stack{position:relative;touch-action:pan-y;user-select:none;-webkit-user-select:none;cursor:crosshair}
 .stack.tool-pan{cursor:grab}
 .panel{position:relative;background:var(--panel);border:1px solid var(--line);overflow:hidden}
-#mPanel{height:clamp(150px,31vh,400px);border-radius:12px 12px 0 0}
+#mPanel{height:clamp(150px,31vh,400px);border-radius:var(--radius-lg) var(--radius-lg) 0 0}
 #bPanel{height:clamp(170px,36vh,450px);border-top:0}
-#aPanel{height:30px;border-top:0;border-radius:0 0 12px 12px}
+#aPanel{height:30px;border-top:0;border-radius:0 0 var(--radius-lg) var(--radius-lg)}
 .panel canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
-.tag{position:absolute;right:8px;top:7px;font-size:11.5px;color:var(--muted);background:var(--tagbg);padding:2px 8px;border-radius:6px;pointer-events:none}
-.tag i{font-family:var(--mono);font-style:normal;color:var(--ink)}
-.hint{color:var(--muted);font-size:12px;margin:7px 2px 0}
+.tag{position:absolute;right:var(--space-2);top:7px;font-size:var(--text-xs);color:var(--muted);background:var(--tagbg);padding:2px var(--space-2);border-radius:6px;pointer-events:none}
+.tag i{font-family:var(--font-mono);font-style:normal;color:var(--fg)}
+.hint{color:var(--muted);font-size:var(--text-sm);margin:7px 2px 0}
 
-.side{display:grid;gap:12px;align-content:start}
+.side{display:grid;gap:var(--space-3);align-content:start}
 @media (min-width:640px) and (max-width:999px){ .side{grid-template-columns:1fr 1fr} .side .why, .side #feigCard{grid-column:1 / -1} }
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
-.cardh{font-size:12px;color:var(--muted);margin:0 0 6px;font-weight:500}
-.status{display:flex;align-items:center;gap:9px;font-size:17px;font-weight:600;margin-bottom:8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius-lg);padding:var(--space-3) var(--space-4)}
+.cardh{font-size:var(--text-sm);color:var(--muted);margin:0 0 6px;font-weight:500}
+.status{display:flex;align-items:center;gap:var(--space-2);font-size:var(--text-xl);font-weight:600;margin-bottom:8px}
 .sw{width:12px;height:12px;border-radius:50%;flex:none;background:var(--muted)}
-.readout dl{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;margin:0;font-family:var(--mono);font-size:13px}
+.readout dl{display:grid;grid-template-columns:auto 1fr;gap:3px var(--space-3);margin:0;font-family:var(--font-mono);font-size:var(--text-md)}
 .readout dt{color:var(--muted)}
 .readout dd{margin:0;overflow-wrap:anywhere}
-.small{font-size:12px;color:var(--muted);margin:8px 0 0}
+.small{font-size:var(--text-sm);color:var(--muted);margin:8px 0 0}
 .cob{position:relative;width:100%;max-width:320px;aspect-ratio:1 / 1;margin:0 auto 10px}
 .ts{position:relative;width:100%;height:96px}
 .cob canvas,.ts canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 
-#feigCard table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px}
-#feigCard th{font:500 11px var(--sans);color:var(--muted);text-align:left;padding:0 6px 4px 0}
+#feigCard table{width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:var(--text-sm)}
+#feigCard th{font:500 var(--text-xs) var(--font-body);color:var(--muted);text-align:left;padding:0 6px 4px 0}
 #feigCard td{padding:3px 6px 3px 0;border-top:1px solid var(--line)}
 #feigCard td button{appearance:none;border:0;background:none;color:inherit;font:inherit;padding:0;cursor:pointer;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
-#feigCard .delta{margin:8px 0 0;font-size:12.5px}
+#feigCard .delta{margin:8px 0 0;font-size:var(--text-sm)}
 
 .why summary{cursor:pointer;font-weight:600;list-style:none;display:flex;justify-content:space-between;align-items:center}
 .why summary::-webkit-details-marker{display:none}
-.why summary::after{content:"+";color:var(--muted);font-weight:400;font-size:18px;line-height:1}
+.why summary::after{content:"+";color:var(--muted);font-weight:400;font-size:var(--text-xl);line-height:1}
 .why[open] summary::after{content:"−"}
-.why p{margin:10px 0 0;font-size:13.5px}
-.formula{font-family:var(--mono);font-size:14px;background:var(--chip);border:1px solid var(--line);border-radius:8px;padding:8px 10px;text-align:center}
-.err{display:none;color:#ef7a5a;font-size:13px;margin-top:8px}
+.why p{margin:10px 0 0;font-size:var(--text-base)}
+.formula{font-family:var(--font-mono);font-size:var(--text-base);background:var(--chip);border:1px solid var(--line);border-radius:var(--radius-md);padding:var(--space-2) 10px;text-align:center}
+.err{display:none;color:#ef7a5a;font-size:var(--text-md);margin-top:8px}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header class="top">
-    <a class="back" href="../index.html">← All widgets</a>
+    <a class="back-link" href="../index.html">← All widgets</a>
     <h1>Bifurcation ↔ Mandelbrot</h1>
     <button type="button" class="icon" id="themeBtn">Light</button>
   </header>
