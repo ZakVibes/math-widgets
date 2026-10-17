@@ -1989,6 +1989,7 @@ new MutationObserver(retheme).observe(document.documentElement, {attributes:true
 // ---- start ----
 renderLegend(); rebuildList(); renderCount(); renderSlots(); renderPicked(); renderNotes(); renderBrush();
 views.forEach(c => { sizeCv(c); mark(c); });
+setView('journey');                                  // opens on Journeys (Zak's choice, 2026-10-16)
 document.fonts && document.fonts.ready.then(markAll);
 
 // ---- ?debug hook ----
