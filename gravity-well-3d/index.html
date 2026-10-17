@@ -227,15 +227,58 @@ function tintArr(m) {
     }
   }
 }
-const tint = m => tintArr(m).join(',');
+const lerp = (a, b, t) => a + (b - a) * t, cl = (x, a, b) => Math.max(a, Math.min(b, x));
+const SURF = [[0,[232,240,250]],[2.18,[226,236,250]],[2.3,[140,180,240]],[3.48,[100,200,140]],[5,[100,200,140]]];
+function surf(m) {
+  const l = Math.log10(Math.max(1, m));
+  for (let i = 1; i < SURF.length; i++) {
+    if (l <= SURF[i][0] || i == SURF.length - 1) {
+      const [a, ca] = SURF[i-1], [b, cb] = SURF[i], t = cl((l - a) / (b - a), 0, 1);
+      return ca.map((c, k) => lerp(c, cb[k], t));
+    }
+  }
+}
+function bbCalc(T) {
+  T /= 100; let r, g, b;
+  if (T <= 66) { r = 255; g = 99.47 * Math.log(T) - 161.12; b = T <= 19 ? 0 : 138.52 * Math.log(T - 10) - 305.04; }
+  else { r = 329.7 * Math.pow(T - 60, -0.1332); g = 288.12 * Math.pow(T - 60, -0.0755); b = 255; }
+  return [cl(r, 0, 255), cl(g, 0, 255), cl(b, 0, 255)];
+}
+const LUT = []; for (let i = 0; i < 256; i++) LUT.push(bbCalc(Math.pow(10, lerp(2.7, 4.6, i / 255))));
+const bb = T => LUT[Math.round(cl((Math.log10(T) - 2.7) / 1.9, 0, 1) * 255)];
+const T0 = m => 2000 * Math.pow(m / 3000, 0.7);
+function look(m, T) {
+  const e = cl((T - 900) / 1300, 0, 1), s = surf(m), h = bb(T), dim = lerp(0.85, 1, cl((T - 900) / 2500, 0, 1));
+  return { c: s.map((v, k) => lerp(v, h[k] * dim, e)), e, h };
+}
+const rd = a => a.map(Math.round).join(',');
+// heat: dT = HEAT_K * (kinetic energy lost in a merge) / merged mass; cooling runs on sim time, SIM_PER_SEC = sim time per real second at default speed
+const HEAT_K = 180, TMAX = 40000, SIM_PER_SEC = 14.4;
+// fixed sources keep the old mass tint; free bodies use look(m, T). Shading blends from the offset sphere (e=0) to the centred hot core (e=1).
 function paint(b) {
-  const c = tintArr(b.m); b.rgb = c.join(',');
-  b.hi = c.map(v => Math.round(v + (255 - v) * 0.55)).join(',');
-  b.lo = c.map(v => Math.round(v * 0.28)).join(',');
+  if (b.fixed) { const c = tintArr(b.m); b.rgb = c.join(','); return; }
+  const L = look(b.m, b.T), c = L.c, e = L.e;
+  b.pT = b.T; b.e = e; b.rgb = rd(c);
+  b.hi = rd(c.map(v => lerp(v, 255, 0.55 + 0.2*e))); b.mid = rd(c.map(v => lerp(v, 255, 0.3*e))); b.lo = rd(c.map(v => v * (0.28 + 0.72*e)));
+  if (e > 0) { const hc = rd(L.h); b.h0 = `rgba(${hc},${0.4*e})`; b.h1 = `rgba(${hc},0)`; }
+}
+function cool(b, dt) {
+  const t0 = b.t0, d = b.T - t0;
+  if (Math.abs(d) > 0.5) {
+    // small steps: the rate grows with T^3, so one big step would wipe out a hot flash in a single frame
+    const r = Math.cbrt(b.m / 300), q = Math.max(t0, 900);
+    for (let left = dt; left > 0; ) {
+      const k = (0.1925 * Math.pow(Math.max(b.T, t0) / q, 3) + 0.12) / r, h = Math.min(left, 0.2 / k);
+      b.T = t0 + (b.T - t0) * Math.exp(-k * h); left -= h;
+    }
+  } else b.T = t0;
+  if ((b.T > 900 || b.pT > 900) && Math.abs(b.T - b.pT) > 0.005 * b.T) paint(b);
 }
 function addBody(o) {
   const b = { x: o.x, y: o.y, z: o.z, vx: o.vx || 0, vy: o.vy || 0, vz: o.vz || 0, ax: 0, ay: 0, az: 0, m: o.m, fixed: !!o.fixed, trail: [], dead: false };
-  b.r = radiusOf(b.m); paint(b);
+  b.r = radiusOf(b.m);
+  if (!b.fixed) { b.t0 = T0(b.m); b.T = b.t0; }
+  paint(b);
   bodies.push(b); changed(); return b;
 }
 function changed() { S.e0 = null; }
@@ -279,9 +322,11 @@ function resolve(hits) {
     if (p.dead || q.dead) continue;
     if (p.fixed || q.fixed) { (p.fixed ? q : p).dead = true; any = true; continue; }
     const M = p.m + q.m, h = p.m >= q.m ? p : q, l = h === p ? q : p;
+    const dvx = p.vx - q.vx, dvy = p.vy - q.vy, dvz = p.vz - q.vz, dT = HEAT_K * 0.5 * (p.m * q.m / M) * (dvx*dvx + dvy*dvy + dvz*dvz) / M;
+    h.T = Math.min(TMAX, (p.T * p.m + q.T * q.m) / M + dT);
     h.x = (p.x*p.m + q.x*q.m)/M; h.y = (p.y*p.m + q.y*q.m)/M; h.z = (p.z*p.m + q.z*q.m)/M;
     h.vx = (p.vx*p.m + q.vx*q.m)/M; h.vy = (p.vy*p.m + q.vy*q.m)/M; h.vz = (p.vz*p.m + q.vz*q.m)/M;
-    h.m = M; h.r = radiusOf(M); paint(h); l.dead = true; any = true;
+    h.m = M; h.r = radiusOf(M); h.t0 = T0(M); paint(h); l.dead = true; any = true;
   }
   if (any) { bodies = bodies.filter(b => !b.dead); changed(); }
   return any;
@@ -412,6 +457,7 @@ function panBy(dx, dy) {
 // ---------- input ----------
 const ptrs = new Map();
 let gesture = null, hover = null, shiftDown = false;
+const rest = { rgb: '' };
 function local(e) { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
 function midDist() { const [a, b] = [...ptrs.values()]; return { x: (a.x + b.x)/2, y: (a.y + b.y)/2, d: Math.hypot(a.x - b.x, a.y - b.y) || 1 }; }
 
@@ -620,21 +666,21 @@ function draw() {
       ctx.globalAlpha = 1; continue;
     }
     const Rr = Math.max(1.2, b.r * it.s);
-    if (b.m >= 2000) {
-      const g = ctx.createRadialGradient(sx, sy, Rr*0.6, sx, sy, Rr*3.4);
-      g.addColorStop(0, `rgba(${b.rgb},0.32)`); g.addColorStop(1, `rgba(${b.rgb},0)`);
-      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sx, sy, Rr*3.4, 0, 7); ctx.fill();
-      ctx.fillStyle = `rgb(${b.hi})`;
-    } else if (Rr > 3) {
-      const g = ctx.createRadialGradient(sx - Rr*0.35, sy - Rr*0.4, Rr*0.1, sx, sy, Rr);
-      g.addColorStop(0, `rgb(${b.hi})`); g.addColorStop(0.55, `rgb(${b.rgb})`); g.addColorStop(1, `rgb(${b.lo})`);
+    if (b.e > 0) {
+      const G = Rr*(2.4 + 1.6*b.e), g = ctx.createRadialGradient(sx, sy, Rr*0.6, sx, sy, G);
+      g.addColorStop(0, b.h0); g.addColorStop(1, b.h1);
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sx, sy, G, 0, 7); ctx.fill();
+    }
+    if (b.e > 0 || Rr > 3) {
+      const u = 1 - (b.e || 0), g = ctx.createRadialGradient(sx - Rr*0.35*u, sy - Rr*0.4*u, Rr*0.1*u, sx, sy, Rr);
+      g.addColorStop(0, `rgb(${b.hi})`); g.addColorStop(0.55, `rgb(${b.mid || b.rgb})`); g.addColorStop(1, `rgb(${b.lo})`);
       ctx.fillStyle = g;
     } else ctx.fillStyle = `rgb(${b.rgb})`;
     ctx.beginPath(); ctx.arc(sx, sy, Rr, 0, 7); ctx.fill();
     ctx.globalAlpha = 1;
   }
   // placement preview
-  const ghostCol = S.tool === 'fixed' ? (S.sign > 0 ? C.fixed : C.repel) : `rgb(${tint(S.mass)})`;
+  const ghostCol = S.tool === 'fixed' ? (S.sign > 0 ? C.fixed : C.repel) : `rgb(${rest.rgb})`;
   const ghost = (w, alpha) => {
     if (!proj(w[0], w[1], w[2], o)) return;
     ctx.globalAlpha = alpha; ctx.fillStyle = ghostCol;
@@ -678,8 +724,10 @@ function frame() {
     accel();
     for (let i = 0; i < S.substeps; i++) advance();
     cull();
+    const cdt = S.substeps * S.dt / SIM_PER_SEC;
     for (const b of bodies) {
       if (b.fixed) continue;
+      cool(b, cdt);
       b.trail.push(b.x, b.y, b.z);
       const over = b.trail.length - 3*S.trailLen; if (over > 0) b.trail.splice(0, over);
     }
@@ -786,7 +834,8 @@ function setTool(t) {
 function setMass(m) {
   S.mass = m; $('mass').value = Math.log10(m);
   $('massVal').textContent = fmt(m);
-  const rgb = tint(m); $('swatch').style.background = `rgb(${rgb})`; $('swatch').style.setProperty('--sw', m >= 2000 ? `rgba(${rgb},.6)` : 'transparent');
+  const L = look(m, T0(m)), rgb = rd(L.c); rest.rgb = rgb;
+  $('swatch').style.background = `rgb(${rgb})`; $('swatch').style.setProperty('--sw', L.e > 0 ? `rgba(${rd(L.h)},${0.6*L.e})` : 'transparent');
   document.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', Math.abs(+c.dataset.m - m) / m < 0.02));
 }
 function syncUI() {
@@ -851,6 +900,7 @@ window.addEventListener('keydown', e => {
 window.addEventListener('keyup', e => { if (e.key === 'Shift') shiftDown = false; if (e.code === 'Space' && e.target.matches('button')) e.preventDefault(); });
 
 setMass(300); syncUI(); basis(); scene('system');
+if (location.search.includes('debug')) window.__gw = { bodies: () => bodies, S, look, T0, addBody, scene };
 requestAnimationFrame(frame);
 })();
 </script>
