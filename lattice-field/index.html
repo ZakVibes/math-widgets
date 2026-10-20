@@ -108,6 +108,15 @@ canvas.plot.tall{height:190px}
 .wheelbox{display:flex;align-items:center;gap:12px;margin-top:var(--space-2);font-size:var(--text-sm);color:var(--muted)}
 .wheelbox canvas{width:76px;height:76px;flex:none}
 .card.dim{opacity:.6}
+/* kink mode: .kh hidden in it, .ko (inline) and .kb (block) shown only in it */
+.ko,.kb{display:none !important}
+body.kink .ko{display:inline-flex !important}
+body.kink .kb{display:block !important}
+body.kink .kh{display:none !important}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:var(--text-sm);color:var(--muted);margin-top:var(--space-2)}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px;margin-right:4px}
+#kScanCv{cursor:pointer}
+.kstatus{margin:var(--space-2) 0 0;font-weight:600;line-height:1.4}
 @media (max-width:860px){
   .layout{grid-template-columns:minmax(0,1fr)}
   h1{font-size:24px}
@@ -124,6 +133,10 @@ canvas.plot.tall{height:190px}
 
   <p class="lede" id="ledeC" hidden>Now <b>φ</b> has two components, so at every site it is an arrow: its <b>phase</b> is the colour, its length the brightness. The action is unchanged by turning every arrow by the same angle (a <b>U(1)</b> symmetry). In two dimensions that symmetry can never break, which is why there is no sign to pick here; instead the arrows can swirl around points called <b>vortices</b>, and the order is destroyed by their unbinding (the <b>BKT</b> transition).</p>
 
+  <p class="lede" id="ledeO" hidden>Now every site holds an <b>arrow</b> of fixed length that can point anywhere in 3D, like a compass needle on a ball. Colour shows where it points: <b>hue</b> is the bearing, <b>pale</b> means up, <b>dark</b> means down. Neighbours want to line up (the knob <b>β</b>), but with only one dimension of space (plus time) the order always melts at long range: the correlation length stays finite and a <b>mass</b> appears although the action has none. The arrows can also wrap the ball once around a point, an <b>instanton</b>; the number of wrappings, Q, is always a whole number.</p>
+
+  <p class="lede" id="ledeK" hidden>Nothing is random here, and the vertical direction is <b>real time</b>, not Euclidean time: we are not looking at quantum fluctuations any more, but at one classical field φ obeying a wave equation and moving, like a film. Space runs across, time runs <b>up</b>. The field has the same double well as before, with two valleys, φ = −1 (blue) and φ = +1 (orange). A <b>kink</b> is a wall between the valleys, and it behaves like a particle: it has a mass and a speed. Here a kink and an antikink rush at each other. They cannot pass through one another, because far to the left and far to the right the field is stuck in the blue valley, so they can only <b>bounce</b> or stick. Each kink can also <b>wobble</b> (physicists call it its shape mode), and in the crash some of the energy is stored in the wobble and may be handed back. If it is handed back at just the right moment the pair gets out after bouncing twice. That resonance was found by Campbell, Schonfeld and Wingate in 1983. Below about 0.26 times the speed of light most crashes end in a trapped wobbling lump that slowly gives off waves (a <b>bion</b>).</p>
+
   <details class="try">
     <summary>Things to try</summary>
     <ol>
@@ -132,6 +145,8 @@ canvas.plot.tall{height:190px}
       <li><b>Watch kinks.</b> Switch to Domain walls at Critical: lines running up the picture are kinks moving through time, small loops are kink–antikink pairs.</li>
       <li><b>Tunnel.</b> Choose Thin strip: the whole of space flips between the two vacua. Press Scan widths to measure the kink mass from how fast tunnelling dies out as space gets wider.</li>
       <li><b>Make it complex.</b> Choose Complex φ and the Vortices view. Go from Vortex gas to Quasi-ordered: free vortices pair up and the stiffness Υ jumps past 2/π. That is the BKT transition.</li>
+      <li><b>Wrap the ball.</b> Choose Arrows (O(3)) and the Topology view, press Add instanton, then Run: the red blob melts in the noise. Press Randomize, then Cool: the noise is stripped away and the instantons (red) and anti-instantons (blue) that remain are left standing. Then compare the Strong, Medium and Weak coupling presets: ξ grows exponentially with β.</li>
+      <li><b>Watch a collision in real time.</b> Choose Kink collisions and press Two bounces: the kinks meet, bounce, fall back for a second hit and only then fly apart. Compare One bounce and Trapped (bion), then press Scan speeds to map every speed from 0.15 to 0.30 and click any bar to replay that collision.</li>
     </ol>
   </details>
 
@@ -141,11 +156,13 @@ canvas.plot.tall{height:190px}
         <div class="toolbar">
           <div class="seggrp" role="group" aria-label="Field type"><span class="lbl">Field</span>
             <button class="btn seg on" id="mReal" aria-pressed="true">Real φ (Z₂)</button>
-            <button class="btn seg" id="mCplx" aria-pressed="false">Complex φ (U(1))</button></div>
-          <div class="seggrp" role="group" aria-label="View"><span class="lbl">View</span>
+            <button class="btn seg" id="mCplx" aria-pressed="false">Complex φ (U(1))</button>
+            <button class="btn seg" id="mO3" aria-pressed="false">Arrows (O(3))</button>
+            <button class="btn seg" id="mKink" aria-pressed="false">Kink collisions</button></div>
+          <div class="seggrp kh" role="group" aria-label="View"><span class="lbl">View</span>
             <button class="btn seg on" id="vField" aria-pressed="true">Field</button>
             <button class="btn seg" id="vWalls" aria-pressed="false">Domain walls</button></div>
-          <div class="seggrp" role="group" aria-label="Geometry" id="geoGrp"><span class="lbl">Geometry</span>
+          <div class="seggrp kh" role="group" aria-label="Geometry" id="geoGrp"><span class="lbl">Geometry</span>
             <button class="btn seg on" id="gSquare" aria-pressed="true">Square</button>
             <button class="btn seg" id="gStrip" aria-pressed="false">Thin strip</button></div>
         </div>
@@ -174,24 +191,65 @@ canvas.plot.tall{height:190px}
             <li>Above it the pairs <b>unbind into a free gas</b>, and the free vortices scramble the phase over long distances. That is the BKT transition.</li>
           </ul>
         </div>
+        <div class="card howto" id="howtoO" hidden style="margin-top:var(--space-2)">
+          <div class="k"><b>How to read it</b></div>
+          <ul>
+            <li>Faded colours: which way the arrows point (see the ball below).</li>
+            <li><span class="sw" style="background:#d23a2e"></span> <b>red</b> marks places where the arrows wrap the ball in the positive sense (charge density q &gt; 0), <span class="sw" style="background:#2f62d6"></span> <b>blue</b> the negative sense (q &lt; 0). Add up all q over the grid and you get Q, always a whole number.</li>
+            <li>A compact red blob adding up to +1 is an <b>instanton</b>: the arrows inside point in every direction exactly once. A blue one is an anti-instanton (−1).</li>
+            <li>In hot noise you see a fine speckle of red and blue that cancels in pairs. <b>Cool</b> melts the speckle and leaves the instantons.</li>
+          </ul>
+        </div>
+        <div class="card howto kb" id="howtoK" style="margin-top:var(--space-2)">
+          <div class="k"><b>How to read it</b></div>
+          <ul>
+            <li><span class="sw" style="background:var(--neg);opacity:.45"></span><span class="sw" style="background:var(--pos);opacity:.45"></span> blue is the − valley (φ = −1), orange the + valley (φ = +1). The pale line between them is a <b>wall</b> (φ = 0): a kink or an antikink.</li>
+            <li>Space runs across and <b>real time runs up</b>, newest moment at the top. A line leaning to the right is a wall moving to the right.</li>
+            <li>At first the two walls lean in towards each other, with orange between them. They touch near the middle, then lean back out (one bounce), or touch twice before leaving (two bounces).</li>
+            <li>A <b>bion</b> is a column in the middle that keeps pulsing blue and orange, slowly weakening, because the pair never gets away.</li>
+            <li>Faint ripples spreading sideways are small waves of the field (mesons) carrying energy away.</li>
+          </ul>
+        </div>
         <div class="cbar" id="cbarBox"><span>φ = −1.3</span><canvas id="cbar" width="256" height="1"></canvas><span>+1.3</span></div>
         <div class="wheelbox" id="wheelBox" hidden><canvas id="wheelCv" aria-label="Colour wheel: hue is the phase angle of phi, brightness is its length"></canvas>
           <span>Hue = the phase angle of φ (red is 0, counter-clockwise as on the wheel); brighter and more saturated = larger |φ|, pale = near zero. While the grid is ordered, colours are shown relative to its average phase, so they don't flicker.</span></div>
+        <div class="wheelbox" id="ballBox" hidden><canvas id="ballCv" aria-label="Shaded ball seen from above the north pole: hue is the compass bearing of the arrow, pale is pointing up, dark is pointing down"></canvas>
+          <span>The ball seen from above its north pole. Hue = the bearing of the arrow (red is 0, counter-clockwise as seen from above); <b>pale</b> = pointing up (north), <b>dark</b> = pointing down (south). Colours are exactly what each site's arrow would look like on this ball.</span></div>
         <div class="row" style="margin-top:var(--space-3)">
           <button class="btn primary" id="runBtn">Pause</button>
-          <button class="btn" id="hotBtn" title="Random values everywhere">Randomize</button>
-          <button class="btn" id="coldBtn" title="Every site set to the well minimum +v">All +v</button>
-          <div class="sizebox" id="sizeBox"><label for="sizeSel">Grid</label>
+          <button class="btn ko" id="fireBtn" style="align-items:center" title="Start a new collision at the current speed">Fire</button>
+          <div class="sizebox ko" style="margin-left:0"><label for="kspeed">Playback</label>
+            <select id="kspeed"><option value="0.5">0.5×</option><option value="1">1×</option><option value="2" selected>2×</option><option value="4">4×</option><option value="8">8×</option></select></div>
+          <button class="btn kh" id="hotBtn" title="Random values everywhere">Randomize</button>
+          <button class="btn kh" id="coldBtn" title="Every site set to the well minimum +v">All +v</button>
+          <button class="btn" id="coolBtn" title="Every arrow repeatedly aligns with its neighbours; the noise melts, instantons stay" hidden>Cool</button>
+          <button class="btn" id="instBtn" title="Paint one instanton (Q = +1) on an aligned background and pause" hidden>Add instanton</button>
+          <div class="sizebox kh" id="sizeBox"><label for="sizeSel">Grid</label>
             <select id="sizeSel"><option value="64">64 × 64</option><option value="128" selected>128 × 128</option><option value="256">256 × 256</option></select></div>
         </div>
-        <div class="presets"><span class="lbl">Presets (λ = 1):</span>
+        <div class="presets"><span class="lbl" id="preLbl">Presets (λ = 1):</span>
           <button class="btn" data-preset="sym">Symmetric</button>
           <button class="btn" data-preset="crit">Critical</button>
           <button class="btn" data-preset="brk">Broken</button>
         </div>
-        <label class="tog"><input type="checkbox" id="cluChk" checked><b>Cluster updates</b></label>
-        <p class="small" style="margin-top:0" id="cluNote">Flips whole same-sign regions at once, which beats the slowing-down of ordinary updates near κ = 0.340.</p>
-        <p class="stat" id="speed">–</p>
+        <label class="tog kh"><input type="checkbox" id="cluChk" checked><b>Cluster updates</b></label>
+        <p class="small kh" style="margin-top:0" id="cluNote">Flips whole same-sign regions at once, which beats the slowing-down of ordinary updates near κ = 0.340.</p>
+        <p class="stat kh" id="coolLine" hidden>–</p>
+        <p class="stat kh" id="speed">–</p>
+      </div>
+
+      <div class="panel kb" id="kScanPanel">
+        <h2>Scan speeds</h2>
+        <p class="small" style="margin-top:0">Runs 151 collisions in the background, v = 0.150 to 0.300 in steps of 0.001, and records how each one ends. Then click a bar to watch that collision.</p>
+        <div class="row" style="margin-top:var(--space-2)">
+          <button class="btn primary" id="kScanBtn">Scan speeds</button>
+          <button class="btn" id="kScanStop" hidden>Stop</button>
+        </div>
+        <p class="stat" id="kScanLine">Not run yet.</p>
+        <canvas class="plot tall" id="kScanCv" aria-label="Outcome of each collision against the speed v: trapped, one bounce, two bounces, or three or more bounces; the critical speed is marked"></canvas>
+        <div class="legend"><span><i style="background:#a3a8b5"></i>trapped (bion)</span><span><i style="background:#2a9d8f"></i>1 bounce</span><span><i style="background:#e9a23b"></i>2 bounces</span><span><i style="background:#c2417c"></i>3+ bounces</span></div>
+        <p class="stat" id="kScanHover">&nbsp;</p>
+        <p class="small">Above the critical speed v<sub>c</sub> ≈ 0.26 every collision bounces once and escapes. Below it the pair is mostly trapped (grey), except in narrow windows of speed where it bounces twice (amber): the wobble hands the energy back just in time. Thinner three-bounce windows (pink) sit beside them. A run counts as trapped if the kinks are still together at t = 500 or have bounced 12 times; where the escape is very slow (right next to v<sub>c</sub>) it is shown as one bounce if the kinks are still drifting apart at t = 500. The exact window edges move a little with the grid spacing.</p>
       </div>
 
       <div class="panel" id="stripPanel" hidden>
@@ -224,11 +282,11 @@ canvas.plot.tall{height:190px}
       <div class="panel">
         <h2>Controls</h2>
         <div class="slider">
-          <div class="top"><label for="kap">κ  hopping</label><span class="val" id="kapV"></span></div>
+          <div class="top"><label for="kap" id="kapLbl">κ  hopping</label><span class="val" id="kapV"></span></div>
           <p class="hint" id="kapHint">How strongly neighbours want to agree (like Ising β/2).</p>
           <input type="range" id="kap" min="0.15" max="0.45" step="0.001" value="0.2">
         </div>
-        <div class="slider" style="margin-bottom:var(--space-2)">
+        <div class="slider kh" id="lamBox" style="margin-bottom:var(--space-2)">
           <div class="top"><label for="lam">λ  well sharpness</label><span class="val" id="lamV"></span></div>
           <p class="hint" id="lamHint">0 = soft free field, large = field pinned near ±1 (Ising).</p>
           <input type="range" id="lam" min="0" max="5" step="0.01" value="1">
@@ -242,24 +300,53 @@ canvas.plot.tall{height:190px}
         <p class="eq" id="eqLine">S = Σ −2κ φφ′ + φ² + λ(φ²−1)²</p>
       </div>
 
-      <div class="panel">
+      <div class="panel kb" id="kReadPanel">
+        <h2>Readouts</h2>
+        <div class="cards">
+          <div class="card"><div class="k">time t</div><div class="v" id="kT">–</div><div class="s" id="kTs">&nbsp;</div></div>
+          <div class="card"><div class="k">bounces so far</div><div class="v" id="kB">–</div><div class="s">dips of φ(0, t) below 0</div></div>
+          <div class="card"><div class="k">total energy E</div><div class="v" id="kE">–</div><div class="s" id="kEs">&nbsp;</div></div>
+          <div class="card"><div class="k">outgoing speed</div><div class="v" id="kV">–</div><div class="s" id="kVs">&nbsp;</div></div>
+        </div>
+        <p class="kstatus" id="kStatus">–</p>
+        <p class="small">E is added up over the middle of the box (|x| &lt; 80) and compared with its starting value 2γ·4/3 = twice the relativistic energy of one kink (mass 4/3). It wobbles by up to ±0.1 % while the kinks touch (a time-step effect of the scheme) and settles afterwards; it falls only when waves reach the absorbing edge. The outgoing speed is the slope of the distance between the outermost zero crossings of φ.</p>
+      </div>
+
+      <div class="panel kb" id="kPlotPanel">
+        <h2>The field right now</h2>
+        <canvas class="plot" id="kPlotX" aria-label="The field phi against x at this moment"></canvas>
+        <h2 style="margin-top:var(--space-3)">The field at the centre, over time</h2>
+        <canvas class="plot" id="kPlotT" aria-label="The field at x = 0 against time; each dip below zero is a bounce"></canvas>
+        <p class="small">φ(0, t) in the same time window as the picture. It starts at +1 (orange between the kinks). Each dip below 0, marked with a dot, is counted as a bounce; a bion keeps dipping.</p>
+      </div>
+
+      <div class="panel" id="afPanel" hidden>
+        <h2>Asymptotic freedom</h2>
+        <canvas class="plot tall" id="afCv" aria-label="Correlation length against beta on a log scale, with measured points, the two-loop asymptotic scaling curve and the live point"></canvas>
+        <p class="small">Correlation length ξ against β on a log scale. <b>Dots</b>: our own measurements (second-moment ξ₂, Monte Carlo on large grids, error bars smaller than the dots where not visible). <b>Curve</b>: the two-loop asymptotic-scaling formula ξ = C e<sup>2πβ</sup>/(2πβ), with C fitted to the largest-β dot. <b>Ring</b>: your simulation right now.</p>
+        <p class="small">The mass appears although the action has none: ξ is finite at every β. And as β grows (weaker coupling, shorter distances) ξ grows exponentially, so the continuum limit sits at β → ∞, where the coupling vanishes. That is <b>asymptotic freedom</b>, the same behaviour that makes quarks nearly free at short distances in QCD.</p>
+      </div>
+
+      <div class="panel kh" id="wellPanel">
         <h2 id="wellH">Mean-field well</h2>
         <canvas class="plot" id="well" aria-label="Mean-field effective potential"></canvas>
         <p class="small" id="wellNote">V(φ) − 4κφ²: one valley means a symmetric vacuum, two valleys means the field must choose a side.</p>
       </div>
 
-      <div class="panel">
+      <div class="panel kh" id="readPanel">
         <h2>Readouts</h2>
         <div class="cards">
           <div class="card"><div class="k" id="absK">⟨|φ|⟩ average field</div><div class="v" id="absM">–</div><div class="s" id="absMi">now –</div></div>
-          <div class="card"><div class="k">acceptance</div><div class="v" id="accV">–</div><div class="s" id="stepV">step –</div></div>
+          <div class="card"><div class="k" id="accK">acceptance</div><div class="v" id="accV">–</div><div class="s" id="stepV">step –</div></div>
           <div class="card" id="wallCard" hidden><div class="k">wall length per site</div><div class="v" id="wallV">–</div><div class="s">smoothed 3×3, per lattice site</div></div>
-          <div class="card" id="massCard"><div class="k">m = 1/ξ  mass</div><div class="v" id="massV">–</div><div class="s" id="massE">&nbsp;</div></div>
-          <div class="card" id="xiCard"><div class="k">ξ  correlation length</div><div class="v" id="xiV">–</div><div class="s" id="xiE">&nbsp;</div></div>
+          <div class="card" id="massCard"><div class="k" id="massK">m = 1/ξ  mass</div><div class="v" id="massV">–</div><div class="s" id="massE">&nbsp;</div></div>
+          <div class="card" id="xiCard"><div class="k" id="xiK">ξ  correlation length</div><div class="v" id="xiV">–</div><div class="s" id="xiE">&nbsp;</div></div>
           <div class="card" id="vortCard" hidden><div class="k">vortex density</div><div class="v" id="vortV">–</div><div class="s" id="vortE">per plaquette</div></div>
           <div class="card" id="upsCard" hidden><div class="k">Υ  helicity modulus</div><div class="v" id="upsV">–</div><div class="s" id="upsE">2/π = 0.637 at BKT</div></div>
           <div class="card" id="etaCard" hidden><div class="k">η  power-law exponent</div><div class="v" id="etaV">–</div><div class="s" id="etaE">&nbsp;</div></div>
           <div class="card" id="mCard" hidden><div class="k">m = 1/ξ  mass</div><div class="v" id="mV">–</div><div class="s" id="mE">&nbsp;</div></div>
+          <div class="card" id="qCard" hidden><div class="k">Q  topological charge now</div><div class="v" id="qV">–</div><div class="s" id="qE">always a whole number</div></div>
+          <div class="card" id="chiTCard" hidden><div class="k">χ<sub>t</sub> = ⟨Q²⟩ / V</div><div class="v" id="chiTV">–</div><div class="s" id="chiTE">&nbsp;</div></div>
         </div>
         <p class="stat" id="etaLine" hidden>–</p>
         <p class="small" id="cmwNote" hidden><b>Coleman–Mermin–Wagner:</b> in 1+1D a continuous symmetry can never truly break. ⟨|m|⟩ only looks nonzero because the grid is finite, and it shrinks slowly (like N<sup>−η/2</sup>) as the grid grows; try 64 → 128 → 256.</p>
@@ -268,7 +355,7 @@ canvas.plot.tall{height:190px}
         <div id="corrSec">
         <h2 style="margin-top:var(--space-3)">Correlation along time</h2>
         <canvas class="plot tall" id="corr" aria-label="Correlation of the field against time separation, log scale"></canvas>
-        <p class="small">On a log plot a straight-ish fall-off means correlations die off like e<sup>−mτ</sup>, and the slope is the particle mass; it goes to zero at the critical point. Points show the measured correlation with error bars, the line is the fit.</p>
+        <p class="small" id="corrNote">On a log plot a straight-ish fall-off means correlations die off like e<sup>−mτ</sup>, and the slope is the particle mass; it goes to zero at the critical point. Points show the measured correlation with error bars, the line is the fit.</p>
         </div>
         <div id="corrSecC" hidden>
         <h2 style="margin-top:var(--space-3)">Correlation along an axis</h2>
@@ -289,6 +376,11 @@ canvas.plot.tall{height:190px}
         <h2 style="margin-top:var(--space-3)">Histogram of the phase angle</h2>
         <canvas class="plot" id="histC" aria-label="Histogram of the phase angle of 8 by 8 block averages"></canvas>
         <p class="small">The phase angle of every 8×8 block average, averaged over the last ~100 steps. It should be flat: the circle of vacua has no preferred direction, because the field keeps wandering around it. The dashed line is perfectly flat.</p>
+        </div>
+        <div id="qSec" hidden>
+        <h2 style="margin-top:var(--space-3)">Topological charge over time</h2>
+        <canvas class="plot" id="qCv" aria-label="Topological charge Q over the last few hundred measurements, a staircase"></canvas>
+        <p class="small">Q after each recent measurement (about one per update step). It only ever changes by whole numbers, so the line is a staircase; at weak coupling it changes rarely, because an instanton has to shrink to a point before it can unwrap.</p>
         </div>
       </div>
     </div>
@@ -403,10 +495,12 @@ function wellMin(){            /* mean-field minimum +v of (1-4k)p^2 + lam(p^2-1
   }
   return 1;
 }
-function resetField(mode){
-  if (cplx){ u1Reset(U, mode, wellMin()); snap = true; histInit = false; resetMeasure(); return; }
+function resetField(how){
+  if (kink) return;
+  if (cplx){ u1Reset(U, how, wellMin()); snap = true; histInit = false; resetMeasure(); return; }
+  if (o3){ o3Reset(O, how); snap = true; coolLeft = 0; qHistN = 0; $("coolLine").textContent = ""; $("coolLine").hidden = true; resetMeasure(); return; }
   var n = Nx * Nt, i, v;
-  if (mode === "cold"){ v = wellMin(); for (i = 0; i < n; i++) f[i] = v; }
+  if (how === "cold"){ v = wellMin(); for (i = 0; i < n; i++) f[i] = v; }
   else { for (i = 0; i < n; i++) f[i] = (rnd() * 2 - 1) * 1.6; }
   snap = true; histInit = false; lastSign = 0;
   resetMeasure();
@@ -416,7 +510,9 @@ function allocLattice(nx, nt){
   cluAvg = 1; cluPer = 1;
 }
 function setSize(n){
+  if (kink) return;
   if (cplx){ allocU(n); return; }
+  if (o3){ allocO(n); return; }
   N = n; sq = null;
   if (strip){ setGeometry("square"); return; }
   allocLattice(N, N);
@@ -433,7 +529,9 @@ var MAXB = 200, BLK = 50, THERM = 200;
 var HN = N >> 1, rowS = new Float64Array(N), colS = new Float64Array(N), curG = new Float64Array(HN + 1), curN = 0;
 var ring = [], ringPos = 0, blocksDone = 0, thermLeft = THERM, est = null, estBlocks = -1, lastSign = 0;
 function resetMeasure(){
+  if (kink) return;
   if (cplx){ resetCMeasure(); return; }
+  if (o3){ resetOMeasure(); return; }
   HN = N >> 1; rowS = new Float64Array(N); colS = new Float64Array(N); curG = new Float64Array(HN + 1); curN = 0;
   ring = []; ringPos = 0; blocksDone = 0; thermLeft = THERM; est = null; estBlocks = -1; massDirty = true;
   liveMeter = makeMeter(100, 25);      /* thin strip: skip ~100 update steps after any change */
@@ -913,6 +1011,371 @@ function jackErr(v){
 }
 /* U1 CORE END */
 
+/* ---------- O(3) sigma model core ----------
+   Unit 3-vectors s on an n x n periodic grid, S = -beta sum_<xy> s_x . s_y. Site i has components s[3i], s[3i+1], s[3i+2].
+   Updates: heat-bath sweep (exact, so it satisfies detailed balance with no tuning) plus embedded Wolff clusters.
+   The block between the BEGIN / END markers needs only rnd() (and Math), so a test harness can run it in a web worker. */
+/* O3 CORE BEGIN */
+function newO3(n){
+  var s = n * n, c = new Float64Array(n), sn = new Float64Array(n), x;
+  for (x = 0; x < n; x++){ c[x] = Math.cos(6.283185307179586 * x / n); sn[x] = Math.sin(6.283185307179586 * x / n); }
+  return { n: n, s: new Float64Array(3 * s), vis: new Uint32Array(s), que: new Int32Array(s), gen: 0, q: new Float64Array(s),
+           beta: 1.4, clusters: true, heat: true, cluAvg: 1, cluPer: 1, cluFix: 0, cluFrozen: false, lastQ: 0, qDev: 0,
+           cosT: c, sinT: sn, colS: new Float64Array(3 * n), rowS: new Float64Array(3 * n) };
+}
+function o3Reset(o, mode){            /* "cold" = all arrows along +z (the north pole); anything else = random directions */
+  var s = o.n * o.n, S = o.s, i;
+  if (mode === "cold"){ for (i = 0; i < s; i++){ S[3 * i] = 0; S[3 * i + 1] = 0; S[3 * i + 2] = 1; } }
+  else for (i = 0; i < s; i++){
+    var z = 2 * rnd() - 1, ph = rnd() * 6.283185307179586, r = Math.sqrt(1 - z * z);
+    S[3 * i] = r * Math.cos(ph); S[3 * i + 1] = r * Math.sin(ph); S[3 * i + 2] = z;
+  }
+  o.cluAvg = 1; o.cluPer = 1;
+}
+/* Heat-bath sweep (checkerboard): the new s is drawn from exp(beta h.s), h = sum of the four neighbours. With c = cos(angle to h):
+   c = 1 + ln(1 - u (1 - e^{-2 beta |h|})) / (beta |h|), u uniform; the azimuth around h is uniform. */
+function o3Sweep(o){
+  var n = o.n, S = o.s, b = o.beta;
+  for (var par = 0; par < 2; par++){
+    for (var y = 0; y < n; y++){
+      var row = y * n, up = (y === 0 ? n - 1 : y - 1) * n, dn = (y === n - 1 ? 0 : y + 1) * n;
+      for (var x = (y + par) & 1; x < n; x += 2){
+        var i = 3 * (row + x), l = 3 * (row + (x === 0 ? n - 1 : x - 1)), r = 3 * (row + (x === n - 1 ? 0 : x + 1)), u = 3 * (up + x), d = 3 * (dn + x);
+        var hx = b * (S[l] + S[r] + S[u] + S[d]), hy = b * (S[l + 1] + S[r + 1] + S[u + 1] + S[d + 1]), hz = b * (S[l + 2] + S[r + 2] + S[u + 2] + S[d + 2]);
+        var hm = Math.sqrt(hx * hx + hy * hy + hz * hz), c, ex, ey, ez;
+        if (hm < 1e-12){ c = 2 * rnd() - 1; ex = 1; ey = 0; ez = 0; }
+        else {
+          c = 1 + Math.log(1 - rnd() * (1 - Math.exp(-2 * hm))) / hm;
+          if (c > 1) c = 1; else if (c < -1) c = -1;
+          ex = hx / hm; ey = hy / hm; ez = hz / hm;
+        }
+        var sn = Math.sqrt(1 - c * c), ph = rnd() * 6.283185307179586, cp = Math.cos(ph) * sn, sp = Math.sin(ph) * sn;
+        /* orthonormal frame (e, f, g) with e along h: f = e x (axis with the smallest component of e), g = e x f */
+        var ax = Math.abs(ex), ay = Math.abs(ey), az = Math.abs(ez), fx, fy, fz;
+        if (ax <= ay && ax <= az){ fx = 0; fy = ez; fz = -ey; } else if (ay <= az){ fx = -ez; fy = 0; fz = ex; } else { fx = ey; fy = -ex; fz = 0; }
+        var fn = Math.sqrt(fx * fx + fy * fy + fz * fz); fx /= fn; fy /= fn; fz /= fn;
+        var gx = ey * fz - ez * fy, gy = ez * fx - ex * fz, gz = ex * fy - ey * fx;
+        S[i] = c * ex + cp * fx + sp * gx; S[i + 1] = c * ey + cp * fy + sp * gy; S[i + 2] = c * ez + cp * fz + sp * gz;
+      }
+    }
+  }
+}
+/* Embedded Wolff cluster (Wolff's original O(n) algorithm): random unit r; sigma_x = sign(s_x.r) is an Ising spin with coupling
+   beta |s_x.r||s_y.r|; join same-sign neighbours with probability 1 - exp(-2 beta (s_x.r)(s_y.r)); reflect the cluster, s -> s - 2 (s.r) r. */
+function o3Wolff(o){
+  var n = o.n, n2 = n * n, S = o.s, V = o.vis, Q = o.que, q;
+  if (++o.gen > 4294967290){ V.fill(0); o.gen = 1; }
+  var g = o.gen, b2 = 2 * o.beta, rz = 2 * rnd() - 1, ra = rnd() * 6.283185307179586, rr = Math.sqrt(1 - rz * rz), rx = rr * Math.cos(ra), ry = rr * Math.sin(ra);
+  var seed = (rnd() * n2) | 0, sg = (S[3 * seed] * rx + S[3 * seed + 1] * ry + S[3 * seed + 2] * rz) >= 0 ? 1 : -1;
+  var head = 0, tail = 1;
+  Q[0] = seed; V[seed] = g;
+  while (head < tail){
+    var i = Q[head++], pi = (S[3 * i] * rx + S[3 * i + 1] * ry + S[3 * i + 2] * rz) * sg, y = (i / n) | 0, x = i - y * n;
+    for (var d = 0; d < 4; d++){
+      var j = d === 0 ? (x === 0 ? i + n - 1 : i - 1) : d === 1 ? (x === n - 1 ? i - n + 1 : i + 1) :
+              d === 2 ? (y === 0 ? i + n2 - n : i - n) : (y === n - 1 ? i - n2 + n : i + n);
+      if (V[j] !== g){
+        var pj = (S[3 * j] * rx + S[3 * j + 1] * ry + S[3 * j + 2] * rz) * sg;
+        if (pj > 0 && rnd() < 1 - Math.exp(-b2 * pi * pj)){ V[j] = g; Q[tail++] = j; }
+      }
+    }
+  }
+  for (q = 0; q < tail; q++){
+    var k = 3 * Q[q], p = 2 * (S[k] * rx + S[k + 1] * ry + S[k + 2] * rz);
+    S[k] -= p * rx; S[k + 1] -= p * ry; S[k + 2] -= p * rz;
+  }
+  return tail;
+}
+/* One update step = a heat-bath sweep, then about n^2 sites' worth of Wolff clusters; the number comes from a running mean of the cluster
+   size (never from this step's own sizes: that would spoil detailed balance), and cluFrozen stops the running mean while measuring. */
+function o3Step(o){
+  if (o.heat) o3Sweep(o);
+  if (o.clusters){
+    var cnt = o.cluFix > 0 ? o.cluFix : Math.min(1000, Math.max(1, Math.floor(o.cluPer + rnd()))), tot = 0, c;
+    for (c = 0; c < cnt; c++) tot += o3Wolff(o);
+    if (!o.cluFrozen){ o.cluAvg += 0.02 * (tot / cnt - o.cluAvg); }
+    o.cluPer = o.n * o.n / o.cluAvg;
+    o.lastCl = tot / cnt; o.lastCnt = cnt;
+  }
+}
+/* Cooling: every arrow is set to the normalised sum of its four neighbours (checkerboard order), which lowers the energy every time. */
+function o3Cool(o){
+  var n = o.n, S = o.s;
+  for (var par = 0; par < 2; par++){
+    for (var y = 0; y < n; y++){
+      var row = y * n, up = (y === 0 ? n - 1 : y - 1) * n, dn = (y === n - 1 ? 0 : y + 1) * n;
+      for (var x = (y + par) & 1; x < n; x += 2){
+        var i = 3 * (row + x), l = 3 * (row + (x === 0 ? n - 1 : x - 1)), r = 3 * (row + (x === n - 1 ? 0 : x + 1)), u = 3 * (up + x), d = 3 * (dn + x);
+        var hx = S[l] + S[r] + S[u] + S[d], hy = S[l + 1] + S[r + 1] + S[u + 1] + S[d + 1], hz = S[l + 2] + S[r + 2] + S[u + 2] + S[d + 2];
+        var hm = Math.sqrt(hx * hx + hy * hy + hz * hz);
+        if (hm > 1e-12){ S[i] = hx / hm; S[i + 1] = hy / hm; S[i + 2] = hz / hm; }
+      }
+    }
+  }
+}
+/* Signed area of the spherical triangle (a, b, c) (indices into S): tan(A/2) = a.(b x c) / (1 + a.b + b.c + c.a). */
+function o3Tri(S, a, b, c){
+  var ax = S[a], ay = S[a + 1], az = S[a + 2], bx = S[b], by = S[b + 1], bz = S[b + 2], cx = S[c], cy = S[c + 1], cz = S[c + 2];
+  var num = ax * (by * cz - bz * cy) + ay * (bz * cx - bx * cz) + az * (bx * cy - by * cx);
+  var den = 1 + ax * bx + ay * by + az * bz + bx * cx + by * cy + bz * cz + cx * ax + cy * ay + cz * az;
+  return 2 * Math.atan2(num, den);
+}
+/* Topological charge (Berg-Luscher geometric definition): each plaquette (x,y),(x+1,y),(x+1,y+1),(x,y+1) is cut into two triangles,
+   q = (A1 + A2) / 4 pi. The sum over the periodic grid is an exact integer for any configuration. fill = true stores q per plaquette in o.q
+   (index of the plaquette's top-left site). Returns the sum as a float (the caller rounds; o.qDev tracks the worst distance to an integer). */
+function o3Charge(o, fill){
+  var n = o.n, S = o.s, Qd = o.q, tot = 0, FP = 12.566370614359172;
+  for (var y = 0; y < n; y++){
+    var row = y * n, dn = (y === n - 1 ? 0 : y + 1) * n;
+    for (var x = 0; x < n; x++){
+      var xr = x === n - 1 ? 0 : x + 1;
+      var i0 = 3 * (row + x), i1 = 3 * (row + xr), i2 = 3 * (dn + xr), i3 = 3 * (dn + x);
+      var a = o3Tri(S, i0, i1, i2) + o3Tri(S, i0, i2, i3);
+      tot += a;
+      if (fill) Qd[row + x] = a / FP;
+    }
+  }
+  tot /= FP;
+  var dev = Math.abs(tot - Math.round(tot));
+  if (dev > o.qDev) o.qDev = dev;
+  return tot;
+}
+/* Belavin-Polyakov instanton of radius rho centred on site (x0, y0), on an aligned background (+z): w = (z - z0) / rho,
+   s = (2 Re w, sgn 2 Im w, |w|^2 - 1) / (|w|^2 + 1). The raw profile is not periodic (the tilt is still 28 degrees at the grid edge for
+   rho = n/8), so the transverse part is faded smoothly to zero over the outer half of the grid, which also keeps it a single wrap (Q = +-1). */
+function o3Instanton(o, rho, x0, y0, sgn){
+  var n = o.n, S = o.s, h = n / 2, q = n / 4;
+  for (var y = 0; y < n; y++){
+    var dy = y - y0; if (dy > h) dy -= n; else if (dy < -h) dy += n;
+    for (var x = 0; x < n; x++){
+      var dx = x - x0; if (dx > h) dx -= n; else if (dx < -h) dx += n;
+      var wr = dx / rho, wi = sgn * dy / rho, d2 = wr * wr + wi * wi, den = 1 + d2;
+      var px = 2 * wr / den, py = 2 * wi / den, pz = (d2 - 1) / den;
+      var dinf = Math.max(Math.abs(dx), Math.abs(dy));
+      if (dinf > q){
+        var t = Math.cos(1.5707963267948966 * Math.min(1, (dinf - q) / (h - q))), f = t * t;
+        px *= f; py *= f; pz = Math.sqrt(Math.max(0, 1 - px * px - py * py));
+      }
+      var k = 3 * (y * n + x);
+      S[k] = px; S[k + 1] = py; S[k + 2] = pz;
+    }
+  }
+  o.cluAvg = 1; o.cluPer = 1;
+}
+/* Measurement accumulator. Per sample: [0] E = <s.s'> per link, [1] chi = |sum s|^2 / V, [2] F = (1/V) |sum s e^{2 pi i x / n}|^2 (both axes averaged),
+   [3] Q, [4] Q^2, then the slice-average correlator Gs(tau), tau = 0..n/2 (row and column means of the 3-vector, both axes). */
+function newO3Meas(n, B, maxBlocks){
+  var H = n >> 1;
+  return { n: n, H: H, B: B, max: maxBlocks || 0, cnt: 0, done: 0, L: 5 + H + 1, sum: new Float64Array(5 + H + 1), blocks: [] };
+}
+function o3Sample(o, M){
+  var n = o.n, V = n * n, S = o.s, col = o.colS, row = o.rowS, H = M.H, Sm = M.sum, x, y, c, t, tau;
+  col.fill(0); row.fill(0);
+  var e = 0;
+  for (y = 0; y < n; y++){
+    var r0 = y * n, dn = (y === n - 1 ? 0 : y + 1) * n, ry0 = 0, ry1 = 0, ry2 = 0;
+    for (x = 0; x < n; x++){
+      var i = 3 * (r0 + x), ir = 3 * (r0 + (x === n - 1 ? 0 : x + 1)), id = 3 * (dn + x), a = S[i], b = S[i + 1], d = S[i + 2];
+      e += a * (S[ir] + S[id]) + b * (S[ir + 1] + S[id + 1]) + d * (S[ir + 2] + S[id + 2]);
+      col[3 * x] += a; col[3 * x + 1] += b; col[3 * x + 2] += d; ry0 += a; ry1 += b; ry2 += d;
+    }
+    row[3 * y] = ry0; row[3 * y + 1] = ry1; row[3 * y + 2] = ry2;
+  }
+  var mx = 0, my = 0, mz = 0;
+  for (x = 0; x < n; x++){ mx += col[3 * x]; my += col[3 * x + 1]; mz += col[3 * x + 2]; }
+  Sm[0] += e / (2 * V);
+  Sm[1] += (mx * mx + my * my + mz * mz) / V;
+  var cT = o.cosT, sT = o.sinT, Fx = 0, Fy = 0;
+  for (c = 0; c < 3; c++){
+    var re = 0, im = 0, re2 = 0, im2 = 0;
+    for (x = 0; x < n; x++){ re += col[3 * x + c] * cT[x]; im += col[3 * x + c] * sT[x]; re2 += row[3 * x + c] * cT[x]; im2 += row[3 * x + c] * sT[x]; }
+    Fx += re * re + im * im; Fy += re2 * re2 + im2 * im2;
+  }
+  Sm[2] += (Fx + Fy) / (2 * V);
+  var Q = Math.round(o3Charge(o, false)); o.lastQ = Q;
+  Sm[3] += Q; Sm[4] += Q * Q;
+  /* slice-mean correlator */
+  for (tau = 0; tau <= H; tau++){
+    var g = 0;
+    for (t = 0; t < n; t++){
+      var u = t + tau; if (u >= n) u -= n;
+      g += row[3 * t] * row[3 * u] + row[3 * t + 1] * row[3 * u + 1] + row[3 * t + 2] * row[3 * u + 2] + col[3 * t] * col[3 * u] + col[3 * t + 1] * col[3 * u + 1] + col[3 * t + 2] * col[3 * u + 2];
+    }
+    Sm[5 + tau] += g / (2 * n * n * n);
+  }
+  if (++M.cnt >= M.B){
+    var blk = new Float64Array(M.L), i2;
+    for (i2 = 0; i2 < M.L; i2++) blk[i2] = Sm[i2] / M.cnt;
+    M.blocks.push(blk); if (M.max && M.blocks.length > M.max) M.blocks.shift();
+    M.done++; Sm.fill(0); M.cnt = 0;
+  }
+}
+function o3Xi2(chi, F, n){ var r = chi / F - 1; return r > 0 ? Math.sqrt(r) / (2 * Math.sin(Math.PI / n)) : 0; }
+/* Means and block errors; xi2 = sqrt(chi/F - 1) / (2 sin(pi/n)) and chi_t = <Q^2>/V with jackknife errors over blocks. */
+function o3Result(M){
+  var nb = M.blocks.length, L = M.L, n = M.n, V = n * n, b, i, S = new Float64Array(L), R = { nb: nb, N: n };
+  if (nb < 4) return R;
+  for (b = 0; b < nb; b++) for (i = 0; i < L; i++) S[i] += M.blocks[b][i];
+  var mean = new Float64Array(L), err = new Float64Array(L), vv = new Float64Array(L);
+  for (i = 0; i < L; i++) mean[i] = S[i] / nb;
+  for (b = 0; b < nb; b++) for (i = 0; i < L; i++){ var d = M.blocks[b][i] - mean[i]; vv[i] += d * d; }
+  for (i = 0; i < L; i++) err[i] = Math.sqrt(vv[i] / (nb * (nb - 1)));
+  R.E = mean[0]; R.Eerr = err[0]; R.chi = mean[1]; R.chiErr = err[1]; R.F = mean[2]; R.FErr = err[2];
+  R.Q2 = mean[4]; R.Q2err = err[4]; R.Qmean = mean[3]; R.Q2V = mean[4] / V; R.chiTErr = err[4] / V;
+  R.xi2 = o3Xi2(mean[1], mean[2], n);
+  var jk = [], j, m = 0, s2 = 0;
+  for (j = 0; j < nb; j++){
+    var cj = (S[1] - M.blocks[j][1]) / (nb - 1), fj = (S[2] - M.blocks[j][2]) / (nb - 1), xj = o3Xi2(cj, fj, n);
+    jk.push(xj); m += xj;
+  }
+  m /= nb;
+  for (j = 0; j < nb; j++) s2 += (jk[j] - m) * (jk[j] - m);
+  R.xi2Err = Math.sqrt((nb - 1) / nb * s2);
+  return R;
+}
+/* A self-contained run on its own lattice (hooks and workers): o3RunNew -> o3RunSteps(s, count) until it returns true -> o3RunResult.
+   opts: every (measure every k steps), clusters (false = heat-bath only), heat (false = clusters only, test only), freeze (default true: stop the cluster-size mean after thermalisation),
+   noMass is handled by the caller. */
+function o3RunNew(n, beta, therm, nsteps, init, opts){
+  opts = opts || {};
+  var o = newO3(n), every = opts.every || 1;
+  o.beta = beta; o.clusters = opts.clusters !== false; o.heat = opts.heat !== false;
+  o3Reset(o, init === "cold" ? "cold" : "hot");
+  return { o: o, M: newO3Meas(n, Math.max(5, Math.ceil(nsteps / every / 100)), 0), therm: therm, done: 0, total: therm + nsteps, every: every, cnt: 0, freeze: opts.freeze !== false };
+}
+function o3RunSteps(s, c){
+  var o = s.o, end = Math.min(s.total, s.done + c);
+  for (; s.done < end; s.done++){
+    if (s.done === s.therm && s.freeze) o.cluFrozen = true;
+    o3Step(o);
+    if (s.done >= s.therm && (++s.cnt % s.every) === 0) o3Sample(o, s.M);
+  }
+  return s.done >= s.total;
+}
+/* O3 CORE END */
+/* Mass gap from the slice-average correlator, with the same estimator as the real mode (differences cancel the constant piece). */
+function o3Mass(M){
+  if (M.blocks.length < 8) return null;
+  return estimate(M.blocks.map(function(b){ return b.subarray(5); }), M.n);
+}
+
+/* KINK CORE BEGIN */
+/* Classical phi^4 in 1+1D, continuum units (not the lattice kappa / lambda of the other modes):
+     phi_tt = phi_xx + 2 phi (1 - phi^2),   V = (1/2)(1 - phi^2)^2.
+   Kink phi = tanh x (mass 4/3), shape mode omega = sqrt 3, meson mass 2, speeds in units of c = 1.
+   Leapfrog, dt = dx/2, box +-L with phi = -1 at both ends and an absorbing layer (extra term -sigma(x) phi_t) in the outer `sponge` units.
+   Pure code (no DOM): kinkCoreFactory.toString() is also what the scan web workers run. */
+function kinkCoreFactory(){
+  var SAMP = 40;       /* zero crossings / escape test every SAMP steps (= every 1 unit of time at dx = 0.05) */
+  function profile(s, x, t){      /* kink at -x0 moving +v, antikink at +x0 moving -v */
+    var g = s.g, v = s.v, x0 = s.x0;
+    return Math.tanh(g * (x + x0 - v * t)) - Math.tanh(g * (x - x0 + v * t)) - 1;
+  }
+  /* init: "pair" (default), "kink" (single boosted kink starting at -x0, moving +v) or "shape" (kink at rest plus amp * sinh x / cosh^2 x) */
+  function newKink(v, o){
+    o = o || {};
+    var dx = o.dx || 0.05, L = o.L || 100, sp = o.sponge === undefined ? 20 : o.sponge, x0 = o.x0 === undefined ? 10 : o.x0;
+    var n = Math.round(2 * L / dx) + 1, i, x, g = 1 / Math.sqrt(1 - v * v), dt = dx / 2;
+    var s = { dx: dx, dt: dt, dt2: dt * dt, idx2: 1 / (dx * dx), L: L, n: n, i0: (n - 1) / 2, v: v, g: g, x0: x0, t: 0, k: 0,
+              a: new Float64Array(n), b: new Float64Array(n), c: new Float64Array(n), sig: new Float64Array(n), init: o.init || "pair" };
+    var smax = o.sigma === undefined ? 2 : o.sigma;
+    for (i = 0; i < n; i++){
+      x = (i - s.i0) * dx;
+      var u = (Math.abs(x) - (L - sp)) / sp;
+      s.sig[i] = (sp > 0 && u > 0) ? smax * u * u : 0;
+      if (s.init === "kink"){
+        s.b[i] = Math.tanh(g * (x + x0)); s.a[i] = Math.tanh(g * (x + x0 + v * dt));
+      } else if (s.init === "shape"){
+        var eta = Math.sinh(x) / (Math.cosh(x) * Math.cosh(x)), A = o.amp || 0.05;
+        s.b[i] = Math.tanh(x) + A * eta; s.a[i] = Math.tanh(x) + A * eta * Math.cos(1.7320508075688772 * dt);
+      } else { s.b[i] = profile(s, x, 0); s.a[i] = profile(s, x, -dt); }
+    }
+    s.bcR = s.init === "pair" ? -1 : 1;                 /* a single kink goes from -1 to +1 */
+    s.a[0] = s.b[0] = -1; s.a[n - 1] = s.b[n - 1] = s.bcR;
+    return s;
+  }
+  function kinkStep(s){
+    var n = s.n, a = s.a, b = s.b, c = s.c, sg = s.sig, d2 = s.dt2, i2 = s.idx2, hd = s.dt / 2, i, p, sh;
+    c[0] = -1; c[n - 1] = s.bcR;
+    for (i = 1; i < n - 1; i++){
+      p = b[i]; sh = sg[i] * hd;
+      c[i] = (2 * p - a[i] * (1 - sh) + d2 * ((b[i - 1] - 2 * p + b[i + 1]) * i2 + 2 * p * (1 - p * p))) / (1 + sh);
+    }
+    s.a = b; s.b = c; s.c = a; s.t += s.dt; s.k++;
+  }
+  /* energy of the inner part |x| < Lin, between the last two time levels (conserved by the scheme up to O(dt^2) in the potential term) */
+  function kinkEnergy(s, Lin){
+    var a = s.a, b = s.b, n = s.n, dx = s.dx, dt = s.dt, lo = Math.max(0, Math.round(s.i0 - Lin / dx)), hi = Math.min(n - 2, Math.round(s.i0 + Lin / dx)), e = 0, i;
+    for (i = lo; i <= hi; i++){
+      var kin = (b[i] - a[i]) / dt, ga = (a[i + 1] - a[i]) / dx, gb = (b[i + 1] - b[i]) / dx, qa = a[i] * a[i] - 1, qb = b[i] * b[i] - 1;
+      e += 0.5 * kin * kin + 0.5 * ga * gb + 0.25 * (qa * qa + qb * qb);
+    }
+    return e * dx;
+  }
+  /* outermost zero crossings of phi inside the undamped region; returns [xl, xr] or null */
+  function kinkCrossings(s){
+    var b = s.b, dx = s.dx, w = Math.floor(0.8 * s.L / dx), lo = s.i0 - w, hi = s.i0 + w, i, xl = NaN, xr = NaN;
+    for (i = lo; i < hi; i++) if (b[i] < 0 && b[i + 1] >= 0){ xl = (i - s.i0 + (-b[i]) / (b[i + 1] - b[i])) * dx; break; }
+    for (i = hi - 1; i >= lo; i--) if (b[i] >= 0 && b[i + 1] < 0){ xr = (i - s.i0 + b[i] / (b[i] - b[i + 1])) * dx; break; }
+    return (xl === xl && xr === xr && xr > xl) ? [xl, xr] : null;
+  }
+  /* tracker: bounces = local minima of phi(0, t) below 0; half-separation d(t) of the outermost zero crossings (sampled once per unit of time);
+     "escaped" = d >= 10, still growing over the last 10 time units (the attraction at d = 10 is about e^-20, so they cannot come back) */
+  function newTracker(s){
+    return { q0: s.a[s.i0], q1: s.b[s.i0], bounces: 0, bounceT: [], bounceV: [], th: [], dh: [], d: NaN, escaped: false, tEsc: -1, vOut: NaN, xl: NaN, xr: NaN };
+  }
+  function trackUpdate(s, T){
+    var q2 = s.b[s.i0];
+    if (T.q1 < T.q0 && T.q1 <= q2 && T.q1 < 0){ T.bounces++; T.bounceT.push(s.t - s.dt); T.bounceV.push(T.q1); }
+    T.q0 = T.q1; T.q1 = q2;
+    if (s.k % SAMP === 0){
+      var cr = kinkCrossings(s), n;
+      if (cr){ T.xl = cr[0]; T.xr = cr[1]; T.d = (cr[1] - cr[0]) / 2; } else { T.xl = T.xr = T.d = NaN; }
+      T.th.push(s.t); T.dh.push(T.d); n = T.dh.length;
+      if (!T.escaped && T.d >= 10 && q2 > 0.5 && n > 11 && T.d - T.dh[n - 11] > 0.02){ T.escaped = true; T.tEsc = s.t; }
+      if (T.escaped){            /* outgoing speed: least-squares slope of d(t) over the last <= 30 samples */
+        var m = Math.min(30, n), i, st = 0, sd = 0, stt = 0, std = 0, ok = 0;
+        for (i = n - m; i < n; i++){ if (T.dh[i] === T.dh[i]){ var tt = T.th[i]; st += tt; sd += T.dh[i]; stt += tt * tt; std += tt * T.dh[i]; ok++; } }
+        if (ok >= 6){ var den = ok * stt - st * st; T.vOut = den > 0 ? (ok * std - st * sd) / den : NaN; }
+      }
+    }
+  }
+  /* A whole collision, advanced in chunks. o: dx, L, sponge, tmax (500), maxB (12: call it trapped after this many bounces; 0 = never),
+     measureV (keep going 30 time units after escaping to measure the outgoing speed), stop (false: never stop by itself, the live view),
+     plus newKink's options (init, x0, sigma, amp). */
+  function newRun(v, o){
+    o = o || {};
+    var s = newKink(v, o), T = newTracker(s), Lin = 0.8 * s.L;
+    var r = { s: s, T: T, o: o, v: v, tmax: o.tmax || 500, maxB: o.maxB === undefined ? 12 : o.maxB, done: false, outcome: null, Lin: Lin, E0: kinkEnergy(s, Lin) };
+    r.advance = function(nsteps){
+      var k;
+      for (k = 0; k < nsteps && !r.done; k++){
+        kinkStep(s); trackUpdate(s, T);
+        if (o.stop !== false && s.k % SAMP === 0){
+          if (T.escaped && (!o.measureV || s.t >= T.tEsc + 30)){ r.done = true; r.outcome = "escaped"; }
+          else if (r.maxB > 0 && T.bounces >= r.maxB){ r.done = true; r.outcome = "trapped"; }
+          else if (s.t >= r.tmax){
+            var nn = T.dh.length;      /* out of time: one to three bounces and still moving apart = an escape that is too slow to finish (exit speed near zero) */
+            r.done = true; r.outcome = T.escaped ? "escaped" : ((T.bounces >= 1 && T.bounces <= 3 && T.d >= 3 && nn > 11 && T.d - T.dh[nn - 11] > 0.02) ? "separating" : "trapped");
+          }
+        }
+      }
+      return r.done;
+    };
+    r.result = function(){
+      var E = kinkEnergy(s, Lin);
+      return { outcome: r.outcome || (T.escaped ? "escaped" : "running"), bounces: T.bounces, vOut: T.escaped && T.vOut === T.vOut ? T.vOut : null,
+               Edrift: (E - r.E0) / r.E0, E0: r.E0, E: E, tEnd: s.t, tEsc: T.escaped ? T.tEsc : null, steps: s.k, v: v,
+               cls: (r.outcome === "escaped" || r.outcome === "separating") ? Math.max(1, Math.min(3, T.bounces)) : 0 };
+    };
+    return r;
+  }
+  function kinkRun(v, o){ var r = newRun(v, o); while (!r.advance(4000)); return r.result(); }
+  return { newKink: newKink, kinkStep: kinkStep, kinkEnergy: kinkEnergy, kinkCrossings: kinkCrossings, newTracker: newTracker, trackUpdate: trackUpdate, newRun: newRun, kinkRun: kinkRun, SAMP: SAMP };
+}
+var KINK = kinkCoreFactory();
+/* KINK CORE END */
+
 /* ---------- colour map (diverging) ---------- */
 var off = document.createElement("canvas"); off.width = off.height = N;
 var octx = off.getContext("2d");
@@ -1114,14 +1577,15 @@ function drawWell(){
 }
 
 function sup(e){ var m = { "-": "⁻", "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹" }; return "10" + String(e).replace(/./g, function(c){ return m[c]; }); }
-function drawCorr(){
+function drawCorr(E, n){
+  if (arguments.length < 1){ E = est; n = N; }
   fitCanvas(corrCv);
   var dpr = window.devicePixelRatio || 1, w = corrCv.width, h = corrCv.height;
   var pad = { l: 52 * dpr, r: 10 * dpr, t: 8 * dpr, b: 34 * dpr };
   cctx.clearRect(0, 0, w, h);
   var font = (11 * dpr) + "px " + getComputedStyle(document.body).fontFamily;
   cctx.font = font; cctx.fillStyle = C["--muted"]; cctx.strokeStyle = C["--line"]; cctx.lineWidth = 1;
-  var H = N >> 1, i;
+  var H = n >> 1, i;
   function X(t){ return pad.l + t / H * (w - pad.l - pad.r); }
   /* axis labels */
   cctx.textAlign = "center"; cctx.textBaseline = "bottom";
@@ -1130,12 +1594,12 @@ function drawCorr(){
   cctx.textBaseline = "top"; cctx.fillText("correlation", 0, -4 * dpr); cctx.restore();
   cctx.textBaseline = "top";
   for (i = 0; i <= 4; i++){ var tt = Math.round(H * i / 4); cctx.fillText(String(tt), X(tt), h - pad.b + 3 * dpr); }
-  if (!est){
+  if (!E){
     cctx.textBaseline = "middle"; cctx.fillText("measuring…", pad.l + (w - pad.l - pad.r) / 2, pad.t + (h - pad.t - pad.b) / 2);
     cctx.beginPath(); cctx.moveTo(pad.l, h - pad.b); cctx.lineTo(w - pad.r, h - pad.b); cctx.stroke(); return;
   }
   /* log range from the points that are clearly above zero */
-  var ytop = 0, ylo = Infinity, G = est.G, sd = est.Cse, c;
+  var ytop = 0, ylo = Infinity, G = E.G, sd = E.Cse, c;
   for (i = 0; i < H; i++){ c = G[i] - G[H]; if (c > ytop) ytop = c; }
   if (!(ytop > 0)){ cctx.textBaseline = "middle"; cctx.fillText("no decay yet", pad.l + (w - pad.l - pad.r) / 2, pad.t + (h - pad.t - pad.b) / 2); return; }
   ytop *= 1.5;
@@ -1153,9 +1617,9 @@ function drawCorr(){
   cctx.beginPath(); cctx.moveTo(pad.l, h - pad.b); cctx.lineTo(w - pad.r, h - pad.b); cctx.stroke();
   cctx.save(); cctx.beginPath(); cctx.rect(pad.l, pad.t, w - pad.l - pad.r, h - pad.t - pad.b); cctx.clip();
   /* fit A [cosh(m (tau - N/2)) - 1], least squares over the plateau region */
-  if (est.m > 0){
-    var m = est.m, num = 0, den = 0, A;
-    for (i = 1; i <= Math.min(est.t1 + 1, H - 1); i++){
+  if (E.m > 0){
+    var m = E.m, num = 0, den = 0, A;
+    for (i = 1; i <= Math.min(E.t1 + 1, H - 1); i++){
       var fi = Math.cosh(m * (i - H)) - 1, yv = G[i] - G[H], ww = 1 / Math.max(sd[i] * sd[i], 1e-300);
       num += ww * yv * fi; den += ww * fi * fi;
     }
@@ -1228,7 +1692,10 @@ function drawHist(){
 }
 
 /* ---------- complex mode (Stage 4): state, drawing, readouts ---------- */
-var cplx = false, U = null, UM = null, rsave = null, ures = null, uDone = -1, cCnt = 0, cEvery = 1, cHead = "eta";
+/* mode: "real" | "complex" | "o3". cplx and o3 are derived from it in one place (modeFlags) so the many draw / update branches stay short. A 4th mode adds an entry to MODES, a parked state, a flag and an applyModeUI branch. */
+var mode = "real", cplx = false, o3 = false, kink = false;
+function modeFlags(){ cplx = mode === "complex"; o3 = mode === "o3"; kink = mode === "kink"; document.body.classList.toggle("kink", kink); }
+var U = null, UM = null, ures = null, uDone = -1, cCnt = 0, cEvery = 1, cHead = "eta";
 var PRESETS_C = { sym:[0.442, 1], crit:[0.502, 1], brk:[0.582, 1] };   /* kappa_BKT(lambda=1) = 0.502 +- 0.002 (Weber-Minnhagen on the helicity modulus, N = 16..128; see PLAN.md); presets at -0.06, 0, +0.08 */
 var csave = { kappa: 0.502, lambda: 1, view: "field" };
 var BLKC = 20, UPS_CLEAR = 0.3;
@@ -1246,57 +1713,387 @@ function allocU(n){
   for (var i = 0; i < 40; i++) u1Tune(U, u1Sweep(U) / (n * n), 0.4);
   snap = true; histInit = false; resetCMeasure(); dirty = true;
 }
-/* Real <-> complex. The real lattice, kappa, lambda, view and strip state are parked and come back untouched. */
+/* Modes. Each mode parks its kappa (beta in the O(3) mode), lambda, view, strip and pause state while another is shown, and gets them back untouched;
+   the lattices (real f, complex U, arrows O) stay allocated. */
+var MODES = {
+  real:    { kmin: 0.15, kmax: 0.45, kstep: 0.001 },
+  complex: { kmin: 0.3,  kmax: 0.8,  kstep: 0.001 },
+  o3:      { kmin: 0.5,  kmax: 2.0,  kstep: 0.01 },
+  kink:    { kmin: 0.05, kmax: 0.6,  kstep: 0.001 }     /* the slider is the kink speed v */
+};
+var parked = {
+  complex: { kappa: 0.502, lambda: 1, view: "field", strip: false, paused: false },
+  o3:      { kappa: 1.4,   lambda: 1, view: "field", strip: false, paused: false },
+  kink:    { kappa: 0.35,  lambda: 1, view: "field", strip: false, paused: false }
+};
 function setMode(m){
-  var want = m === "complex";
-  if (want === cplx || scan) return;
-  if (want){
-    rsave = { kappa: kappa, lambda: lambda, view: viewMode, strip: strip };
-    if (!U) allocU(parseInt($("sizeSel").value, 10) || N);
-    cplx = true; strip = false;
-    kappa = csave.kappa; lambda = csave.lambda; viewMode = csave.view;
-    kapEl.min = "0.3"; kapEl.max = "0.8";
-    $("sizeSel").value = String(U.n);
-  } else {
-    csave = { kappa: kappa, lambda: lambda, view: viewMode };
-    cplx = false; strip = rsave.strip;
-    kappa = rsave.kappa; lambda = rsave.lambda; viewMode = rsave.view;
-    kapEl.min = "0.15"; kapEl.max = "0.45";
-    $("sizeSel").value = String(N);
-    lastSign = 0;
-  }
+  if (m === mode || scan || kscan || !MODES[m]) return;
+  parked[mode] = { kappa: kappa, lambda: lambda, view: viewMode, strip: strip, paused: paused };
+  if (o3) coolLeft = 0;
+  var sz = parseInt($("sizeSel").value, 10) || N, p = parked[m], cfg = MODES[m];
+  mode = m; modeFlags();
+  kappa = p.kappa; lambda = p.lambda; viewMode = p.view; strip = m === "real" && p.strip; paused = p.paused;
+  $("runBtn").textContent = paused ? "Run" : "Pause";
+  kapEl.step = cfg.kstep; kapEl.min = cfg.kmin; kapEl.max = cfg.kmax;
+  if (cplx && !U) allocU(sz);
+  if (o3 && !O) allocO(sz);
+  if (kink){ kappa = Math.max(cfg.kmin, Math.min(cfg.kmax, kappa)); if (!K) kinkFire(); else { $("runBtn").disabled = K.s.t >= KTMAX; } kLast = performance.now(); }
+  else $("runBtn").disabled = false;
+  $("sizeSel").value = String(cplx ? U.n : (o3 ? O.n : N));
+  if (m === "real") lastSign = 0;
   snap = true; histInit = false; emaAbs = 0;
   syncSliders(); applyUI();
 }
+var MODE_TEXT = {
+  real: {
+    abs: "⟨|φ|⟩ average field", acc: "acceptance", kap: "κ  hopping",
+    kapHint: "How strongly neighbours want to agree (like Ising β/2).",
+    lamHint: "0 = soft free field, large = field pinned near ±1 (Ising).",
+    eq: "S = Σ −2κ φφ′ + φ² + λ(φ²−1)²", wellH: "Mean-field well",
+    wellNote: "V(φ) − 4κφ²: one valley means a symmetric vacuum, two valleys means the field must choose a side.",
+    clu: "Flips whole same-sign regions at once, which beats the slowing-down of ordinary updates near κ = 0.340.",
+    cold: "All +v", coldTitle: "Every site set to the well minimum +v", pre: "Presets (λ = 1):", presets: ["Symmetric", "Critical", "Broken"], view2: "Domain walls",
+    xiN: "The correlation length is comparable to the grid: near the critical point, try a bigger grid.",
+    corr: "On a log plot a straight-ish fall-off means correlations die off like e<sup>−mτ</sup>, and the slope is the particle mass; it goes to zero at the critical point. Points show the measured correlation with error bars, the line is the fit."
+  },
+  complex: {
+    abs: "⟨|m|⟩ grid-average arrow", acc: "acceptance", kap: "κ  hopping",
+    kapHint: "How strongly neighbours want to point the same way (like XY β/2).",
+    lamHint: "0 = soft free field, large = every arrow the same length (the XY model).",
+    eq: "S = Σ −2κ φ·φ′ + |φ|² + λ(|φ|²−1)²", wellH: "Mexican hat (radial slice)",
+    wellNote: "V(r) − 4κr²: the bottom of the hat is a whole circle of vacua, so there is no single direction to pick.",
+    clu: "Flips whole regions at once (embedded Wolff clusters: reflect φ across a random line), which beats the slowing-down of ordinary updates near the BKT point.",
+    cold: "All aligned", coldTitle: "Every arrow set to the rim of the hat, all pointing the same way", pre: "Presets (λ = 1):", presets: ["Vortex gas", "BKT point", "Quasi-ordered"], view2: "Vortices", corr: "", xiN: ""
+  },
+  o3: {
+    abs: "E = ⟨s·s′⟩ energy per link", acc: "average cluster", kap: "β  coupling",
+    kapHint: "How strongly neighbouring arrows want to line up. Bigger β = weaker coupling, longer correlations.",
+    lamHint: "", eq: "S = −β Σ s·s′, |s| = 1", wellH: "", wellNote: "",
+    clu: "Flips whole regions at once (Wolff clusters: reflect every arrow in a cluster across a random plane), which beats the slowing-down of ordinary updates when ξ is large.",
+    cold: "All aligned", coldTitle: "Every arrow pointing straight up (north)", pre: "Presets:", presets: ["Strong coupling", "Medium", "Weak coupling"], view2: "Topology",
+    xiN: "ξ is no longer much smaller than the grid, so the numbers are distorted by its finite size: try a bigger grid, or a smaller β.",
+    corr: "Correlation of the row and column averages of the arrows along time, on a log scale. A straight-ish fall-off means e<sup>−mτ</sup>: the slope is the mass gap m. It never reaches zero at a finite β, but it shrinks exponentially as β grows. Points show the measurement with error bars, the line is the fit."
+  },
+  kink: {
+    abs: "", acc: "", kap: "v  speed of each kink",
+    kapHint: "In units of the speed of light. The kink starts at x = −10 and the antikink at x = +10. Let go of the slider to fire a new collision.",
+    lamHint: "", eq: "φ_tt = φ_xx + 2φ(1 − φ²)", wellH: "", wellNote: "", clu: "",
+    cold: "", coldTitle: "", pre: "Presets:", presets: ["One bounce", "Two bounces", "Trapped (bion)"], view2: "", xiN: "", corr: ""
+  }
+};
 function applyModeUI(){
-  var walls = viewMode === "walls", i, ids;
-  setPressed("mReal", "mCplx", !cplx);
-  $("vWalls").textContent = cplx ? "Vortices" : "Domain walls";
-  $("geoGrp").hidden = cplx; $("ledeR").hidden = cplx; $("ledeC").hidden = !cplx;
-  $("histSec").hidden = cplx;
+  var walls = viewMode === "walls", i, ids, T = MODE_TEXT[mode], k, mb = { real: "mReal", complex: "mCplx", o3: "mO3", kink: "mKink" };
+  for (k in mb){ $(mb[k]).classList.toggle("on", k === mode); $(mb[k]).setAttribute("aria-pressed", String(k === mode)); }
+  $("vWalls").textContent = T.view2;
+  $("geoGrp").hidden = mode !== "real"; $("ledeR").hidden = mode !== "real"; $("ledeC").hidden = !cplx; $("ledeO").hidden = !o3; $("ledeK").hidden = !kink;
+  $("histSec").hidden = mode !== "real";
   ids = ["corrSecC", "histSecC", "wheelBox", "vortCard", "upsCard", "etaCard", "mCard", "etaLine", "cmwNote"];
   for (i = 0; i < ids.length; i++) $(ids[i]).hidden = !cplx;
-  if (cplx){
-    ids = ["cbarBox", "howto", "wallCard", "massCard", "xiCard", "corrSec", "xiNote", "ordNote", "stripPanel"];
+  ids = ["ballBox", "qSec", "qCard", "chiTCard", "afPanel", "coolBtn", "instBtn"];
+  for (i = 0; i < ids.length; i++) $(ids[i]).hidden = !o3;
+  $("coolLine").hidden = !o3 || !$("coolLine").textContent;
+  $("lamBox").hidden = o3; $("wellPanel").hidden = o3;
+  if (mode !== "real"){
+    ids = ["cbarBox", "howto", "wallCard", "stripPanel", "xiNote", "ordNote"];
     for (i = 0; i < ids.length; i++) $(ids[i]).hidden = true;
-    $("howtoV").hidden = !walls;
-  } else $("howtoV").hidden = true;
-  var pb = document.querySelectorAll("[data-preset]"), names = cplx ? ["Vortex gas", "BKT point", "Quasi-ordered"] : ["Symmetric", "Critical", "Broken"];
-  for (i = 0; i < pb.length; i++) pb[i].textContent = names[i];
-  $("absK").textContent = cplx ? "⟨|m|⟩ grid-average arrow" : "⟨|φ|⟩ average field";
-  $("kapHint").textContent = cplx ? "How strongly neighbours want to point the same way (like XY β/2)." : "How strongly neighbours want to agree (like Ising β/2).";
-  $("lamHint").textContent = cplx ? "0 = soft free field, large = every arrow the same length (the XY model)." : "0 = soft free field, large = field pinned near ±1 (Ising).";
-  $("eqLine").textContent = cplx ? "S = Σ −2κ φ·φ′ + |φ|² + λ(|φ|²−1)²" : "S = Σ −2κ φφ′ + φ² + λ(φ²−1)²";
-  $("wellH").textContent = cplx ? "Mexican hat (radial slice)" : "Mean-field well";
-  $("wellNote").textContent = cplx ? "V(r) − 4κr²: the bottom of the hat is a whole circle of vacua, so there is no single direction to pick."
-                                   : "V(φ) − 4κφ²: one valley means a symmetric vacuum, two valleys means the field must choose a side.";
-  $("cluNote").textContent = cplx ? "Flips whole regions at once (embedded Wolff clusters: reflect φ across a random line), which beats the slowing-down of ordinary updates near the BKT point."
-                                  : "Flips whole same-sign regions at once, which beats the slowing-down of ordinary updates near κ = 0.340.";
-  $("coldBtn").textContent = cplx ? "All aligned" : "All +v";
-  $("coldBtn").title = cplx ? "Every arrow set to the rim of the hat, all pointing the same way" : "Every site set to the well minimum +v";
+    $("massCard").hidden = $("xiCard").hidden = $("corrSec").hidden = cplx;
+  }
+  $("howtoV").hidden = !(cplx && walls); $("howtoO").hidden = !(o3 && walls);
+  if (kink) $("cbarBox").hidden = false;
+  $("ylab").textContent = kink ? "real time t ↑" : "Euclidean time ↑";
+  $("xlab").textContent = kink ? "space x →" : (strip ? "time →" : "space →");
+  var pb = document.querySelectorAll("[data-preset]");
+  for (i = 0; i < pb.length; i++) pb[i].textContent = T.presets[i];
+  $("preLbl").textContent = T.pre;
+  $("absK").textContent = T.abs; $("accK").textContent = T.acc; $("kapLbl").textContent = T.kap;
+  $("kapHint").textContent = T.kapHint; $("lamHint").textContent = T.lamHint; $("eqLine").textContent = T.eq;
+  $("wellH").textContent = T.wellH; $("wellNote").textContent = T.wellNote; $("cluNote").textContent = T.clu;
+  $("coldBtn").textContent = T.cold; $("coldBtn").title = T.coldTitle;
+  $("corrNote").innerHTML = T.corr; if (T.xiN) $("xiNote").textContent = T.xiN;
+  $("massK").textContent = o3 ? "m  mass gap (slice correlator)" : "m = 1/ξ  mass";
+  $("xiK").textContent = o3 ? "ξ₂  second-moment correlation length" : "ξ  correlation length";
 }
 document.getElementById("mReal").addEventListener("click", function(){ setMode("real"); });
 document.getElementById("mCplx").addEventListener("click", function(){ setMode("complex"); });
+document.getElementById("mO3").addEventListener("click", function(){ setMode("o3"); });
+document.getElementById("mKink").addEventListener("click", function(){ setMode("kink"); });
+
+/* ---------- O(3) arrows mode: state, colours, drawing, readouts ---------- */
+var O = null, OM = null, ores = null, omass = null, oDone = -1, oCnt = 0, oEvery = 1, BLKO = 25;
+var coolLeft = 0, coolTotal = 0, coolQ0 = 0;
+var QH = 300, qHist = new Int16Array(QH), qHistN = 0;      /* ring buffer of the last QH charges, qHistN = how many were ever pushed */
+var PRESETS_O = { sym:[1.0, 1], crit:[1.4, 1], brk:[1.6, 1] };
+var oQnow = 0, oQt = 0, oEnow = 0, oQscale = 0.01, oCl = 1, INST_SGN = -1;   /* orientation of the painted profile so that the geometric Q comes out +1 (checked: Q = +1.0000000000000033) */
+/* Our own Monte Carlo measurements for the asymptotic-freedom plot: [beta, xi2, error, N]. Second-moment correlation length from this page's
+   O(3) core (heat-bath + Wolff clusters, the same code as above), sizes at least 7 xi; see PLAN.md "Stage 6" for the method and run lengths. */
+var AF_PTS = [[1.0, 1.863, 0.041, 48], [1.2, 3.245, 0.040, 64], [1.4, 6.873, 0.027, 64], [1.5, 10.970, 0.064, 96], [1.6, 18.985, 0.107, 128], [1.7, 33.913, 0.521, 256]];
+/* measured with the debug hook / workers (measureO3 core), 2026-10-20: heat-bath + Wolff, 150k/150k/120k/70k/70k/16k steps; error bars from block jackknife. Wolff 1990 gives 6.90 / 11.09 / 19.07 at beta = 1.4 / 1.5 / 1.6. */
+var AF_C = 0;     /* C of xi = C e^{2 pi beta} / (2 pi beta), fitted to the largest-beta point (set below from AF_PTS) */
+function afFit(){
+  if (!AF_PTS.length) return;
+  var p = AF_PTS[AF_PTS.length - 1];
+  AF_C = p[1] * 2 * Math.PI * p[0] / Math.exp(2 * Math.PI * p[0]);
+}
+function afCurve(b){ return AF_C * Math.exp(2 * Math.PI * b) / (2 * Math.PI * b); }
+function syncO(){ O.beta = kappa; O.clusters = useClusters; }
+function resetOMeasure(){
+  if (!O) return;
+  oEvery = O.n <= 64 ? 1 : (O.n <= 128 ? 2 : 4);
+  OM = newO3Meas(O.n, BLKO, MAXB); oCnt = 0; thermLeft = THERM; ores = null; omass = null; oDone = -1; massDirty = true; qHistN = 0;
+}
+function allocO(n){
+  O = newO3(n); syncO(); o3Reset(O, "hot"); coolLeft = 0; snap = true; $("coolLine").textContent = "";
+  resetOMeasure(); dirty = true;
+}
+function pushQ(q){ qHist[qHistN % QH] = q; qHistN++; }
+function o3Energy(o){
+  var n = o.n, S = o.s, e = 0;
+  for (var y = 0; y < n; y++){
+    var r0 = y * n, dn = (y === n - 1 ? 0 : y + 1) * n;
+    for (var x = 0; x < n; x++){
+      var i = 3 * (r0 + x), ir = 3 * (r0 + (x === n - 1 ? 0 : x + 1)), id = 3 * (dn + x);
+      e += S[i] * (S[ir] + S[id]) + S[i + 1] * (S[ir + 1] + S[id + 1]) + S[i + 2] * (S[ir + 2] + S[id + 2]);
+    }
+  }
+  return e / (2 * n * n);
+}
+
+/* colour of a unit vector: hue = azimuth atan2(s2, s1), lightness from s3 (north pole pale, south pole dark); saturation fades to zero at the
+   poles, where the azimuth is undefined. One 2D lookup table: [s3 level][hue degree]. */
+var OT = 64, oLut = new Uint32Array(360 * OT), oBg = [243, 240, 233];
+function hsl2rgb(h, s, l){
+  var a = s * Math.min(l, 1 - l);
+  function ch(n){ var k = (n + h / 30) % 12; return l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)); }
+  return [ch(0) * 255, ch(8) * 255, ch(4) * 255];
+}
+function buildBall(){
+  var dark = isDark(), zi, h;
+  oBg = dark ? [30, 36, 44] : [243, 240, 233];
+  for (zi = 0; zi < OT; zi++){
+    var z = zi / (OT - 1) * 2 - 1, u = (z + 1) / 2, st = Math.sqrt(Math.max(0, 1 - z * z));
+    var l = dark ? 0.2 + 0.64 * u : 0.3 + 0.62 * u, sat = (dark ? 0.62 : 0.7) * Math.pow(st, 0.7);
+    for (h = 0; h < 360; h++){
+      var c = hsl2rgb(h + 0.5, sat, l);
+      oLut[zi * 360 + h] = (255 << 24) | (Math.round(c[2]) << 16) | (Math.round(c[1]) << 8) | Math.round(c[0]);
+    }
+  }
+}
+var ballCv = document.getElementById("ballCv"), ballCx = ballCv.getContext("2d");
+function drawBall(){
+  var dpr = window.devicePixelRatio || 1, s = Math.round(76 * dpr);
+  if (ballCv.width !== s){ ballCv.width = s; ballCv.height = s; }
+  ballCx.clearRect(0, 0, s, s);
+  var id = ballCx.createImageData(s, s), d32 = new Uint32Array(id.data.buffer), R = s * 0.45, c0 = s / 2, x, y;
+  var el = 1.1, se = Math.sin(el), ce = Math.cos(el), K = 360 / TWO_PI;       /* camera elevation 63 degrees: looking down from the north side */
+  for (y = 0; y < s; y++) for (x = 0; x < s; x++){
+    var u = (x + 0.5 - c0) / R, v = -(y + 0.5 - c0) / R, r2 = u * u + v * v;
+    if (r2 > 1) continue;
+    var w = Math.sqrt(1 - r2);
+    var px = u, py = v * se - w * ce, pz = v * ce + w * se;                    /* point on the unit ball, world coordinates */
+    var zi = Math.max(0, Math.min(OT - 1, Math.round((pz + 1) / 2 * (OT - 1)))), hue = (Math.floor(Math.atan2(py, px) * K) + 720) % 360;
+    var c = oLut[zi * 360 + hue], shade = 0.74 + 0.36 * Math.max(0, (-0.45 * u + 0.5 * v + 0.74 * w));
+    var rr = Math.min(255, (c & 255) * shade), gg = Math.min(255, ((c >> 8) & 255) * shade), bb = Math.min(255, ((c >> 16) & 255) * shade);
+    var edge = r2 > 0.93 ? 1 - (r2 - 0.93) / 0.07 : 1;                         /* soft anti-aliased rim */
+    d32[y * s + x] = (Math.round(255 * Math.max(0, Math.min(1, edge * 1.0))) << 24) | (Math.round(bb) << 16) | (Math.round(gg) << 8) | Math.round(rr);
+  }
+  ballCx.putImageData(id, 0, 0);
+  ballCx.strokeStyle = C["--line"]; ballCx.lineWidth = 1 * dpr; ballCx.beginPath(); ballCx.arc(c0, c0, R, 0, TWO_PI); ballCx.stroke();
+}
+function drawFieldO(){
+  if (fieldCv.style.height) fieldCv.style.height = "";
+  fitCanvas(fieldCv);
+  var W = fieldCv.width, H = fieldCv.height, n = O.n, n2 = n * n, S = O.s, Qd = O.q, i, topo = viewMode === "walls";
+  var K = 360 / TWO_PI, zs = (OT - 1) / 2, top = OT - 1;
+  ensureImg(n, n);
+  var qs = 1, bgR = oBg[0], bgG = oBg[1], bgB = oBg[2];
+  var dk = isDark(), rc = dk ? [255, 92, 78] : [214, 40, 34], bc = dk ? [92, 150, 255] : [34, 80, 218];
+  if (topo){
+    var mq = 0;
+    for (i = 0; i < n2; i++){ var aq = Qd[i] < 0 ? -Qd[i] : Qd[i]; if (aq > mq) mq = aq; }
+    if (snap || oQscale <= 0) oQscale = 0.55 * mq; else oQscale += 0.15 * (0.55 * mq - oQscale);
+    qs = Math.max(oQscale, 2e-4);
+  }
+  for (i = 0; i < n2; i++){
+    var j = 3 * i, zi = ((S[j + 2] + 1) * zs + 0.5) | 0, hue = ((Math.atan2(S[j + 1], S[j]) * K + 360) | 0) % 360;
+    if (hue >= 360) hue -= 360;
+    var c = oLut[(zi < 0 ? 0 : (zi > top ? top : zi)) * 360 + hue];
+    if (topo){
+      var r = c & 255, g = (c >> 8) & 255, b = (c >> 16) & 255, fk = dk ? 0.58 : 0.4;
+      r = bgR + (r - bgR) * fk; g = bgG + (g - bgG) * fk; b = bgB + (b - bgB) * fk;
+      var q = Qd[i], a = Math.pow(Math.min(1, Math.abs(q) / qs), 0.65), tc = q > 0 ? rc : bc;
+      r += (tc[0] - r) * a; g += (tc[1] - g) * a; b += (tc[2] - b) * a;
+      c = (255 << 24) | (((b + 0.5) | 0) << 16) | (((g + 0.5) | 0) << 8) | ((r + 0.5) | 0);
+    }
+    img32[i] = c;
+  }
+  octx.putImageData(img, 0, 0);
+  fctx.imageSmoothingEnabled = false;
+  fctx.drawImage(off, 0, 0, W, H);
+}
+var qCv = document.getElementById("qCv"), qctx = qCv.getContext("2d");
+function drawQ(){
+  fitCanvas(qCv);
+  var dpr = window.devicePixelRatio || 1, w = qCv.width, h = qCv.height, ctx = qctx, pad = { l: 34 * dpr, r: 8 * dpr, t: 8 * dpr, b: 22 * dpr };
+  ctx.clearRect(0, 0, w, h);
+  ctx.font = (11 * dpr) + "px " + getComputedStyle(document.body).fontFamily;
+  var cnt = Math.min(qHistN, QH), i, lo = -1, hi = 1;
+  for (i = 0; i < cnt; i++){ var v = qHist[(qHistN - cnt + i) % QH]; if (v < lo) lo = v; if (v > hi) hi = v; }
+  lo -= 1; hi += 1;
+  function X(t){ return pad.l + t / (QH - 1) * (w - pad.l - pad.r); }
+  function Y(v){ return pad.t + (1 - (v - lo) / (hi - lo)) * (h - pad.t - pad.b); }
+  ctx.fillStyle = C["--muted"]; ctx.strokeStyle = C["--line"]; ctx.lineWidth = 1; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  var stepv = Math.max(1, Math.ceil((hi - lo) / 6));
+  for (var e = Math.ceil(lo / stepv) * stepv; e <= hi; e += stepv){
+    ctx.globalAlpha = e === 0 ? 0.9 : 0.4; ctx.beginPath(); ctx.moveTo(pad.l, Y(e)); ctx.lineTo(w - pad.r, Y(e)); ctx.stroke(); ctx.globalAlpha = 1;
+    ctx.fillText(e > 0 ? "+" + e : (e < 0 ? "−" + (-e) : "0"), pad.l - 5 * dpr, Y(e));
+  }
+  ctx.textAlign = "center"; ctx.textBaseline = "top";
+  ctx.fillText("time →   (last " + QH + " measurements)", pad.l + (w - pad.l - pad.r) / 2, h - pad.b + 5 * dpr);
+  if (!cnt) return;
+  ctx.strokeStyle = C["--accent"]; ctx.lineWidth = 2 * dpr; ctx.lineJoin = "round"; ctx.beginPath();
+  var x0 = QH - cnt, py = null;
+  for (i = 0; i < cnt; i++){
+    var q = qHist[(qHistN - cnt + i) % QH], xx = X(x0 + i), yy = Y(q);
+    if (i === 0) ctx.moveTo(xx, yy); else { ctx.lineTo(xx, py); ctx.lineTo(xx, yy); }
+    py = yy;
+  }
+  ctx.lineTo(X(QH - 1), py);
+  ctx.stroke();
+}
+var afCv = document.getElementById("afCv"), afx = afCv.getContext("2d");
+function drawAF(){
+  fitCanvas(afCv);
+  var dpr = window.devicePixelRatio || 1, w = afCv.width, h = afCv.height, ctx = afx, pad = { l: 40 * dpr, r: 10 * dpr, t: 10 * dpr, b: 34 * dpr };
+  ctx.clearRect(0, 0, w, h);
+  ctx.font = (11 * dpr) + "px " + getComputedStyle(document.body).fontFamily;
+  var b0 = 0.5, b1 = 2.0, yl = Math.log10(0.3), yh = Math.log10(400);
+  function X(b){ return pad.l + (b - b0) / (b1 - b0) * (w - pad.l - pad.r); }
+  function Y(v){ return pad.t + (yh - Math.log10(Math.max(v, 1e-3))) / (yh - yl) * (h - pad.t - pad.b); }
+  ctx.fillStyle = C["--muted"]; ctx.strokeStyle = C["--line"]; ctx.lineWidth = 1;
+  ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  [0.3, 1, 3, 10, 30, 100, 300].forEach(function(v){
+    ctx.globalAlpha = (v === 1 || v === 10 || v === 100) ? 0.6 : 0.25; ctx.beginPath(); ctx.moveTo(pad.l, Y(v)); ctx.lineTo(w - pad.r, Y(v)); ctx.stroke(); ctx.globalAlpha = 1;
+    ctx.fillText(String(v), pad.l - 5 * dpr, Y(v));
+  });
+  ctx.textAlign = "center"; ctx.textBaseline = "top";
+  [0.5, 1, 1.5, 2].forEach(function(b){ ctx.fillText(String(b), X(b), h - pad.b + 3 * dpr); });
+  ctx.fillText("coupling β   (larger β = weaker coupling)", pad.l + (w - pad.l - pad.r) / 2, h - 14 * dpr);
+  ctx.save(); ctx.translate(10 * dpr, pad.t + (h - pad.t - pad.b) / 2); ctx.rotate(-Math.PI / 2);
+  ctx.textBaseline = "top"; ctx.fillText("ξ  (lattice spacings, log)", 0, -4 * dpr); ctx.restore();
+  ctx.beginPath(); ctx.moveTo(pad.l, h - pad.b); ctx.lineTo(w - pad.r, h - pad.b); ctx.stroke();
+  ctx.save(); ctx.beginPath(); ctx.rect(pad.l, pad.t, w - pad.l - pad.r, h - pad.t - pad.b); ctx.clip();
+  if (AF_C > 0){
+    ctx.strokeStyle = C["--pos"]; ctx.lineWidth = 2 * dpr; ctx.beginPath();
+    for (var b = 0.8; b <= 2.0001; b += 0.02){ if (b > 0.8) ctx.lineTo(X(b), Y(afCurve(b))); else ctx.moveTo(X(b), Y(afCurve(b))); }
+    ctx.stroke();
+  }
+  AF_PTS.forEach(function(p){
+    var x = X(p[0]), y = Y(p[1]), lo = Y(Math.max(1e-3, p[1] - p[2])), hi = Y(p[1] + p[2]);
+    ctx.strokeStyle = C["--accent"]; ctx.lineWidth = 1.5 * dpr; ctx.beginPath(); ctx.moveTo(x, lo); ctx.lineTo(x, hi); ctx.stroke();
+    ctx.fillStyle = C["--accent"]; ctx.beginPath(); ctx.arc(x, y, 3.5 * dpr, 0, TWO_PI); ctx.fill();
+  });
+  var xl = ores && ores.nb >= 8 ? ores.xi2 : 0;       /* the live point: xi_2, or 1/m when xi_2 is too noisy (small xi on a big grid) */
+  if (ores && ores.nb >= 8 && !(ores.xi2Err <= 0.25 * ores.xi2)) xl = omass && omass.m > 0 ? 1 / omass.m : 0;
+  if (xl > 0){
+    var lx = X(kappa), ly = Y(xl), fin = xl > O.n / 7;
+    ctx.lineWidth = 2.5 * dpr; ctx.strokeStyle = C["--fg"]; ctx.fillStyle = C["--panel"];
+    ctx.beginPath(); ctx.arc(lx, ly, 6 * dpr, 0, TWO_PI); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = C["--fg"]; ctx.textAlign = lx > w * 0.7 ? "right" : "left"; ctx.textBaseline = "bottom";
+    ctx.fillText(fin ? "you (grid too small)" : "you", lx + (lx > w * 0.7 ? -9 : 9) * dpr, ly - 9 * dpr);
+  }
+  ctx.restore();
+}
+function fmtSci(v, d){
+  if (!isFinite(v) || v === 0) return v === 0 ? "0" : "–";
+  var e = Math.floor(Math.log10(Math.abs(v))), m = v / Math.pow(10, e);
+  if (Math.abs(+m.toFixed(d)) >= 10){ m /= 10; e++; }
+  return m.toFixed(d) + "×" + sup(e);
+}
+function showO(){
+  var r = ores, m = omass, why = thermLeft > 0 ? "settling down" : "collecting data";
+  if (!r || r.nb < 8){
+    $("absM").textContent = "measuring…"; $("xiV").textContent = "measuring…"; $("massV").textContent = "measuring…"; $("chiTV").textContent = "measuring…";
+    $("xiE").textContent = $("massE").textContent = $("chiTE").textContent = why; $("xiNote").hidden = true;
+    return;
+  }
+  var d = r.xi2 < 10 ? 2 : 1;
+  $("absM").textContent = r.E.toFixed(4);
+  $("xiV").textContent = r.xi2 > 0 ? r.xi2.toFixed(d) : "–";
+  /* chi/F - 1 = xi^2 (2 sin(pi/N))^2 is tiny when xi << N, so xi_2 is noisy then (error ~ 1 / (N^2 xi^2 sqrt(samples))); the mass reading is the better number there */
+  $("xiE").textContent = !(r.xi2 > 0) ? "too noisy here, trust m" : "± " + r.xi2Err.toFixed(d) + (r.xi2Err > 0.25 * r.xi2 ? " · noisy, trust m" : " lattice units");
+  $("xiNote").hidden = !(r.xi2 > O.n / 7);
+  if (m && m.m > 0){
+    var dm = m.rough ? 2 : 3;
+    $("massV").textContent = (m.rough ? "≈ " : "") + m.m.toFixed(dm); $("massE").textContent = "± " + m.mErr.toFixed(dm) + " · 1/m = " + (1 / m.m).toFixed(m.xi < 10 ? 2 : 1);
+  } else { $("massV").textContent = "–"; $("massE").textContent = "no clear decay yet"; }
+  $("chiTV").textContent = fmtSci(r.Q2V, 2); $("chiTE").textContent = "± " + fmtSci(r.chiTErr, 1) + " · ⟨Q²⟩ = " + r.Q2.toFixed(2);
+}
+function finishCool(){
+  coolLeft = 0; paused = true; $("runBtn").textContent = "Run";
+  oQnow = Math.round(o3Charge(O, true)); oEnow = o3Energy(O);
+  $("coolLine").textContent = "Cooled " + coolTotal + " sweeps: Q " + coolQ0 + " → " + oQnow + ", energy per link " + oEnow.toFixed(4) + ". Monte Carlo is paused (press Run to heat it up again).";
+  $("coolLine").hidden = false;
+  resetOMeasure(); snap = true; dirty = true;
+}
+function startCool(sweeps){
+  if (coolLeft > 0) return;
+  coolQ0 = Math.round(o3Charge(O, false)); coolTotal = coolLeft = sweeps || 150;
+  paused = true; $("runBtn").textContent = "Run"; $("coolLine").textContent = "Cooling…"; $("coolLine").hidden = false;
+}
+function addInstanton(){
+  coolLeft = 0; o3Reset(O, "cold"); o3Instanton(O, O.n / 8, O.n / 2, O.n / 2, INST_SGN);
+  paused = true; $("runBtn").textContent = "Run";
+  oQnow = Math.round(o3Charge(O, true)); oEnow = o3Energy(O);
+  $("coolLine").textContent = "Painted one instanton of radius " + (O.n / 8) + " on an aligned background: Q = " + (oQnow > 0 ? "+" : "") + oQnow + ", energy per link " + oEnow.toFixed(4) + ". Run melts it; Cool tightens it.";
+  $("coolLine").hidden = false;
+  resetOMeasure(); snap = true; dirty = true;
+}
+document.getElementById("coolBtn").addEventListener("click", function(){ startCool(150); });
+document.getElementById("instBtn").addEventListener("click", addInstanton);
+function frameO(){
+  var changed = dirty, now = performance.now();
+  if (coolLeft > 0){
+    var per = Math.max(1, Math.ceil(coolTotal / 80)), k = Math.min(per, coolLeft);
+    for (var j = 0; j < k; j++) o3Cool(O);
+    coolLeft -= k; changed = true; oQt = 0;
+    if (coolLeft <= 0) finishCool();
+    else $("coolLine").textContent = "Cooling… " + (coolTotal - coolLeft) + " / " + coolTotal + " sweeps";
+  } else if (!paused){
+    var t0 = performance.now(), ns = 0, cl = 0;
+    syncO();
+    do {
+      O.cluFrozen = thermLeft === 0;       /* the cluster count adapts only while settling: no history bias in the data */
+      o3Step(O); ns++; cl += O.lastCl || 0;
+      var meas = thermLeft === 0;
+      if (thermLeft > 0) thermLeft--;
+      if ((++oCnt % oEvery) === 0){
+        if (meas){ o3Sample(O, OM); pushQ(O.lastQ); }
+        else pushQ(Math.round(o3Charge(O, false)));
+      }
+    } while (performance.now() - t0 < 8);
+    oCl += 0.2 * (cl / ns - oCl);
+    spsCount += ns; changed = true;
+  }
+  if (now - spsT > 500){ spsVal = spsCount * 1000 / (now - spsT); spsCount = 0; spsT = now;
+    $("speed").textContent = paused ? "paused" : (Math.round(spsVal) + " update steps/s  ·  " + O.n + "×" + O.n + " lattice"); }
+  if (now - estT > 300 || massDirty){
+    estT = now;
+    if (OM.done !== oDone){ oDone = OM.done; ores = o3Result(OM); omass = o3Mass(OM); massDirty = true; }
+    if (massDirty || thermLeft > 0 || OM.blocks.length < 8){ showO(); massDirty = false; changed = true; }
+  }
+  if (changed){
+    var topo = viewMode === "walls";
+    if (topo || dirty || now - oQt > 150){ oQnow = Math.round(o3Charge(O, topo)); oEnow = o3Energy(O); oQt = now; }
+    drawFieldO(); drawCorr(omass, O.n); drawQ(); snap = false;
+    $("absMi").textContent = "now " + oEnow.toFixed(4);
+    $("qV").textContent = (oQnow > 0 ? "+" : (oQnow < 0 ? "−" : "")) + Math.abs(oQnow);
+    $("accV").textContent = (paused || coolLeft > 0) ? "–" : (oCl < 10 ? oCl.toFixed(1) : String(Math.round(oCl))) + " sites";
+    $("stepV").textContent = O.clusters ? (O.lastCnt || 0) + " clusters per step" : "clusters off";
+    if (dirty){ drawAF(); drawBall(); dirty = false; }
+    else if (!paused && now - afT > 400){ drawAF(); afT = now; }
+  }
+}
+var afT = 0;
 
 /* colour wheel: hue = phase, depth = |phi| (pale towards the background colour at small |phi|) */
 var CT = 40, cLut = new Uint32Array(CT * 360), wheelCss = [];
@@ -1606,12 +2403,12 @@ var $ = function(id){ return document.getElementById(id); };
 var kapEl = $("kap"), lamEl = $("lam");
 var dirty = true, snap = true, emaAbs = 0, emaAcc = 0.5, massDirty = true, estT = 0;
 function syncSliders(){
-  if (cplx) syncU();
+  if (cplx) syncU(); else if (o3) syncO();
   resetMeasure();
   kapEl.value = kappa; lamEl.value = lambda;
-  $("kapV").textContent = kappa.toFixed(3);
+  $("kapV").textContent = kappa.toFixed(o3 ? 2 : 3);
   $("lamV").textContent = lambda.toFixed(2);
-  $("warn").hidden = !(lambda < 0.005 && kappa >= 0.25);
+  $("warn").hidden = o3 || !(lambda < 0.005 && kappa >= 0.25);
   dirty = true;
 }
 function setParams(k, l){ kappa = k; lambda = l; syncSliders(); }
@@ -1696,7 +2493,7 @@ function showStrip(){
 
 /* ---------- width scan: ln(rate) against L, straight-line fit gives the kink mass ---------- */
 var scan = null;
-var SCAN_CTRL = ["mReal", "mCplx", "kap", "lam", "lsl", "hotBtn", "coldBtn", "gSquare", "gStrip", "sizeSel", "vField", "vWalls"];
+var SCAN_CTRL = ["mReal", "mCplx", "mO3", "mKink", "kap", "lam", "lsl", "hotBtn", "coldBtn", "gSquare", "gStrip", "sizeSel", "vField", "vWalls"];
 function setScanLocked(b){
   SCAN_CTRL.forEach(function(id){ $(id).disabled = b; });
   Array.prototype.forEach.call(document.querySelectorAll("[data-preset]"), function(e){ e.disabled = b; });
@@ -1767,10 +2564,10 @@ function showMass(){
   }
 }
 Array.prototype.forEach.call(document.querySelectorAll("[data-preset]"), function(b){
-  b.addEventListener("click", function(){ var p = (cplx ? PRESETS_C : PRESETS)[b.getAttribute("data-preset")]; setParams(p[0], p[1]); });
+  b.addEventListener("click", function(){ var p = (kink ? PRESETS_K : (cplx ? PRESETS_C : (o3 ? PRESETS_O : PRESETS)))[b.getAttribute("data-preset")]; setParams(p[0], p[1]); if (kink) kinkFire(); });
 });
 
-function onTheme(){ readColors(); buildLut(); buildWheel(); drawWheel(); dirty = true; }
+function onTheme(){ readColors(); buildLut(); buildWheel(); drawWheel(); buildBall(); drawBall(); dirty = true; }
 if (window.matchMedia){
   var mq = matchMedia("(prefers-color-scheme: dark)");
   if (mq.addEventListener) mq.addEventListener("change", onTheme); else if (mq.addListener) mq.addListener(onTheme);
@@ -1778,16 +2575,317 @@ if (window.matchMedia){
 new MutationObserver(onTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 if (window.ResizeObserver){
   var ro = new ResizeObserver(function(){ dirty = true; });
-  ro.observe(fieldCv); ro.observe(wellCv); ro.observe(histCv); ro.observe(corrCv); ro.observe(sCv); ro.observe(scanCv); ro.observe(corrC2); ro.observe(histC2);
+  ro.observe(fieldCv); ro.observe(wellCv); ro.observe(histCv); ro.observe(corrCv); ro.observe(sCv); ro.observe(scanCv); ro.observe(corrC2); ro.observe(histC2); ro.observe(afCv); ro.observe(qCv);
 }
 window.addEventListener("resize", function(){ dirty = true; });
+
+/* ---------- kink collisions (Stage 7): live run, space-time picture, plots, readouts, speed scan ---------- */
+/* The slider "kappa" doubles as the kink speed v in this mode (parked / restored like the other modes' kappa). The solver is KINK (see KINK CORE above). */
+var K = null, KCOLS = 500, KROWS = 500, KROWSTEP = 8, KHALF = 25, KTMAX = 1000, KDTROW = KROWSTEP * 0.025, KSPS = 480;   /* 8 steps = 0.2 time units per picture row; 1x = 480 steps per second */
+var kimg = new Float32Array(KCOLS * KROWS), kRows = 0, kPhi0 = new Float32Array(Math.ceil(KTMAX / KDTROW) + 20), kHistN = 0, kTnew = 0;
+var kMult = 2, kAcc = 0, kLast = 0, kReadT = 0, kEnow = 0, kEmin = 0, kEmax = 0, kEhi = false;
+var PRESETS_K = { sym: [0.35, 1], crit: [0.198, 1], brk: [0.16, 1] };   /* one bounce, two bounces (middle of the first window), trapped (bion) */
+var KVC = 0.2598;                                                         /* critical speed: ours 0.25965 at dx = 0.05, 0.2600 extrapolated, literature 0.2598 */
+var KS_V0 = 0.15, KS_V1 = 0.30, KS_DV = 0.001, KS_N = 151, KS_OPTS = { tmax: 500, maxB: 12 };
+var KCOL = ["#a3a8b5", "#2a9d8f", "#e9a23b", "#c2417c"], KLAB = ["trapped", "1 bounce", "2 bounces", "3+ bounces"];
+var kxCv = $("kPlotX"), kxCtx = kxCv.getContext("2d"), ktCv = $("kPlotT"), ktCtx = ktCv.getContext("2d"), ksCv = $("kScanCv"), ksCtx = ksCv.getContext("2d");
+var kres = [], kscan = null;
+function kinkFire(){
+  K = KINK.newRun(kappa, { stop: false });
+  kRows = 0; kHistN = 0; kAcc = 0; kEmin = kEmax = 0; kimg.fill(0);
+  paused = false; $("runBtn").textContent = "Pause"; $("runBtn").disabled = false;
+  kPushRow(); dirty = true; kReadT = 0;
+}
+function kPushRow(){
+  var s = K.s, b = s.b, base = s.i0 - Math.round(KHALF / s.dx), j, row;
+  if (kRows < KROWS){ row = KROWS - 1 - kRows; kRows++; }
+  else { kimg.copyWithin(KCOLS, 0, (KROWS - 1) * KCOLS); row = 0; }
+  var o = row * KCOLS;
+  for (j = 0; j < KCOLS; j++) kimg[o + j] = 0.5 * (b[base + 2 * j] + b[base + 2 * j + 1]);
+  kPhi0[kHistN++] = b[s.i0]; kTnew = s.t;
+}
+function kStatus(){
+  var T = K.T, s = K.s, d = T.d, nb = T.bounces;
+  if (T.escaped){
+    var vo = T.vOut === T.vOut ? T.vOut : null;
+    return "Bounced " + nb + (nb === 1 ? " time" : " times") + ", now flying apart" + (vo !== null ? " at v_out ≈ " + vo.toFixed(3) + " (they came in at " + s.v.toFixed(3) + ")" : "") + ".";
+  }
+  if (nb === 0) return (d === d && d > 2.5) ? "Approaching: the kinks are " + (2 * d).toFixed(1) + " apart." : "Colliding…";
+  if (nb >= 6 || (nb >= 3 && s.t > 250)) return "Trapped: a bion. The pair stays together, wobbling, and slowly radiates small waves (" + nb + " bounces so far).";
+  if (d === d && d >= 3) return "Bounced " + nb + "×; the kinks are " + (2 * d).toFixed(1) + " apart. Will they escape or fall back?";
+  return "Bounced " + nb + "×, still in contact.";
+}
+function showK(){
+  var s = K.s, T = K.T, E = KINK.kinkEnergy(s, K.Lin), dr = (E - K.E0) / K.E0;
+  if (kEhi || s.k < 200){ kEmin = kEmax = 0; }
+  kEmin = Math.min(kEmin, dr); kEmax = Math.max(kEmax, dr); kEnow = E;
+  $("kT").textContent = s.t.toFixed(1); $("kTs").textContent = "step " + s.k;
+  $("kB").textContent = String(T.bounces);
+  $("kE").textContent = E.toFixed(4);
+  $("kEs").textContent = "start " + K.E0.toFixed(4) + " · change " + (dr >= 0 ? "+" : "−") + Math.abs(dr * 1e6).toFixed(0) + " ppm";
+  var vo = T.escaped && T.vOut === T.vOut ? T.vOut : null;
+  $("kV").textContent = vo !== null ? vo.toFixed(3) : "–";
+  $("kVs").textContent = vo !== null ? "ratio v_out / v = " + (vo / s.v).toFixed(2) : (T.escaped ? "measuring…" : "no escape yet");
+  $("kStatus").textContent = kStatus() + (s.t >= KTMAX ? " (run ends at t = " + KTMAX + "; press Fire.)" : "");
+}
+/* picture: x across (the central part, -25 .. 25), real time up, newest row at the top once the canvas is full */
+function drawFieldK(){
+  if (fieldCv.style.height) fieldCv.style.height = "";
+  fitCanvas(fieldCv);
+  var W = fieldCv.width, H = fieldCv.height, dpr = window.devicePixelRatio || 1, i, j, r;
+  ensureImg(KCOLS, KROWS);
+  var scale = (LUTN - 1) / (2 * VMAX), top = LUTN - 1, rNew = kRows < KROWS ? KROWS - kRows : 0;
+  for (r = 0; r < rNew; r++) for (j = 0; j < KCOLS; j++) img32[r * KCOLS + j] = 0;
+  for (i = rNew * KCOLS; i < KROWS * KCOLS; i++){
+    var k = ((kimg[i] + VMAX) * scale) | 0;
+    img32[i] = lut[k < 0 ? 0 : (k > top ? top : k)];
+  }
+  octx.putImageData(img, 0, 0);
+  fctx.clearRect(0, 0, W, H);
+  fctx.imageSmoothingEnabled = false;
+  fctx.drawImage(off, 0, 0, W, H);
+  /* axis ticks: white text with a dark halo so they read on both colours */
+  fctx.font = "600 " + (11 * dpr) + "px " + getComputedStyle(document.body).fontFamily;
+  fctx.lineJoin = "round"; fctx.lineWidth = 3 * dpr; fctx.textBaseline = "middle";
+  function label(txt, x, y, al){
+    fctx.textAlign = al; fctx.strokeStyle = "rgba(0,0,0,0.6)"; fctx.strokeText(txt, x, y); fctx.fillStyle = "#ffffff"; fctx.fillText(txt, x, y);
+  }
+  var t0 = kTnew - (KROWS - 1 - rNew) * KDTROW, tk;
+  for (tk = Math.ceil(Math.max(0, t0) / 20) * 20; tk <= kTnew; tk += 20){
+    var yy = (rNew + (kTnew - tk) / KDTROW + 0.5) / KROWS * H;
+    fctx.strokeStyle = "rgba(255,255,255,0.8)"; fctx.lineWidth = 1.5 * dpr; fctx.beginPath(); fctx.moveTo(0, yy); fctx.lineTo(7 * dpr, yy); fctx.stroke();
+    fctx.lineWidth = 3 * dpr; if (yy < H - 26 * dpr) label("t = " + tk, 10 * dpr, yy, "left");
+  }
+  for (var xv = -20; xv <= 20; xv += 10){
+    var xx = (xv + KHALF) / (2 * KHALF) * W;
+    fctx.strokeStyle = "rgba(255,255,255,0.8)"; fctx.lineWidth = 1.5 * dpr; fctx.beginPath(); fctx.moveTo(xx, H); fctx.lineTo(xx, H - 7 * dpr); fctx.stroke();
+    fctx.lineWidth = 3 * dpr; label(xv === 0 ? "x = 0" : String(xv).replace("-", "−"), xx, H - 14 * dpr, "center");
+  }
+}
+function kPlotFrame(cv, ctx, xmin, xmax, ymin, ymax, yticks, xticks, xlabel){
+  fitCanvas(cv);
+  var dpr = window.devicePixelRatio || 1, w = cv.width, h = cv.height, pad = { l: 34 * dpr, r: 8 * dpr, t: 8 * dpr, b: 22 * dpr };
+  ctx.clearRect(0, 0, w, h);
+  function X(v){ return pad.l + (v - xmin) / (xmax - xmin) * (w - pad.l - pad.r); }
+  function Y(v){ return pad.t + (1 - (v - ymin) / (ymax - ymin)) * (h - pad.t - pad.b); }
+  ctx.font = (11 * dpr) + "px " + getComputedStyle(document.body).fontFamily;
+  ctx.fillStyle = C["--muted"]; ctx.strokeStyle = C["--line"]; ctx.lineWidth = 1;
+  ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  yticks.forEach(function(v){
+    ctx.globalAlpha = v === 0 ? 0.9 : 0.45; ctx.beginPath(); ctx.moveTo(pad.l, Y(v)); ctx.lineTo(w - pad.r, Y(v)); ctx.stroke(); ctx.globalAlpha = 1;
+    ctx.fillText(v > 0 ? "+" + v : (v < 0 ? "−" + (-v) : "0"), pad.l - 5 * dpr, Y(v));
+  });
+  ctx.textAlign = "center"; ctx.textBaseline = "top";
+  xticks.forEach(function(v){
+    ctx.globalAlpha = 0.45; ctx.beginPath(); ctx.moveTo(X(v), pad.t); ctx.lineTo(X(v), h - pad.b); ctx.stroke(); ctx.globalAlpha = 1;
+    ctx.fillText(String(Math.round(v * 10) / 10).replace("-", "−"), X(v), h - pad.b + 3 * dpr);
+  });
+  ctx.textAlign = "right"; ctx.fillText(xlabel, w - pad.r, h - 12 * dpr);
+  ctx.beginPath(); ctx.moveTo(pad.l, h - pad.b); ctx.lineTo(w - pad.r, h - pad.b); ctx.stroke();
+  return { X: X, Y: Y, pad: pad, w: w, h: h, dpr: dpr };
+}
+function drawKX(){
+  var P = kPlotFrame(kxCv, kxCtx, -KHALF, KHALF, -1.5, 1.5, [-1, 0, 1], [-20, -10, 0, 10, 20], "x"), ctx = kxCtx, dpr = P.dpr;
+  if (!K) return;
+  var s = K.s, b = s.b, i0 = s.i0, nh = Math.round(KHALF / s.dx), i;
+  ctx.save(); ctx.beginPath(); ctx.rect(P.pad.l, P.pad.t, P.w - P.pad.l - P.pad.r, P.h - P.pad.t - P.pad.b); ctx.clip();
+  ctx.strokeStyle = C["--accent"]; ctx.lineWidth = 2 * dpr; ctx.lineJoin = "round"; ctx.beginPath();
+  for (i = -nh; i <= nh; i += 2){ var x = i * s.dx, y = P.Y(Math.max(-1.5, Math.min(1.5, b[i0 + i]))); if (i === -nh) ctx.moveTo(P.X(x), y); else ctx.lineTo(P.X(x), y); }
+  ctx.stroke(); ctx.restore();
+}
+function tickList(a, b){ var o = [], v; for (v = Math.ceil(a / 20) * 20; v <= b + 1e-9; v += 20) o.push(v); return o; }
+function drawKT(){
+  var tw = Math.max(0, kTnew - (KROWS - 1) * KDTROW), tmax = Math.max(KROWS * KDTROW, kTnew);   /* the same time window as the picture */
+  if (kRows < KROWS){ tw = 0; tmax = KROWS * KDTROW; }
+  var P = kPlotFrame(ktCv, ktCtx, tw, tmax, -2, 1.5, [-2, -1, 0, 1], tickList(tw, tmax), "t"), ctx = ktCtx, dpr = P.dpr;
+  if (!K) return;
+  ctx.save(); ctx.beginPath(); ctx.rect(P.pad.l, P.pad.t, P.w - P.pad.l - P.pad.r, P.h - P.pad.t - P.pad.b); ctx.clip();
+  ctx.setLineDash([6 * dpr, 4 * dpr]); ctx.strokeStyle = C["--muted"]; ctx.lineWidth = 1.2 * dpr;
+  ctx.beginPath(); ctx.moveTo(P.pad.l, P.Y(0)); ctx.lineTo(P.w - P.pad.r, P.Y(0)); ctx.stroke(); ctx.setLineDash([]);
+  var j0 = Math.max(0, Math.floor(tw / KDTROW) - 1), j;
+  ctx.strokeStyle = C["--accent"]; ctx.lineWidth = 1.8 * dpr; ctx.lineJoin = "round"; ctx.beginPath();
+  for (j = j0; j < kHistN; j++){ var x = P.X(j * KDTROW), y = P.Y(kPhi0[j]); if (j === j0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
+  ctx.stroke();
+  var T = K.T, q;
+  ctx.fillStyle = C["--pos"];
+  for (q = 0; q < T.bounceT.length; q++){
+    if (T.bounceT[q] < tw) continue;
+    ctx.beginPath(); ctx.arc(P.X(T.bounceT[q]), P.Y(Math.max(-2, T.bounceV[q])), 3.5 * dpr, 0, 6.2832); ctx.fill();
+  }
+  ctx.restore();
+}
+function frameK(){
+  var now = performance.now(), dtf = Math.min(0.05, Math.max(0, (now - kLast) / 1000)), changed = dirty;
+  kLast = now;
+  if (!K) kinkFire();
+  var s = K.s, T = K.T, busy = kscan && kscan.mode === "main";
+  if (!paused && !busy && s.t < KTMAX){
+    kAcc += KSPS * kMult * dtf;
+    var ns = Math.min(Math.floor(kAcc), 6000), k;
+    kAcc -= Math.floor(kAcc);
+    for (k = 0; k < ns && s.t < KTMAX; k++){
+      KINK.kinkStep(s); KINK.trackUpdate(s, T);
+      if (s.k % KROWSTEP === 0) kPushRow();
+    }
+    if (ns > 0) changed = true;
+    if (s.t >= KTMAX){ paused = true; $("runBtn").textContent = "Run"; $("runBtn").disabled = true; }
+  }
+  if (now - kReadT > 100 || dirty){ kReadT = now; showK(); changed = true; }
+  if (now - spsT > 500){ spsT = now; }
+  if (changed){ drawFieldK(); drawKX(); drawKT(); drawKScan(); dirty = false; }
+}
+/* ----- speed scan ----- */
+function kScanV(i){ return Math.round((KS_V0 + KS_DV * i) * 1000) / 1000; }
+function kScanColor(c){ return KCOL[c]; }
+function drawKScan(){
+  fitCanvas(ksCv);
+  var dpr = window.devicePixelRatio || 1, w = ksCv.width, h = ksCv.height, ctx = ksCtx, pad = { l: 56 * dpr, r: 10 * dpr, t: 22 * dpr, b: 36 * dpr };
+  ctx.clearRect(0, 0, w, h);
+  function X(v){ return pad.l + (v - KS_V0) / (KS_V1 - KS_V0) * (w - pad.l - pad.r); }
+  var ph = h - pad.t - pad.b;
+  function Y(f){ return h - pad.b - f * ph; }     /* f in 0..1 */
+  ctx.font = (11 * dpr) + "px " + getComputedStyle(document.body).fontFamily;
+  ctx.fillStyle = C["--muted"]; ctx.strokeStyle = C["--line"]; ctx.lineWidth = 1;
+  ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  [["1", 0.25], ["2", 0.5], ["3+", 0.75], ["trapped", 1]].forEach(function(q){
+    ctx.globalAlpha = 0.45; ctx.beginPath(); ctx.moveTo(pad.l, Y(q[1])); ctx.lineTo(w - pad.r, Y(q[1])); ctx.stroke(); ctx.globalAlpha = 1;
+    ctx.fillText(q[0], pad.l - 5 * dpr, Y(q[1] - 0.125));
+  });
+  ctx.textAlign = "center"; ctx.textBaseline = "top";
+  for (var v = 0.15; v <= 0.3001; v += 0.05) ctx.fillText(v.toFixed(2), X(v), h - pad.b + 3 * dpr);
+  ctx.fillText("speed v of each kink (in units of c)", pad.l + (w - pad.l - pad.r) / 2, h - 14 * dpr);
+  ctx.beginPath(); ctx.moveTo(pad.l, h - pad.b); ctx.lineTo(w - pad.r, h - pad.b); ctx.stroke();
+  var bw = (w - pad.l - pad.r) / KS_N, i, r;
+  for (i = 0; i < KS_N; i++){
+    r = kres[i]; if (!r) continue;
+    var c = r.cls, fh = c === 0 ? 1 : c * 0.25;
+    ctx.fillStyle = KCOL[c];
+    var x0 = Math.round(X(kScanV(i)) - bw / 2), x1 = Math.round(X(kScanV(i)) + bw / 2);
+    ctx.fillRect(x0, Y(fh), Math.max(1, x1 - x0), fh * ph);
+  }
+  ctx.globalAlpha = 1;
+  /* critical speed */
+  ctx.setLineDash([5 * dpr, 4 * dpr]); ctx.strokeStyle = C["--fg"]; ctx.lineWidth = 1.5 * dpr;
+  ctx.beginPath(); ctx.moveTo(X(KVC), pad.t - 4 * dpr); ctx.lineTo(X(KVC), h - pad.b); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = C["--fg"]; ctx.textAlign = "right"; ctx.textBaseline = "bottom";
+  /* label sits in the top margin, clear of the bars */
+  ctx.fillStyle = C["--fg"]; ctx.fillText("v_c ≈ 0.2598", X(KVC) - 4 * dpr, pad.t - 3 * dpr);
+  /* current speed */
+  if (kappa >= KS_V0 && kappa <= KS_V1){
+    var xm = X(kappa);
+    ctx.fillStyle = C["--accent"]; ctx.beginPath(); ctx.moveTo(xm, 11 * dpr); ctx.lineTo(xm - 5 * dpr, 2 * dpr); ctx.lineTo(xm + 5 * dpr, 2 * dpr); ctx.closePath(); ctx.fill();
+  }
+}
+function kScanIndexAt(ev){
+  var rc = ksCv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1, x = (ev.clientX - rc.left) * ksCv.width / rc.width;
+  var padl = 56 * dpr, padr = 10 * dpr, v = KS_V0 + (x - padl) / (ksCv.width - padl - padr) * (KS_V1 - KS_V0);
+  return Math.max(0, Math.min(KS_N - 1, Math.round((v - KS_V0) / KS_DV)));
+}
+function kScanDesc(i){
+  var r = kres[i], v = kScanV(i).toFixed(3);
+  if (!r) return "v = " + v + ": not scanned yet. Click to fire it.";
+  return "v = " + v + ": " + (r.cls === 0 ? "trapped (" + r.bounces + " bounces" + (r.outcome === "trapped" && r.tEnd >= KS_OPTS.tmax ? ", still together at t = " + KS_OPTS.tmax : ", stopped counting") + ")" : r.bounces + (r.bounces === 1 ? " bounce" : " bounces") + (r.outcome === "separating" ? ", still slowly separating at t = " + KS_OPTS.tmax : ", then flew apart")) + ". Click to fire it.";
+}
+ksCv.addEventListener("pointermove", function(ev){ $("kScanHover").textContent = kScanDesc(kScanIndexAt(ev)); });
+ksCv.addEventListener("click", function(ev){
+  var i = kScanIndexAt(ev);
+  kappa = kScanV(i); syncSliders(); kinkFire();
+});
+function kScanProgress(){
+  var s = kscan, el = (performance.now() - s.t0) / 1000;
+  $("kScanLine").textContent = (s.stop ? "Stopped: " : "Scanning: ") + s.done + " / " + KS_N + " runs · " + el.toFixed(1) + " s" + (s.mode === "main" ? " (on the main thread)" : " (" + s.workers.length + " workers)");
+}
+function kScanLock(b){
+  ["mReal", "mCplx", "mO3", "mKink"].forEach(function(id){ $(id).disabled = b; });
+  $("kScanBtn").disabled = b; $("kScanStop").hidden = !b;
+}
+function kScanFinish(stopped){
+  var s = kscan, el = (performance.now() - s.t0) / 1000;
+  s.workers.forEach(function(w){ try { w.terminate(); } catch (e) {} });
+  if (s.url) try { URL.revokeObjectURL(s.url); } catch (e) {}
+  kscan = null; kScanLock(false);
+  var cnt = [0, 0, 0, 0], i;
+  for (i = 0; i < KS_N; i++) if (kres[i]) cnt[kres[i].cls]++;
+  $("kScanLine").textContent = (stopped ? "Stopped after " : "Done: ") + s.done + " runs in " + el.toFixed(1) + " s. Trapped " + cnt[0] + ", one bounce " + cnt[1] + ", two bounces " + cnt[2] + ", three or more " + cnt[3] + ".";
+  dirty = true;
+}
+function kScanStart(){
+  if (kscan) return;
+  kres = new Array(KS_N);
+  kscan = { next: 0, done: 0, t0: performance.now(), workers: [], stop: false, mode: "worker", url: null, cur: null };
+  kScanLock(true); dirty = true;
+  var ok = false;
+  try {
+    var src = "var core=(" + kinkCoreFactory.toString() + ")();\nonmessage=function(e){var m=e.data;postMessage({i:m.i,r:core.kinkRun(m.v,m.o)});};";
+    kscan.url = URL.createObjectURL(new Blob([src], { type: "application/javascript" }));
+    var nw = Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 2) - 1)), q;
+    for (q = 0; q < nw; q++){
+      var w = new Worker(kscan.url);
+      w.onmessage = function(ev){
+        if (!kscan) return;
+        var m = ev.data;
+        kres[m.i] = m.r; kscan.done++;
+        kScanProgress(); dirty = true;
+        if (kscan.done >= KS_N) kScanFinish(false);
+        else if (kscan.stop) { if (kscan.done >= kscan.next) kScanFinish(true); }
+        else kScanDispatch(this);
+      };
+      w.onerror = function(){ if (kscan && kscan.mode === "worker" && kscan.done === 0) kScanMain(); };
+      kscan.workers.push(w);
+    }
+    ok = true;
+    kscan.workers.forEach(kScanDispatch);
+  } catch (e) { ok = false; }
+  if (!ok) kScanMain();
+  else kScanProgress();
+}
+function kScanDispatch(w){
+  var s = kscan;
+  if (!s || s.stop || s.next >= KS_N) return;
+  var i = s.next++;
+  w.postMessage({ i: i, v: kScanV(i), o: KS_OPTS });
+}
+/* fallback without workers: the same runs, in slices of a few milliseconds, with the live picture waiting */
+function kScanMain(){
+  var s = kscan;
+  s.workers.forEach(function(w){ try { w.terminate(); } catch (e) {} });
+  s.workers = []; s.mode = "main"; s.next = s.done = 0; kres = new Array(KS_N); s.t0 = performance.now();
+  setTimeout(kScanTick, 0);
+}
+function kScanTick(){
+  var s = kscan;
+  if (!s || s.mode !== "main") return;
+  if (s.stop){ kScanFinish(true); return; }
+  var t0 = performance.now();
+  while (performance.now() - t0 < 25){
+    if (!s.cur) s.cur = KINK.newRun(kScanV(s.next), KS_OPTS);
+    if (s.cur.advance(500)){
+      kres[s.next] = s.cur.result(); s.cur = null; s.next++; s.done++;
+      if (s.next >= KS_N){ kScanFinish(false); return; }
+    }
+  }
+  kScanProgress(); dirty = true;
+  setTimeout(kScanTick, 0);
+}
+$("kScanBtn").addEventListener("click", kScanStart);
+$("kScanStop").addEventListener("click", function(){
+  if (!kscan) return;
+  kscan.stop = true;
+  if (kscan.mode === "worker") kScanFinish(true);
+});
+$("fireBtn").addEventListener("click", kinkFire);
+$("kspeed").addEventListener("change", function(){ kMult = parseFloat(this.value); });
+kapEl.addEventListener("change", function(){ if (kink) kinkFire(); });
+if (window.ResizeObserver){ ro.observe(kxCv); ro.observe(ktCv); ro.observe(ksCv); }
 
 /* ---------- main loop ---------- */
 var spsCount = 0, spsT = performance.now(), spsVal = 0, readoutT = 0;
 function frame(){
   requestAnimationFrame(frame);
   if (scan) return;          /* a width scan is running on its own lattices; the live picture waits */
+  if (kink){ frameK(); return; }
   if (cplx){ frameC(); return; }
+  if (o3){ frameO(); return; }
   var changed = dirty;
   if (!paused){
     var t0 = performance.now(), acc = 0, ns = 0;
@@ -1836,7 +2934,7 @@ function frame(){
   }
 }
 
-readColors(); buildLut(); buildWheel(); syncSliders();
+readColors(); buildLut(); buildWheel(); buildBall(); afFit(); syncSliders();
 resetField("hot"); tuneDelta(40);
 setParams(0.285, 1);
 applyUI();
@@ -1943,7 +3041,7 @@ if (/[?&]debug\b/.test(location.search)){
     get scanning(){ return !!scan; },
     /* ----- Stage 4: complex phi ----- */
     setMode: setMode,
-    get mode(){ return cplx ? "complex" : "real"; },
+    get mode(){ return mode; },
     get u1(){ return { U: U, UM: UM, res: ures, head: cHead }; },
     /* U(1) run on its own lattice (the live one is untouched): u1Begin -> u1Run(n) until it returns true -> u1Result.
        opts: N (default = current grid), every (measure every k steps), clusters (false = Metropolis only), slice (also the slice-average mass),
@@ -1978,6 +3076,49 @@ if (/[?&]debug\b/.test(location.search)){
     },
     measureU1: function(k, l, therm, nsteps, init, opts){
       lf.u1Begin(k, l, therm, nsteps, init, opts); lf.u1Run(therm + nsteps); return lf.u1Result();
+    },
+    /* ----- Stage 6: O(3) arrows -----
+       o3Begin -> o3Run(n) until it returns true -> o3Result runs on its own lattice (the live one is untouched).
+       opts: N, every, clusters (false = heat-bath only), freeze (default true), mass (default true: also the slice-correlator mass). */
+    get o3(){ return { O: O, OM: OM, res: ores, mass: omass, Q: oQnow, coolLeft: coolLeft }; },
+    /* ----- Stage 7: kink collisions (setMode('kink') for the page) -----
+       kinkRun(v, opts) -> {outcome, bounces, vOut, Edrift, tEnd, ...} on its own grid (opts: dx, L, sponge, tmax, maxB, measureV (default true here), init, x0, amp);
+       kinkScanBegin(v0, v1, dv, opts) -> kinkScanRun(ms) (true when done) -> kinkScanResult() runs a speed scan in slices on the main thread;
+       kinkScanUI() starts the page's own scan (web workers); kinkCore has the raw solver. */
+    kinkCore: KINK, kinkCoreSrc: kinkCoreFactory.toString(),
+    kinkRun: function(v, opts){ var o = { measureV: true }, k; for (k in opts) o[k] = opts[k]; return KINK.kinkRun(v, o); },
+    kinkFire: function(v){ if (v != null){ kappa = v; syncSliders(); } if (!kink) setMode("kink"); kinkFire(); },
+    get kink(){ return { K: K, rows: kRows, hist: kHistN, scan: kres, mult: kMult, scanning: !!kscan, v: kappa }; },
+    kinkScanUI: kScanStart,
+    kinkScanBegin: function(v0, v1, dv, opts){
+      var vs = [], n = Math.round((v1 - v0) / dv), i;
+      for (i = 0; i <= n; i++) vs.push(Math.round((v0 + i * dv) * 1e6) / 1e6);
+      lf._ks = { vs: vs, o: opts || KS_OPTS, next: 0, cur: null, res: [], t0: performance.now() };
+    },
+    kinkScanRun: function(ms){
+      var s = lf._ks, t0 = performance.now();
+      while (s.next < s.vs.length && performance.now() - t0 < ms){
+        if (!s.cur) s.cur = KINK.newRun(s.vs[s.next], s.o);
+        if (s.cur.advance(500)){ s.res.push(s.cur.result()); s.cur = null; s.next++; }
+      }
+      return s.next >= s.vs.length;
+    },
+    kinkScanResult: function(){ return lf._ks.res; },
+    core: { newO3: newO3, o3Reset: o3Reset, o3Sweep: o3Sweep, o3Wolff: o3Wolff, o3Step: o3Step, o3Cool: o3Cool, o3Charge: o3Charge, o3Instanton: o3Instanton,
+            o3Sample: o3Sample, newO3Meas: newO3Meas, o3Result: o3Result, o3Mass: o3Mass, o3RunNew: o3RunNew, o3RunSteps: o3RunSteps, o3Energy: o3Energy, estimate: estimate },
+    o3Begin: function(beta, therm, nsteps, init, opts){
+      opts = opts || {};
+      lf._o3 = o3RunNew(opts.N || (o3 && O ? O.n : N), beta, therm, nsteps, init, opts); lf._o3.mass = opts.mass !== false;
+    },
+    o3Run: function(c){ return o3RunSteps(lf._o3, c); },
+    o3Result: function(){
+      var s = lf._o3, R = o3Result(s.M), e = s.mass ? o3Mass(s.M) : null;
+      if (e && e.m > 0){ R.m = e.m; R.mErr = e.mErr; R.mRough = e.rough; }
+      R.beta = s.o.beta; R.clusters = s.o.clusters; R.cluAvg = s.o.cluAvg; R.qDev = s.o.qDev; R.energyNow = o3Energy(s.o);
+      return R;
+    },
+    measureO3: function(beta, therm, nsteps, init, opts){
+      lf.o3Begin(beta, therm, nsteps, init, opts); lf.o3Run(therm + nsteps); return lf.o3Result();
     }
   };
   var acSeries = [];

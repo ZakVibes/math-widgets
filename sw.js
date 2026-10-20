@@ -5,7 +5,7 @@
 // When you add a widget: add its folder name to WIDGETS below (it needs previews/<name>.jpg too)
 // and bump VERSION, so phones that already have the app download the new list.
 
-const VERSION = "v9";
+const VERSION = "v10";
 const CACHE = "math-widgets-" + VERSION;
 const FONTS = "math-widgets-fonts";
 const SLOW_MS = 4000;
