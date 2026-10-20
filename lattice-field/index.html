@@ -1,0 +1,1989 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Quantum Field on a Lattice</title>
+<link rel="manifest" href="../manifest.json"><link rel="icon" href="../icons/icon-192.png"><link rel="apple-touch-icon" href="../icons/icon-180.png"><meta name="apple-mobile-web-app-title" content="Math Widgets"><script>if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("../sw.js"));</script>
+<link rel="stylesheet" href="../site.css">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Quantum Field on a Lattice: live Monte Carlo of 1+1D phi^4 theory (Stage 4: Z2 field, cluster updates, correlator and mass, domain walls, thin strip tunnelling; complex U(1) field with vortices and BKT). */
+:root{
+  color-scheme: light;
+  --bg:#f4f2ed; --panel:#ffffff; --soft:#eeebe4; --line:#d9d5ca;
+  --fg:#1d2430; --muted:#5d6877; --accent:#2a6bb5; --on-accent:#ffffff;
+  --neg:#2a6bb5; --pos:#cc5a2b;
+  --font-display:"Fraunces", Georgia, "Times New Roman", serif;
+  --font-body:"Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono:"JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --bg:#0f1318; --panel:#171c23; --soft:#202731; --line:#2e3642;
+    --fg:#e7ebf1; --muted:#9aa6b6; --accent:#6fb0ff; --on-accent:#0b1320;
+    --neg:#6fb0ff; --pos:#f09a5c;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#0f1318; --panel:#171c23; --soft:#202731; --line:#2e3642;
+  --fg:#e7ebf1; --muted:#9aa6b6; --accent:#6fb0ff; --on-accent:#0b1320;
+  --neg:#6fb0ff; --pos:#f09a5c;
+}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:var(--text-base);line-height:1.5}
+.wrap{max-width:1080px;margin:0 auto;padding:var(--space-4);padding-left:max(var(--space-4),env(safe-area-inset-left));padding-right:max(var(--space-4),env(safe-area-inset-right));padding-bottom:var(--space-5)}
+h1{font-family:var(--font-display);font-weight:600;font-size:28px;line-height:1.15;margin:var(--space-2) 0 var(--space-3)}
+.lede{max-width:62ch;color:var(--muted);font-size:var(--text-lg);margin:0 0 var(--space-4)}
+.lede b{color:var(--fg);font-weight:600}
+.try{max-width:62ch;margin:0 0 var(--space-4);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:var(--space-2) var(--space-3)}
+.try summary{cursor:pointer;font-weight:600;min-height:var(--tap);display:flex;align-items:center}
+.try ol{margin:var(--space-2) 0 var(--space-2);padding-left:1.3em;color:var(--muted)}
+.try li{margin-bottom:var(--space-2)}
+.try b{color:var(--fg)}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:var(--space-4);align-items:start}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-lg);padding:var(--space-3) var(--space-4)}
+.col{display:flex;flex-direction:column;gap:var(--space-3);min-width:0}
+h2{font-size:var(--text-md);font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:0 0 var(--space-2)}
+
+/* field canvas with axis labels */
+.field-frame{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto;gap:6px 8px;align-items:center}
+.field-frame .ylab{writing-mode:vertical-rl;transform:rotate(180deg);text-align:center;font-size:var(--text-sm);color:var(--muted);white-space:nowrap}
+.field-frame .xlab{grid-column:2;text-align:center;font-size:var(--text-sm);color:var(--muted)}
+#field{display:block;width:100%;aspect-ratio:1/1;border-radius:var(--radius-md);background:var(--soft);touch-action:manipulation}
+.cbar{display:flex;align-items:center;gap:8px;margin-top:var(--space-2);font-size:var(--text-sm);color:var(--muted);font-family:var(--font-mono)}
+.cbar canvas{flex:1;height:10px;border-radius:5px;min-width:0}
+
+.row{display:flex;flex-wrap:wrap;gap:var(--space-2)}
+.btn{min-height:var(--tap);padding:0 var(--space-4);border-radius:var(--radius-md);border:1px solid var(--line);background:var(--panel);color:var(--fg);font:inherit;font-weight:500;cursor:pointer;touch-action:manipulation}
+.btn:hover{border-color:var(--accent)}
+.btn:active{background:var(--soft)}
+.btn.seg{min-height:32px;padding:0 var(--space-3);font-size:var(--text-sm)}
+.btn.seg.on{background:var(--soft);border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);min-width:84px}
+.btn:focus-visible,input[type=range]:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.presets{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2);margin-top:var(--space-2)}
+.presets .lbl{font-size:var(--text-sm);color:var(--muted);margin-right:2px}
+select{min-height:var(--tap);border-radius:var(--radius-md);border:1px solid var(--line);background:var(--panel);color:var(--fg);font:inherit;padding:0 var(--space-2)}
+.sizebox{display:flex;align-items:center;gap:var(--space-2);margin-left:auto;font-size:var(--text-sm);color:var(--muted)}
+
+/* sliders */
+.slider{margin-bottom:var(--space-3)}
+.slider .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.slider label{font-weight:600}
+.slider .val{font-family:var(--font-mono);font-size:var(--text-lg);font-weight:500}
+.slider .hint{font-size:var(--text-sm);color:var(--muted);margin:0 0 2px}
+input[type=range]{width:100%;height:var(--tap);margin:0;accent-color:var(--accent);touch-action:pan-y}
+.warn{font-size:var(--text-sm);color:var(--pos);margin:0 0 var(--space-2)}
+.eq{font-family:var(--font-mono);font-size:var(--text-sm);color:var(--muted);margin:0}
+
+canvas.plot{display:block;width:100%;height:150px}
+canvas.plot.tall{height:190px}
+.tog{display:flex;align-items:center;gap:var(--space-2);min-height:var(--tap);margin-top:var(--space-2);cursor:pointer}
+.tog input{width:20px;height:20px;margin:0;accent-color:var(--accent)}
+.tog b{font-weight:600}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2)}
+.card{background:var(--soft);border-radius:var(--radius-md);padding:var(--space-2) var(--space-3)}
+.card .k{font-size:var(--text-sm);color:var(--muted)}
+.card .v{font-family:var(--font-mono);font-size:var(--text-2xl);font-weight:500;line-height:1.2}
+.card .s{font-size:var(--text-xs);color:var(--muted);font-family:var(--font-mono)}
+.small{font-size:var(--text-sm);color:var(--muted);margin:var(--space-2) 0 0}
+.stat{font-family:var(--font-mono);font-size:var(--text-sm);color:var(--muted);margin:var(--space-2) 0 0}
+
+[hidden]{display:none !important}
+.toolbar{display:flex;flex-wrap:wrap;gap:var(--space-2) var(--space-4);align-items:center;margin-bottom:var(--space-3)}
+.seggrp{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.seggrp .lbl{font-size:var(--text-sm);color:var(--muted)}
+.field-frame .slab{display:none;font-size:var(--text-sm);color:var(--muted)}
+.field-frame.strip{grid-template-columns:minmax(0,1fr)}
+.field-frame.strip .ylab{display:none}
+.field-frame.strip .slab{display:block}
+.field-frame.strip .xlab{grid-column:1}
+.field-frame.strip #field{aspect-ratio:auto}
+.howto ul{margin:4px 0 0;padding-left:20px;font-size:var(--text-sm)}
+.howto li{margin:2px 0}
+.howto .sw{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px;margin-right:2px;border:1px solid var(--line)}
+.wheelbox{display:flex;align-items:center;gap:12px;margin-top:var(--space-2);font-size:var(--text-sm);color:var(--muted)}
+.wheelbox canvas{width:76px;height:76px;flex:none}
+.card.dim{opacity:.6}
+@media (max-width:860px){
+  .layout{grid-template-columns:minmax(0,1fr)}
+  h1{font-size:24px}
+  .lede{font-size:var(--text-base)}
+  .sizebox{margin-left:0}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back-link" href="../index.html">← All widgets</a>
+  <h1>Quantum Field on a Lattice</h1>
+  <p class="lede" id="ledeR">Each pixel is the value of a field <b>φ</b> at one point of a grid. Horizontal is space; vertical is <b>imaginary time</b>, so the whole picture is a snapshot of the quantum vacuum's fluctuations, shaken by a live Monte Carlo simulation. Drag <b>κ</b> up and watch the field pick a sign, blue or orange, everywhere: that is spontaneous symmetry breaking (Z₂), just like the Ising model.</p>
+
+  <p class="lede" id="ledeC" hidden>Now <b>φ</b> has two components, so at every site it is an arrow: its <b>phase</b> is the colour, its length the brightness. The action is unchanged by turning every arrow by the same angle (a <b>U(1)</b> symmetry). In two dimensions that symmetry can never break, which is why there is no sign to pick here; instead the arrows can swirl around points called <b>vortices</b>, and the order is destroyed by their unbinding (the <b>BKT</b> transition).</p>
+
+  <details class="try">
+    <summary>Things to try</summary>
+    <ol>
+      <li><b>Break the symmetry.</b> Press Randomize, then Broken: blue and orange domains grow until one sign wins. Back to Symmetric and the order melts.</li>
+      <li><b>Find the critical point.</b> Press Critical: domains of every size appear, and the mass m falls towards zero (correlations reach across the whole grid).</li>
+      <li><b>Watch kinks.</b> Switch to Domain walls at Critical: lines running up the picture are kinks moving through time, small loops are kink–antikink pairs.</li>
+      <li><b>Tunnel.</b> Choose Thin strip: the whole of space flips between the two vacua. Press Scan widths to measure the kink mass from how fast tunnelling dies out as space gets wider.</li>
+      <li><b>Make it complex.</b> Choose Complex φ and the Vortices view. Go from Vortex gas to Quasi-ordered: free vortices pair up and the stiffness Υ jumps past 2/π. That is the BKT transition.</li>
+    </ol>
+  </details>
+
+  <div class="layout">
+    <div class="col">
+      <div class="panel">
+        <div class="toolbar">
+          <div class="seggrp" role="group" aria-label="Field type"><span class="lbl">Field</span>
+            <button class="btn seg on" id="mReal" aria-pressed="true">Real φ (Z₂)</button>
+            <button class="btn seg" id="mCplx" aria-pressed="false">Complex φ (U(1))</button></div>
+          <div class="seggrp" role="group" aria-label="View"><span class="lbl">View</span>
+            <button class="btn seg on" id="vField" aria-pressed="true">Field</button>
+            <button class="btn seg" id="vWalls" aria-pressed="false">Domain walls</button></div>
+          <div class="seggrp" role="group" aria-label="Geometry" id="geoGrp"><span class="lbl">Geometry</span>
+            <button class="btn seg on" id="gSquare" aria-pressed="true">Square</button>
+            <button class="btn seg" id="gStrip" aria-pressed="false">Thin strip</button></div>
+        </div>
+        <div class="field-frame" id="frameBox">
+          <div class="slab" id="slab">↕ space (12 sites)</div>
+          <div class="ylab" id="ylab">Euclidean time ↑</div>
+          <canvas id="field" aria-label="Lattice field, colour shows the value of phi at each site"></canvas>
+          <div class="xlab" id="xlab">space →</div>
+        </div>
+        <div class="card howto" id="howto" hidden style="margin-top:var(--space-2)">
+          <div class="k"><b>How to read it</b></div>
+          <ul>
+            <li><span class="sw" style="background:var(--neg);opacity:.45"></span><span class="sw" style="background:var(--pos);opacity:.45"></span> pale colour: which vacuum the field is in (blue is −, orange is +).</li>
+            <li>A dark line is a <b>wall</b> between the two vacua (a kink).</li>
+            <li>A line running <span id="hwAlong">up the picture</span> is a kink moving through time.</li>
+            <li>A closed loop is a kink–antikink pair popping in and out of the vacuum.</li>
+            <li>A line right <span id="hwAcross">across</span> is the whole of space tunnelling at once.</li>
+          </ul>
+        </div>
+        <div class="card howto" id="howtoV" hidden style="margin-top:var(--space-2)">
+          <div class="k"><b>How to read it</b></div>
+          <ul>
+            <li>Faded colours: the phase of φ (see the wheel below).</li>
+            <li>A <b>swirl of colour around a point</b>, every hue appearing once on a small loop, is a vortex. A dark dot marks one that winds counter-clockwise (+), a light dot with a dark rim one that winds clockwise (−, an antivortex).</li>
+            <li>Below the transition, vortices only appear in <b>tightly bound + / − pairs</b>, close enough that from afar their swirls cancel.</li>
+            <li>Above it the pairs <b>unbind into a free gas</b>, and the free vortices scramble the phase over long distances. That is the BKT transition.</li>
+          </ul>
+        </div>
+        <div class="cbar" id="cbarBox"><span>φ = −1.3</span><canvas id="cbar" width="256" height="1"></canvas><span>+1.3</span></div>
+        <div class="wheelbox" id="wheelBox" hidden><canvas id="wheelCv" aria-label="Colour wheel: hue is the phase angle of phi, brightness is its length"></canvas>
+          <span>Hue = the phase angle of φ (red is 0, counter-clockwise as on the wheel); brighter and more saturated = larger |φ|, pale = near zero. While the grid is ordered, colours are shown relative to its average phase, so they don't flicker.</span></div>
+        <div class="row" style="margin-top:var(--space-3)">
+          <button class="btn primary" id="runBtn">Pause</button>
+          <button class="btn" id="hotBtn" title="Random values everywhere">Randomize</button>
+          <button class="btn" id="coldBtn" title="Every site set to the well minimum +v">All +v</button>
+          <div class="sizebox" id="sizeBox"><label for="sizeSel">Grid</label>
+            <select id="sizeSel"><option value="64">64 × 64</option><option value="128" selected>128 × 128</option><option value="256">256 × 256</option></select></div>
+        </div>
+        <div class="presets"><span class="lbl">Presets (λ = 1):</span>
+          <button class="btn" data-preset="sym">Symmetric</button>
+          <button class="btn" data-preset="crit">Critical</button>
+          <button class="btn" data-preset="brk">Broken</button>
+        </div>
+        <label class="tog"><input type="checkbox" id="cluChk" checked><b>Cluster updates</b></label>
+        <p class="small" style="margin-top:0" id="cluNote">Flips whole same-sign regions at once, which beats the slowing-down of ordinary updates near κ = 0.340.</p>
+        <p class="stat" id="speed">–</p>
+      </div>
+
+      <div class="panel" id="stripPanel" hidden>
+        <h2>Thin strip: tunnelling</h2>
+        <p class="small" style="margin-top:0">With only a few sites of space, the field cannot hold two sign domains side by side. What it can do is hop, as a whole, from one vacuum to the other as time goes by.</p>
+        <canvas class="plot" id="sPlot" aria-label="Average of phi over space at each time"></canvas>
+        <p class="small">The average of φ over space at each moment, s(t). It sits near −v or +v and every jump between them is a tunnelling event.</p>
+        <div class="cards">
+          <div class="card"><div class="k">Tunnellings per 1000 time steps</div><div class="v" id="rateV">–</div><div class="s" id="rateE">&nbsp;</div></div>
+          <div class="card"><div class="k">⟨|s|⟩ slice average</div><div class="v" id="sAbsV">–</div><div class="s" id="sAbsE">&nbsp;</div></div>
+        </div>
+        <p class="warn" id="stripHint" hidden style="margin-top:var(--space-2)">Tunnelling only means something in the ordered phase. Try κ ≈ 0.37.</p>
+        <p class="small" id="stripKapNote" hidden>κ was below 0.35, so it was set to 0.37 to put the strip in the ordered phase.</p>
+        <div class="row" style="margin-top:var(--space-3)">
+          <button class="btn primary" id="scanBtn">Scan widths</button>
+          <button class="btn" id="scanStop" hidden>Stop</button>
+        </div>
+        <p class="stat" id="scanLine">Measures the rate for L = 4, 6, …, 20 at the current κ and λ.</p>
+        <canvas class="plot tall" id="scanCv" hidden aria-label="Log of tunnelling rate against strip width, with straight-line fit"></canvas>
+        <div class="cards" id="scanCards" hidden style="margin-top:var(--space-2)">
+          <div class="card"><div class="k">kink mass M ≈</div><div class="v" id="scanM">–</div><div class="s" id="scanME">&nbsp;</div></div>
+          <div class="card"><div class="k">2M ≈</div><div class="v" id="scan2M">–</div><div class="s" id="scan2ME">&nbsp;</div></div>
+        </div>
+        <p class="stat" id="scanFit2" hidden></p>
+        <p class="small" id="scanExplain">Wider space means a wall stretched across it costs more action, so tunnelling gets exponentially rarer; the slope of ln(rate) against L is minus the kink mass M. (A strip that loops around in time always holds an even number of walls, so when walls are rarer than about one per strip the scan corrects its counts for that.)</p>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="panel">
+        <h2>Controls</h2>
+        <div class="slider">
+          <div class="top"><label for="kap">κ  hopping</label><span class="val" id="kapV"></span></div>
+          <p class="hint" id="kapHint">How strongly neighbours want to agree (like Ising β/2).</p>
+          <input type="range" id="kap" min="0.15" max="0.45" step="0.001" value="0.2">
+        </div>
+        <div class="slider" style="margin-bottom:var(--space-2)">
+          <div class="top"><label for="lam">λ  well sharpness</label><span class="val" id="lamV"></span></div>
+          <p class="hint" id="lamHint">0 = soft free field, large = field pinned near ±1 (Ising).</p>
+          <input type="range" id="lam" min="0" max="5" step="0.01" value="1">
+        </div>
+        <div class="slider" id="lBox" hidden>
+          <div class="top"><label for="lsl">L  width of space</label><span class="val" id="lslV"></span></div>
+          <p class="hint">Thin strip only: sites of space (time is a long strip of sites).</p>
+          <input type="range" id="lsl" min="4" max="32" step="1" value="12">
+        </div>
+        <p class="warn" id="warn" hidden>With λ = 0 and κ ≥ 0.25 the field is unstable (it runs away); the simulation clips it at ±30.</p>
+        <p class="eq" id="eqLine">S = Σ −2κ φφ′ + φ² + λ(φ²−1)²</p>
+      </div>
+
+      <div class="panel">
+        <h2 id="wellH">Mean-field well</h2>
+        <canvas class="plot" id="well" aria-label="Mean-field effective potential"></canvas>
+        <p class="small" id="wellNote">V(φ) − 4κφ²: one valley means a symmetric vacuum, two valleys means the field must choose a side.</p>
+      </div>
+
+      <div class="panel">
+        <h2>Readouts</h2>
+        <div class="cards">
+          <div class="card"><div class="k" id="absK">⟨|φ|⟩ average field</div><div class="v" id="absM">–</div><div class="s" id="absMi">now –</div></div>
+          <div class="card"><div class="k">acceptance</div><div class="v" id="accV">–</div><div class="s" id="stepV">step –</div></div>
+          <div class="card" id="wallCard" hidden><div class="k">wall length per site</div><div class="v" id="wallV">–</div><div class="s">smoothed 3×3, per lattice site</div></div>
+          <div class="card" id="massCard"><div class="k">m = 1/ξ  mass</div><div class="v" id="massV">–</div><div class="s" id="massE">&nbsp;</div></div>
+          <div class="card" id="xiCard"><div class="k">ξ  correlation length</div><div class="v" id="xiV">–</div><div class="s" id="xiE">&nbsp;</div></div>
+          <div class="card" id="vortCard" hidden><div class="k">vortex density</div><div class="v" id="vortV">–</div><div class="s" id="vortE">per plaquette</div></div>
+          <div class="card" id="upsCard" hidden><div class="k">Υ  helicity modulus</div><div class="v" id="upsV">–</div><div class="s" id="upsE">2/π = 0.637 at BKT</div></div>
+          <div class="card" id="etaCard" hidden><div class="k">η  power-law exponent</div><div class="v" id="etaV">–</div><div class="s" id="etaE">&nbsp;</div></div>
+          <div class="card" id="mCard" hidden><div class="k">m = 1/ξ  mass</div><div class="v" id="mV">–</div><div class="s" id="mE">&nbsp;</div></div>
+        </div>
+        <p class="stat" id="etaLine" hidden>–</p>
+        <p class="small" id="cmwNote" hidden><b>Coleman–Mermin–Wagner:</b> in 1+1D a continuous symmetry can never truly break. ⟨|m|⟩ only looks nonzero because the grid is finite, and it shrinks slowly (like N<sup>−η/2</sup>) as the grid grows; try 64 → 128 → 256.</p>
+        <p class="warn" id="xiNote" hidden style="margin-top:var(--space-2)">The correlation length is comparable to the grid: near the critical point, try a bigger grid.</p>
+        <p class="small" id="ordNote" hidden>In the ordered phase, the lightest thing a nudge of φ can create is a kink–antikink pair (a kink is a wall between the + and − vacua), and pairs fade out more slowly than a single particle would. So here the number is only a rough decay rate: an overestimate of twice the kink mass.</p>
+        <div id="corrSec">
+        <h2 style="margin-top:var(--space-3)">Correlation along time</h2>
+        <canvas class="plot tall" id="corr" aria-label="Correlation of the field against time separation, log scale"></canvas>
+        <p class="small">On a log plot a straight-ish fall-off means correlations die off like e<sup>−mτ</sup>, and the slope is the particle mass; it goes to zero at the critical point. Points show the measured correlation with error bars, the line is the fit.</p>
+        </div>
+        <div id="corrSecC" hidden>
+        <h2 style="margin-top:var(--space-3)">Correlation along an axis</h2>
+        <canvas class="plot tall" id="corrC" aria-label="Point to point correlation of phi against distance, log-log"></canvas>
+        <p class="small" id="corrCnote">G(r) = ⟨φ(x)·φ(x + r)⟩, averaged over every site and both axes, on log-log axes: a straight line is a power law r<sup>−η</sup> (on this periodic grid the fit curve bends over slightly towards r = N/2, because r is really a chord on a ring). Points have error bars; the curve is the fit.</p>
+        </div>
+        <div id="histSec">
+        <h2 style="margin-top:var(--space-3)">Histogram of φ</h2>
+        <div class="row" style="margin-bottom:var(--space-2)" role="group" aria-label="Histogram of what">
+          <button class="btn seg on" id="hBlock" aria-pressed="true">8×8 averages</button>
+          <button class="btn seg" id="hSite" aria-pressed="false">Single sites</button>
+        </div>
+        <canvas class="plot" id="hist" aria-label="Histogram of field values"></canvas>
+        <p class="small" id="histNote">Averaging over 8×8 blocks smooths out the small wiggles: one hump means no preferred sign, two humps mean the field has chosen a side (or both, in different domains). Single sites always look two-humped at λ = 1, because the well itself has two valleys.</p>
+        <p class="small">⟨|φ|⟩ is the absolute value of the grid-wide average of φ, smoothed over recent sweeps. It is near 0 when domains of both signs cancel and near the well minimum when one sign wins.</p>
+        </div>
+        <div id="histSecC" hidden>
+        <h2 style="margin-top:var(--space-3)">Histogram of the phase angle</h2>
+        <canvas class="plot" id="histC" aria-label="Histogram of the phase angle of 8 by 8 block averages"></canvas>
+        <p class="small">The phase angle of every 8×8 block average, averaged over the last ~100 steps. It should be flat: the circle of vacua has no preferred direction, because the field keeps wandering around it. The dashed line is perfectly flat.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ---------- state ---------- */
+/* N is the side of the square grid. The lattice actually simulated is Nx (space) x Nt (time), site index = t * Nx + x:
+   square grid: Nx = Nt = N; thin strip: Nx = L (a few sites of space), Nt = T (a long strip of time). */
+var N = 128, Nx = N, Nt = N, f = new Float64Array(N*N);
+var strip = false, viewMode = "field", Lsp = 12, Tt = 0, sq = null;
+var useClusters = true, visited = new Uint32Array(N*N), gen = 0, queue = new Int32Array(N*N);
+var kappa = 0.2, lambda = 1;
+var delta = 1.5, lastAcc = 0.5;
+var paused = false;
+var LIM = 30;
+var PRESETS = { sym:[0.285, 1], crit:[0.340, 1], brk:[0.394, 1] };   /* kappa_c(lambda=1) = 0.340 +- 0.002 (Binder crossing N=16/32/64, Metropolis + Wolff clusters; see PLAN.md) */
+
+/* ---------- PRNG: sfc32 ---------- */
+var ra = 0, rb = 0, rc = 0, rd = 0;
+function seedRng(x){
+  ra = 0x9E3779B9 ^ x; rb = 0x243F6A88; rc = 0xB7E15162; rd = 1;
+  for (var i = 0; i < 20; i++) rnd();
+}
+function rnd(){
+  ra >>>= 0; rb >>>= 0; rc >>>= 0; rd >>>= 0;
+  var t = (ra + rb) | 0;
+  ra = rb ^ (rb >>> 9);
+  rb = (rc + (rc << 3)) | 0;
+  rc = (rc << 21) | (rc >>> 11);
+  rd = (rd + 1) | 0;
+  t = (t + rd) | 0;
+  rc = (rc + t) | 0;
+  return (t >>> 0) / 4294967296;
+}
+seedRng((Date.now() ^ (Math.random() * 4294967296)) | 0);
+
+/* ---------- Monte Carlo ---------- */
+function sweep(){
+  var nx = Nx, nt = Nt, k2 = 2 * kappa, lam = lambda, d = delta, acc = 0, F = f;
+  for (var par = 0; par < 2; par++){
+    for (var y = 0; y < nt; y++){
+      var row = y * nx, up = (y === 0 ? nt - 1 : y - 1) * nx, dn = (y === nt - 1 ? 0 : y + 1) * nx;
+      for (var x = (y + par) & 1; x < nx; x += 2){
+        var i = row + x, o = F[i];
+        var s = F[row + (x === 0 ? nx - 1 : x - 1)] + F[row + (x === nx - 1 ? 0 : x + 1)] + F[up + x] + F[dn + x];
+        var p = o + d * (rnd() - 0.5);
+        var o2 = o * o, p2 = p * p, a = p2 - 1, b = o2 - 1;
+        var dS = -k2 * (p - o) * s + (p2 - o2) + lam * (a * a - b * b);
+        if (p > -LIM && p < LIM && (dS <= 0 || rnd() < Math.exp(-dS))){ F[i] = p; acc++; }
+      }
+    }
+  }
+  lastAcc = acc / (nx * nt);
+  return acc;
+}
+/* Wolff cluster flip for the embedded Ising model (Brower-Tamayo): the sign of phi is the Ising spin, and a bond
+   between same-sign neighbours is added with p = 1 - exp(-4 kappa phi_i phi_j). Returns the cluster size. */
+function wolff(){
+  var nx = Nx, nt = Nt, n2 = nx * nt, F = f, V = visited, Q = queue;
+  if (++gen > 4294967290){ V.fill(0); gen = 1; }
+  var g = gen, k4 = 4 * kappa;
+  var seed = (rnd() * n2) | 0, sg = F[seed] > 0 ? 1 : -1;
+  var head = 0, tail = 1, q;
+  Q[0] = seed; V[seed] = g;
+  while (head < tail){
+    var i = Q[head++], fi = F[i], y = (i / nx) | 0, x = i - y * nx;
+    for (var d = 0; d < 4; d++){
+      var j = d === 0 ? (x === 0 ? i + nx - 1 : i - 1) : d === 1 ? (x === nx - 1 ? i - nx + 1 : i + 1) :
+              d === 2 ? (y === 0 ? i + n2 - nx : i - nx) : (y === nt - 1 ? i - n2 + nx : i + nx);
+      if (V[j] !== g){
+        var fj = F[j];
+        if (fj * sg > 0 && rnd() < 1 - Math.exp(-k4 * fi * fj)){ V[j] = g; Q[tail++] = j; }
+      }
+    }
+  }
+  for (q = 0; q < tail; q++){ var s = Q[q]; F[s] = -F[s]; }
+  return tail;
+}
+/* One update step = a Metropolis sweep, then about N^2 sites' worth of Wolff clusters. The number of clusters is set from a slowly
+   updated running mean of the cluster size (capped), not from this step's own sizes: stopping when N^2 sites have flipped would
+   make the count depend on the configuration and slightly spoil detailed balance. Returns accepted count. */
+var cluPer = 1, cluAvg = 1, cluFix = 0, cluFreeze = false;   /* cluFreeze: live loop only, set while measuring (see frame) */
+function updateStep(){
+  var acc = sweep();
+  if (useClusters){
+    var cnt = cluFix > 0 ? cluFix : Math.min(1000, Math.max(1, Math.floor(cluPer + rnd()))), tot = 0, c;
+    for (c = 0; c < cnt; c++) tot += wolff();
+    if (!cluFreeze) cluAvg += 0.02 * (tot / cnt - cluAvg);
+    cluPer = Nx * Nt / cluAvg;
+  }
+  return acc;
+}
+function tune(acc, gain){
+  delta *= Math.exp(gain * (acc - 0.5));
+  if (delta < 0.02) delta = 0.02;
+  if (delta > 8) delta = 8;
+}
+function meanPhi(){
+  var s = 0, F = f, n = Nx * Nt;
+  for (var i = 0; i < n; i++) s += F[i];
+  return s / n;
+}
+function wellMin(){            /* mean-field minimum +v of (1-4k)p^2 + lam(p^2-1)^2 */
+  if (lambda > 1e-9){
+    var v2 = 1 - (1 - 4 * kappa) / (2 * lambda);
+    if (v2 > 0.05) return Math.sqrt(v2);
+  }
+  return 1;
+}
+function resetField(mode){
+  if (cplx){ u1Reset(U, mode, wellMin()); snap = true; histInit = false; resetMeasure(); return; }
+  var n = Nx * Nt, i, v;
+  if (mode === "cold"){ v = wellMin(); for (i = 0; i < n; i++) f[i] = v; }
+  else { for (i = 0; i < n; i++) f[i] = (rnd() * 2 - 1) * 1.6; }
+  snap = true; histInit = false; lastSign = 0;
+  resetMeasure();
+}
+function allocLattice(nx, nt){
+  Nx = nx; Nt = nt; f = new Float64Array(nx * nt); visited = new Uint32Array(nx * nt); gen = 0; queue = new Int32Array(nx * nt);
+  cluAvg = 1; cluPer = 1;
+}
+function setSize(n){
+  if (cplx){ allocU(n); return; }
+  N = n; sq = null;
+  if (strip){ setGeometry("square"); return; }
+  allocLattice(N, N);
+  resetField("hot"); tuneDelta(40); dirty = true;
+}
+function tuneDelta(nsw){ for (var i = 0; i < nsw; i++) tune(sweep() / (Nx * Nt), 0.4); }
+
+/* ---------- correlator and mass ----------
+   After each update step: time-slice means s_t = mean_x phi(x,t), G(tau) = (1/N) sum_t s_t s_{t+tau} (periodic), tau = 0..N/2.
+   G is averaged in blocks of BLK steps (last MAXB blocks kept) for jackknife errors. On a periodic lattice
+   G(tau) = c + A cosh(m (tau - N/2)), where c is a constant (zero mode / tunnelling piece). The differences
+   D(tau) = G(tau) - G(tau+1) ~ sinh(m (h - tau)), h = (N-1)/2, cancel c; the ratio D(tau)/D(tau+1) gives m_eff(tau). */
+var MAXB = 200, BLK = 50, THERM = 200;
+var HN = N >> 1, rowS = new Float64Array(N), colS = new Float64Array(N), curG = new Float64Array(HN + 1), curN = 0;
+var ring = [], ringPos = 0, blocksDone = 0, thermLeft = THERM, est = null, estBlocks = -1, lastSign = 0;
+function resetMeasure(){
+  if (cplx){ resetCMeasure(); return; }
+  HN = N >> 1; rowS = new Float64Array(N); colS = new Float64Array(N); curG = new Float64Array(HN + 1); curN = 0;
+  ring = []; ringPos = 0; blocksDone = 0; thermLeft = THERM; est = null; estBlocks = -1; massDirty = true;
+  liveMeter = makeMeter(100, 25);      /* thin strip: skip ~100 update steps after any change */
+}
+function accumulate(){
+  if (Nx !== Nt) return;     /* square grids only, see the note below */
+  /* NOTE: this assumes N_x = N_t (square grid, same kappa in both directions, so space and Euclidean time are equivalent).
+     We average the time correlator (row means) with the space correlator (column means): twice the statistics.
+     A later "thin strip" mode has a non-square grid and must use the time direction only. */
+  var n = N, F = f, s = rowS, c = colS, y, x, t, tau;
+  for (x = 0; x < n; x++) c[x] = 0;
+  for (y = 0; y < n; y++){ var r = y * n, a = 0; for (x = 0; x < n; x++){ var v = F[r + x]; a += v; c[x] += v; } s[y] = a / n; }
+  for (x = 0; x < n; x++) c[x] /= n;
+  for (tau = 0; tau <= HN; tau++){
+    var b = 0;
+    for (t = 0; t < n; t++){ var u = t + tau; if (u >= n) u -= n; b += s[t] * s[u] + c[t] * c[u]; }
+    curG[tau] += b / (2 * n);
+  }
+  if (++curN >= BLK){
+    var blk = new Float64Array(HN + 1);
+    for (tau = 0; tau <= HN; tau++) blk[tau] = curG[tau] / curN;
+    if (ring.length < MAXB) ring.push(blk); else { ring[ringPos] = blk; ringPos = (ringPos + 1) % MAXB; }
+    blocksDone++; curG.fill(0); curN = 0;
+  }
+}
+/* ---------- thin strip: tunnelling counter ----------
+   s_t = (1/L) sum_x phi(x,t). A tunnelling event is a sign change of s_t with hysteresis: the state only switches when s_t
+   crosses +h or -h, h = v/2, v = running mean of the site-average |phi| (the vacuum value). Counted once around the periodic
+   strip. rate = events per 1000 time sites. This is a property of each configuration, averaged over update steps (after a
+   burn-in); the error comes from blocks of K steps. */
+var liveMeter = null;
+function makeMeter(skip, K){ return { skip: skip, K: K, bsum: 0, bn: 0, blocks: [], flips: 0, steps: 0, v: 0, sAbs: 0, s: null }; }
+function meterStep(m){
+  var nx = Nx, nt = Nt, F = f, y, x;
+  if (!m.s || m.s.length !== nt) m.s = new Float64Array(nt);
+  var s = m.s, sab = 0, sa = 0;
+  for (y = 0; y < nt; y++){
+    var r = y * nx, a = 0, ab = 0;
+    for (x = 0; x < nx; x++){ var v = F[r + x]; a += v; ab += v < 0 ? -v : v; }
+    s[y] = a / nx; sab += ab; sa += a < 0 ? -a / nx : a / nx;
+  }
+  var vc = sab / (nx * nt), sc = sa / nt;
+  if (m.v === 0){ m.v = vc; m.sAbs = sc; } else { m.v += 0.05 * (vc - m.v); m.sAbs += 0.05 * (sc - m.sAbs); }
+  if (m.skip > 0){ m.skip--; return; }
+  var h = m.v / 2, t0 = -1, fl = 0;
+  for (y = 0; y < nt; y++) if (s[y] > h || s[y] < -h){ t0 = y; break; }
+  if (t0 >= 0){
+    var st = s[t0] > 0 ? 1 : -1;
+    for (var k = 1; k <= nt; k++){
+      var u = t0 + k; if (u >= nt) u -= nt;
+      if (st > 0){ if (s[u] < -h){ st = -1; fl++; } } else if (s[u] > h){ st = 1; fl++; }
+    }
+  }
+  m.flips += fl; m.steps++; m.bsum += fl / nt * 1000;
+  if (++m.bn >= m.K){ m.blocks.push(m.bsum / m.K); m.bsum = 0; m.bn = 0; if (m.blocks.length > 2000) m.blocks.shift(); }
+}
+function meterResult(m){
+  var nb = m.blocks.length, i, mean = 0, ss = 0;
+  for (i = 0; i < nb; i++) mean += m.blocks[i];
+  if (nb) mean /= nb;
+  for (i = 0; i < nb; i++) ss += (m.blocks[i] - mean) * (m.blocks[i] - mean);
+  var err = nb >= 4 ? Math.sqrt(ss / (nb - 1) / nb) : null, r = { rate: mean, err: err, nb: nb, flips: m.flips, steps: m.steps, v: m.v, sAbs: m.sAbs, skip: m.skip };
+  /* Finite-strip correction. A periodic strip of T time sites always holds an even number of walls, so for an ideal gas of walls
+     with density n and x = nT the mean count is <N> = x tanh x, not x. When walls are rarer than about one per strip the raw rate
+     is therefore low (a factor ~3 when x = 0.35). rateC solves x tanh x = <N> for x and returns x / T. */
+  if (m.s && mean > 0){
+    var T = m.s.length, Nn = mean * T / 1000, lo = 0, hi = 60, x;
+    for (var it = 0; it < 60; it++){ x = 0.5 * (lo + hi); if (x * Math.tanh(x) < Nn) lo = x; else hi = x; }
+    x = 0.5 * (lo + hi);
+    var th = Math.tanh(x), dxdN = 1 / (th + x * (1 - th * th));
+    r.rateC = x / T * 1000; r.errC = err === null ? null : err * dxdN;
+  } else { r.rateC = 0; r.errC = err; }
+  return r;
+}
+/* Weighted least squares y = sum_j c_j basis_j(x); returns coefficients, their errors and chi^2/dof. */
+function wls(xs, ys, sg, basis){
+  var p = basis.length, A = [], b = [], i, a, c;
+  for (a = 0; a < p; a++){ A.push(new Array(2 * p).fill(0)); b.push(0); }
+  for (i = 0; i < xs.length; i++){
+    var w = 1 / (sg[i] * sg[i]), ph = basis.map(function(g){ return g(xs[i]); });
+    for (a = 0; a < p; a++){ b[a] += w * ph[a] * ys[i]; for (c = 0; c < p; c++) A[a][c] += w * ph[a] * ph[c]; }
+  }
+  for (a = 0; a < p; a++) A[a][p + a] = 1;
+  for (a = 0; a < p; a++){            /* Gauss-Jordan inverse */
+    var piv = a;
+    for (c = a + 1; c < p; c++) if (Math.abs(A[c][a]) > Math.abs(A[piv][a])) piv = c;
+    var tmp = A[a]; A[a] = A[piv]; A[piv] = tmp;
+    var d = A[a][a];
+    if (!(Math.abs(d) > 1e-300)) return null;
+    for (c = 0; c < 2 * p; c++) A[a][c] /= d;
+    for (var r = 0; r < p; r++) if (r !== a){ var q = A[r][a]; if (q) for (c = 0; c < 2 * p; c++) A[r][c] -= q * A[a][c]; }
+  }
+  var coef = [], err = [];
+  for (a = 0; a < p; a++){ var sm = 0; for (c = 0; c < p; c++) sm += A[a][p + c] * b[c]; coef.push(sm); err.push(Math.sqrt(A[a][p + a])); }
+  var chi2 = 0;
+  for (i = 0; i < xs.length; i++){
+    var fit = 0; for (a = 0; a < p; a++) fit += coef[a] * basis[a](xs[i]);
+    chi2 += (ys[i] - fit) * (ys[i] - fit) / (sg[i] * sg[i]);
+  }
+  var dof = xs.length - p;
+  return { coef: coef, err: err, chi2: chi2, dof: dof, red: dof > 0 ? chi2 / dof : null };
+}
+/* Fit ln(rate) = a - M L (+ b ln L if withLog). pts: [{L, rate, err, flips}]; zero counts are skipped. */
+function fitRates(pts, withLog, raw){
+  var xs = [], ys = [], sg = [];       /* raw = true: use the uncorrected rate/err instead of rateC/errC if the points carry both */
+  pts.forEach(function(q){
+    var r = (!raw && q.rateC !== undefined) ? q.rateC : q.rate, e = (!raw && q.rateC !== undefined) ? q.errC : q.err;
+    if (q.flips > 0 && r > 0){ xs.push(q.L); ys.push(Math.log(r)); sg.push(Math.max(e ? e / r : 1 / Math.sqrt(q.flips), 0.01)); }
+  });
+  var basis = [function(){ return 1; }, function(x){ return -x; }];
+  if (withLog) basis.push(function(x){ return Math.log(x); });
+  if (xs.length < basis.length + 1) return null;
+  var r = wls(xs, ys, sg, basis);
+  if (!r) return null;
+  var infl = r.red && r.red > 1 ? Math.sqrt(r.red) : 1;
+  return { a: r.coef[0], M: r.coef[1], Merr: r.err[1] * infl, b: withLog ? r.coef[2] : 0, berr: withLog ? r.err[2] * infl : 0, red: r.red, n: xs.length, xs: xs, ys: ys, sg: sg };
+}
+/* A self-contained strip run (own lattice and state, swapped in only while it steps) so the live page state is untouched. */
+function grab(){ return { f: f, visited: visited, queue: queue, gen: gen, Nx: Nx, Nt: Nt, kappa: kappa, lambda: lambda, delta: delta, cluAvg: cluAvg, cluPer: cluPer, useClusters: useClusters, lastAcc: lastAcc }; }
+function put(s){ f = s.f; visited = s.visited; queue = s.queue; gen = s.gen; Nx = s.Nx; Nt = s.Nt; kappa = s.kappa; lambda = s.lambda; delta = s.delta; cluAvg = s.cluAvg; cluPer = s.cluPer; useClusters = s.useClusters; lastAcc = s.lastAcc; }
+function TunnelRun(k, l, L, T, therm, nsteps){
+  var n = L * T, i;
+  this.st = { f: new Float64Array(n), visited: new Uint32Array(n), queue: new Int32Array(n), gen: 0, Nx: L, Nt: T, kappa: k, lambda: l, delta: 1.5, cluAvg: 1, cluPer: 1, useClusters: true, lastAcc: 0.5 };
+  for (i = 0; i < n; i++) this.st.f[i] = (rnd() * 2 - 1) * 1.6;
+  this.meter = makeMeter(therm, Math.max(1, Math.floor(nsteps / 20)));
+  this.L = L; this.done = 0; this.total = therm + nsteps; this.tuned = false;
+}
+TunnelRun.prototype.run = function(n){
+  var saved = grab(); put(this.st);
+  if (!this.tuned){ tuneDelta(30); this.tuned = true; }
+  var end = Math.min(this.total, this.done + n);
+  for (; this.done < end; this.done++){ var a = updateStep(); tune(a / (Nx * Nt), 0.1); meterStep(this.meter); }
+  this.st = grab(); put(saved);
+};
+TunnelRun.prototype.finished = function(){ return this.done >= this.total; };
+TunnelRun.prototype.result = function(){ var r = meterResult(this.meter); r.L = this.L; return r; };
+
+function solveM(r, a){         /* sinh(m a) / sinh(m (a-1)) = r, for m > 0 (NaN if none) */
+  if (!(r > a / (a - 1) * (1 + 1e-9))) return NaN;
+  function g(m){ return Math.exp(m) * (1 - Math.exp(-2 * m * a)) / (1 - Math.exp(-2 * m * (a - 1))); }
+  var lo = 0, hi = 12;
+  if (!(g(hi) >= r)) return NaN;
+  for (var it = 0; it < 50; it++){ var mid = 0.5 * (lo + hi); if (g(mid) < r) lo = mid; else hi = mid; }
+  return 0.5 * (lo + hi);
+}
+function estimate(bl, n){
+  var nb = bl.length, H = n >> 1, h = (n - 1) / 2, b, t, k;
+  if (nb < 8) return null;
+  var G = new Float64Array(H + 1), S = new Float64Array(H + 1);
+  for (b = 0; b < nb; b++) for (t = 0; t <= H; t++) S[t] += bl[b][t];
+  for (t = 0; t <= H; t++) G[t] = S[t] / nb;
+  var Cse = new Float64Array(H + 1), Dm = new Float64Array(H), Dse = new Float64Array(H);
+  for (t = 0; t <= H; t++){
+    var v = 0;
+    for (b = 0; b < nb; b++){ var e = (bl[b][t] - bl[b][H]) - (G[t] - G[H]); v += e * e; }
+    Cse[t] = Math.sqrt(v / (nb * (nb - 1)));
+  }
+  for (t = 0; t < H; t++){
+    Dm[t] = G[t] - G[t + 1];
+    var w = 0;
+    for (b = 0; b < nb; b++){ var e2 = (bl[b][t] - bl[b][t + 1]) - Dm[t]; w += e2 * e2; }
+    Dse[t] = Math.sqrt(w / (nb * (nb - 1)));
+  }
+  var meff = new Array(H - 1);
+  for (t = 0; t <= H - 2; t++) meff[t] = (Dm[t] > 0 && Dm[t + 1] > 0) ? solveM(Dm[t] / Dm[t + 1], h - t) : NaN;
+  var res = { G: G, Cse: Cse, D: Dm, Dse: Dse, meff: meff, nb: nb, t0: 2, t1: 1, rough: false, m: null, mErr: null, xi: null, xiErr: null };
+  /* plateau: from tau = 2 up to where D is still known to 20% (and m_eff exists). If that gives fewer than two points (signal
+     gone before tau = 4: heavy mass, e.g. the ordered phase), start at tau = 1 instead and accept 1-2 points, flagged as rough. */
+  function plateauEnd(s0){
+    var e = s0 - 1;
+    for (var q = s0; q <= H - 2; q++){
+      if (!(Dm[q] > 0 && Dm[q + 1] > 0)) break;
+      if (Dse[q] / Dm[q] > 0.2 || Dse[q + 1] / Dm[q + 1] > 0.2) break;
+      if (!(meff[q] > 0)) break;
+      e = q;
+    }
+    return e;
+  }
+  var t0 = 2, t1 = plateauEnd(2);
+  if (t1 < 3){ var e1 = plateauEnd(1); if (e1 >= 1){ t0 = 1; t1 = e1; res.rough = true; } }
+  res.t0 = t0; res.t1 = t1;
+  if (t1 < t0) return res;
+  var W = t1 - t0 + 1, mj = [], Gj = new Float64Array(t1 + 3), j, sig = new Float64Array(W), wt = new Float64Array(W);
+  for (j = 0; j < nb; j++){
+    for (t = 0; t <= t1 + 2; t++) Gj[t] = (S[t] - bl[j][t]) / (nb - 1);
+    var arr = new Float64Array(W);
+    for (k = 0; k < W; k++){
+      t = t0 + k;
+      var d0 = Gj[t] - Gj[t + 1], d1 = Gj[t + 1] - Gj[t + 2];
+      arr[k] = (d0 > 0 && d1 > 0) ? solveM(d0 / d1, h - t) : NaN;
+    }
+    mj.push(arr);
+  }
+  var wsum = 0;
+  for (k = 0; k < W; k++){
+    var cnt = 0, mean = 0, ss = 0;
+    for (j = 0; j < nb; j++) if (mj[j][k] === mj[j][k]){ cnt++; mean += mj[j][k]; }
+    if (cnt < nb * 0.5){ wt[k] = 0; continue; }
+    mean /= cnt;
+    for (j = 0; j < nb; j++) if (mj[j][k] === mj[j][k]) ss += (mj[j][k] - mean) * (mj[j][k] - mean);
+    sig[k] = Math.sqrt((nb - 1) / cnt * ss);
+    wt[k] = 1 / Math.max(sig[k] * sig[k], 1e-12); wsum += wt[k];
+  }
+  if (!(wsum > 0)){ for (k = 0; k < W; k++) wt[k] = 1; }
+  var num = 0, den = 0;
+  for (k = 0; k < W; k++){ num += wt[k] * meff[t0 + k]; den += wt[k]; }
+  var m = num / den, mjs = [], mm = 0;
+  for (j = 0; j < nb; j++){
+    var nu = 0, de = 0;
+    for (k = 0; k < W; k++) if (mj[j][k] === mj[j][k]){ nu += wt[k] * mj[j][k]; de += wt[k]; }
+    var q = de > 0 ? nu / de : m; mjs.push(q); mm += q;
+  }
+  mm /= nb;
+  var vv = 0;
+  for (j = 0; j < nb; j++) vv += (mjs[j] - mm) * (mjs[j] - mm);
+  res.m = m; res.mErr = Math.sqrt((nb - 1) / nb * vv); res.xi = 1 / m; res.xiErr = res.mErr / (m * m);
+  return res;
+}
+
+/* ---------- complex field: U(1) / O(2) core ----------
+   phi = (a, b) per site, S = sum -2k phi.phi' + |phi|^2 + lam (|phi|^2 - 1)^2. The block between the BEGIN / END markers needs only rnd()
+   and LIM, so a test harness can run it outside the page (in a web worker). */
+/* U1 CORE BEGIN */
+var TWO_PI = 6.283185307179586;
+function newU1(n){
+  var s = n * n;
+  return { n: n, a: new Float64Array(s), b: new Float64Array(s), vis: new Uint32Array(s), que: new Int32Array(s), gen: 0,
+           th: new Float64Array(s), w: new Int8Array(s), kappa: 0.5, lambda: 1, delta: 1.5, lastAcc: 0.5,
+           clusters: true, cluAvg: 1, cluPer: 1, cluFix: 0, cluFrozen: false, charge: 0 };
+}
+function u1Reset(u, mode, v){
+  var s = u.n * u.n, i;
+  if (mode === "cold"){ for (i = 0; i < s; i++){ u.a[i] = v; u.b[i] = 0; } }
+  else { for (i = 0; i < s; i++){ u.a[i] = (rnd() * 2 - 1) * 1.6; u.b[i] = (rnd() * 2 - 1) * 1.6; } }
+  u.cluAvg = 1; u.cluPer = 1;
+}
+/* Metropolis sweep (checkerboard): propose a random 2D displacement of width delta. */
+function u1Sweep(u){
+  var n = u.n, A = u.a, B = u.b, k2 = 2 * u.kappa, lam = u.lambda, d = u.delta, acc = 0;
+  for (var par = 0; par < 2; par++){
+    for (var y = 0; y < n; y++){
+      var row = y * n, up = (y === 0 ? n - 1 : y - 1) * n, dn = (y === n - 1 ? 0 : y + 1) * n;
+      for (var x = (y + par) & 1; x < n; x += 2){
+        var i = row + x, xl = row + (x === 0 ? n - 1 : x - 1), xr = row + (x === n - 1 ? 0 : x + 1);
+        var sa = A[xl] + A[xr] + A[up + x] + A[dn + x], sb = B[xl] + B[xr] + B[up + x] + B[dn + x];
+        var oa = A[i], ob = B[i], pa = oa + d * (rnd() - 0.5), pb = ob + d * (rnd() - 0.5);
+        var o2 = oa * oa + ob * ob, p2 = pa * pa + pb * pb, q = p2 - 1, r = o2 - 1;
+        var dS = -k2 * ((pa - oa) * sa + (pb - ob) * sb) + (p2 - o2) + lam * (q * q - r * r);
+        if (pa > -LIM && pa < LIM && pb > -LIM && pb < LIM && (dS <= 0 || rnd() < Math.exp(-dS))){ A[i] = pa; B[i] = pb; acc++; }
+      }
+    }
+  }
+  u.lastAcc = acc / (n * n);
+  return acc;
+}
+/* Embedded Wolff cluster (Wolff's original O(n) algorithm): pick a random unit vector r; the projection p = phi.r is an Ising-like
+   spin; grow over neighbours whose p has the seed's sign, adding each bond with probability 1 - exp(-4 k p_x p_y); then reflect
+   the cluster, phi -> phi - 2 (phi.r) r. Returns the cluster size. */
+function u1Wolff(u){
+  var n = u.n, n2 = n * n, A = u.a, B = u.b, V = u.vis, Q = u.que, q;
+  if (++u.gen > 4294967290){ V.fill(0); u.gen = 1; }
+  var g = u.gen, k4 = 4 * u.kappa, ang = rnd() * TWO_PI, rx = Math.cos(ang), ry = Math.sin(ang);
+  var seed = (rnd() * n2) | 0, sg = (A[seed] * rx + B[seed] * ry) > 0 ? 1 : -1;
+  var head = 0, tail = 1;
+  Q[0] = seed; V[seed] = g;
+  while (head < tail){
+    var i = Q[head++], pi = A[i] * rx + B[i] * ry, y = (i / n) | 0, x = i - y * n;
+    for (var d = 0; d < 4; d++){
+      var j = d === 0 ? (x === 0 ? i + n - 1 : i - 1) : d === 1 ? (x === n - 1 ? i - n + 1 : i + 1) :
+              d === 2 ? (y === 0 ? i + n2 - n : i - n) : (y === n - 1 ? i - n2 + n : i + n);
+      if (V[j] !== g){
+        var pj = A[j] * rx + B[j] * ry;
+        if (pj * sg > 0 && rnd() < 1 - Math.exp(-k4 * pi * pj)){ V[j] = g; Q[tail++] = j; }
+      }
+    }
+  }
+  for (q = 0; q < tail; q++){ var s = Q[q], p = A[s] * rx + B[s] * ry; A[s] -= 2 * p * rx; B[s] -= 2 * p * ry; }
+  return tail;
+}
+/* One update step = a Metropolis sweep, then about N^2 sites' worth of Wolff clusters, the number set from a running mean of the
+   cluster size (never from this step's own sizes), exactly as in the real mode. Returns the accepted count.
+   cluFrozen = true stops the running mean (the count then no longer depends on the configuration history at all): the debug hooks
+   freeze it after thermalisation, because with the running mean on, the free field at N = 8 reads <m^2> 1.2% high (see PLAN.md);
+   the effect falls roughly like 1/N^2 and is below 0.1% at N = 64 and up, so the live page keeps the running mean. */
+function u1Step(u){
+  var acc = u1Sweep(u);
+  if (u.clusters){
+    var cnt = u.cluFix > 0 ? u.cluFix : Math.min(1000, Math.max(1, Math.floor(u.cluPer + rnd()))), tot = 0, c;
+    for (c = 0; c < cnt; c++) tot += u1Wolff(u);
+    if (!u.cluFrozen){ u.cluAvg += 0.02 * (tot / cnt - u.cluAvg); u.cluPer = u.n * u.n / u.cluAvg; }
+  }
+  return acc;
+}
+function u1Tune(u, acc, gain){
+  u.delta *= Math.exp(gain * (acc - 0.5));
+  if (u.delta < 0.02) u.delta = 0.02;
+  if (u.delta > 8) u.delta = 8;
+}
+/* Winding number of each plaquette (x,y),(x,y+1),(x+1,y+1),(x+1,y) (counter-clockwise on screen, y down): sum of the four wrapped
+   phase differences / 2 pi. Needs u.th filled. Fills u.w (index of the plaquette's top-left site), returns the number of nonzero ones. */
+function u1Winding(u){
+  var n = u.n, th = u.th, W = u.w, cnt = 0, ch = 0, P = Math.PI;
+  for (var y = 0; y < n; y++){
+    var row = y * n, dn = (y === n - 1 ? 0 : y + 1) * n;
+    for (var x = 0; x < n; x++){
+      var xr = x === n - 1 ? 0 : x + 1, t0 = th[row + x], t1 = th[dn + x], t2 = th[dn + xr], t3 = th[row + xr];
+      var d0 = t1 - t0, d1 = t2 - t1, d2 = t3 - t2, d3 = t0 - t3;
+      if (d0 > P) d0 -= TWO_PI; else if (d0 < -P) d0 += TWO_PI;
+      if (d1 > P) d1 -= TWO_PI; else if (d1 < -P) d1 += TWO_PI;
+      if (d2 > P) d2 -= TWO_PI; else if (d2 < -P) d2 += TWO_PI;
+      if (d3 > P) d3 -= TWO_PI; else if (d3 < -P) d3 += TWO_PI;
+      var wv = Math.round((d0 + d1 + d2 + d3) / TWO_PI);
+      W[row + x] = wv;
+      if (wv !== 0){ cnt++; ch += wv; }
+    }
+  }
+  u.charge = ch;
+  return cnt;
+}
+/* Measurement accumulator. Per sample: [0] |m|, [1] |m|^2, [2] vortex density per plaquette, [3] helicity modulus Y,
+   then G(r) = <phi(x).phi(x+r)> over all x and both axes (r = 0..N/2), then the slice-average correlator Gs(tau) (row and column
+   means of the 2-vector, used only for the exact free-field check). Samples are averaged in blocks of B for the error bars. */
+function newU1Meas(n, B, maxBlocks, noG){
+  var H = n >> 1;
+  return { n: n, H: H, B: B, max: maxBlocks || 0, noG: !!noG, cnt: 0, done: 0, L: 4 + 2 * (H + 1), sum: new Float64Array(4 + 2 * (H + 1)), blocks: [],
+           ra: new Float64Array(2 * n), rb: new Float64Array(2 * n), rowA: new Float64Array(n), rowB: new Float64Array(n), colA: new Float64Array(n), colB: new Float64Array(n) };
+}
+function u1Sample(u, M){
+  var n = u.n, n2 = n * n, A = u.a, B = u.b, th = u.th, H = M.H, S = M.sum, i, x, y, r;
+  var sa = 0, sb = 0;
+  for (i = 0; i < n2; i++){ sa += A[i]; sb += B[i]; th[i] = Math.atan2(B[i], A[i]); }
+  sa /= n2; sb /= n2;
+  S[0] += Math.sqrt(sa * sa + sb * sb); S[1] += sa * sa + sb * sb;
+  S[2] += u1Winding(u) / n2;
+  var k2 = 2 * u.kappa, Dx = 0, Cx = 0, Dy = 0, Cy = 0;
+  for (y = 0; y < n; y++){
+    var row = y * n, dn = (y === n - 1 ? 0 : y + 1) * n;
+    for (x = 0; x < n; x++){
+      var i0 = row + x, ir = row + (x === n - 1 ? 0 : x + 1), id = dn + x, a0 = A[i0], b0 = B[i0];
+      Dx += a0 * A[ir] + b0 * B[ir]; Cx += a0 * B[ir] - b0 * A[ir];
+      Dy += a0 * A[id] + b0 * B[id]; Cy += a0 * B[id] - b0 * A[id];
+    }
+  }
+  Dx *= k2; Cx *= k2; Dy *= k2; Cy *= k2;
+  S[3] += 0.5 * ((Dx - Cx * Cx) + (Dy - Cy * Cy)) / n2;
+  if (!M.noG) u1Corr(u, M);
+  if (++M.cnt >= M.B){
+    var blk = new Float64Array(M.L);
+    for (i = 0; i < M.L; i++) blk[i] = S[i] / M.cnt;
+    M.blocks.push(blk); if (M.max && M.blocks.length > M.max) M.blocks.shift();
+    M.done++; S.fill(0); M.cnt = 0;
+  }
+}
+function u1Corr(u, M){
+  var n = u.n, n2 = n * n, A = u.a, B = u.b, H = M.H, S = M.sum, x, y, r;
+  /* point-to-point correlator, rows then columns; each line is copied twice so the periodic shift needs no modulus */
+  var ra = M.ra, rb = M.rb, off = 4;
+  for (y = 0; y < n; y++){
+    var rr = y * n;
+    for (x = 0; x < n; x++){ ra[x] = ra[x + n] = A[rr + x]; rb[x] = rb[x + n] = B[rr + x]; }
+    for (r = 0; r <= H; r++){ var c = 0; for (x = 0; x < n; x++) c += ra[x] * ra[x + r] + rb[x] * rb[x + r]; S[off + r] += c / (2 * n2); }
+  }
+  for (x = 0; x < n; x++){
+    for (y = 0; y < n; y++){ ra[y] = ra[y + n] = A[y * n + x]; rb[y] = rb[y + n] = B[y * n + x]; }
+    for (r = 0; r <= H; r++){ var c2 = 0; for (y = 0; y < n; y++) c2 += ra[y] * ra[y + r] + rb[y] * rb[y + r]; S[off + r] += c2 / (2 * n2); }
+  }
+  /* slice means: row and column means of the 2-vector, then their time correlator */
+  var so = 5 + H, rowA = M.rowA, rowB = M.rowB, colA = M.colA, colB = M.colB;
+  colA.fill(0); colB.fill(0);
+  for (y = 0; y < n; y++){ var q2 = y * n, ta = 0, tb = 0; for (x = 0; x < n; x++){ ta += A[q2 + x]; tb += B[q2 + x]; colA[x] += A[q2 + x]; colB[x] += B[q2 + x]; } rowA[y] = ta / n; rowB[y] = tb / n; }
+  for (x = 0; x < n; x++){ colA[x] /= n; colB[x] /= n; }
+  for (r = 0; r <= H; r++){
+    var g = 0;
+    for (var t = 0; t < n; t++){ var u2 = t + r; if (u2 >= n) u2 -= n; g += rowA[t] * rowA[u2] + rowB[t] * rowB[u2] + colA[t] * colA[u2] + colB[t] * colB[u2]; }
+    S[so + r] += g / (2 * n);
+  }
+}
+/* Least-squares power-law fit over r = 2..N/4 (A solved exactly for each eta; golden-section refined).
+   form 0 (default): the periodic-grid form G = A [ (N/pi) sin(pi r / N) ]^-eta (the exact shape of a power law on a ring; it reproduces eta = 1/(2 pi Y)).
+   form 1: G = A [ r^-eta + (N-r)^-eta ] (sum of the two nearest images; this reads eta 40-70% too high, kept only for comparison).
+   Weights use the block errors with a 1% floor of |G| (short-distance lattice corrections are not statistical noise). */
+function u1FitPow(G, sg, n, form){
+  var r0 = 2, r1 = Math.max(4, n >> 2), cnt = r1 - r0 + 1, w = new Float64Array(cnt), g = new Float64Array(cnt), f = new Float64Array(cnt), i, Abest = 0;
+  for (i = 0; i < cnt; i++){ var s = Math.max(sg[r0 + i], 0.01 * Math.abs(G[r0 + i]), 1e-12); g[i] = G[r0 + i]; w[i] = 1 / (s * s); }
+  function chi(e){
+    var sgf = 0, sff = 0, k;
+    for (k = 0; k < cnt; k++){ var r = r0 + k; f[k] = form === 1 ? Math.pow(r, -e) + Math.pow(n - r, -e) : Math.pow(Math.sin(Math.PI * r / n) * n / Math.PI, -e); sgf += w[k] * g[k] * f[k]; sff += w[k] * f[k] * f[k]; }
+    var A = sgf / sff, c = 0;
+    for (k = 0; k < cnt; k++){ var d = g[k] - A * f[k]; c += w[k] * d * d; }
+    Abest = A; return c;
+  }
+  var best = 0, cb = Infinity, e;
+  for (e = 0; e <= 3.0001; e += 0.05){ var c0 = chi(e); if (c0 < cb){ cb = c0; best = e; } }
+  var lo = Math.max(0, best - 0.05), hi = Math.min(4, best + 0.05), gr = 0.6180339887;
+  var x1 = hi - gr * (hi - lo), x2 = lo + gr * (hi - lo), f1 = chi(x1), f2 = chi(x2);
+  for (var it = 0; it < 24; it++){
+    if (f1 < f2){ hi = x2; x2 = x1; f2 = f1; x1 = hi - gr * (hi - lo); f1 = chi(x1); }
+    else { lo = x1; x1 = x2; f1 = f2; x2 = lo + gr * (hi - lo); f2 = chi(x2); }
+  }
+  var eta = 0.5 * (lo + hi), cf = chi(eta);
+  return { eta: eta, A: Abest, chi2: cf, dof: cnt - 2 };
+}
+/* Least-squares G(r) = A [ e^(-m r) r^-p + e^(-m (N-r)) (N-r)^-p ] over r = 2..rmax (A solved exactly for each m; log-grid then golden section).
+   p = 0 is the plain cosh(m (r - N/2)); p = 1/2 adds the 1/sqrt(r) of a particle propagating in 2D (a plain cosh reads the mass about 30% high). */
+function u1FitCosh(G, sg, n, rmax, p){
+  var r0 = 2, cnt = rmax - r0 + 1, w = new Float64Array(cnt), g = new Float64Array(cnt), f = new Float64Array(cnt), i, Abest = 0;
+  if (cnt < 3) return null;
+  for (i = 0; i < cnt; i++){ var s = Math.max(sg[r0 + i], 0.01 * Math.abs(G[r0 + i]), 1e-12); g[i] = G[r0 + i]; w[i] = 1 / (s * s); }
+  function chi(m){
+    var sgf = 0, sff = 0, k;
+    for (k = 0; k < cnt; k++){ var r = r0 + k; f[k] = Math.exp(-m * r) * Math.pow(r, -p) + Math.exp(-m * (n - r)) * Math.pow(n - r, -p); sgf += w[k] * g[k] * f[k]; sff += w[k] * f[k] * f[k]; }
+    var A = sgf / sff, c = 0;
+    for (k = 0; k < cnt; k++){ var d = g[k] - A * f[k]; c += w[k] * d * d; }
+    Abest = A; return c;
+  }
+  var best = 0.003, cb = Infinity, m;
+  for (m = 0.003; m < 4; m *= 1.08){ var c0 = chi(m); if (c0 < cb){ cb = c0; best = m; } }
+  var lo = best / 1.08, hi = best * 1.08, gr = 0.6180339887;
+  var x1 = hi - gr * (hi - lo), x2 = lo + gr * (hi - lo), f1 = chi(x1), f2 = chi(x2);
+  for (var it = 0; it < 24; it++){
+    if (f1 < f2){ hi = x2; x2 = x1; f2 = f1; x1 = hi - gr * (hi - lo); f1 = chi(x1); }
+    else { lo = x1; x1 = x2; f1 = f2; x2 = lo + gr * (hi - lo); f2 = chi(x2); }
+  }
+  var mm = 0.5 * (lo + hi);
+  return { m: mm, A: (chi(mm), Abest) };
+}
+/* Means and block errors of everything, the eta fit and the cosh mass fit with jackknife errors over blocks. */
+function u1Result(M){
+  var nb = M.blocks.length, L = M.L, H = M.H, n = M.n, b, i, S = new Float64Array(L), V = new Float64Array(L);
+  var R = { nb: nb, N: n };
+  if (nb < 4) return R;
+  for (b = 0; b < nb; b++) for (i = 0; i < L; i++) S[i] += M.blocks[b][i];
+  var mean = new Float64Array(L);
+  for (i = 0; i < L; i++) mean[i] = S[i] / nb;
+  for (b = 0; b < nb; b++) for (i = 0; i < L; i++){ var e = M.blocks[b][i] - mean[i]; V[i] += e * e; }
+  var err = new Float64Array(L);
+  for (i = 0; i < L; i++) err[i] = Math.sqrt(V[i] / (nb * (nb - 1)));
+  R.absM = mean[0]; R.absMErr = err[0]; R.m2 = mean[1]; R.m2Err = err[1]; R.vort = mean[2]; R.vortErr = err[2]; R.ups = mean[3]; R.upsErr = err[3];
+  R.G = Array.prototype.slice.call(mean, 4, 5 + H); R.Gerr = Array.prototype.slice.call(err, 4, 5 + H);
+  R.Gs = Array.prototype.slice.call(mean, 5 + H, L); R.Gserr = Array.prototype.slice.call(err, 5 + H, L);
+  if (nb < 8 || M.noG) return R;
+  var sg = R.Gerr, fit = u1FitPow(R.G, sg, n, 0), jk = [], Gj = new Array(H + 1), j, k;
+  R.etaImg = u1FitPow(R.G, sg, n, 1).eta;
+  R.eta = fit.eta; R.etaA = fit.A; R.etaChi2 = fit.chi2 / fit.dof;
+  for (j = 0; j < nb; j++){
+    for (k = 0; k <= H; k++) Gj[k] = (S[4 + k] - M.blocks[j][4 + k]) / (nb - 1);
+    jk.push(u1FitPow(Gj, sg, n, 0).eta);
+  }
+  R.etaErr = jackErr(jk);
+  /* mass: largest contiguous r from 2 where G > 2.5 sigma */
+  var rmax = 1;
+  for (k = 2; k <= H; k++){ if (R.G[k] > 2.5 * sg[k]) rmax = k; else break; }
+  R.rmax = rmax;
+  if (rmax >= 5){
+    var cf = u1FitCosh(R.G, sg, n, rmax, 0.5), c0 = u1FitCosh(R.G, sg, n, rmax, 0);
+    if (c0) R.mCosh = c0.m;
+    if (cf && cf.m * n < 4){ R.mRaw = cf.m; cf = null; }      /* correlation length longer than N/4: no exponential decay to speak of */
+    if (cf){
+      var jm = [], jc = [];
+      for (j = 0; j < nb; j++){
+        for (k = 0; k <= H; k++) Gj[k] = (S[4 + k] - M.blocks[j][4 + k]) / (nb - 1);
+        var cj = u1FitCosh(Gj, sg, n, rmax, 0.5); jm.push(cj ? cj.m : cf.m);
+        if (c0){ var cz = u1FitCosh(Gj, sg, n, rmax, 0); jc.push(cz ? cz.m : c0.m); }
+      }
+      R.m = cf.m; R.mA = cf.A; R.mErr = jackErr(jm);
+      if (c0) R.mCoshErr = jackErr(jc);
+    }
+  }
+  return R;
+}
+function jackErr(v){
+  var nb = v.length, m = 0, s = 0, i;
+  for (i = 0; i < nb; i++) m += v[i];
+  m /= nb;
+  for (i = 0; i < nb; i++) s += (v[i] - m) * (v[i] - m);
+  return Math.sqrt((nb - 1) / nb * s);
+}
+/* U1 CORE END */
+
+/* ---------- colour map (diverging) ---------- */
+var off = document.createElement("canvas"); off.width = off.height = N;
+var octx = off.getContext("2d");
+var img = octx.createImageData(N, N), img32 = new Uint32Array(img.data.buffer);
+var LUTN = 1024, lut = new Uint32Array(LUTN), VMAX = 1.3, palNeg = 0, palPos = 0;
+function ensureImg(w, h){
+  if (off.width !== w || off.height !== h){ off.width = w; off.height = h; img = octx.createImageData(w, h); img32 = new Uint32Array(img.data.buffer); }
+}
+var STOPS_L = [[-1,[28,86,158]],[-0.5,[118,168,212]],[0,[243,240,233]],[0.5,[235,160,120]],[1,[178,62,28]]];
+var STOPS_D = [[-1,[120,190,255]],[-0.5,[48,108,170]],[0,[30,36,44]],[0.5,[176,98,52]],[1,[255,176,102]]];
+function isDark(){
+  var t = document.documentElement.getAttribute("data-theme");
+  if (t === "dark") return true;
+  if (t === "light") return false;
+  return window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches;
+}
+function buildLut(){
+  var st = isDark() ? STOPS_D : STOPS_L;
+  for (var i = 0; i < LUTN; i++){
+    var t = i / (LUTN - 1) * 2 - 1, k = 0;
+    while (k < st.length - 2 && t > st[k + 1][0]) k++;
+    var a = st[k], b = st[k + 1], u = (t - a[0]) / (b[0] - a[0]);
+    var r = Math.round(a[1][0] + (b[1][0] - a[1][0]) * u);
+    var g = Math.round(a[1][1] + (b[1][1] - a[1][1]) * u);
+    var bl = Math.round(a[1][2] + (b[1][2] - a[1][2]) * u);
+    lut[i] = (255 << 24) | (bl << 16) | (g << 8) | r;
+  }
+  /* domain-walls view fills: pale blue (-) and pale orange (+); muted dark tones in the dark theme */
+  var pn = isDark() ? [38, 66, 104] : [196, 216, 240], pp = isDark() ? [112, 70, 40] : [248, 208, 180];
+  palNeg = (255 << 24) | (pn[2] << 16) | (pn[1] << 8) | pn[0];
+  palPos = (255 << 24) | (pp[2] << 16) | (pp[1] << 8) | pp[0];
+  var cb = document.getElementById("cbar"), cx = cb.getContext("2d"), id = cx.createImageData(256, 1), d32 = new Uint32Array(id.data.buffer);
+  for (var j = 0; j < 256; j++) d32[j] = lut[Math.round(j / 255 * (LUTN - 1))];
+  cx.putImageData(id, 0, 0);
+}
+
+/* ---------- drawing ---------- */
+var fieldCv = document.getElementById("field"), fctx = fieldCv.getContext("2d");
+var wellCv = document.getElementById("well"), wctx = wellCv.getContext("2d");
+var histCv = document.getElementById("hist"), hctx = histCv.getContext("2d");
+var corrCv = document.getElementById("corr"), cctx = corrCv.getContext("2d");
+var C = {};
+function readColors(){
+  var cs = getComputedStyle(document.documentElement);
+  ["--fg","--muted","--line","--accent","--neg","--pos","--soft","--panel"].forEach(function(k){ C[k] = cs.getPropertyValue(k).trim(); });
+}
+function fitCanvas(cv){
+  var dpr = window.devicePixelRatio || 1;
+  var w = Math.max(1, Math.round(cv.clientWidth * dpr)), h = Math.max(1, Math.round(cv.clientHeight * dpr));
+  if (cv.width !== w || cv.height !== h){ cv.width = w; cv.height = h; return true; }
+  return false;
+}
+/* Domain walls: smooth with a 3x3 periodic box average, sign of the result = which vacuum. Fills wsign (1 = +), returns the
+   number of neighbouring (right / down, periodic) site pairs of opposite smoothed sign divided by the number of sites. */
+var wsign = null, wtmp = null, wallLen = 0;
+function computeWalls(){
+  var nx = Nx, nt = Nt, n = nx * nt, F = f, x, y;
+  if (!wsign || wsign.length !== n){ wsign = new Uint8Array(n); wtmp = new Float64Array(n); }
+  for (y = 0; y < nt; y++){
+    var r = y * nx;
+    for (x = 0; x < nx; x++) wtmp[r + x] = F[r + (x === 0 ? nx - 1 : x - 1)] + F[r + x] + F[r + (x === nx - 1 ? 0 : x + 1)];
+  }
+  for (y = 0; y < nt; y++){
+    var r2 = y * nx, up = (y === 0 ? nt - 1 : y - 1) * nx, dn = (y === nt - 1 ? 0 : y + 1) * nx;
+    for (x = 0; x < nx; x++) wsign[r2 + x] = (wtmp[up + x] + wtmp[r2 + x] + wtmp[dn + x]) > 0 ? 1 : 0;
+  }
+  var c = 0;
+  for (y = 0; y < nt; y++){
+    var r3 = y * nx, dn2 = (y === nt - 1 ? 0 : y + 1) * nx;
+    for (x = 0; x < nx; x++){
+      var s = wsign[r3 + x];
+      if (s !== wsign[r3 + (x === nx - 1 ? 0 : x + 1)]) c++;
+      if (s !== wsign[dn2 + x]) c++;
+    }
+  }
+  wallLen = c / n;
+  return wallLen;
+}
+function drawField(){
+  var dpr = window.devicePixelRatio || 1, i, x, y;
+  if (strip){
+    var hh = Math.max(40, Math.round(fieldCv.clientWidth * Nx / Nt)) + "px";
+    if (fieldCv.style.height !== hh) fieldCv.style.height = hh;
+  } else if (fieldCv.style.height) fieldCv.style.height = "";
+  fitCanvas(fieldCv);
+  var W = fieldCv.width, H = fieldCv.height, nx = Nx, nt = Nt, F = f;
+  if (viewMode === "walls"){
+    var wl = computeWalls(), cols = strip ? nt : nx, rows = strip ? nx : nt;
+    $("wallV").textContent = wl.toFixed(3);
+    ensureImg(cols, rows);
+    if (!strip){ for (i = 0; i < nx * nt; i++) img32[i] = wsign[i] ? palPos : palNeg; }
+    else { for (y = 0; y < nt; y++) for (x = 0; x < nx; x++) img32[x * nt + y] = wsign[y * nx + x] ? palPos : palNeg; }
+    octx.putImageData(img, 0, 0);
+    fctx.imageSmoothingEnabled = false;
+    fctx.drawImage(off, 0, 0, W, H);
+    var lw = Math.max(1, Math.round((strip ? 1.2 : 1.6) * dpr)), hw = lw / 2, cw = W / cols, ch = H / rows, rd = Math.round;
+    fctx.strokeStyle = C["--fg"]; fctx.lineWidth = lw; fctx.lineCap = "butt"; fctx.lineJoin = "miter";
+    fctx.beginPath();
+    for (y = 0; y < nt; y++){
+      var row = y * nx, dn = (y === nt - 1 ? 0 : y + 1) * nx;
+      for (x = 0; x < nx; x++){
+        var s = wsign[row + x], xp = x === nx - 1 ? 0 : x + 1;
+        if (s !== wsign[row + xp]){                       /* wall between space neighbours x and x+1 */
+          if (!strip){ var X = xp === 0 ? hw : rd(xp * cw); fctx.moveTo(X, rd(y * ch)); fctx.lineTo(X, rd((y + 1) * ch)); }
+          else { var Y = xp === 0 ? hw : rd(xp * ch), a0 = rd(y * cw); fctx.moveTo(a0, Y); fctx.lineTo(Math.max(rd((y + 1) * cw), a0 + 1), Y); }
+        }
+        if (s !== wsign[dn + x]){                         /* wall between time neighbours y and y+1 */
+          var yd = y === nt - 1 ? 0 : y + 1;
+          if (!strip){ var Y2 = yd === 0 ? hw : rd(yd * ch), b0 = rd(x * cw); fctx.moveTo(b0, Y2); fctx.lineTo(rd((x + 1) * cw), Y2); }
+          else { var X2 = yd === 0 ? hw : rd(yd * cw); fctx.moveTo(X2, rd(x * ch)); fctx.lineTo(X2, rd((x + 1) * ch)); }
+        }
+      }
+    }
+    fctx.stroke();
+    return;
+  }
+  var scale = (LUTN - 1) / (2 * VMAX), top = LUTN - 1;
+  if (!strip){
+    ensureImg(nx, nt);
+    var n = nx * nt;
+    for (i = 0; i < n; i++){
+      var k = ((F[i] + VMAX) * scale) | 0;
+      img32[i] = lut[k < 0 ? 0 : (k > top ? top : k)];
+    }
+  } else {
+    /* time runs left to right: image pixel (t, x) = phi(x, t); if the canvas is narrower than T, average the time sites in each pixel column */
+    var wc = Math.min(nt, W);
+    ensureImg(wc, nx);
+    for (var c = 0; c < wc; c++){
+      var t0 = Math.floor(c * nt / wc), t1 = Math.max(t0 + 1, Math.floor((c + 1) * nt / wc));
+      for (x = 0; x < nx; x++){
+        var sm = 0;
+        for (y = t0; y < t1; y++) sm += F[y * nx + x];
+        var kk = ((sm / (t1 - t0) + VMAX) * scale) | 0;
+        img32[x * wc + c] = lut[kk < 0 ? 0 : (kk > top ? top : kk)];
+      }
+    }
+  }
+  octx.putImageData(img, 0, 0);
+  fctx.imageSmoothingEnabled = false;
+  fctx.drawImage(off, 0, 0, W, H);
+  if (!strip && est && est.m > 0){      /* scale bar: one correlation length xi */
+    var dpr = window.devicePixelRatio || 1, L = est.xi * fieldCv.width / N, x0 = 12 * dpr, y0 = fieldCv.height - 14 * dpr;
+    if (L >= 3 * dpr && L < fieldCv.width - 2 * x0){
+      fctx.lineCap = "round";
+      fctx.strokeStyle = "rgba(0,0,0,0.55)"; fctx.lineWidth = 5 * dpr;
+      fctx.beginPath(); fctx.moveTo(x0, y0); fctx.lineTo(x0 + L, y0); fctx.stroke();
+      fctx.strokeStyle = "#ffffff"; fctx.lineWidth = 2.5 * dpr;
+      fctx.beginPath(); fctx.moveTo(x0, y0); fctx.lineTo(x0 + L, y0); fctx.stroke();
+      fctx.font = "600 " + (13 * dpr) + "px " + getComputedStyle(document.body).fontFamily;
+      fctx.textAlign = "left"; fctx.textBaseline = "bottom"; fctx.lineJoin = "round";
+      fctx.strokeStyle = "rgba(0,0,0,0.6)"; fctx.lineWidth = 3 * dpr; fctx.strokeText("ξ", x0, y0 - 5 * dpr);
+      fctx.fillStyle = "#ffffff"; fctx.fillText("ξ", x0, y0 - 5 * dpr);
+    }
+  }
+}
+function axes(ctx, w, h, pad, xmin, xmax, ticks){
+  ctx.strokeStyle = C["--line"]; ctx.fillStyle = C["--muted"]; ctx.lineWidth = 1;
+  ctx.font = (11 * (window.devicePixelRatio || 1)) + "px " + getComputedStyle(document.body).fontFamily;
+  ctx.textAlign = "center"; ctx.textBaseline = "top";
+  ticks.forEach(function(t){
+    var x = pad.l + (t - xmin) / (xmax - xmin) * (w - pad.l - pad.r);
+    ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, h - pad.b); ctx.globalAlpha = (t === 0 ? 0.9 : 0.4); ctx.stroke(); ctx.globalAlpha = 1;
+    ctx.fillText(String(t), x, h - pad.b + 3 * (window.devicePixelRatio || 1));
+  });
+  ctx.beginPath(); ctx.moveTo(pad.l, h - pad.b); ctx.lineTo(w - pad.r, h - pad.b); ctx.stroke();
+}
+function drawWell(){
+  fitCanvas(wellCv);
+  var dpr = window.devicePixelRatio || 1, w = wellCv.width, h = wellCv.height;
+  var pad = { l: 8 * dpr, r: 8 * dpr, t: 8 * dpr, b: 20 * dpr };
+  wctx.clearRect(0, 0, w, h);
+  var xmin = -2, xmax = 2, m = 1 - 4 * kappa;
+  function V(p){ var q = p * p - 1; return m * p * p + lambda * q * q; }
+  var vmin = Infinity, pts = [], i, p;
+  for (i = 0; i <= 200; i++){ p = xmin + (xmax - xmin) * i / 200; var v = V(p); pts.push([p, v]); if (v < vmin) vmin = v; }
+  var span = 3.2, ymin = vmin - 0.25, ymax = ymin + span;
+  axes(wctx, w, h, pad, xmin, xmax, [-2, -1, 0, 1, 2]);
+  function X(p){ return pad.l + (p - xmin) / (xmax - xmin) * (w - pad.l - pad.r); }
+  function Y(v){ return pad.t + (1 - (v - ymin) / (ymax - ymin)) * (h - pad.t - pad.b); }
+  wctx.save(); wctx.beginPath(); wctx.rect(pad.l, pad.t, w - pad.l - pad.r, h - pad.t - pad.b); wctx.clip();
+  var grad = wctx.createLinearGradient(pad.l, 0, w - pad.r, 0);
+  if (cplx){ grad.addColorStop(0, C["--accent"]); grad.addColorStop(1, C["--accent"]); }
+  else { grad.addColorStop(0, C["--neg"]); grad.addColorStop(0.5, C["--muted"]); grad.addColorStop(1, C["--pos"]); }
+  wctx.strokeStyle = grad; wctx.lineWidth = 2.5 * dpr; wctx.lineJoin = "round"; wctx.beginPath();
+  pts.forEach(function(q, j){ if (j) wctx.lineTo(X(q[0]), Y(q[1])); else wctx.moveTo(X(q[0]), Y(q[1])); });
+  wctx.stroke();
+  /* mark the minima */
+  var best = pts.reduce(function(a, q){ return q[1] < a[1] ? q : a; }, pts[0]);
+  var marks = Math.abs(best[0]) > 0.15 ? [best[0], -best[0]] : [0];
+  marks.forEach(function(px){
+    wctx.fillStyle = cplx ? C["--accent"] : (px < 0 ? C["--neg"] : (px > 0 ? C["--pos"] : C["--fg"]));
+    wctx.beginPath(); wctx.arc(X(px), Y(V(px)), 4 * dpr, 0, 6.2832); wctx.fill();
+  });
+  wctx.restore();
+  wctx.fillStyle = C["--muted"]; wctx.textAlign = "right"; wctx.textBaseline = "top";
+  wctx.font = (11 * dpr) + "px " + getComputedStyle(document.body).fontFamily;
+  wctx.fillText(cplx ? "r (slice through the hat)" : "φ", w - pad.r, pad.t);
+}
+
+function sup(e){ var m = { "-": "⁻", "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹" }; return "10" + String(e).replace(/./g, function(c){ return m[c]; }); }
+function drawCorr(){
+  fitCanvas(corrCv);
+  var dpr = window.devicePixelRatio || 1, w = corrCv.width, h = corrCv.height;
+  var pad = { l: 52 * dpr, r: 10 * dpr, t: 8 * dpr, b: 34 * dpr };
+  cctx.clearRect(0, 0, w, h);
+  var font = (11 * dpr) + "px " + getComputedStyle(document.body).fontFamily;
+  cctx.font = font; cctx.fillStyle = C["--muted"]; cctx.strokeStyle = C["--line"]; cctx.lineWidth = 1;
+  var H = N >> 1, i;
+  function X(t){ return pad.l + t / H * (w - pad.l - pad.r); }
+  /* axis labels */
+  cctx.textAlign = "center"; cctx.textBaseline = "bottom";
+  cctx.fillText("time separation τ", pad.l + (w - pad.l - pad.r) / 2, h - 1 * dpr);
+  cctx.save(); cctx.translate(11 * dpr, pad.t + (h - pad.t - pad.b) / 2); cctx.rotate(-Math.PI / 2);
+  cctx.textBaseline = "top"; cctx.fillText("correlation", 0, -4 * dpr); cctx.restore();
+  cctx.textBaseline = "top";
+  for (i = 0; i <= 4; i++){ var tt = Math.round(H * i / 4); cctx.fillText(String(tt), X(tt), h - pad.b + 3 * dpr); }
+  if (!est){
+    cctx.textBaseline = "middle"; cctx.fillText("measuring…", pad.l + (w - pad.l - pad.r) / 2, pad.t + (h - pad.t - pad.b) / 2);
+    cctx.beginPath(); cctx.moveTo(pad.l, h - pad.b); cctx.lineTo(w - pad.r, h - pad.b); cctx.stroke(); return;
+  }
+  /* log range from the points that are clearly above zero */
+  var ytop = 0, ylo = Infinity, G = est.G, sd = est.Cse, c;
+  for (i = 0; i < H; i++){ c = G[i] - G[H]; if (c > ytop) ytop = c; }
+  if (!(ytop > 0)){ cctx.textBaseline = "middle"; cctx.fillText("no decay yet", pad.l + (w - pad.l - pad.r) / 2, pad.t + (h - pad.t - pad.b) / 2); return; }
+  ytop *= 1.5;
+  for (i = 0; i < H; i++){ c = G[i] - G[H]; if (c > 2 * sd[i] && c < ylo) ylo = c; }
+  if (!(ylo < Infinity)) ylo = ytop * 1e-3;
+  ylo = Math.max(ylo / 4, ytop * 1e-8);
+  var lt = Math.log10(ytop), ll = Math.log10(ylo);
+  function Y(v){ return pad.t + (lt - Math.log10(v)) / (lt - ll) * (h - pad.t - pad.b); }
+  cctx.textAlign = "right"; cctx.textBaseline = "middle";
+  for (var e = Math.ceil(ll); e <= Math.floor(lt); e++){
+    var yy = Y(Math.pow(10, e));
+    cctx.globalAlpha = 0.5; cctx.beginPath(); cctx.moveTo(pad.l, yy); cctx.lineTo(w - pad.r, yy); cctx.stroke(); cctx.globalAlpha = 1;
+    cctx.fillText(sup(e), pad.l - 4 * dpr, yy);
+  }
+  cctx.beginPath(); cctx.moveTo(pad.l, h - pad.b); cctx.lineTo(w - pad.r, h - pad.b); cctx.stroke();
+  cctx.save(); cctx.beginPath(); cctx.rect(pad.l, pad.t, w - pad.l - pad.r, h - pad.t - pad.b); cctx.clip();
+  /* fit A [cosh(m (tau - N/2)) - 1], least squares over the plateau region */
+  if (est.m > 0){
+    var m = est.m, num = 0, den = 0, A;
+    for (i = 1; i <= Math.min(est.t1 + 1, H - 1); i++){
+      var fi = Math.cosh(m * (i - H)) - 1, yv = G[i] - G[H], ww = 1 / Math.max(sd[i] * sd[i], 1e-300);
+      num += ww * yv * fi; den += ww * fi * fi;
+    }
+    A = den > 0 ? num / den : 0;
+    if (A > 0){
+      cctx.strokeStyle = C["--pos"]; cctx.lineWidth = 2 * dpr; cctx.beginPath();
+      var first = true;
+      for (i = 0; i <= 4 * H; i++){
+        var tq = i / 4, v = A * (Math.cosh(m * (tq - H)) - 1);
+        if (!(v > 0)) continue;
+        if (first){ cctx.moveTo(X(tq), Y(v)); first = false; } else cctx.lineTo(X(tq), Y(v));
+      }
+      cctx.stroke();
+    }
+  }
+  /* data points with error bars */
+  for (i = 0; i < H; i++){
+    c = G[i] - G[H];
+    if (!(c > 0)) continue;
+    var x = X(i), lo = Math.max(c - sd[i], ylo), hi = c + sd[i];
+    cctx.strokeStyle = C["--accent"]; cctx.lineWidth = 1.5 * dpr;
+    cctx.beginPath(); cctx.moveTo(x, Y(Math.min(hi, ytop * 3))); cctx.lineTo(x, Y(lo)); cctx.stroke();
+    cctx.beginPath(); cctx.arc(x, Y(c), 3 * dpr, 0, 6.2832);
+    if (c > 2 * sd[i]){ cctx.fillStyle = C["--accent"]; cctx.fill(); } else { cctx.stroke(); }
+  }
+  cctx.restore();
+}
+
+var histBlock = 8;  /* 1 = single sites, 8 = averages over 8x8 blocks */
+var NB = 44, HR = 2.2, hist = new Float64Array(NB), histInit = false;
+function updateHist(){
+  var cnt = new Float64Array(NB), F = f, n = Nx * Nt, sc = NB / (2 * HR), tot = 0, b;
+  if (histBlock <= 1){
+    for (var i = 0; i < n; i++){
+      b = ((F[i] + HR) * sc) | 0;
+      cnt[b < 0 ? 0 : (b >= NB ? NB - 1 : b)]++;
+    }
+    tot = n;
+  } else {
+    var B = histBlock, Bx = Math.min(B, Nx), nbx = Math.floor(Nx / Bx), nby = Math.floor(Nt / B);   /* thin strip: blocks of L x 8 at most */
+    for (var by = 0; by < nby; by++) for (var bx = 0; bx < nbx; bx++){
+      var s = 0;
+      for (var y = 0; y < B; y++){ var r = (by * B + y) * Nx + bx * Bx; for (var x = 0; x < Bx; x++) s += F[r + x]; }
+      b = ((s / (B * Bx) + HR) * sc) | 0;
+      cnt[b < 0 ? 0 : (b >= NB ? NB - 1 : b)]++;
+    }
+    tot = nbx * nby;
+  }
+  var a = histInit ? (histBlock <= 1 ? 0.25 : 0.08) : 1;
+  for (var j = 0; j < NB; j++) hist[j] += a * (cnt[j] / tot - hist[j]);
+  histInit = true;
+}
+function drawHist(){
+  fitCanvas(histCv);
+  var dpr = window.devicePixelRatio || 1, w = histCv.width, h = histCv.height;
+  var pad = { l: 8 * dpr, r: 8 * dpr, t: 8 * dpr, b: 20 * dpr };
+  hctx.clearRect(0, 0, w, h);
+  axes(hctx, w, h, pad, -HR, HR, [-2, -1, 0, 1, 2]);
+  var mx = 0.0001, j;
+  for (j = 0; j < NB; j++) if (hist[j] > mx) mx = hist[j];
+  var bw = (w - pad.l - pad.r) / NB, ph = h - pad.t - pad.b;
+  for (j = 0; j < NB; j++){
+    var c = -HR + (j + 0.5) * (2 * HR / NB);
+    var bh = hist[j] / mx * ph * 0.95;
+    hctx.fillStyle = c < 0 ? C["--neg"] : C["--pos"];
+    hctx.globalAlpha = 0.85;
+    hctx.fillRect(pad.l + j * bw + 0.5 * dpr, h - pad.b - bh, Math.max(1, bw - 1 * dpr), bh);
+  }
+  hctx.globalAlpha = 1;
+}
+
+/* ---------- complex mode (Stage 4): state, drawing, readouts ---------- */
+var cplx = false, U = null, UM = null, rsave = null, ures = null, uDone = -1, cCnt = 0, cEvery = 1, cHead = "eta";
+var PRESETS_C = { sym:[0.442, 1], crit:[0.502, 1], brk:[0.582, 1] };   /* kappa_BKT(lambda=1) = 0.502 +- 0.002 (Weber-Minnhagen on the helicity modulus, N = 16..128; see PLAN.md); presets at -0.06, 0, +0.08 */
+var csave = { kappa: 0.502, lambda: 1, view: "field" };
+var BLKC = 20, UPS_CLEAR = 0.3;
+var corrC2 = document.getElementById("corrC"), cc2 = corrC2.getContext("2d");
+var histC2 = document.getElementById("histC"), hc2 = histC2.getContext("2d");
+var wheelCv = document.getElementById("wheelCv"), wheelCx = wheelCv.getContext("2d");
+function syncU(){ U.kappa = kappa; U.lambda = lambda; U.clusters = useClusters; }
+function resetCMeasure(){
+  if (!U) return;
+  cEvery = U.n <= 64 ? 1 : (U.n <= 128 ? 2 : 4);
+  UM = newU1Meas(U.n, BLKC, MAXB); cCnt = 0; thermLeft = THERM; ures = null; uDone = -1; massDirty = true; histInit = false;
+}
+function allocU(n){
+  U = newU1(n); syncU(); u1Reset(U, "hot");
+  for (var i = 0; i < 40; i++) u1Tune(U, u1Sweep(U) / (n * n), 0.4);
+  snap = true; histInit = false; resetCMeasure(); dirty = true;
+}
+/* Real <-> complex. The real lattice, kappa, lambda, view and strip state are parked and come back untouched. */
+function setMode(m){
+  var want = m === "complex";
+  if (want === cplx || scan) return;
+  if (want){
+    rsave = { kappa: kappa, lambda: lambda, view: viewMode, strip: strip };
+    if (!U) allocU(parseInt($("sizeSel").value, 10) || N);
+    cplx = true; strip = false;
+    kappa = csave.kappa; lambda = csave.lambda; viewMode = csave.view;
+    kapEl.min = "0.3"; kapEl.max = "0.8";
+    $("sizeSel").value = String(U.n);
+  } else {
+    csave = { kappa: kappa, lambda: lambda, view: viewMode };
+    cplx = false; strip = rsave.strip;
+    kappa = rsave.kappa; lambda = rsave.lambda; viewMode = rsave.view;
+    kapEl.min = "0.15"; kapEl.max = "0.45";
+    $("sizeSel").value = String(N);
+    lastSign = 0;
+  }
+  snap = true; histInit = false; emaAbs = 0;
+  syncSliders(); applyUI();
+}
+function applyModeUI(){
+  var walls = viewMode === "walls", i, ids;
+  setPressed("mReal", "mCplx", !cplx);
+  $("vWalls").textContent = cplx ? "Vortices" : "Domain walls";
+  $("geoGrp").hidden = cplx; $("ledeR").hidden = cplx; $("ledeC").hidden = !cplx;
+  $("histSec").hidden = cplx;
+  ids = ["corrSecC", "histSecC", "wheelBox", "vortCard", "upsCard", "etaCard", "mCard", "etaLine", "cmwNote"];
+  for (i = 0; i < ids.length; i++) $(ids[i]).hidden = !cplx;
+  if (cplx){
+    ids = ["cbarBox", "howto", "wallCard", "massCard", "xiCard", "corrSec", "xiNote", "ordNote", "stripPanel"];
+    for (i = 0; i < ids.length; i++) $(ids[i]).hidden = true;
+    $("howtoV").hidden = !walls;
+  } else $("howtoV").hidden = true;
+  var pb = document.querySelectorAll("[data-preset]"), names = cplx ? ["Vortex gas", "BKT point", "Quasi-ordered"] : ["Symmetric", "Critical", "Broken"];
+  for (i = 0; i < pb.length; i++) pb[i].textContent = names[i];
+  $("absK").textContent = cplx ? "⟨|m|⟩ grid-average arrow" : "⟨|φ|⟩ average field";
+  $("kapHint").textContent = cplx ? "How strongly neighbours want to point the same way (like XY β/2)." : "How strongly neighbours want to agree (like Ising β/2).";
+  $("lamHint").textContent = cplx ? "0 = soft free field, large = every arrow the same length (the XY model)." : "0 = soft free field, large = field pinned near ±1 (Ising).";
+  $("eqLine").textContent = cplx ? "S = Σ −2κ φ·φ′ + |φ|² + λ(|φ|²−1)²" : "S = Σ −2κ φφ′ + φ² + λ(φ²−1)²";
+  $("wellH").textContent = cplx ? "Mexican hat (radial slice)" : "Mean-field well";
+  $("wellNote").textContent = cplx ? "V(r) − 4κr²: the bottom of the hat is a whole circle of vacua, so there is no single direction to pick."
+                                   : "V(φ) − 4κφ²: one valley means a symmetric vacuum, two valleys means the field must choose a side.";
+  $("cluNote").textContent = cplx ? "Flips whole regions at once (embedded Wolff clusters: reflect φ across a random line), which beats the slowing-down of ordinary updates near the BKT point."
+                                  : "Flips whole same-sign regions at once, which beats the slowing-down of ordinary updates near κ = 0.340.";
+  $("coldBtn").textContent = cplx ? "All aligned" : "All +v";
+  $("coldBtn").title = cplx ? "Every arrow set to the rim of the hat, all pointing the same way" : "Every site set to the well minimum +v";
+}
+document.getElementById("mReal").addEventListener("click", function(){ setMode("real"); });
+document.getElementById("mCplx").addEventListener("click", function(){ setMode("complex"); });
+
+/* colour wheel: hue = phase, depth = |phi| (pale towards the background colour at small |phi|) */
+var CT = 40, cLut = new Uint32Array(CT * 360), wheelCss = [];
+function buildWheel(){
+  var dark = isDark(), bg = dark ? [30, 36, 44] : [243, 240, 233], h, ti;
+  for (h = 0; h < 360; h++){
+    var a = (h + 0.5) / 360 * TWO_PI, v = [0.5 + 0.5 * Math.cos(a), 0.5 + 0.5 * Math.cos(a - 2.0944), 0.5 + 0.5 * Math.cos(a + 2.0944)], base = [], k;
+    for (k = 0; k < 3; k++) base.push(255 * (dark ? 0.3 + 0.7 * v[k] : 0.92 * v[k]));
+    wheelCss[h] = "rgb(" + Math.round(base[0]) + "," + Math.round(base[1]) + "," + Math.round(base[2]) + ")";
+    for (ti = 0; ti < CT; ti++){
+      var t = ti / (CT - 1), c = [];
+      for (k = 0; k < 3; k++) c.push(Math.round(bg[k] * (1 - t) + base[k] * t));
+      cLut[ti * 360 + h] = (255 << 24) | (c[2] << 16) | (c[1] << 8) | c[0];
+    }
+  }
+}
+function hueOf(theta){ var q = Math.round(theta * 360 / TWO_PI) + 720; return q % 360; }
+function drawWheel(){
+  var dpr = window.devicePixelRatio || 1, s = Math.round(76 * dpr);
+  if (wheelCv.width !== s){ wheelCv.width = s; wheelCv.height = s; }
+  wheelCx.clearRect(0, 0, s, s);
+  var id = wheelCx.createImageData(s, s), d32 = new Uint32Array(id.data.buffer), R = s * 0.34, c0 = s / 2, x, y;
+  for (y = 0; y < s; y++) for (x = 0; x < s; x++){
+    var dx = x + 0.5 - c0, dy = y + 0.5 - c0, rho = Math.sqrt(dx * dx + dy * dy) / R;
+    if (rho > 1) continue;
+    var th = Math.atan2(-dy, dx), ti = Math.min(CT - 1, Math.round(rho * (CT - 1)));
+    d32[y * s + x] = cLut[ti * 360 + hueOf(th)];
+  }
+  wheelCx.putImageData(id, 0, 0);
+  wheelCx.fillStyle = C["--muted"]; wheelCx.font = (10 * dpr) + "px " + getComputedStyle(document.body).fontFamily;
+  wheelCx.textAlign = "center"; wheelCx.textBaseline = "middle";
+  wheelCx.fillText("0", c0 + R + 8 * dpr, c0); wheelCx.fillText("π/2", c0, c0 - R - 7 * dpr);
+  wheelCx.fillText("π", c0 - R - 8 * dpr, c0); wheelCx.fillText("−π/2", c0, c0 + R + 7 * dpr);
+}
+function drawFieldC(){
+  if (fieldCv.style.height) fieldCv.style.height = "";
+  fitCanvas(fieldCv);
+  var dpr = window.devicePixelRatio || 1, W = fieldCv.width, H = fieldCv.height, n = U.n, n2 = n * n, A = U.a, B = U.b, th = U.th, i;
+  var sa = 0, sb = 0;
+  for (i = 0; i < n2; i++){ sa += A[i]; sb += B[i]; }
+  var shift = Math.sqrt(sa * sa + sb * sb) / n2 > 0.15 ? Math.atan2(sb, sa) : 0;
+  var vort = viewMode === "walls", K = 360 / TWO_PI, tm = (CT - 1) / 1.1;
+  ensureImg(n, n);
+  for (i = 0; i < n2; i++){
+    var a = A[i], b = B[i], t = th[i] = Math.atan2(b, a), ti = (Math.sqrt(a * a + b * b) * tm + 0.5) | 0;
+    if (ti > CT - 1) ti = CT - 1;
+    if (vort) ti = (ti * 0.42) | 0;
+    img32[i] = cLut[ti * 360 + (((t - shift) * K + 360) | 0) % 360];
+  }
+  octx.putImageData(img, 0, 0);
+  fctx.imageSmoothingEnabled = false;
+  fctx.drawImage(off, 0, 0, W, H);
+  if (!vort) return;
+  var cnt = u1Winding(U), cw = W / n, ch = H / n, rad = Math.max(2.2 * dpr, Math.min(6 * dpr, cw * 0.8)), x, y, k = 0;
+  var px = new Float64Array(cnt * 4 + 4), py = new Float64Array(cnt * 4 + 4), ps = new Int8Array(cnt * 4 + 4);
+  function add(X, Y, s){ px[k] = X; py[k] = Y; ps[k] = s; k++; }
+  for (y = 0; y < n; y++) for (x = 0; x < n; x++){
+    var w = U.w[y * n + x];
+    if (!w) continue;
+    var X = (x + 1) * cw, Y = (y + 1) * ch;
+    add(X, Y, w);
+    if (x === n - 1){ add(0, Y, w); if (y === n - 1) add(0, 0, w); }
+    if (y === n - 1) add(X, 0, w);
+  }
+  fctx.lineJoin = "round";
+  fctx.beginPath(); for (i = 0; i < k; i++){ fctx.moveTo(px[i] + rad, py[i]); fctx.arc(px[i], py[i], rad, 0, TWO_PI); }
+  fctx.strokeStyle = C["--panel"]; fctx.lineWidth = 3.6 * dpr; fctx.stroke();
+  fctx.beginPath(); for (i = 0; i < k; i++) if (ps[i] > 0){ fctx.moveTo(px[i] + rad, py[i]); fctx.arc(px[i], py[i], rad, 0, TWO_PI); }
+  fctx.fillStyle = C["--fg"]; fctx.fill();
+  fctx.beginPath(); for (i = 0; i < k; i++) if (ps[i] < 0){ fctx.moveTo(px[i] + rad, py[i]); fctx.arc(px[i], py[i], rad, 0, TWO_PI); }
+  fctx.fillStyle = C["--panel"]; fctx.fill();          /* antivortex: light dot with dark rim, so it reads apart from + at small sizes */
+  fctx.strokeStyle = C["--fg"]; fctx.lineWidth = 1.4 * dpr; fctx.stroke();
+}
+var NBC = 36, histCa = new Float64Array(NBC);
+function updateHistC(alpha){
+  var n = U.n, A = U.a, B = U.b, cnt = new Float64Array(NBC), nb = Math.floor(n / 8), by, bx, x, y, tot = nb * nb;
+  for (by = 0; by < nb; by++) for (bx = 0; bx < nb; bx++){
+    var sa = 0, sb = 0;
+    for (y = 0; y < 8; y++){ var r = (by * 8 + y) * n + bx * 8; for (x = 0; x < 8; x++){ sa += A[r + x]; sb += B[r + x]; } }
+    var j = Math.floor((Math.atan2(sb, sa) + Math.PI) / TWO_PI * NBC); cnt[j >= NBC ? NBC - 1 : j]++;
+  }
+  var a = histInit ? alpha : 1;      /* per update step: each Wolff step can turn the whole grid to a new global phase, so ~100 steps are averaged */
+  for (var q = 0; q < NBC; q++) histCa[q] += a * (cnt[q] / tot - histCa[q]);
+  histInit = true;
+}
+function drawHistC(){
+  fitCanvas(histC2);
+  var dpr = window.devicePixelRatio || 1, w = histC2.width, h = histC2.height, pad = { l: 8 * dpr, r: 8 * dpr, t: 8 * dpr, b: 20 * dpr }, j;
+  hc2.clearRect(0, 0, w, h);
+  hc2.strokeStyle = C["--line"]; hc2.fillStyle = C["--muted"]; hc2.lineWidth = 1;
+  hc2.font = (11 * dpr) + "px " + getComputedStyle(document.body).fontFamily; hc2.textAlign = "center"; hc2.textBaseline = "top";
+  [[-Math.PI, "−π"], [0, "0"], [Math.PI, "π"]].forEach(function(t){
+    var x = pad.l + (t[0] + Math.PI) / TWO_PI * (w - pad.l - pad.r);
+    hc2.beginPath(); hc2.moveTo(x, pad.t); hc2.lineTo(x, h - pad.b); hc2.globalAlpha = 0.4; hc2.stroke(); hc2.globalAlpha = 1;
+    hc2.fillText(t[1], Math.min(w - 6 * dpr, Math.max(6 * dpr, x)), h - pad.b + 3 * dpr);
+  });
+  hc2.beginPath(); hc2.moveTo(pad.l, h - pad.b); hc2.lineTo(w - pad.r, h - pad.b); hc2.stroke();
+  var mx = 2 / NBC;
+  for (j = 0; j < NBC; j++) if (histCa[j] * 1.1 > mx) mx = histCa[j] * 1.1;
+  var bw = (w - pad.l - pad.r) / NBC, ph = h - pad.t - pad.b;
+  for (j = 0; j < NBC; j++){
+    var th = -Math.PI + (j + 0.5) * TWO_PI / NBC, bh = Math.min(ph, histCa[j] / mx * ph);
+    hc2.fillStyle = wheelCss[hueOf(th)]; hc2.globalAlpha = 0.9;
+    hc2.fillRect(pad.l + j * bw + 0.5 * dpr, h - pad.b - bh, Math.max(1, bw - 1 * dpr), bh);
+  }
+  hc2.globalAlpha = 1;
+  var yu = h - pad.b - (1 / NBC) / mx * ph;
+  hc2.strokeStyle = C["--fg"]; hc2.lineWidth = 1.5 * dpr; hc2.setLineDash([5 * dpr, 4 * dpr]);
+  hc2.beginPath(); hc2.moveTo(pad.l, yu); hc2.lineTo(w - pad.r, yu); hc2.stroke(); hc2.setLineDash([]);
+}
+function niceNum(v){ return v >= 0.01 ? String(+v.toPrecision(1)) : sup(Math.round(Math.log10(v))); }
+function drawCorrC(){
+  fitCanvas(corrC2);
+  var dpr = window.devicePixelRatio || 1, w = corrC2.width, h = corrC2.height, pad = { l: 52 * dpr, r: 12 * dpr, t: 8 * dpr, b: 34 * dpr }, ctx = cc2;
+  ctx.clearRect(0, 0, w, h);
+  ctx.font = (11 * dpr) + "px " + getComputedStyle(document.body).fontFamily; ctx.fillStyle = C["--muted"]; ctx.strokeStyle = C["--line"]; ctx.lineWidth = 1;
+  var H = U.n >> 1, i, lH = Math.log(H);
+  function X(r){ return pad.l + Math.log(r) / lH * (w - pad.l - pad.r); }
+  ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+  ctx.fillText("separation r (log scale)", pad.l + (w - pad.l - pad.r) / 2, h - 1 * dpr);
+  ctx.save(); ctx.translate(11 * dpr, pad.t + (h - pad.t - pad.b) / 2); ctx.rotate(-Math.PI / 2);
+  ctx.textBaseline = "top"; ctx.fillText("G(r), log scale", 0, -4 * dpr); ctx.restore();
+  ctx.textBaseline = "top";
+  for (var r = 1; r <= H; r *= 2){ ctx.beginPath(); ctx.moveTo(X(r), pad.t); ctx.lineTo(X(r), h - pad.b); ctx.globalAlpha = 0.4; ctx.stroke(); ctx.globalAlpha = 1; ctx.fillText(String(r), X(r), h - pad.b + 3 * dpr); }
+  ctx.beginPath(); ctx.moveTo(pad.l, h - pad.b); ctx.lineTo(w - pad.r, h - pad.b); ctx.stroke();
+  if (!ures || !ures.G){ ctx.textBaseline = "middle"; ctx.fillText("measuring…", pad.l + (w - pad.l - pad.r) / 2, pad.t + (h - pad.t - pad.b) / 2); return; }
+  var G = ures.G, sd = ures.Gerr, top = 0, lo = Infinity;
+  for (i = 1; i <= H; i++){ if (G[i] > top) top = G[i]; if (G[i] > 2 * sd[i] && G[i] < lo) lo = G[i]; }
+  if (!(top > 0)){ ctx.textBaseline = "middle"; ctx.fillText("no signal yet", pad.l + (w - pad.l - pad.r) / 2, pad.t + (h - pad.t - pad.b) / 2); return; }
+  top *= 1.25; lo = Math.max(lo / 1.6, top * 1e-5);
+  var lt = Math.log10(top), ll = Math.log10(lo);
+  function Y(v){ return pad.t + (lt - Math.log10(v)) / (lt - ll) * (h - pad.t - pad.b); }
+  ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  var mults = (lt - ll) > 1.2 ? [1] : [1, 2, 5];
+  for (var e = Math.floor(ll); e <= Math.ceil(lt); e++) mults.forEach(function(mu){
+    var v = mu * Math.pow(10, e);
+    if (v < lo || v > top) return;
+    var yy = Y(v); ctx.globalAlpha = 0.5; ctx.beginPath(); ctx.moveTo(pad.l, yy); ctx.lineTo(w - pad.r, yy); ctx.stroke(); ctx.globalAlpha = 1;
+    ctx.fillText(niceNum(v), pad.l - 4 * dpr, yy);
+  });
+  ctx.save(); ctx.beginPath(); ctx.rect(pad.l, pad.t, w - pad.l - pad.r, h - pad.t - pad.b); ctx.clip();
+  function curve(f, r0, r1, dash){
+    ctx.setLineDash(dash ? [5 * dpr, 4 * dpr] : []); ctx.beginPath(); var first = true;
+    for (var rr = r0; rr <= r1 + 1e-9; rr *= 1.04){ var v = f(rr); if (!(v > 0)) continue; if (first){ ctx.moveTo(X(rr), Y(v)); first = false; } else ctx.lineTo(X(rr), Y(v)); }
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+  ctx.strokeStyle = C["--pos"]; ctx.lineWidth = 2 * dpr;
+  if (cHead === "eta" && ures.eta !== undefined){
+    var fp = function(rr){ return ures.etaA * Math.pow(Math.sin(Math.PI * rr / U.n) * U.n / Math.PI, -ures.eta); };
+    curve(fp, 1, 2, true); curve(fp, 2, Math.max(4, U.n >> 2), false); curve(fp, Math.max(4, U.n >> 2), H, true);
+  } else if (ures.m > 0){
+    var fc = function(rr){ return ures.mA * (Math.exp(-ures.m * rr) / Math.sqrt(rr) + Math.exp(-ures.m * (U.n - rr)) / Math.sqrt(U.n - rr)); };
+    curve(fc, 1, 2, true); curve(fc, 2, ures.rmax, false); curve(fc, ures.rmax, H, true);
+  }
+  for (i = 1; i <= H; i++){
+    if (!(G[i] > 0)) continue;
+    var x = X(i), lo2 = Math.max(G[i] - sd[i], lo), hi2 = G[i] + sd[i];
+    ctx.strokeStyle = C["--accent"]; ctx.lineWidth = 1.5 * dpr;
+    ctx.beginPath(); ctx.moveTo(x, Y(Math.min(hi2, top))); ctx.lineTo(x, Y(lo2)); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, Y(G[i]), 3 * dpr, 0, 6.2832);
+    if (G[i] > 2 * sd[i]){ ctx.fillStyle = C["--accent"]; ctx.fill(); } else ctx.stroke();
+  }
+  ctx.restore();
+}
+function fmtV(v, d){ return v === undefined || v === null || !isFinite(v) ? "–" : v.toFixed(d); }
+function showC(){
+  var r = ures;
+  if (!r || r.nb < 8 || r.G === undefined || r.eta === undefined){
+    var why = thermLeft > 0 ? "settling down" : "collecting data";
+    $("vortV").textContent = $("upsV").textContent = $("etaV").textContent = $("mV").textContent = "measuring…";
+    $("vortE").textContent = "per plaquette"; $("upsE").textContent = why; $("etaE").innerHTML = $("mE").innerHTML = "&nbsp;";
+    $("etaLine").textContent = "η: " + why + "…";
+    return;
+  }
+  var vd = r.vort < 0.001 ? 1 : 4;
+  $("vortV").textContent = vd === 1 ? r.vort.toExponential(1) : r.vort.toFixed(4);
+  $("vortE").textContent = "± " + (vd === 1 ? r.vortErr.toExponential(0) : r.vortErr.toFixed(4)) + " per plaquette";
+  $("upsV").textContent = r.ups.toFixed(3); $("upsE").textContent = "± " + r.upsErr.toFixed(3) + "  ·  2/π = 0.637 at BKT";
+  var clear = r.ups > UPS_CLEAR && r.ups > 5 * r.upsErr;
+  cHead = (clear || !(r.m > 0)) ? "eta" : "m";
+  $("etaV").textContent = fmtV(r.eta, 3); $("etaE").textContent = "± " + fmtV(r.etaErr, 3) + (cHead === "eta" ? "  ·  headline" : "");
+  $("mV").textContent = r.m > 0 ? r.m.toFixed(3) : "–"; $("mE").textContent = r.m > 0 ? "± " + r.mErr.toFixed(3) + (cHead === "m" ? "  ·  headline" : "") : "no decay inside N/4";
+  $("etaCard").style.order = cHead === "eta" ? 0 : 1; $("mCard").style.order = cHead === "m" ? 0 : 1;
+  $("etaCard").classList.toggle("dim", cHead !== "eta"); $("mCard").classList.toggle("dim", cHead !== "m");
+  var pred = r.ups > 0.02 ? 1 / (2 * Math.PI * r.ups) : NaN, pe = pred * r.upsErr / Math.max(r.ups, 1e-9);
+  $("etaLine").textContent = "η = " + fmtV(r.eta, 3) + " ± " + fmtV(r.etaErr, 3) + " (BKT predicts 1/4 at the transition; spin waves predict 1/(2πΥ) below it). From the measured Υ = " + r.ups.toFixed(3) +
+    " that is " + (isFinite(pred) ? pred.toFixed(3) + " ± " + pe.toFixed(3) : "undefined") + "." +
+    (cHead === "m" ? " Υ is not clearly nonzero here, so G(r) decays exponentially and the mass m is the meaningful number, not η." : "");
+}
+function frameC(){
+  var changed = dirty;
+  if (!paused){
+    var t0 = performance.now(), acc = 0, ns = 0;
+    syncU();
+    do {
+      U.cluFrozen = thermLeft === 0;   /* count adapts only while settling: no history bias in the data */
+      acc += u1Step(U); ns++;
+      if (thermLeft > 0) thermLeft--; else if ((++cCnt % cEvery) === 0) u1Sample(U, UM);
+      updateHistC(0.008);
+    } while (performance.now() - t0 < 8);
+    var a = acc / (ns * U.n * U.n);
+    u1Tune(U, a, 0.5);
+    emaAcc += 0.1 * (a - emaAcc);
+    var n2 = U.n * U.n, sa = 0, sb = 0, i;
+    for (i = 0; i < n2; i++){ sa += U.a[i]; sb += U.b[i]; }
+    var m = Math.sqrt(sa * sa + sb * sb) / n2;
+    if (snap){ emaAbs = m; snap = false; } else emaAbs += (1 - Math.pow(0.98, ns)) * (m - emaAbs);
+    $("absMi").textContent = "now " + m.toFixed(3);
+    spsCount += ns; changed = true;
+  } else if (dirty && !histInit){
+    updateHistC(1);
+  }
+  var now = performance.now();
+  if (now - spsT > 500){ spsVal = spsCount * 1000 / (now - spsT); spsCount = 0; spsT = now;
+    $("speed").textContent = paused ? "paused" : (Math.round(spsVal) + " update steps/s  ·  " + U.n + "×" + U.n + " lattice"); }
+  if (now - estT > 300 || massDirty){
+    estT = now;
+    if (UM.done !== uDone){ uDone = UM.done; ures = u1Result(UM); massDirty = true; }
+    if (massDirty || thermLeft > 0 || UM.blocks.length < 8){ showC(); massDirty = false; changed = true; }
+  }
+  if (changed){
+    drawCorrC(); drawFieldC(); drawHistC();
+    $("absM").textContent = emaAbs.toFixed(3);
+    $("accV").textContent = Math.round(emaAcc * 100) + "%";
+    $("stepV").textContent = "step δ " + U.delta.toFixed(2);
+    if (dirty){ drawWell(); drawWheel(); dirty = false; }
+  }
+}
+
+/* ---------- thin strip plots ---------- */
+var sCv = null, sctx = null, scanCv = null, scctx = null;
+function drawSlice(){
+  fitCanvas(sCv);
+  var dpr = window.devicePixelRatio || 1, w = sCv.width, h = sCv.height, m = liveMeter, ctx = sctx;
+  var pad = { l: 34 * dpr, r: 8 * dpr, t: 8 * dpr, b: 22 * dpr };
+  ctx.clearRect(0, 0, w, h);
+  var ym = 1.5;
+  function X(t){ return pad.l + t / Math.max(1, Nt - 1) * (w - pad.l - pad.r); }
+  function Y(v){ return pad.t + (1 - (v + ym) / (2 * ym)) * (h - pad.t - pad.b); }
+  ctx.font = (11 * dpr) + "px " + getComputedStyle(document.body).fontFamily;
+  ctx.fillStyle = C["--muted"]; ctx.strokeStyle = C["--line"]; ctx.lineWidth = 1;
+  ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  [-1, 0, 1].forEach(function(v){ ctx.fillText(v > 0 ? "+" + v : (v < 0 ? "−" + (-v) : "0"), pad.l - 5 * dpr, Y(v)); });
+  ctx.textAlign = "center"; ctx.textBaseline = "top";
+  ctx.fillText("time t  →", pad.l + (w - pad.l - pad.r) / 2, h - pad.b + 5 * dpr);
+  ctx.beginPath(); ctx.moveTo(pad.l, h - pad.b); ctx.lineTo(w - pad.r, h - pad.b); ctx.stroke();
+  if (!m || !m.s || m.s.length !== Nt) return;
+  var hy = m.v / 2;
+  ctx.globalAlpha = 0.5; ctx.setLineDash([2 * dpr, 4 * dpr]);       /* hysteresis band: +-v/2 */
+  [hy, -hy].forEach(function(v){ ctx.beginPath(); ctx.moveTo(pad.l, Y(v)); ctx.lineTo(w - pad.r, Y(v)); ctx.stroke(); });
+  ctx.globalAlpha = 1;
+  ctx.setLineDash([6 * dpr, 4 * dpr]); ctx.strokeStyle = C["--muted"]; ctx.lineWidth = 1.2 * dpr;   /* zero line */
+  ctx.beginPath(); ctx.moveTo(pad.l, Y(0)); ctx.lineTo(w - pad.r, Y(0)); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.strokeStyle = C["--accent"]; ctx.lineWidth = 1.5 * dpr; ctx.lineJoin = "round";
+  ctx.beginPath();
+  for (var t = 0; t < Nt; t++){ var yy = Y(Math.max(-ym, Math.min(ym, m.s[t]))); if (t) ctx.lineTo(X(t), yy); else ctx.moveTo(X(t), yy); }
+  ctx.stroke();
+}
+var scanFit = null, scanFit2 = null, scanPts = [];
+function drawScan(){
+  fitCanvas(scanCv);
+  var dpr = window.devicePixelRatio || 1, w = scanCv.width, h = scanCv.height, ctx = scctx;
+  var pad = { l: 40 * dpr, r: 10 * dpr, t: 10 * dpr, b: 34 * dpr };
+  ctx.clearRect(0, 0, w, h);
+  ctx.font = (11 * dpr) + "px " + getComputedStyle(document.body).fontFamily;
+  var pts = scanPts.filter(function(q){ return q.flips > 0 && q.rate > 0; });
+  var xmin = 2, xmax = 22, lo = Infinity, hi = -Infinity;
+  pts.forEach(function(q){ var e = q.err ? q.err / q.rate : 0.05; lo = Math.min(lo, Math.log(q.rate) - e); hi = Math.max(hi, Math.log(q.rate) + e); });
+  if (!(lo < Infinity)){ lo = -3; hi = 3; }
+  lo = Math.floor(lo - 0.3); hi = Math.ceil(hi + 0.3);
+  function X(v){ return pad.l + (v - xmin) / (xmax - xmin) * (w - pad.l - pad.r); }
+  function Y(v){ return pad.t + (1 - (v - lo) / (hi - lo)) * (h - pad.t - pad.b); }
+  ctx.fillStyle = C["--muted"]; ctx.strokeStyle = C["--line"]; ctx.lineWidth = 1;
+  ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  for (var e = lo; e <= hi; e++){
+    ctx.globalAlpha = 0.5; ctx.beginPath(); ctx.moveTo(pad.l, Y(e)); ctx.lineTo(w - pad.r, Y(e)); ctx.stroke(); ctx.globalAlpha = 1;
+    ctx.fillText(String(e).replace("-", "−"), pad.l - 5 * dpr, Y(e));
+  }
+  ctx.textAlign = "center"; ctx.textBaseline = "top";
+  for (var L = 4; L <= 20; L += 4) ctx.fillText(String(L), X(L), h - pad.b + 3 * dpr);
+  ctx.fillText("width of space L (sites)", pad.l + (w - pad.l - pad.r) / 2, h - 14 * dpr);
+  ctx.save(); ctx.translate(10 * dpr, pad.t + (h - pad.t - pad.b) / 2); ctx.rotate(-Math.PI / 2);
+  ctx.textBaseline = "top"; ctx.fillText("ln(rate)", 0, -4 * dpr); ctx.restore();
+  ctx.beginPath(); ctx.moveTo(pad.l, h - pad.b); ctx.lineTo(w - pad.r, h - pad.b); ctx.stroke();
+  ctx.save(); ctx.beginPath(); ctx.rect(pad.l, pad.t, w - pad.l - pad.r, h - pad.t - pad.b); ctx.clip();
+  if (scanFit){
+    ctx.strokeStyle = C["--pos"]; ctx.lineWidth = 2 * dpr; ctx.beginPath();
+    ctx.moveTo(X(xmin), Y(scanFit.a - scanFit.M * xmin)); ctx.lineTo(X(xmax), Y(scanFit.a - scanFit.M * xmax)); ctx.stroke();
+  }
+  if (scanFit2){            /* dashed: with the slowly varying ln L prefactor */
+    ctx.strokeStyle = C["--muted"]; ctx.lineWidth = 1.5 * dpr; ctx.setLineDash([5 * dpr, 4 * dpr]); ctx.beginPath();
+    for (var Lq = 3; Lq <= 22; Lq += 0.5){ var yq = scanFit2.a - scanFit2.M * Lq + scanFit2.b * Math.log(Lq); if (Lq > 3) ctx.lineTo(X(Lq), Y(yq)); else ctx.moveTo(X(Lq), Y(yq)); }
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+  pts.forEach(function(q){
+    var y = Math.log(q.rate), e = q.err ? q.err / q.rate : 0.05;
+    ctx.strokeStyle = C["--accent"]; ctx.lineWidth = 1.5 * dpr;
+    ctx.beginPath(); ctx.moveTo(X(q.L), Y(y - e)); ctx.lineTo(X(q.L), Y(y + e)); ctx.stroke();
+    ctx.fillStyle = C["--accent"]; ctx.beginPath(); ctx.arc(X(q.L), Y(y), 3.5 * dpr, 0, 6.2832); ctx.fill();
+  });
+  ctx.restore();
+}
+
+/* ---------- UI ---------- */
+var $ = function(id){ return document.getElementById(id); };
+var kapEl = $("kap"), lamEl = $("lam");
+var dirty = true, snap = true, emaAbs = 0, emaAcc = 0.5, massDirty = true, estT = 0;
+function syncSliders(){
+  if (cplx) syncU();
+  resetMeasure();
+  kapEl.value = kappa; lamEl.value = lambda;
+  $("kapV").textContent = kappa.toFixed(3);
+  $("lamV").textContent = lambda.toFixed(2);
+  $("warn").hidden = !(lambda < 0.005 && kappa >= 0.25);
+  dirty = true;
+}
+function setParams(k, l){ kappa = k; lambda = l; syncSliders(); }
+kapEl.addEventListener("input", function(){ kappa = parseFloat(kapEl.value); syncSliders(); });
+lamEl.addEventListener("input", function(){ lambda = parseFloat(lamEl.value); syncSliders(); });
+$("runBtn").addEventListener("click", function(){ paused = !paused; this.textContent = paused ? "Run" : "Pause"; });
+$("hotBtn").addEventListener("click", function(){ resetField("hot"); dirty = true; });
+$("coldBtn").addEventListener("click", function(){ resetField("cold"); dirty = true; });
+function setHistMode(b){
+  histBlock = b; histInit = false;
+  $("hBlock").classList.toggle("on", b > 1); $("hBlock").setAttribute("aria-pressed", String(b > 1));
+  $("hSite").classList.toggle("on", b <= 1); $("hSite").setAttribute("aria-pressed", String(b <= 1));
+  dirty = true;
+}
+$("hBlock").addEventListener("click", function(){ setHistMode(8); });
+$("hSite").addEventListener("click", function(){ setHistMode(1); });
+$("sizeSel").addEventListener("change", function(){ setSize(parseInt(this.value, 10)); });
+kapEl.addEventListener("input", function(){ $("stripKapNote").hidden = true; });
+
+/* ---------- view and geometry ---------- */
+sCv = $("sPlot"); sctx = sCv.getContext("2d"); scanCv = $("scanCv"); scctx = scanCv.getContext("2d");
+function setPressed(a, b, firstOn){
+  $(a).classList.toggle("on", firstOn); $(a).setAttribute("aria-pressed", String(firstOn));
+  $(b).classList.toggle("on", !firstOn); $(b).setAttribute("aria-pressed", String(!firstOn));
+}
+function applyUI(){
+  var walls = viewMode === "walls";
+  setPressed("vField", "vWalls", !walls);
+  setPressed("gSquare", "gStrip", !strip);
+  $("frameBox").classList.toggle("strip", strip);
+  $("slab").textContent = "↕ space (" + Nx + " sites)";
+  $("xlab").textContent = strip ? "time →" : "space →";
+  $("sizeBox").hidden = strip;
+  $("lBox").hidden = !strip; $("lsl").value = Lsp; $("lslV").textContent = String(Lsp);
+  $("corrSec").hidden = strip; $("massCard").hidden = strip; $("xiCard").hidden = strip;
+  if (strip){ $("xiNote").hidden = true; $("ordNote").hidden = true; }
+  $("stripPanel").hidden = !strip;
+  $("wallCard").hidden = !walls; $("howto").hidden = !walls; $("cbarBox").hidden = walls;
+  $("hwAlong").textContent = strip ? "left to right" : "up the picture";
+  $("hwAcross").textContent = strip ? "across the strip, top to bottom," : "across";
+  applyModeUI();
+  dirty = true;
+}
+function setView(v){ viewMode = v === "walls" ? "walls" : "field"; applyUI(); }
+/* square <-> thin strip. autoKap: the UI's default of kappa = 0.37 when kappa < 0.35 (the hook leaves kappa alone). */
+function setGeometry(g, L, T, autoKap){
+  if (scan) return;
+  if (g === "strip"){
+    if (L != null) Lsp = Math.max(3, Math.min(64, L | 0));
+    if (T != null) Tt = T | 0; else if (!Tt) Tt = window.innerWidth < 600 ? 512 : 1024;
+    if (!strip) sq = { f: f, visited: visited, queue: queue, gen: gen };
+    strip = true;
+    allocLattice(Lsp, Tt); resetField("hot"); tuneDelta(40);
+    $("stripKapNote").hidden = true;
+    if (autoKap && kappa < 0.35){ setParams(0.37, lambda); $("stripKapNote").hidden = false; }
+  } else if (strip){
+    strip = false;
+    if (sq && sq.f.length === N * N){ Nx = Nt = N; f = sq.f; visited = sq.visited; queue = sq.queue; gen = sq.gen; cluAvg = 1; cluPer = 1; snap = true; histInit = false; lastSign = 0; }
+    else { allocLattice(N, N); resetField("hot"); tuneDelta(40); }
+    sq = null; tuneDelta(5);
+  }
+  resetMeasure(); applyUI();
+}
+$("vField").addEventListener("click", function(){ setView("field"); });
+$("vWalls").addEventListener("click", function(){ setView("walls"); });
+$("gSquare").addEventListener("click", function(){ setGeometry("square"); });
+$("gStrip").addEventListener("click", function(){ setGeometry("strip", null, null, true); });
+$("lsl").addEventListener("input", function(){ Lsp = parseInt(this.value, 10); setGeometry("strip", Lsp); });
+function fmtRate(r){ return r >= 100 ? r.toFixed(0) : (r >= 10 ? r.toFixed(1) : r.toFixed(2)); }
+function showStrip(){
+  var r = meterResult(liveMeter);
+  if (r.skip > 0 || r.nb < 4){
+    $("rateV").textContent = "measuring…"; $("rateE").innerHTML = "&nbsp;";
+  } else {
+    $("rateV").textContent = fmtRate(r.rate);
+    $("rateE").textContent = "± " + fmtRate(r.err) + (r.flips === 0 ? " (none seen yet)" : "");
+  }
+  $("sAbsV").textContent = r.sAbs.toFixed(2);
+  $("sAbsE").textContent = "v ≈ " + r.v.toFixed(2);
+  $("stripHint").hidden = !(r.skip <= 0 && r.sAbs < 0.3);
+}
+
+/* ---------- width scan: ln(rate) against L, straight-line fit gives the kink mass ---------- */
+var scan = null;
+var SCAN_CTRL = ["mReal", "mCplx", "kap", "lam", "lsl", "hotBtn", "coldBtn", "gSquare", "gStrip", "sizeSel", "vField", "vWalls"];
+function setScanLocked(b){
+  SCAN_CTRL.forEach(function(id){ $(id).disabled = b; });
+  Array.prototype.forEach.call(document.querySelectorAll("[data-preset]"), function(e){ e.disabled = b; });
+  $("scanBtn").disabled = b; $("scanStop").hidden = !b;
+}
+function scanStart(){
+  if (scan || !strip) return;
+  scan = { Ls: [4, 6, 8, 10, 12, 14, 16, 18, 20], idx: 0, run: null, k: kappa, l: lambda, T: 1024, therm: 100, nst: 1200, stop: false };
+  scanPts = []; scanFit = null; scanFit2 = null; $("scanFit2").hidden = true;
+  setScanLocked(true);
+  $("scanCv").hidden = true; $("scanCards").hidden = true;
+  $("scanLine").textContent = "Starting…";
+  setTimeout(scanTick, 20);
+}
+function scanTick(){
+  var s = scan;
+  if (!s) return;
+  if (s.stop){ scanFinish(true); return; }
+  if (!s.run) s.run = new TunnelRun(s.k, s.l, s.Ls[s.idx], s.T, s.therm, s.nst);
+  var t0 = performance.now();
+  while (performance.now() - t0 < 30 && !s.run.finished()) s.run.run(5);
+  $("scanLine").textContent = "Measuring L = " + s.Ls[s.idx] + " (" + (s.idx + 1) + " of " + s.Ls.length + "): " + Math.min(s.run.done, s.run.total) + " / " + s.run.total + " update steps";
+  if (s.run.finished()){
+    var rr = s.run.result();
+    scanPts.push({ L: rr.L, rate: rr.rateC, err: rr.errC, flips: rr.flips, raw: rr.rate });   /* finite-strip corrected rate, see meterResult */
+    s.run = null; s.idx++;
+    scanFit = fitRates(scanPts, false);
+    $("scanCv").hidden = false; drawScan();
+    if (s.idx >= s.Ls.length){ scanFinish(false); return; }
+  }
+  setTimeout(scanTick, 0);
+}
+function scanFinish(stopped){
+  scan = null; setScanLocked(false); dirty = true;
+  scanFit = fitRates(scanPts, false); scanFit2 = fitRates(scanPts, true);
+  $("scanCv").hidden = scanPts.length === 0; drawScan();
+  $("scanFit2").hidden = !scanFit2;
+  if (scanFit2) $("scanFit2").textContent = "M comes from the dashed fit, which allows a slowly varying prefactor L^" + scanFit2.b.toFixed(2) + " (about L^−½ is expected for a wall wobbling around the strip). A plain straight line (solid) gives M ≈ " + scanFit.M.toFixed(3) + ", which reads high.";
+  var tag = "κ = " + kappaOfScan.toFixed(3) + ", λ = " + lambdaOfScan.toFixed(2);
+  var best = scanFit2 || scanFit;   /* ln L fit reproduced Ising duality (M(0.37)=0.243 vs m(0.31)=0.241; M(0.36)=0.157 vs 0.163); straight line ~30% high */
+  if (best){
+    $("scanCards").hidden = false;
+    var dm = best.Merr < 0.01 ? 3 : 2;
+    $("scanM").textContent = best.M.toFixed(dm); $("scanME").textContent = "± " + best.Merr.toFixed(dm);
+    $("scan2M").textContent = (2 * best.M).toFixed(dm); $("scan2ME").textContent = "± " + (2 * best.Merr).toFixed(dm);
+    $("scanLine").textContent = (stopped ? "Stopped early, fit uses " + scanFit.n + " widths. " : "Done. ") + tag + ".";
+  } else {
+    $("scanCards").hidden = true;
+    $("scanLine").textContent = (stopped ? "Stopped early. " : "") + "Not enough widths with tunnelling events to fit a line. " + tag + ". " + (kappaOfScan < 0.35 ? "Try κ ≈ 0.37." : "");
+  }
+}
+var kappaOfScan = 0, lambdaOfScan = 0;
+$("scanBtn").addEventListener("click", function(){ kappaOfScan = kappa; lambdaOfScan = lambda; scanStart(); });
+$("scanStop").addEventListener("click", function(){ if (scan) scan.stop = true; });
+function setClusters(b){ useClusters = !!b; $("cluChk").checked = useClusters; resetMeasure(); dirty = true; }
+$("cluChk").addEventListener("change", function(){ setClusters(this.checked); });
+function showMass(){
+  var k = $("massV"), e = $("massE"), xv = $("xiV"), xe = $("xiE"), note = $("xiNote");
+  if (est && est.m > 0){
+    var pre = est.rough ? "≈ " : "", d = est.xi < 10 ? 2 : 1, dm = est.rough ? 2 : 3;
+    k.textContent = pre + est.m.toFixed(dm); e.textContent = "± " + est.mErr.toFixed(dm) + (est.rough ? " (short plateau)" : "");
+    xv.textContent = pre + est.xi.toFixed(d); xe.textContent = "± " + est.xiErr.toFixed(d) + (est.rough ? " (short plateau)" : " lattice units");
+    note.hidden = !(est.xi > N / 6);
+  } else {
+    k.textContent = xv.textContent = "measuring…";
+    e.textContent = xe.textContent = thermLeft > 0 ? "settling down" : (ring.length < 8 ? "collecting data" : "waiting for a clear signal");
+    note.hidden = true;
+  }
+}
+Array.prototype.forEach.call(document.querySelectorAll("[data-preset]"), function(b){
+  b.addEventListener("click", function(){ var p = (cplx ? PRESETS_C : PRESETS)[b.getAttribute("data-preset")]; setParams(p[0], p[1]); });
+});
+
+function onTheme(){ readColors(); buildLut(); buildWheel(); drawWheel(); dirty = true; }
+if (window.matchMedia){
+  var mq = matchMedia("(prefers-color-scheme: dark)");
+  if (mq.addEventListener) mq.addEventListener("change", onTheme); else if (mq.addListener) mq.addListener(onTheme);
+}
+new MutationObserver(onTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+if (window.ResizeObserver){
+  var ro = new ResizeObserver(function(){ dirty = true; });
+  ro.observe(fieldCv); ro.observe(wellCv); ro.observe(histCv); ro.observe(corrCv); ro.observe(sCv); ro.observe(scanCv); ro.observe(corrC2); ro.observe(histC2);
+}
+window.addEventListener("resize", function(){ dirty = true; });
+
+/* ---------- main loop ---------- */
+var spsCount = 0, spsT = performance.now(), spsVal = 0, readoutT = 0;
+function frame(){
+  requestAnimationFrame(frame);
+  if (scan) return;          /* a width scan is running on its own lattices; the live picture waits */
+  if (cplx){ frameC(); return; }
+  var changed = dirty;
+  if (!paused){
+    var t0 = performance.now(), acc = 0, ns = 0;
+    do {
+      cluFreeze = strip ? (liveMeter && liveMeter.skip === 0) : thermLeft === 0;   /* count adapts only while settling: no history bias in the data */
+      acc += updateStep(); ns++;
+      if (strip) meterStep(liveMeter);
+      else if (thermLeft > 0) thermLeft--; else accumulate();
+    } while (performance.now() - t0 < 8);
+    cluFreeze = false;   /* never leak into the width scan, which steps its own lattices */
+    var a = acc / (ns * Nx * Nt);
+    tune(a, 0.5);
+    emaAcc += 0.1 * (a - emaAcc);
+    var mm = meanPhi(), m = Math.abs(mm);
+    /* cluster flips can reverse the whole field between frames; Z2 symmetry makes flipping it back harmless and avoids strobing */
+    var sgn = mm >= 0 ? 1 : -1;
+    if (m > 0.2){
+      if (lastSign && sgn !== lastSign){ for (var q = 0, nn = Nx * Nt; q < nn; q++) f[q] = -f[q]; } else lastSign = sgn;
+    }
+    if (snap){ emaAbs = m; snap = false; } else emaAbs += (1 - Math.pow(0.98, ns)) * (m - emaAbs);
+    $("absMi").textContent = "now " + m.toFixed(3);
+    updateHist();
+    spsCount += ns; changed = true;
+  } else if (dirty){
+    updateHist();
+  }
+  var now = performance.now();
+  if (now - spsT > 500){ spsVal = spsCount * 1000 / (now - spsT); spsCount = 0; spsT = now;
+    $("speed").textContent = paused ? "paused" : (Math.round(spsVal) + " update steps/s  ·  " + Nx + "×" + Nt + " lattice"); }
+  if (strip){
+    if (now - estT > 300 || massDirty){ estT = now; massDirty = false; showStrip(); changed = true; }
+  } else if (now - estT > 300 || massDirty){
+    estT = now;
+    if (blocksDone !== estBlocks){ estBlocks = blocksDone; est = estimate(ring, N); massDirty = true; }
+    if (massDirty || thermLeft > 0 || ring.length < 8){ showMass(); massDirty = false; changed = true; }
+  }
+  if (changed){
+    if (strip){ drawSlice(); if (!scanCv.hidden) drawScan(); } else drawCorr();
+    drawField();
+    drawHist();
+    $("absM").textContent = emaAbs.toFixed(3);
+    $("ordNote").hidden = strip || !(emaAbs > 0.3);
+    $("accV").textContent = Math.round(emaAcc * 100) + "%";
+    $("stepV").textContent = "step δ " + delta.toFixed(2);
+    if (dirty){ drawWell(); dirty = false; }
+  }
+}
+
+readColors(); buildLut(); buildWheel(); syncSliders();
+resetField("hot"); tuneDelta(40);
+setParams(0.285, 1);
+applyUI();
+requestAnimationFrame(frame);
+
+/* ---------- debug hook ---------- */
+if (/[?&]debug\b/.test(location.search)){
+  var lf = {
+    get N(){ return N; },
+    get field(){ return f; },
+    get delta(){ return delta; },
+    params: { get kappa(){ return kappa; }, get lambda(){ return lambda; } },
+    setParams: setParams,
+    setN: setSize,
+    reset: function(mode){ resetField(mode); },
+    sweep: function(n){ for (var i = 0; i < n; i++) tune(sweep() / (Nx * Nt), 0.05); },
+    stats: function(){ var m = meanPhi(); return { absM: Math.abs(m), m: m, acc: lastAcc }; },
+    measure: function(k, l, therm, nmeas, init){
+      setParams(k, l);
+      if (init) resetField(init);
+      var i, m;
+      var NN = Nx * Nt;
+      for (i = 0; i < therm; i++){ var a = updateStep() / NN; if (i < therm / 2) tune(a, 0.3); }
+      var s1 = 0, s2 = 0, s4 = 0, sa = 0, sp = 0, q;
+      for (i = 0; i < nmeas; i++){ sa += updateStep() / NN; m = meanPhi(); for (q = 0; q < f.length; q++) sp += f[q] * f[q]; s1 += Math.abs(m); s2 += m * m; s4 += m * m * m * m; }
+      s1 /= nmeas; s2 /= nmeas; s4 /= nmeas;
+      return { N: N, kappa: k, lambda: l, clusters: useClusters, absM: s1, m2: s2, chi: NN * (s2 - s1 * s1), binder: 1 - s4 / (3 * s2 * s2), acc: sa / nmeas, phi2: sp / (nmeas * NN), delta: delta };
+    },
+    get clusters(){ return useClusters; },
+    setClusters: setClusters,
+    setClusterCount: function(c){ cluFix = c | 0; },   /* test only: fixed number of Wolff clusters per step (0 = automatic) */
+    get est(){ return est; },
+    /* correlator run in chunks: corrBegin -> corrRun (repeat) -> corrResult. measureCorr does all three. */
+    corrBegin: function(k, l, therm, nsteps, init){
+      setParams(k, l);
+      if (init) resetField(init);
+      for (var i = 0; i < therm; i++){ var a = updateStep() / (Nx * Nt); if (i < therm / 2) tune(a, 0.3); }
+      BLK =Math.max(50, Math.ceil(nsteps / MAXB)); resetMeasure(); thermLeft = 0;
+    },
+    corrRun: function(n){ for (var i = 0; i < n; i++){ updateStep(); accumulate(); } return blocksDone; },
+    corrResult: function(){
+      var e = estimate(ring, N);
+      BLK = 50; resetMeasure();
+      if (!e) return { G: null, meff: null, m: null, mErr: null, xi: null };
+      var nan = function(v){ return v === v ? v : null; };
+      return { G: Array.from(e.G), Gerr: Array.from(e.Cse), meff: e.meff.map(nan), m: e.m, mErr: e.mErr, xi: e.xi, xiErr: e.xiErr, window: [e.t0, e.t1], rough: e.rough, blocks: e.nb };
+    },
+    measureCorr: function(k, l, therm, nsteps, init){
+      lf.corrBegin(k, l, therm, nsteps, init); lf.corrRun(nsteps); return lf.corrResult();
+    },
+    /* integrated autocorrelation time of |m| in update steps (Sokal window, c = 6); chunked: acBegin, acRun, acResult */
+    acBegin: function(k, l, therm){
+      setParams(k, l);
+      for (var i = 0; i < therm; i++){ var a = updateStep() / (Nx * Nt); if (i < therm / 2) tune(a, 0.3); }
+      acSeries = [];
+    },
+    acRun: function(n){ for (var i = 0; i < n; i++){ updateStep(); acSeries.push(Math.abs(meanPhi())); } return acSeries.length; },
+    acResult: function(){
+      var x = acSeries, n = x.length, i, t, mean = 0, c0 = 0;
+      for (i = 0; i < n; i++) mean += x[i];
+      mean /= n;
+      for (i = 0; i < n; i++) c0 += (x[i] - mean) * (x[i] - mean);
+      c0 /= n;
+      var tau = 0.5, W = 0;
+      for (t = 1; t < n / 4; t++){
+        var c = 0;
+        for (i = 0; i + t < n; i++) c += (x[i] - mean) * (x[i + t] - mean);
+        tau += c / (n - t) / c0; W = t;
+        if (t >= 6 * tau) break;
+      }
+      return { tau: tau, window: W, n: n, mean: mean };
+    },
+    autocorr: function(k, l, therm, nsteps){ lf.acBegin(k, l, therm); lf.acRun(nsteps); return lf.acResult().tau; },
+    /* ----- Stage 3 ----- */
+    setView: setView,
+    setGeometry: function(g, L, T){ setGeometry(g, L, T, false); },   /* does not touch kappa (the UI button does) */
+    get geom(){ return { strip: strip, Nx: Nx, Nt: Nt, view: viewMode }; },
+    wallLength: function(){ return computeWalls(); },
+    /* mean wall length per site over nsteps update steps (square or strip, current geometry) */
+    wallStats: function(k, l, therm, nsteps, init){
+      setParams(k, l);
+      if (init) resetField(init);
+      var i, s = 0, s2 = 0, NN = Nx * Nt;
+      for (i = 0; i < therm; i++){ var a = updateStep() / NN; if (i < therm / 2) tune(a, 0.3); }
+      for (i = 0; i < nsteps; i++){ updateStep(); var w = computeWalls(); s += w; s2 += w * w; }
+      s /= nsteps; s2 /= nsteps;
+      return { wall: s, sd: Math.sqrt(Math.max(0, s2 - s * s)), N: Nx, Nt: Nt };
+    },
+    /* tunnelling rate per 1000 time steps on its own strip lattice L x T (T defaults to the strip length in use, else 1024);
+       does not touch the live lattice. Returns {rate, err, flips, steps, v, sAbs}. */
+    tunnelRate: function(k, l, L, therm, nsteps, T){
+      var r = new TunnelRun(k, l, L, T || Tt || 1024, therm, nsteps);
+      r.run(r.total);
+      return r.result();
+    },
+    /* chunked: tunBegin -> tunRun(n) (repeat until true) -> tunResult */
+    tunBegin: function(k, l, L, therm, nsteps, T){ lf._run = new TunnelRun(k, l, L, T || Tt || 1024, therm, nsteps); },
+    tunRun: function(n){ lf._run.run(n); return lf._run.finished(); },
+    tunResult: function(){ return lf._run.result(); },
+    /* fit ln(rate) = a - M L (+ b ln L); pts = [{L, rate, err, flips}] */
+    fitRates: fitRates,
+    get scanPts(){ return scanPts; },
+    startScan: function(){ kappaOfScan = kappa; lambdaOfScan = lambda; scanStart(); },
+    get scanning(){ return !!scan; },
+    /* ----- Stage 4: complex phi ----- */
+    setMode: setMode,
+    get mode(){ return cplx ? "complex" : "real"; },
+    get u1(){ return { U: U, UM: UM, res: ures, head: cHead }; },
+    /* U(1) run on its own lattice (the live one is untouched): u1Begin -> u1Run(n) until it returns true -> u1Result.
+       opts: N (default = current grid), every (measure every k steps), clusters (false = Metropolis only), slice (also the slice-average mass),
+       freeze (default true: stop the running cluster-size mean after thermalisation, see u1Step), noG (skip the correlators). */
+    u1Begin: function(k, l, therm, nsteps, init, opts){
+      opts = opts || {};
+      var n = opts.N || (cplx && U ? U.n : N), u = newU1(n), every = opts.every || 1, i, v = 1;
+      u.kappa = k; u.lambda = l; u.clusters = opts.clusters !== false;
+      if (l > 1e-9){ var v2 = 1 - (1 - 4 * k) / (2 * l); if (v2 > 0.05) v = Math.sqrt(v2); }
+      u1Reset(u, init === "cold" ? "cold" : "hot", v);
+      for (i = 0; i < 20; i++) u1Tune(u, u1Sweep(u) / (n * n), 0.4);
+      lf._u1 = { u: u, M: newU1Meas(n, Math.max(5, Math.ceil(nsteps / every / 100)), 0, !!opts.noG), therm: therm, done: 0, total: therm + nsteps, every: every, cnt: 0, slice: !!opts.slice, init: init || "hot", freeze: opts.freeze !== false };
+    },
+    u1Run: function(c){
+      var s = lf._u1, u = s.u, end = Math.min(s.total, s.done + c);
+      for (; s.done < end; s.done++){
+        var a = u1Step(u) / (u.n * u.n);
+        if (s.done === s.therm - 1 && s.freeze) u.cluFrozen = true;
+        if (s.done < s.therm){ if (s.done < s.therm / 2) u1Tune(u, a, 0.3); }
+        else if ((++s.cnt % s.every) === 0) u1Sample(u, s.M);
+      }
+      return s.done >= s.total;
+    },
+    u1Result: function(){
+      var s = lf._u1, R = u1Result(s.M);
+      if (s.slice && R.nb >= 8){
+        var e = estimate(s.M.blocks.map(function(b){ return b.subarray(5 + s.M.H); }), s.u.n);
+        if (e && e.m > 0){ R.mSlice = e.m; R.mSliceErr = e.mErr; }
+      }
+      R.kappa = s.u.kappa; R.lambda = s.u.lambda; R.clusters = s.u.clusters; R.delta = s.u.delta; R.cluAvg = s.u.cluAvg;
+      return R;
+    },
+    measureU1: function(k, l, therm, nsteps, init, opts){
+      lf.u1Begin(k, l, therm, nsteps, init, opts); lf.u1Run(therm + nsteps); return lf.u1Result();
+    }
+  };
+  var acSeries = [];
+  window.__lf = lf;
+}
+})();
+</script>
+</body>
+</html>
