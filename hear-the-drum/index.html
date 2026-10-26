@@ -1691,11 +1691,11 @@ function renderSound(parts, sr, voice, maxDur) {   // whole sound at once (used 
   L.set(head.L); R.set(head.R); L.set(tail.L, head.L.length); R.set(tail.R, head.R.length);
   return { L: L, R: R, reverb: job.reverb };
 }
-function playJob(job, delay, vol, inst) {          // inst: {f, tune} for an instrument note (low-passed; damped by clashing newer notes), else falsy
+function playJob(job, delay, vol, inst) {          // inst: {f, tune, raw} for a single note (damped by clashing newer notes; low-passed unless raw), else falsy
   if (!audio) return;
   if (audio.ctx.state !== 'running') { audio.pending.push({ job: job, delay: delay, vol: vol, inst: inst, t: performance.now() }); return; }
   var ctx = audio.ctx, g = ctx.createGain(), send = ctx.createGain();
-  g.gain.value = vol === undefined ? 1 : vol; send.gain.value = job.reverb; g.connect(inst ? audio.lp : audio.master); g.connect(send); send.connect(audio.verb);
+  g.gain.value = vol === undefined ? 1 : vol; send.gain.value = job.reverb; g.connect(inst && !inst.raw ? audio.lp : audio.master); g.connect(send); send.connect(audio.verb);
   var t0 = ctx.currentTime + 0.02 + (delay || 0), nh = Math.min(job.n, Math.floor(HEAD_SECS * job.sr));
   if (inst) dampOthers(g, t0, t0 + job.n / job.sr, inst.f, inst.tune);
   function sched(chunk, at, last) {
@@ -1772,7 +1772,7 @@ function labParts(inst, f) {                       // [freq, amp, tau] per parti
   return out;
 }
 function labNote(sol, k, delay, vol, tune) {             // one instrument note for pattern k; returns the caption item
-  var inst = SOUND.real ? 'marimba' : SOUND.inst, LV = INSTS[inst], f0 = sol.f[0], fs = labFreq(sol, k), fp = fs * LV.up;   // Real drum borrows the marimba for tunes
+  var inst = SOUND.real ? 'marimba' : SOUND.inst, LV = INSTS[inst], f0 = sol.f[0], fs = labFreq(sol, k), fp = fs * LV.up;   // Real drum plays drumNote instead; marimba is only a fallback
   var pan = clamp((Math.log2(fs / f0) - 1) * 0.3, -0.5, 0.5);
   var parts = labParts(inst, fp).map(function (q) { return { f: q[0], a: q[1], tau: q[2], pan: pan }; });
   playJob(soundJob(parts, audio.ctx.sampleRate, LV), delay, vol, { f: fp, tune: !!tune });
@@ -1783,9 +1783,15 @@ function labNote(sol, k, delay, vol, tune) {             // one instrument note 
   }
   return { text: text, mode: k + 1 };
 }
+function drumNote(sol, k, delay, vol, tune) {     // one pattern in the Real drum voice, at the exact pitch the physics gives
+  var f = sol.f[k];
+  playJob(soundJob([{ f: f, a: 1, tau: tauOf(sol, k, VOICES.drum) * 1.3, pan: 0 }], audio.ctx.sampleRate, VOICES.drum), delay, vol, { f: f, tune: !!tune, raw: true });
+}
 function playTune(a, sol, delay, max) {            // the drum's first `max` (default 8) notes, rising, 0.3 s apart, one ringing at a time
   var d = delay || 0;
-  tunedNotes(a, sol, max || 8).forEach(function (nt, i) { labNote(sol, nt.k, d + i * 0.3, 0.55, true); });
+  tunedNotes(a, sol, max || 8).forEach(function (nt, i) {
+    if (SOUND.real) drumNote(sol, nt.k, d + i * 0.3, 0.55, true); else labNote(sol, nt.k, d + i * 0.3, 0.55, true);
+  });
   lastNote = null;
 }
 function playStrike(a, sol, delay, maxDur) {      // sol, delay and maxDur (seconds) are optional
@@ -1848,7 +1854,7 @@ function playMode(k, sol) {
   if (!ensureAudio()) return;
   sol = sol || state.sol;
   if (!SOUND.real) { labNote(sol, k, 0, 0.55); return; }
-  playJob(soundJob([{ f: sol.f[k], a: 1, tau: tauOf(sol, k, VOICES.drum) * 1.3, pan: 0 }], audio.ctx.sampleRate, VOICES.drum));   // exact pitch, as the physics gives it
+  drumNote(sol, k, 0);
 }
 
 /* ===================================================================
@@ -3300,7 +3306,7 @@ function gsListen(c) { var sol = gsSolOf(c); if (G.ready && sol) gsArp(sol); }
 
 /* ---------- screen ---------- */
 function gsCaption() {
-  $('gsCaption').textContent = 'Then listen to each shape and pick the one that matches.' + (SOUND.snap ? ' Notes are gently tuned (by at most half a semitone).' : '');
+  $('gsCaption').textContent = 'Then listen to each shape and pick the one that matches.' + (SOUND.snap && !SOUND.real ? ' Notes are gently tuned (by at most half a semitone).' : '');
 }
 function gsBuildCards() {
   var box = $('gsCards'), rd = G.R[G.round], def = gsDef(G.round);
