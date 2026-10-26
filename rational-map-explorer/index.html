@@ -46,7 +46,7 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid 
 <div class="wrap">
 <a class="back-link" href="../index.html">← All widgets</a>
 <h1>Rational map explorer: z<sup>n</sup> + c / z<sup>m</sup></h1>
-<p class="hint">The parameter plane (c) shows where the critical orbit stays bounded; the dynamical plane (z) shows the dynamics for the c you pick. Tap the parameter plane or drag its marker to set c. On both panels, drag to pan and pinch or scroll to zoom; double-tap or double-click the dynamical plane to reset it. Try n = 2, m = 3 and a small c. Set m = 0 for the ordinary z<sup>n</sup> + c (Mandelbrot and Julia sets). Both panels zoom far beyond normal precision (the zoom label shows "deep"); deep views usually need more iterations. Animate c moves the marker around the centre of the parameter plane view; Path sets the shape of the loop.</p>
+<p class="hint">The parameter plane (c) shows where the critical orbit stays bounded; the dynamical plane (z) shows the dynamics for the c you pick. Tap the parameter plane or drag its marker to set c. On both panels, drag to pan and pinch or scroll to zoom; double-tap or double-click the dynamical plane to reset it. It opens with m = 0, the ordinary z<sup>n</sup> + c (Mandelbrot and Julia sets); raise m to add a pole, and try n = 2, m = 3 with a small c. Both panels zoom far beyond normal precision (the zoom label shows "deep"); deep views usually need more iterations. Animate c moves the marker around the centre of the parameter plane view; Path sets the shape of the loop.</p>
 <div class="grid">
 <div><div class="cap"><span>Parameter plane (c)</span><span id="z0">x1.0</span></div>
 <div class="view" id="mv"><canvas id="mc"></canvas><div id="mk"></div></div></div>
@@ -56,11 +56,11 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid 
 <div class="st" id="st">Starting...</div>
 <div class="ctl">
 <div class="row"><label for="n">Power n</label><input type="range" id="n" min="2" max="8" step="1" value="2"><output id="nv">2</output></div>
-<div class="row"><label for="m">Pole m</label><input type="range" id="m" min="0" max="8" step="1" value="2"><output id="mv2">2</output></div>
+<div class="row"><label for="m">Pole m</label><input type="range" id="m" min="0" max="8" step="1" value="0"><output id="mv2">0</output></div>
 <div class="row"><label for="it">Iterations</label><input type="range" id="it" min="50" max="3000" step="50" value="200"><output id="itv">200</output></div>
 <div class="row"><label for="cd">Color</label><input type="range" id="cd" min="0.02" max="0.5" step="0.01" value="0.02"><output id="cdv">0.02</output></div>
-<div class="row"><label for="lr">Re(c)</label><input type="range" id="lr" min="-2.5" max="2.5" step="0.001" value="0.06"><output id="lrv">0.060</output></div>
-<div class="row"><label for="li">Im(c)</label><input type="range" id="li" min="-2.5" max="2.5" step="0.001" value="0.02"><output id="liv">0.020</output></div>
+<div class="row"><label for="lr">Re(c)</label><input type="range" id="lr" min="-2.5" max="2.5" step="0.001" value="-0.4"><output id="lrv">-0.400</output></div>
+<div class="row"><label for="li">Im(c)</label><input type="range" id="li" min="-2.5" max="2.5" step="0.001" value="0.6"><output id="liv">0.600</output></div>
 <div class="row"><label for="sp">Anim speed</label><input type="range" id="sp" min="0.1" max="4" step="0.1" value="1"><output id="spv">1.0</output></div>
 </div>
 <div class="bar">
@@ -88,7 +88,7 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid 
 var $=function(i){return document.getElementById(i)};
 
 /* ---------- settings ---------- */
-var S={n:2,m:2,it:200,cd:0.02,lr:0.06,li:0.02,pal:0,R:720,E:3000,ss:1,sp:1,path:1,reg:1};
+var S={n:2,m:0,it:200,cd:0.02,lr:-0.4,li:0.6,pal:0,R:720,E:3000,ss:1,sp:1,path:1,reg:0};
 var PALS=[[[.5,.5,.5],[.5,.5,.5],[1,1,1],[0,.1,.2]],[[.25,.5,.6],[.25,.4,.4],[1,1,1],[.5,.6,.7]],[[.5,.5,.5],[.5,.5,.5],[1,1,1],[0,0,0]]];
 
 /* ---------- math kernel (these functions are also copied into the worker threads) ---------- */
