@@ -113,6 +113,12 @@ canvas.plot.tall{height:190px}
 body.kink .ko{display:inline-flex !important}
 body.kink .kb{display:block !important}
 body.kink .kh{display:none !important}
+/* poke mode: .ph hidden in it, .po (inline) and .pb (block) shown only in it */
+.po,.pb{display:none !important}
+body.poke .po{display:inline-flex !important}
+body.poke .pb{display:block !important}
+body.poke .ph{display:none !important}
+body.poke #field{touch-action:none;cursor:crosshair;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:var(--text-sm);color:var(--muted);margin-top:var(--space-2)}
 .legend i{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px;margin-right:4px}
 #kScanCv{cursor:pointer}
@@ -137,6 +143,8 @@ body.kink .kh{display:none !important}
 
   <p class="lede" id="ledeK" hidden>Nothing is random here, and the vertical direction is <b>real time</b>, not Euclidean time: we are not looking at quantum fluctuations any more, but at one classical field φ obeying a wave equation and moving, like a film. Space runs across, time runs <b>up</b>. The field has the same double well as before, with two valleys, φ = −1 (blue) and φ = +1 (orange). A <b>kink</b> is a wall between the valleys, and it behaves like a particle: it has a mass and a speed. Here a kink and an antikink rush at each other. They cannot pass through one another, because far to the left and far to the right the field is stuck in the blue valley, so they can only <b>bounce</b> or stick. Each kink can also <b>wobble</b> (physicists call it its shape mode), and in the crash some of the energy is stored in the wobble and may be handed back. If it is handed back at just the right moment the pair gets out after bouncing twice. That resonance was found by Campbell, Schonfeld and Wingate in 1983. Below about 0.26 times the speed of light most crashes end in a trapped wobbling lump that slowly gives off waves (a <b>bion</b>).</p>
 
+  <p class="lede" id="ledeP" hidden>Here <b>you</b> are the source. The field is classical again and moves in real time: space runs across, time runs <b>up</b>, and the newest moment is at the top. It starts at rest in the blue valley, φ = −1. <b>Press and hold</b> anywhere on the picture to push on the field there. In the equation that push is a <b>source term J</b>, an outside force acting on φ. A quick tap only sends out <b>ripples</b>. In the quantum theory those ripples come in lumps called <b>mesons</b>, the field's particles (mass 2), and they always travel slower than light (the dashed lines). Hold longer and the field gets shoved over the hump into the orange valley: a <b>kink and an antikink are born</b> and fly apart. The energy has to come from your finger, and a pair costs at least twice the kink mass, 2 × 4/3 ≈ 2.67.</p>
+
   <details class="try">
     <summary>Things to try</summary>
     <ol>
@@ -147,6 +155,7 @@ body.kink .kh{display:none !important}
       <li><b>Make it complex.</b> Choose Complex φ and the Vortices view. Go from Vortex gas to Quasi-ordered: free vortices pair up and the stiffness Υ jumps past 2/π. That is the BKT transition.</li>
       <li><b>Wrap the ball.</b> Choose Arrows (O(3)) and the Topology view, press Add instanton, then Run: the red blob melts in the noise. Press Randomize, then Cool: the noise is stripped away and the instantons (red) and anti-instantons (blue) that remain are left standing. Then compare the Strong, Medium and Weak coupling presets: ξ grows exponentially with β.</li>
       <li><b>Watch a collision in real time.</b> Choose Kink collisions and press Two bounces: the kinks meet, bounce, fall back for a second hit and only then fly apart. Compare One bounce and Trapped (bion), then press Scan speeds to map every speed from 0.15 to 0.30 and click any bar to replay that collision.</li>
+      <li><b>Make particles yourself.</b> Choose Poke the field. Tap the picture quickly: only ripples. Now press and hold for about half a second: a kink–antikink pair is born and flies apart. With Gentle strength no pair ever forms, however long you hold, because the push is too weak to lift the field over the hump.</li>
     </ol>
   </details>
 
@@ -158,11 +167,12 @@ body.kink .kh{display:none !important}
             <button class="btn seg on" id="mReal" aria-pressed="true">Real φ (Z₂)</button>
             <button class="btn seg" id="mCplx" aria-pressed="false">Complex φ (U(1))</button>
             <button class="btn seg" id="mO3" aria-pressed="false">Arrows (O(3))</button>
-            <button class="btn seg" id="mKink" aria-pressed="false">Kink collisions</button></div>
+            <button class="btn seg" id="mKink" aria-pressed="false">Kink collisions</button>
+            <button class="btn seg" id="mPoke" aria-pressed="false">Poke the field</button></div>
           <div class="seggrp kh" role="group" aria-label="View"><span class="lbl">View</span>
             <button class="btn seg on" id="vField" aria-pressed="true">Field</button>
             <button class="btn seg" id="vWalls" aria-pressed="false">Domain walls</button></div>
-          <div class="seggrp kh" role="group" aria-label="Geometry" id="geoGrp"><span class="lbl">Geometry</span>
+          <div class="seggrp kh ph" role="group" aria-label="Geometry" id="geoGrp"><span class="lbl">Geometry</span>
             <button class="btn seg on" id="gSquare" aria-pressed="true">Square</button>
             <button class="btn seg" id="gStrip" aria-pressed="false">Thin strip</button></div>
         </div>
@@ -210,6 +220,17 @@ body.kink .kh{display:none !important}
             <li>Faint ripples spreading sideways are small waves of the field (mesons) carrying energy away.</li>
           </ul>
         </div>
+        <div class="card howto pb" id="howtoP" style="margin-top:var(--space-2)">
+          <div class="k"><b>How to read it</b></div>
+          <ul>
+            <li><b>Press and hold</b> on the picture to push the field at that point; drag to move the push. The white trail shows where and how hard you pushed. Two fingers make two pushes.</li>
+            <li>Blue is the − valley (φ = −1), orange the + valley (φ = +1). A push always heads for the other valley.</li>
+            <li>Ripples spreading out in a V are small waves of the field (mesons). The dashed V from your latest push is the speed of light: ripples always stay inside it.</li>
+            <li>An orange band that opens up between two pale lines is a <b>kink–antikink pair</b> flying apart. A spot that keeps pulsing in place is an <b>oscillon</b>: a wobbling lump that slowly leaks ripples.</li>
+            <li>Faint ripples are easier to see in the <b>Energy</b> view, which shows where the energy is.</li>
+          </ul>
+        </div>
+        <div class="cbar" id="ebarBox" hidden><span>energy: low</span><canvas id="ebar" width="256" height="1"></canvas><span>high</span></div>
         <div class="cbar" id="cbarBox"><span>φ = −1.3</span><canvas id="cbar" width="256" height="1"></canvas><span>+1.3</span></div>
         <div class="wheelbox" id="wheelBox" hidden><canvas id="wheelCv" aria-label="Colour wheel: hue is the phase angle of phi, brightness is its length"></canvas>
           <span>Hue = the phase angle of φ (red is 0, counter-clockwise as on the wheel); brighter and more saturated = larger |φ|, pale = near zero. While the grid is ordered, colours are shown relative to its average phase, so they don't flicker.</span></div>
@@ -218,13 +239,14 @@ body.kink .kh{display:none !important}
         <div class="row" style="margin-top:var(--space-3)">
           <button class="btn primary" id="runBtn">Pause</button>
           <button class="btn ko" id="fireBtn" style="align-items:center" title="Start a new collision at the current speed">Fire</button>
-          <div class="sizebox ko" style="margin-left:0"><label for="kspeed">Playback</label>
+          <button class="btn po" id="calmBtn" style="align-items:center" title="Set the whole field back to rest in the blue valley">Calm</button>
+          <div class="sizebox ko po" style="margin-left:0"><label for="kspeed">Playback</label>
             <select id="kspeed"><option value="0.5">0.5×</option><option value="1">1×</option><option value="2" selected>2×</option><option value="4">4×</option><option value="8">8×</option></select></div>
-          <button class="btn kh" id="hotBtn" title="Random values everywhere">Randomize</button>
-          <button class="btn kh" id="coldBtn" title="Every site set to the well minimum +v">All +v</button>
+          <button class="btn kh ph" id="hotBtn" title="Random values everywhere">Randomize</button>
+          <button class="btn kh ph" id="coldBtn" title="Every site set to the well minimum +v">All +v</button>
           <button class="btn" id="coolBtn" title="Every arrow repeatedly aligns with its neighbours; the noise melts, instantons stay" hidden>Cool</button>
           <button class="btn" id="instBtn" title="Paint one instanton (Q = +1) on an aligned background and pause" hidden>Add instanton</button>
-          <div class="sizebox kh" id="sizeBox"><label for="sizeSel">Grid</label>
+          <div class="sizebox kh ph" id="sizeBox"><label for="sizeSel">Grid</label>
             <select id="sizeSel"><option value="64">64 × 64</option><option value="128" selected>128 × 128</option><option value="256">256 × 256</option></select></div>
         </div>
         <div class="presets"><span class="lbl" id="preLbl">Presets (λ = 1):</span>
@@ -232,10 +254,10 @@ body.kink .kh{display:none !important}
           <button class="btn" data-preset="crit">Critical</button>
           <button class="btn" data-preset="brk">Broken</button>
         </div>
-        <label class="tog kh"><input type="checkbox" id="cluChk" checked><b>Cluster updates</b></label>
-        <p class="small kh" style="margin-top:0" id="cluNote">Flips whole same-sign regions at once, which beats the slowing-down of ordinary updates near κ = 0.340.</p>
-        <p class="stat kh" id="coolLine" hidden>–</p>
-        <p class="stat kh" id="speed">–</p>
+        <label class="tog kh ph"><input type="checkbox" id="cluChk" checked><b>Cluster updates</b></label>
+        <p class="small kh ph" style="margin-top:0" id="cluNote">Flips whole same-sign regions at once, which beats the slowing-down of ordinary updates near κ = 0.340.</p>
+        <p class="stat kh ph" id="coolLine" hidden>–</p>
+        <p class="stat kh ph" id="speed">–</p>
       </div>
 
       <div class="panel kb" id="kScanPanel">
@@ -286,7 +308,7 @@ body.kink .kh{display:none !important}
           <p class="hint" id="kapHint">How strongly neighbours want to agree (like Ising β/2).</p>
           <input type="range" id="kap" min="0.15" max="0.45" step="0.001" value="0.2">
         </div>
-        <div class="slider kh" id="lamBox" style="margin-bottom:var(--space-2)">
+        <div class="slider kh ph" id="lamBox" style="margin-bottom:var(--space-2)">
           <div class="top"><label for="lam">λ  well sharpness</label><span class="val" id="lamV"></span></div>
           <p class="hint" id="lamHint">0 = soft free field, large = field pinned near ±1 (Ising).</p>
           <input type="range" id="lam" min="0" max="5" step="0.01" value="1">
@@ -320,6 +342,24 @@ body.kink .kh{display:none !important}
         <p class="small">φ(0, t) in the same time window as the picture. It starts at +1 (orange between the kinks). Each dip below 0, marked with a dot, is counted as a bounce; a bion keeps dipping.</p>
       </div>
 
+      <div class="panel pb" id="pReadPanel">
+        <h2>Readouts</h2>
+        <div class="cards">
+          <div class="card"><div class="k">time t</div><div class="v" id="pT">–</div><div class="s" id="pTs">&nbsp;</div></div>
+          <div class="card"><div class="k">walls in view</div><div class="v" id="pW">–</div><div class="s">kinks and antikinks</div></div>
+          <div class="card"><div class="k">your last push put in</div><div class="v" id="pIn">–</div><div class="s">a pair needs ≥ 2.67</div></div>
+          <div class="card"><div class="k">energy in the box</div><div class="v" id="pE">–</div><div class="s">ripples carry it off the edges</div></div>
+        </div>
+        <p class="kstatus" id="pStatus">Press and hold on the picture to push the field.</p>
+        <p class="small">"Put in" is the work your push did on the field, J times the speed of φ, added up over space and time. Energy is conserved, so a kink–antikink pair (rest energy 2 × 4/3 ≈ 2.67) can only appear if a push puts in at least that much. More is not always enough: much of it can leave as ripples.</p>
+      </div>
+
+      <div class="panel pb" id="pPlotPanel">
+        <h2>The field right now</h2>
+        <canvas class="plot" id="pPlotX" aria-label="The field phi against x at this moment, with the pushes marked"></canvas>
+        <p class="small">φ along the part of space in the picture. A push shows as a white band; the dashed lines are the two valleys, φ = ±1.</p>
+      </div>
+
       <div class="panel" id="afPanel" hidden>
         <h2>Asymptotic freedom</h2>
         <canvas class="plot tall" id="afCv" aria-label="Correlation length against beta on a log scale, with measured points, the two-loop asymptotic scaling curve and the live point"></canvas>
@@ -327,13 +367,13 @@ body.kink .kh{display:none !important}
         <p class="small">The mass appears although the action has none: ξ is finite at every β. And as β grows (weaker coupling, shorter distances) ξ grows exponentially, so the continuum limit sits at β → ∞, where the coupling vanishes. That is <b>asymptotic freedom</b>, the same behaviour that makes quarks nearly free at short distances in QCD.</p>
       </div>
 
-      <div class="panel kh" id="wellPanel">
+      <div class="panel kh ph" id="wellPanel">
         <h2 id="wellH">Mean-field well</h2>
         <canvas class="plot" id="well" aria-label="Mean-field effective potential"></canvas>
         <p class="small" id="wellNote">V(φ) − 4κφ²: one valley means a symmetric vacuum, two valleys means the field must choose a side.</p>
       </div>
 
-      <div class="panel kh" id="readPanel">
+      <div class="panel kh ph" id="readPanel">
         <h2>Readouts</h2>
         <div class="cards">
           <div class="card"><div class="k" id="absK">⟨|φ|⟩ average field</div><div class="v" id="absM">–</div><div class="s" id="absMi">now –</div></div>
@@ -496,7 +536,7 @@ function wellMin(){            /* mean-field minimum +v of (1-4k)p^2 + lam(p^2-1
   return 1;
 }
 function resetField(how){
-  if (kink) return;
+  if (kink || poke) return;
   if (cplx){ u1Reset(U, how, wellMin()); snap = true; histInit = false; resetMeasure(); return; }
   if (o3){ o3Reset(O, how); snap = true; coolLeft = 0; qHistN = 0; $("coolLine").textContent = ""; $("coolLine").hidden = true; resetMeasure(); return; }
   var n = Nx * Nt, i, v;
@@ -510,7 +550,7 @@ function allocLattice(nx, nt){
   cluAvg = 1; cluPer = 1;
 }
 function setSize(n){
-  if (kink) return;
+  if (kink || poke) return;
   if (cplx){ allocU(n); return; }
   if (o3){ allocO(n); return; }
   N = n; sq = null;
@@ -529,7 +569,7 @@ var MAXB = 200, BLK = 50, THERM = 200;
 var HN = N >> 1, rowS = new Float64Array(N), colS = new Float64Array(N), curG = new Float64Array(HN + 1), curN = 0;
 var ring = [], ringPos = 0, blocksDone = 0, thermLeft = THERM, est = null, estBlocks = -1, lastSign = 0;
 function resetMeasure(){
-  if (kink) return;
+  if (kink || poke) return;
   if (cplx){ resetCMeasure(); return; }
   if (o3){ resetOMeasure(); return; }
   HN = N >> 1; rowS = new Float64Array(N); colS = new Float64Array(N); curG = new Float64Array(HN + 1); curN = 0;
@@ -1693,8 +1733,8 @@ function drawHist(){
 
 /* ---------- complex mode (Stage 4): state, drawing, readouts ---------- */
 /* mode: "real" | "complex" | "o3". cplx and o3 are derived from it in one place (modeFlags) so the many draw / update branches stay short. A 4th mode adds an entry to MODES, a parked state, a flag and an applyModeUI branch. */
-var mode = "real", cplx = false, o3 = false, kink = false;
-function modeFlags(){ cplx = mode === "complex"; o3 = mode === "o3"; kink = mode === "kink"; document.body.classList.toggle("kink", kink); }
+var mode = "real", cplx = false, o3 = false, kink = false, poke = false;
+function modeFlags(){ cplx = mode === "complex"; o3 = mode === "o3"; kink = mode === "kink"; poke = mode === "poke"; document.body.classList.toggle("kink", kink); document.body.classList.toggle("poke", poke); }
 var U = null, UM = null, ures = null, uDone = -1, cCnt = 0, cEvery = 1, cHead = "eta";
 var PRESETS_C = { sym:[0.442, 1], crit:[0.502, 1], brk:[0.582, 1] };   /* kappa_BKT(lambda=1) = 0.502 +- 0.002 (Weber-Minnhagen on the helicity modulus, N = 16..128; see PLAN.md); presets at -0.06, 0, +0.08 */
 var csave = { kappa: 0.502, lambda: 1, view: "field" };
@@ -1719,12 +1759,14 @@ var MODES = {
   real:    { kmin: 0.15, kmax: 0.45, kstep: 0.001 },
   complex: { kmin: 0.3,  kmax: 0.8,  kstep: 0.001 },
   o3:      { kmin: 0.5,  kmax: 2.0,  kstep: 0.01 },
-  kink:    { kmin: 0.05, kmax: 0.6,  kstep: 0.001 }     /* the slider is the kink speed v */
+  kink:    { kmin: 0.05, kmax: 0.6,  kstep: 0.001 },    /* the slider is the kink speed v */
+  poke:    { kmin: 0.2,  kmax: 3,    kstep: 0.05 }      /* the slider is the push strength J */
 };
 var parked = {
   complex: { kappa: 0.502, lambda: 1, view: "field", strip: false, paused: false },
   o3:      { kappa: 1.4,   lambda: 1, view: "field", strip: false, paused: false },
-  kink:    { kappa: 0.35,  lambda: 1, view: "field", strip: false, paused: false }
+  kink:    { kappa: 0.35,  lambda: 1, view: "field", strip: false, paused: false },
+  poke:    { kappa: 1,     lambda: 1, view: "field", strip: false, paused: false }
 };
 function setMode(m){
   if (m === mode || scan || kscan || !MODES[m]) return;
@@ -1739,6 +1781,8 @@ function setMode(m){
   if (o3 && !O) allocO(sz);
   if (kink){ kappa = Math.max(cfg.kmin, Math.min(cfg.kmax, kappa)); if (!K) kinkFire(); else { $("runBtn").disabled = K.s.t >= KTMAX; } kLast = performance.now(); }
   else $("runBtn").disabled = false;
+  if (poke){ kappa = Math.max(cfg.kmin, Math.min(cfg.kmax, kappa)); if (!PK) pokeReset(); pLast = performance.now(); }
+  else pokeRelease();
   $("sizeSel").value = String(cplx ? U.n : (o3 ? O.n : N));
   if (m === "real") lastSign = 0;
   snap = true; histInit = false; emaAbs = 0;
@@ -1779,13 +1823,19 @@ var MODE_TEXT = {
     kapHint: "In units of the speed of light. The kink starts at x = −10 and the antikink at x = +10. Let go of the slider to fire a new collision.",
     lamHint: "", eq: "φ_tt = φ_xx + 2φ(1 − φ²)", wellH: "", wellNote: "", clu: "",
     cold: "", coldTitle: "", pre: "Presets:", presets: ["One bounce", "Two bounces", "Trapped (bion)"], view2: "", xiN: "", corr: ""
+  },
+  poke: {
+    abs: "", acc: "", kap: "J  push strength",
+    kapHint: "How hard your finger pushes on the field. Below about 0.77 the push can never lift the field over the hump, however long you hold it, so it only makes ripples.",
+    lamHint: "", eq: "φ_tt = φ_xx + 2φ(1 − φ²) + J(x, t)", wellH: "", wellNote: "", clu: "",
+    cold: "", coldTitle: "", pre: "Strength:", presets: ["Gentle", "Medium", "Strong"], view2: "Energy", xiN: "", corr: ""
   }
 };
 function applyModeUI(){
-  var walls = viewMode === "walls", i, ids, T = MODE_TEXT[mode], k, mb = { real: "mReal", complex: "mCplx", o3: "mO3", kink: "mKink" };
+  var walls = viewMode === "walls", i, ids, T = MODE_TEXT[mode], k, mb = { real: "mReal", complex: "mCplx", o3: "mO3", kink: "mKink", poke: "mPoke" };
   for (k in mb){ $(mb[k]).classList.toggle("on", k === mode); $(mb[k]).setAttribute("aria-pressed", String(k === mode)); }
   $("vWalls").textContent = T.view2;
-  $("geoGrp").hidden = mode !== "real"; $("ledeR").hidden = mode !== "real"; $("ledeC").hidden = !cplx; $("ledeO").hidden = !o3; $("ledeK").hidden = !kink;
+  $("geoGrp").hidden = mode !== "real"; $("ledeR").hidden = mode !== "real"; $("ledeC").hidden = !cplx; $("ledeO").hidden = !o3; $("ledeK").hidden = !kink; $("ledeP").hidden = !poke;
   $("histSec").hidden = mode !== "real";
   ids = ["corrSecC", "histSecC", "wheelBox", "vortCard", "upsCard", "etaCard", "mCard", "etaLine", "cmwNote"];
   for (i = 0; i < ids.length; i++) $(ids[i]).hidden = !cplx;
@@ -1799,9 +1849,11 @@ function applyModeUI(){
     $("massCard").hidden = $("xiCard").hidden = $("corrSec").hidden = cplx;
   }
   $("howtoV").hidden = !(cplx && walls); $("howtoO").hidden = !(o3 && walls);
-  if (kink) $("cbarBox").hidden = false;
-  $("ylab").textContent = kink ? "real time t ↑" : "Euclidean time ↑";
-  $("xlab").textContent = kink ? "space x →" : (strip ? "time →" : "space →");
+  if (kink || (poke && !walls)) $("cbarBox").hidden = false;
+  $("ebarBox").hidden = !(poke && walls);
+  $("ylab").textContent = kink || poke ? "real time t ↑" : "Euclidean time ↑";
+  $("xlab").textContent = kink || poke ? "space x →" : (strip ? "time →" : "space →");
+  fieldCv.tabIndex = poke ? 0 : -1;
   var pb = document.querySelectorAll("[data-preset]");
   for (i = 0; i < pb.length; i++) pb[i].textContent = T.presets[i];
   $("preLbl").textContent = T.pre;
@@ -1817,6 +1869,7 @@ document.getElementById("mReal").addEventListener("click", function(){ setMode("
 document.getElementById("mCplx").addEventListener("click", function(){ setMode("complex"); });
 document.getElementById("mO3").addEventListener("click", function(){ setMode("o3"); });
 document.getElementById("mKink").addEventListener("click", function(){ setMode("kink"); });
+document.getElementById("mPoke").addEventListener("click", function(){ setMode("poke"); });
 
 /* ---------- O(3) arrows mode: state, colours, drawing, readouts ---------- */
 var O = null, OM = null, ores = null, omass = null, oDone = -1, oCnt = 0, oEvery = 1, BLKO = 25;
@@ -2406,7 +2459,7 @@ function syncSliders(){
   if (cplx) syncU(); else if (o3) syncO();
   resetMeasure();
   kapEl.value = kappa; lamEl.value = lambda;
-  $("kapV").textContent = kappa.toFixed(o3 ? 2 : 3);
+  $("kapV").textContent = kappa.toFixed(o3 || poke ? 2 : 3);
   $("lamV").textContent = lambda.toFixed(2);
   $("warn").hidden = o3 || !(lambda < 0.005 && kappa >= 0.25);
   dirty = true;
@@ -2564,10 +2617,10 @@ function showMass(){
   }
 }
 Array.prototype.forEach.call(document.querySelectorAll("[data-preset]"), function(b){
-  b.addEventListener("click", function(){ var p = (kink ? PRESETS_K : (cplx ? PRESETS_C : (o3 ? PRESETS_O : PRESETS)))[b.getAttribute("data-preset")]; setParams(p[0], p[1]); if (kink) kinkFire(); });
+  b.addEventListener("click", function(){ var p = (poke ? PRESETS_P : (kink ? PRESETS_K : (cplx ? PRESETS_C : (o3 ? PRESETS_O : PRESETS))))[b.getAttribute("data-preset")]; setParams(p[0], p[1]); if (kink) kinkFire(); });
 });
 
-function onTheme(){ readColors(); buildLut(); buildWheel(); drawWheel(); buildBall(); drawBall(); dirty = true; }
+function onTheme(){ readColors(); buildLut(); buildElut(); buildWheel(); drawWheel(); buildBall(); drawBall(); dirty = true; }
 if (window.matchMedia){
   var mq = matchMedia("(prefers-color-scheme: dark)");
   if (mq.addEventListener) mq.addEventListener("change", onTheme); else if (mq.addListener) mq.addListener(onTheme);
@@ -2796,7 +2849,7 @@ function kScanProgress(){
   $("kScanLine").textContent = (s.stop ? "Stopped: " : "Scanning: ") + s.done + " / " + KS_N + " runs · " + el.toFixed(1) + " s" + (s.mode === "main" ? " (on the main thread)" : " (" + s.workers.length + " workers)");
 }
 function kScanLock(b){
-  ["mReal", "mCplx", "mO3", "mKink"].forEach(function(id){ $(id).disabled = b; });
+  ["mReal", "mCplx", "mO3", "mKink", "mPoke"].forEach(function(id){ $(id).disabled = b; });
   $("kScanBtn").disabled = b; $("kScanStop").hidden = !b;
 }
 function kScanFinish(stopped){
@@ -2878,12 +2931,287 @@ $("kspeed").addEventListener("change", function(){ kMult = parseFloat(this.value
 kapEl.addEventListener("change", function(){ if (kink) kinkFire(); });
 if (window.ResizeObserver){ ro.observe(kxCv); ro.observe(ktCv); ro.observe(ksCv); }
 
+/* ---------- poke the field (Stage 8): the same classical phi^4 as the kink mode, plus a source J(x, t) from the visitor's finger ----------
+   phi_tt = phi_xx + 2 phi (1 - phi^2) + J - sigma(x) phi_t, J = sum over pushes of amp * sgn * exp(-(x - xs)^2 / (2 PW^2)).
+   Box +-60, phi = -1 at both ends, absorbing layer in the outer 20 (as in the kink core); the picture shows -25..25.
+   Each push heads for the other valley (sgn from phi under the finger when pressed); amp follows the slider J while held and eases to 0
+   over ~PRAMP after release. Work done by a push = sum J phi_t dx dt (the energy it put in). Picture rows are a ring buffer: newest at the top. */
+var PL = 60, PSPONGE = 20, PDX = 0.05, PW = 1.5, PRAMP = 0.3, PHALF = 25, PCOLS = 500, PROWS = 500, PROWSTEP = 4, PSPS = 120, PMAXSRC = 4;
+var PKPAIR = 8 / 3;                                            /* rest energy of a kink-antikink pair, 2 x 4/3 */
+var PRESETS_P = { sym: [0.6, 1], crit: [1, 1], brk: [2, 1] };   /* gentle (never crosses the hump: max restoring force 4/(3 sqrt 3) = 0.77), medium, strong */
+var PK = null, psrc = [], pHead = 0, pLast = 0, pReadT = 0, pAcc = 0, pCone = null, pLastW = null, pEval = null, pStatusTxt = "", pKeyX = 0;
+var pimgF = new Float32Array(PCOLS * PROWS), pimgE = new Float32Array(PCOLS * PROWS);
+var pSX = new Float32Array(PROWS * PMAXSRC), pSA = new Float32Array(PROWS * PMAXSRC);
+var pxCv = $("pPlotX"), pxCtx = pxCv.getContext("2d");
+function pokeNew(){
+  var n = Math.round(2 * PL / PDX) + 1, i, s = { dx: PDX, dt: PDX / 2, n: n, i0: (n - 1) / 2, t: 0, k: 0,
+    a: new Float64Array(n), b: new Float64Array(n), c: new Float64Array(n), sig: new Float64Array(n) };
+  s.a.fill(-1); s.b.fill(-1);
+  for (i = 0; i < n; i++){ var u = (Math.abs((i - s.i0) * PDX) - (PL - PSPONGE)) / PSPONGE; s.sig[i] = u > 0 ? 2 * u * u : 0; }
+  return s;
+}
+/* one leapfrog step with the pushes in srcs (each {x, sgn, amp, tgt, W}); adds each push's work to its W and eases amp towards tgt */
+function pokeStep(s, srcs){
+  var n = s.n, a = s.a, b = s.b, c = s.c, sg = s.sig, d2 = s.dt * s.dt, i2 = 1 / (s.dx * s.dx), hd = s.dt / 2, i, p, q, sh;
+  c[0] = -1; c[n - 1] = -1;
+  for (i = 1; i < n - 1; i++){
+    p = b[i]; sh = sg[i] * hd;
+    c[i] = (2 * p - a[i] * (1 - sh) + d2 * ((b[i - 1] - 2 * p + b[i + 1]) * i2 + 2 * p * (1 - p * p))) / (1 + sh);
+  }
+  for (q = 0; q < srcs.length; q++){
+    var S = srcs[q];
+    if (S.amp > 1e-5){
+      var ic = Math.round(S.x / s.dx) + s.i0, h = Math.ceil(4.5 * PW / s.dx), lo = Math.max(1, ic - h), hi = Math.min(n - 2, ic + h), w = 0, A = S.amp * S.sgn, k2 = 1 / (2 * PW * PW);
+      for (i = lo; i <= hi; i++){
+        var x = (i - s.i0) * s.dx - S.x, J = A * Math.exp(-x * x * k2);
+        c[i] += d2 * J / (1 + sg[i] * hd);
+        w += J * (c[i] - a[i]);
+      }
+      S.W += 0.5 * w * s.dx;                 /* J phi_t dx dt with phi_t = (c - a) / (2 dt) */
+    }
+    S.amp += (S.tgt - S.amp) * Math.min(1, s.dt / PRAMP);
+  }
+  s.a = b; s.b = c; s.c = a; s.t += s.dt; s.k++;
+}
+/* energy of |x| < Lin (same discrete form as kinkEnergy) */
+function pokeEnergy(s, Lin){
+  var a = s.a, b = s.b, dx = s.dx, dt = s.dt, lo = Math.max(0, Math.round(s.i0 - Lin / dx)), hi = Math.min(s.n - 2, Math.round(s.i0 + Lin / dx)), e = 0, i;
+  for (i = lo; i <= hi; i++){
+    var kin = (b[i] - a[i]) / dt, ga = (a[i + 1] - a[i]) / dx, gb = (b[i + 1] - b[i]) / dx, qa = a[i] * a[i] - 1, qb = b[i] * b[i] - 1;
+    e += 0.5 * kin * kin + 0.5 * ga * gb + 0.25 * (qa * qa + qb * qb);
+  }
+  return e * dx;
+}
+/* walls in |x| < Lin: sign changes of phi averaged over +-1 (so ripples and the wiggles of a push are not counted), sampled every 0.25 */
+function pokeWalls(s, Lin){
+  var b = s.b, h = Math.round(1 / s.dx), st = Math.round(0.25 / s.dx), lo = Math.round(s.i0 - Lin / s.dx), hi = Math.round(s.i0 + Lin / s.dx), i, j, m, prev = 0, cnt = 0;
+  for (i = lo; i <= hi; i += st){
+    for (m = 0, j = -h; j <= h; j++) m += b[i + j];
+    var sgn = m > 0 ? 1 : -1;
+    if (prev && sgn !== prev) cnt++;
+    prev = sgn;
+  }
+  return cnt;
+}
+function pokeLocalE(s, x, r){
+  var a = s.a, b = s.b, dx = s.dx, dt = s.dt, lo = Math.round(s.i0 + (x - r) / dx), hi = Math.round(s.i0 + (x + r) / dx), e = 0, i;
+  for (i = lo; i <= hi; i++){ var kin = (b[i] - a[i]) / dt, g = (b[i + 1] - b[i]) / dx, q = b[i] * b[i] - 1; e += 0.5 * kin * kin + 0.5 * g * g + 0.5 * q * q; }
+  return e * dx;
+}
+function pokeReset(){
+  PK = pokeNew(); psrc = []; pAcc = 0; pCone = null; pLastW = null; pEval = null; pStatusTxt = "";
+  pimgF.fill(-1); pimgE.fill(0); pSA.fill(0); pHead = 0;
+  dirty = true; pReadT = 0;
+}
+function pokeRelease(){ for (var q = 0; q < psrc.length; q++) psrc[q].tgt = 0; }
+function pPushRow(){
+  var s = PK, a = s.a, b = s.b, base = s.i0 - Math.round(PHALF / s.dx), dt = s.dt, i2 = 0.5 / s.dx, j, q, o;
+  pHead = (pHead + 1) % PROWS; o = pHead * PCOLS;
+  for (j = 0; j < PCOLS; j++){
+    var i = base + 2 * j, e = 0, m, kin, g, v;
+    for (m = 0; m < 2; m++){ v = b[i + m]; kin = (v - a[i + m]) / dt; g = (b[i + m + 1] - b[i + m - 1]) * i2; e += 0.5 * kin * kin + 0.5 * g * g + 0.5 * (1 - v * v) * (1 - v * v); }
+    pimgF[o + j] = 0.5 * (b[i] + b[i + 1]);
+    e = 0.5 * e;                                        /* energy density, mapped to 0..1 on a log scale: 0.005 -> 0, 2 -> 1 */
+    pimgE[o + j] = e <= 0.005 ? 0 : Math.min(1, (Math.log(e) * 0.4342944819 + 2.3) / 2.6);
+  }
+  for (q = 0; q < PMAXSRC; q++){
+    var S = psrc[q];
+    pSA[pHead * PMAXSRC + q] = S && S.amp > 0.02 ? S.amp : 0;
+    pSX[pHead * PMAXSRC + q] = S ? S.x : 0;
+  }
+}
+/* energy colour map (sequential): pale to dark plum in light theme, dark to pale gold in dark theme */
+var ELUTN = 256, elut = new Uint32Array(ELUTN);
+var ESTOPS_L = [[0,[250,248,243]],[0.25,[246,214,140]],[0.5,[226,120,60]],[0.75,[150,40,90]],[1,[40,16,60]]];
+var ESTOPS_D = [[0,[15,19,24]],[0.25,[70,30,95]],[0.5,[190,60,110]],[0.75,[245,150,80]],[1,[255,245,200]]];
+function buildElut(){
+  var st = isDark() ? ESTOPS_D : ESTOPS_L, i, k;
+  for (i = 0; i < ELUTN; i++){
+    var t = i / (ELUTN - 1); k = 0;
+    while (k < st.length - 2 && t > st[k + 1][0]) k++;
+    var A = st[k], B = st[k + 1], u = (t - A[0]) / (B[0] - A[0]);
+    elut[i] = (255 << 24) | (Math.round(A[1][2] + (B[1][2] - A[1][2]) * u) << 16) | (Math.round(A[1][1] + (B[1][1] - A[1][1]) * u) << 8) | Math.round(A[1][0] + (B[1][0] - A[1][0]) * u);
+  }
+  var cb = $("ebar"), cx = cb.getContext("2d"), id = cx.createImageData(256, 1), d32 = new Uint32Array(id.data.buffer);
+  for (i = 0; i < 256; i++) d32[i] = elut[i];
+  cx.putImageData(id, 0, 0);
+}
+function pX(x, W){ return (x + PHALF) / (2 * PHALF) * W; }
+function drawFieldP(){
+  if (fieldCv.style.height) fieldCv.style.height = "";
+  fitCanvas(fieldCv);
+  var W = fieldCv.width, H = fieldCv.height, dpr = window.devicePixelRatio || 1, y, j, q, en = viewMode === "walls";
+  ensureImg(PCOLS, PROWS);
+  var scale = (LUTN - 1) / (2 * VMAX), top = LUTN - 1;
+  for (y = 0; y < PROWS; y++){
+    var src = ((pHead - y + PROWS) % PROWS) * PCOLS, dst = y * PCOLS;
+    if (en) for (j = 0; j < PCOLS; j++) img32[dst + j] = elut[(pimgE[src + j] * (ELUTN - 1)) | 0];
+    else for (j = 0; j < PCOLS; j++){ var k = ((pimgF[src + j] + VMAX) * scale) | 0; img32[dst + j] = lut[k < 0 ? 0 : (k > top ? top : k)]; }
+  }
+  octx.putImageData(img, 0, 0);
+  fctx.clearRect(0, 0, W, H);
+  fctx.imageSmoothingEnabled = false;
+  fctx.drawImage(off, 0, 0, W, H);
+  var rowH = H / PROWS, tNow = PK.t;
+  /* light cone of the latest push: x = x0 +- (t - t0) */
+  if (pCone && tNow - pCone.t < PROWS * PROWSTEP * PK.dt){
+    var yA = (tNow - pCone.t) / (PROWSTEP * PK.dt) * rowH, d = (tNow - pCone.t) / (2 * PHALF) * W, x0 = pX(pCone.x, W);
+    fctx.save(); fctx.setLineDash([6 * dpr, 5 * dpr]); fctx.lineWidth = 1.5 * dpr;
+    [["rgba(0,0,0,0.45)", 3 * dpr], ["rgba(255,255,255,0.9)", 1.5 * dpr]].forEach(function(st){
+      fctx.strokeStyle = st[0]; fctx.lineWidth = st[1]; fctx.beginPath();
+      fctx.moveTo(x0 - d, 0); fctx.lineTo(x0, yA); fctx.lineTo(x0 + d, 0); fctx.stroke();
+    });
+    fctx.restore();
+  }
+  /* trails of the pushes: one stroke per run of rows where a push was on, width by strength */
+  fctx.lineCap = "round"; fctx.lineJoin = "round";
+  for (q = 0; q < PMAXSRC; q++){
+    for (var pass = 0; pass < 2; pass++){
+      fctx.strokeStyle = pass ? "rgba(255,255,255,0.95)" : "rgba(0,0,0,0.4)";
+      var on = false;
+      fctx.beginPath();
+      for (y = 0; y < PROWS; y++){
+        var r = ((pHead - y + PROWS) % PROWS) * PMAXSRC + q, amp = pSA[r];
+        if (amp > 0){
+          var xx = pX(pSX[r], W), yy = (y + 0.5) * rowH;
+          if (!on){ fctx.moveTo(xx, yy); on = true; } else fctx.lineTo(xx, yy);
+        } else on = false;
+      }
+      fctx.lineWidth = (pass ? 3 : 6) * dpr; fctx.stroke();
+    }
+  }
+  /* finger marker at the top edge while a push is on */
+  for (q = 0; q < psrc.length; q++){
+    if (psrc[q].tgt <= 0) continue;
+    var fx = pX(psrc[q].x, W);
+    fctx.fillStyle = "#ffffff"; fctx.strokeStyle = "rgba(0,0,0,0.6)"; fctx.lineWidth = 2 * dpr;
+    fctx.beginPath(); fctx.moveTo(fx, 14 * dpr); fctx.lineTo(fx - 8 * dpr, 0); fctx.lineTo(fx + 8 * dpr, 0); fctx.closePath(); fctx.fill(); fctx.stroke();
+  }
+  /* axis ticks (as in the kink picture) */
+  fctx.font = "600 " + (11 * dpr) + "px " + getComputedStyle(document.body).fontFamily;
+  fctx.lineJoin = "round"; fctx.textBaseline = "middle";
+  function label(txt, x, y, al){ fctx.textAlign = al; fctx.lineWidth = 3 * dpr; fctx.strokeStyle = "rgba(0,0,0,0.6)"; fctx.strokeText(txt, x, y); fctx.fillStyle = "#ffffff"; fctx.fillText(txt, x, y); }
+  var span = PROWS * PROWSTEP * PK.dt, tk;
+  for (tk = Math.ceil(Math.max(0, tNow - span) / 10) * 10; tk <= tNow; tk += 10){
+    var ty = (tNow - tk) / span * H;
+    fctx.strokeStyle = "rgba(255,255,255,0.8)"; fctx.lineWidth = 1.5 * dpr; fctx.beginPath(); fctx.moveTo(0, ty); fctx.lineTo(7 * dpr, ty); fctx.stroke();
+    if (ty > 18 * dpr && ty < H - 32 * dpr) label("t = " + tk, 10 * dpr, ty, "left");
+  }
+  for (var xv = -20; xv <= 20; xv += 10){
+    var xt = pX(xv, W);
+    fctx.strokeStyle = "rgba(255,255,255,0.8)"; fctx.lineWidth = 1.5 * dpr; fctx.beginPath(); fctx.moveTo(xt, H); fctx.lineTo(xt, H - 7 * dpr); fctx.stroke();
+    label(xv === 0 ? "x = 0" : String(xv).replace("-", "−"), xt, H - 14 * dpr, "center");
+  }
+}
+function drawPX(){
+  var P = kPlotFrame(pxCv, pxCtx, -PHALF, PHALF, -1.8, 1.8, [-1, 0, 1], [-20, -10, 0, 10, 20], "x"), ctx = pxCtx, dpr = P.dpr, q;
+  if (!PK) return;
+  var s = PK, b = s.b, i0 = s.i0, nh = Math.round(PHALF / s.dx), i;
+  ctx.save(); ctx.beginPath(); ctx.rect(P.pad.l, P.pad.t, P.w - P.pad.l - P.pad.r, P.h - P.pad.t - P.pad.b); ctx.clip();
+  for (q = 0; q < psrc.length; q++){
+    if (psrc[q].amp < 0.02) continue;
+    ctx.fillStyle = C["--muted"]; ctx.globalAlpha = Math.min(0.35, 0.12 + 0.1 * psrc[q].amp);
+    ctx.fillRect(P.X(psrc[q].x - 2 * PW), P.pad.t, P.X(psrc[q].x + 2 * PW) - P.X(psrc[q].x - 2 * PW), P.h - P.pad.t - P.pad.b);
+    ctx.globalAlpha = 1;
+  }
+  ctx.setLineDash([5 * dpr, 4 * dpr]); ctx.strokeStyle = C["--muted"]; ctx.lineWidth = 1.2 * dpr;
+  [-1, 1].forEach(function(v){ ctx.beginPath(); ctx.moveTo(P.pad.l, P.Y(v)); ctx.lineTo(P.w - P.pad.r, P.Y(v)); ctx.stroke(); });
+  ctx.setLineDash([]);
+  ctx.strokeStyle = C["--accent"]; ctx.lineWidth = 2 * dpr; ctx.lineJoin = "round"; ctx.beginPath();
+  for (i = -nh; i <= nh; i += 2){ var y = P.Y(Math.max(-1.8, Math.min(1.8, b[i0 + i]))); if (i === -nh) ctx.moveTo(P.X(i * s.dx), y); else ctx.lineTo(P.X(i * s.dx), y); }
+  ctx.stroke(); ctx.restore();
+}
+function showP(){
+  var s = PK, act = null, q;
+  for (q = 0; q < psrc.length; q++) if (psrc[q].tgt > 0){ act = psrc[q]; break; }
+  $("pT").textContent = s.t.toFixed(1); $("pTs").textContent = "step " + s.k;
+  $("pW").textContent = String(pokeWalls(s, PHALF));
+  $("pE").textContent = pokeEnergy(s, PL - PSPONGE).toFixed(2);
+  var w = act ? act.W : pLastW;
+  $("pIn").textContent = w === null ? "–" : w.toFixed(2);
+  if (act) $("pStatus").textContent = "Pushing… " + act.W.toFixed(2) + " put in so far" + (act.W >= PKPAIR ? ": enough for a pair." : (kappa < 0.77 ? ". At this strength the field can never get over the hump." : ", a pair needs 2.67."));
+  else if (pStatusTxt) $("pStatus").textContent = pStatusTxt;
+}
+/* judge a finished push 12 time units after it ended: new walls = pairs; energy still sitting near it = an oscillon */
+function pJudge(){
+  var e = pEval, s = PK, walls = pokeWalls(s, PL - PSPONGE), dW = walls - e.walls0, lump = pokeLocalE(s, e.x, 4), w = e.W.toFixed(2), msg;
+  if (dW >= 2) msg = "That push put in " + w + " and made " + (dW >= 4 ? Math.floor(dW / 2) + " kink–antikink pairs" : "a kink–antikink pair") + ". Watch them fly apart.";
+  else if (dW <= -2) msg = "That push put in " + w + " and the field between two walls flipped back: a pair annihilated.";
+  else if (lump > 0.6) msg = "That push put in " + w + " and left a wobbling lump (an oscillon). It slowly leaks its energy as ripples.";
+  else if (e.W < PKPAIR) msg = "That push put in " + w + ", less than the 2.67 a pair costs, so it could only make ripples (mesons).";
+  else msg = "That push put in " + w + ", more than the 2.67 a pair costs, but it all left as ripples: no pair this time.";
+  pStatusTxt = msg; pEval = null;
+}
+function frameP(){
+  var now = performance.now(), dtf = Math.min(0.05, Math.max(0, (now - pLast) / 1000)), changed = dirty, q;
+  pLast = now;
+  if (!PK) pokeReset();
+  for (q = 0; q < psrc.length; q++) if (psrc[q].tgt > 0) psrc[q].tgt = kappa;
+  if (!paused){
+    pAcc += PSPS * kMult * dtf;
+    var ns = Math.min(Math.floor(pAcc), 4000);
+    pAcc -= Math.floor(pAcc);
+    pAdvance(ns);
+    if (ns > 0) changed = true;
+  }
+  if (now - pReadT > 100 || dirty){ pReadT = now; showP(); changed = true; }
+  if (changed){ drawFieldP(); drawPX(); dirty = false; }
+}
+function pAdvance(ns){
+  var s = PK, k, q;
+  for (k = 0; k < ns; k++){
+    pokeStep(s, psrc);
+    if (s.k % PROWSTEP === 0) pPushRow();
+    for (q = psrc.length - 1; q >= 0; q--){
+      var S = psrc[q];
+      if (S.tgt === 0 && S.amp < 1e-3){
+        psrc.splice(q, 1); pLastW = S.W;
+        if (!psrc.length) pEval = { t: s.t + 12, W: S.W, x: S.x, walls0: S.walls0 };
+        else pEval = null;
+      }
+    }
+    if (pEval && s.t >= pEval.t) pJudge();
+  }
+}
+/* pointer: press = a push at that x (heading for the other valley), drag moves it, release lets go */
+function pXat(ev){ var rc = fieldCv.getBoundingClientRect(); return Math.max(-PHALF, Math.min(PHALF, ((ev.clientX - rc.left) / rc.width * 2 - 1) * PHALF)); }
+function pPress(id, x){
+  if (!PK || psrc.length >= PMAXSRC) return;
+  var s = PK, ic = Math.round(x / s.dx) + s.i0, m = 0, j;
+  for (j = -10; j <= 10; j++) m += s.b[ic + j];
+  psrc.push({ id: id, x: x, sgn: m > 0 ? -1 : 1, amp: 0, tgt: kappa, W: 0, walls0: pokeWalls(s, PL - PSPONGE) });
+  pCone = { x: x, t: s.t }; pEval = null; pStatusTxt = "";
+  if (paused){ paused = false; $("runBtn").textContent = "Pause"; }
+  dirty = true;
+}
+function pMove(id, x){ for (var q = 0; q < psrc.length; q++) if (psrc[q].id === id && psrc[q].tgt > 0) psrc[q].x = x; }
+function pUp(id){ for (var q = 0; q < psrc.length; q++) if (psrc[q].id === id) psrc[q].tgt = 0; }
+fieldCv.addEventListener("pointerdown", function(ev){
+  if (!poke) return;
+  ev.preventDefault();
+  try { fieldCv.setPointerCapture(ev.pointerId); } catch (e) {}
+  pPress(ev.pointerId, pXat(ev));
+});
+fieldCv.addEventListener("pointermove", function(ev){ if (poke) pMove(ev.pointerId, pXat(ev)); });
+["pointerup", "pointercancel", "lostpointercapture"].forEach(function(t){ fieldCv.addEventListener(t, function(ev){ if (poke) pUp(ev.pointerId); }); });
+fieldCv.addEventListener("contextmenu", function(ev){ if (poke) ev.preventDefault(); });
+/* keyboard: Space or Enter pushes at pKeyX while held, arrows move it */
+fieldCv.addEventListener("keydown", function(ev){
+  if (!poke) return;
+  if ((ev.key === " " || ev.key === "Enter") && !ev.repeat){ ev.preventDefault(); pPress("key", pKeyX); }
+  else if (ev.key === "ArrowLeft" || ev.key === "ArrowRight"){ ev.preventDefault(); pKeyX = Math.max(-PHALF, Math.min(PHALF, pKeyX + (ev.key === "ArrowLeft" ? -1 : 1))); pMove("key", pKeyX); }
+});
+fieldCv.addEventListener("keyup", function(ev){ if (poke && (ev.key === " " || ev.key === "Enter")) pUp("key"); });
+$("calmBtn").addEventListener("click", function(){ pokeReset(); });
+if (window.ResizeObserver) ro.observe(pxCv);
+
 /* ---------- main loop ---------- */
 var spsCount = 0, spsT = performance.now(), spsVal = 0, readoutT = 0;
 function frame(){
   requestAnimationFrame(frame);
   if (scan) return;          /* a width scan is running on its own lattices; the live picture waits */
   if (kink){ frameK(); return; }
+  if (poke){ frameP(); return; }
   if (cplx){ frameC(); return; }
   if (o3){ frameO(); return; }
   var changed = dirty;
@@ -2934,7 +3262,7 @@ function frame(){
   }
 }
 
-readColors(); buildLut(); buildWheel(); buildBall(); afFit(); syncSliders();
+readColors(); buildLut(); buildElut(); buildWheel(); buildBall(); afFit(); syncSliders();
 resetField("hot"); tuneDelta(40);
 setParams(0.285, 1);
 applyUI();
@@ -3089,6 +3417,20 @@ if (/[?&]debug\b/.test(location.search)){
     kinkRun: function(v, opts){ var o = { measureV: true }, k; for (k in opts) o[k] = opts[k]; return KINK.kinkRun(v, o); },
     kinkFire: function(v){ if (v != null){ kappa = v; syncSliders(); } if (!kink) setMode("kink"); kinkFire(); },
     get kink(){ return { K: K, rows: kRows, hist: kHistN, scan: kres, mult: kMult, scanning: !!kscan, v: kappa }; },
+    /* ----- Stage 8: poke the field (setMode('poke') for the page) -----
+       poke: the live state; pokePress(x) / pokeUp() push like a finger (id "hook");
+       pokeRun(A, hold, opts) runs one push on its own grid: strength A held for `hold` time units at x (opts.x, default 0), then T (default 30) in all;
+       returns {W (work put in), walls (in |x| < 40), wallsView (|x| < 25), E, lumpE (energy within 4 of x), t}. */
+    get poke(){ return { PK: PK, src: psrc, lastW: pLastW, status: pStatusTxt, cone: pCone, head: pHead }; },
+    pokePress: function(x){ if (!poke) setMode("poke"); pPress("hook", x || 0); },
+    pokeUp: function(){ pUp("hook"); },
+    pokeAdvance: function(t){ pAdvance(Math.round(t / PK.dt)); showP(); drawFieldP(); drawPX(); },   /* advance t time units and redraw (for a hidden pane) */
+    pokeRun: function(A, hold, opts){
+      opts = opts || {};
+      var s = pokeNew(), x = opts.x || 0, T = opts.T || 30, S = { id: 0, x: x, sgn: opts.sgn || 1, amp: 0, tgt: A, W: 0 }, src = [S];
+      while (s.t < T){ if (s.t >= hold) S.tgt = 0; pokeStep(s, src); }
+      return { W: S.W, walls: pokeWalls(s, PL - PSPONGE), wallsView: pokeWalls(s, PHALF), E: pokeEnergy(s, PL - PSPONGE), lumpE: pokeLocalE(s, x, 4), t: s.t };
+    },
     kinkScanUI: kScanStart,
     kinkScanBegin: function(v0, v1, dv, opts){
       var vs = [], n = Math.round((v1 - v0) / dv), i;
