@@ -53,6 +53,9 @@ h2{font-size:var(--text-md);font-weight:600;letter-spacing:.04em;text-transform:
 .field-frame .ylab{writing-mode:vertical-rl;transform:rotate(180deg);text-align:center;font-size:var(--text-sm);color:var(--muted);white-space:nowrap}
 .field-frame .xlab{grid-column:2;text-align:center;font-size:var(--text-sm);color:var(--muted)}
 #field{display:block;width:100%;aspect-ratio:1/1;border-radius:var(--radius-md);background:var(--soft);touch-action:manipulation}
+.fieldwrap{position:relative;min-width:0}
+.fieldwrap.settling #field{opacity:.45}
+.settle{position:absolute;top:8px;left:8px;max-width:calc(100% - 16px);padding:3px 10px;border-radius:999px;background:var(--panel);color:var(--fg);font-size:var(--text-sm);font-weight:600;box-shadow:0 1px 4px rgba(0,0,0,.25);pointer-events:none}
 .cbar{display:flex;align-items:center;gap:8px;margin-top:var(--space-2);font-size:var(--text-sm);color:var(--muted);font-family:var(--font-mono)}
 .cbar canvas{flex:1;height:10px;border-radius:5px;min-width:0}
 
@@ -118,7 +121,7 @@ body.kink .kh{display:none !important}
 body.poke .po{display:inline-flex !important}
 body.poke .pb{display:block !important}
 body.poke .ph{display:none !important}
-body.poke #field{touch-action:none;cursor:crosshair;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+body.poke #field,body.srcmode #field{touch-action:none;cursor:crosshair;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:var(--text-sm);color:var(--muted);margin-top:var(--space-2)}
 .legend i{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px;margin-right:4px}
 #kScanCv{cursor:pointer}
@@ -135,7 +138,7 @@ body.poke #field{touch-action:none;cursor:crosshair;-webkit-user-select:none;use
 <div class="wrap">
   <a class="back-link" href="../index.html">← All widgets</a>
   <h1>Quantum Field on a Lattice</h1>
-  <p class="lede" id="ledeR">Each pixel is the value of a field <b>φ</b> at one point of a grid. Horizontal is space; vertical is <b>imaginary time</b>, so the whole picture is a snapshot of the quantum vacuum's fluctuations, shaken by a live Monte Carlo simulation. Drag <b>κ</b> up and watch the field pick a sign, blue or orange, everywhere: that is spontaneous symmetry breaking (Z₂), just like the Ising model.</p>
+  <p class="lede" id="ledeR">Each pixel is the value of a field <b>φ</b> at one point of a grid. Horizontal is space; vertical is <b>imaginary time</b>, so the whole picture is a snapshot of the quantum vacuum's fluctuations, shaken by a live Monte Carlo simulation. Drag <b>κ</b> up and watch the field pick a sign, blue or orange, everywhere: that is spontaneous symmetry breaking (Z₂), just like the Ising model. <b>Tap</b> the picture to place a <b>source</b> that pulls on φ there, then switch to the <b>Average</b> view to see the cloud it makes.</p>
 
   <p class="lede" id="ledeC" hidden>Now <b>φ</b> has two components, so at every site it is an arrow: its <b>phase</b> is the colour, its length the brightness. The action is unchanged by turning every arrow by the same angle (a <b>U(1)</b> symmetry). In two dimensions that symmetry can never break, which is why there is no sign to pick here; instead the arrows can swirl around points called <b>vortices</b>, and the order is destroyed by their unbinding (the <b>BKT</b> transition).</p>
 
@@ -148,12 +151,13 @@ body.poke #field{touch-action:none;cursor:crosshair;-webkit-user-select:none;use
   <details class="try">
     <summary>Things to try</summary>
     <ol>
-      <li><b>Break the symmetry.</b> Press Randomize, then Broken: blue and orange domains grow until one sign wins. Back to Symmetric and the order melts.</li>
+      <li><b>Break the symmetry.</b> Press Broken: nearly the whole grid takes one sign, with small bubbles of the other. Back to Symmetric and both signs mix again. Now turn off Cluster updates and press Randomize at Broken: the slowly growing domains are the computer settling down, not physics. Turn clusters back on and it settles at once.</li>
       <li><b>Find the critical point.</b> Press Critical: domains of every size appear, and the mass m falls towards zero (correlations reach across the whole grid).</li>
       <li><b>Watch kinks.</b> Switch to Domain walls at Critical: lines running up the picture are kinks moving through time, small loops are kink–antikink pairs.</li>
+      <li><b>See the mass.</b> At Symmetric, tap the middle of the picture to place a source and switch to the Average view: a small round cloud appears around it. Its size is 1/m. Drag κ towards Critical and watch the cloud swell. The panel "Around your source" measures m from the cloud; compare it with the m from the correlation plot.</li>
       <li><b>Tunnel.</b> Choose Thin strip: the whole of space flips between the two vacua. Press Scan widths to measure the kink mass from how fast tunnelling dies out as space gets wider.</li>
       <li><b>Make it complex.</b> Choose Complex φ and the Vortices view. Go from Vortex gas to Quasi-ordered: free vortices pair up and the stiffness Υ jumps past 2/π. That is the BKT transition.</li>
-      <li><b>Wrap the ball.</b> Choose Arrows (O(3)) and the Topology view, press Add instanton, then Run: the red blob melts in the noise. Press Randomize, then Cool: the noise is stripped away and the instantons (red) and anti-instantons (blue) that remain are left standing. Then compare the Strong, Medium and Weak coupling presets: ξ grows exponentially with β.</li>
+      <li><b>Wrap the ball.</b> Choose Arrows (O(3)) and the Topology view, press Add instanton, then Run: the hand-made blob is not a typical sample, and the next samples no longer show it. Press Randomize, wait for the picture to settle, then Cool: the noise is stripped away and the instantons (red) and anti-instantons (blue) that remain are left standing. Then compare the Strong, Medium and Weak coupling presets: ξ grows exponentially with β.</li>
       <li><b>Watch a collision in real time.</b> Choose Kink collisions and press Two bounces: the kinks meet, bounce, fall back for a second hit and only then fly apart. Compare One bounce and Trapped (bion), then press Scan speeds to map every speed from 0.15 to 0.30 and click any bar to replay that collision.</li>
       <li><b>Make particles yourself.</b> Choose Poke the field. Tap the picture quickly: only ripples. Now press and hold for about half a second: a kink–antikink pair is born and flies apart. With Gentle strength no pair ever forms, however long you hold, because the push is too weak to lift the field over the hump.</li>
     </ol>
@@ -171,7 +175,8 @@ body.poke #field{touch-action:none;cursor:crosshair;-webkit-user-select:none;use
             <button class="btn seg" id="mPoke" aria-pressed="false">Poke the field</button></div>
           <div class="seggrp kh" role="group" aria-label="View"><span class="lbl">View</span>
             <button class="btn seg on" id="vField" aria-pressed="true">Field</button>
-            <button class="btn seg" id="vWalls" aria-pressed="false">Domain walls</button></div>
+            <button class="btn seg" id="vWalls" aria-pressed="false">Domain walls</button>
+            <button class="btn seg" id="vAvg" aria-pressed="false" hidden>Average</button></div>
           <div class="seggrp kh ph" role="group" aria-label="Geometry" id="geoGrp"><span class="lbl">Geometry</span>
             <button class="btn seg on" id="gSquare" aria-pressed="true">Square</button>
             <button class="btn seg" id="gStrip" aria-pressed="false">Thin strip</button></div>
@@ -179,9 +184,11 @@ body.poke #field{touch-action:none;cursor:crosshair;-webkit-user-select:none;use
         <div class="field-frame" id="frameBox">
           <div class="slab" id="slab">↕ space (12 sites)</div>
           <div class="ylab" id="ylab">Euclidean time ↑</div>
-          <canvas id="field" aria-label="Lattice field, colour shows the value of phi at each site"></canvas>
+          <div class="fieldwrap"><canvas id="field" aria-label="Lattice field, colour shows the value of phi at each site"></canvas>
+            <div class="settle" id="settle" hidden role="status">Settling: not a fair sample yet</div></div>
           <div class="xlab" id="xlab">space →</div>
         </div>
+        <p class="small kh ph" id="sampleNote">The picture is not moving through time: time is already one of its axes (see the labels). Each new frame is a fresh sample of the whole vacuum, drawn by the computer, so watching them is like flipping through photos, not watching a film.</p>
         <div class="card howto" id="howto" hidden style="margin-top:var(--space-2)">
           <div class="k"><b>How to read it</b></div>
           <ul>
@@ -231,7 +238,7 @@ body.poke #field{touch-action:none;cursor:crosshair;-webkit-user-select:none;use
           </ul>
         </div>
         <div class="cbar" id="ebarBox" hidden><span>energy: low</span><canvas id="ebar" width="256" height="1"></canvas><span>high</span></div>
-        <div class="cbar" id="cbarBox"><span>φ = −1.3</span><canvas id="cbar" width="256" height="1"></canvas><span>+1.3</span></div>
+        <div class="cbar" id="cbarBox"><span id="cbLo">φ = −1.3</span><canvas id="cbar" width="256" height="1"></canvas><span id="cbHi">+1.3</span></div>
         <div class="wheelbox" id="wheelBox" hidden><canvas id="wheelCv" aria-label="Colour wheel: hue is the phase angle of phi, brightness is its length"></canvas>
           <span>Hue = the phase angle of φ (red is 0, counter-clockwise as on the wheel); brighter and more saturated = larger |φ|, pale = near zero. While the grid is ordered, colours are shown relative to its average phase, so they don't flicker.</span></div>
         <div class="wheelbox" id="ballBox" hidden><canvas id="ballCv" aria-label="Shaded ball seen from above the north pole: hue is the compass bearing of the arrow, pale is pointing up, dark is pointing down"></canvas>
@@ -244,6 +251,7 @@ body.poke #field{touch-action:none;cursor:crosshair;-webkit-user-select:none;use
             <select id="kspeed"><option value="0.5">0.5×</option><option value="1">1×</option><option value="2" selected>2×</option><option value="4">4×</option><option value="8">8×</option></select></div>
           <button class="btn kh ph" id="hotBtn" title="Random values everywhere">Randomize</button>
           <button class="btn kh ph" id="coldBtn" title="Every site set to the well minimum +v">All +v</button>
+          <button class="btn" id="clrSrcBtn" hidden>Remove sources</button>
           <button class="btn" id="coolBtn" title="Every arrow repeatedly aligns with its neighbours; the noise melts, instantons stay" hidden>Cool</button>
           <button class="btn" id="instBtn" title="Paint one instanton (Q = +1) on an aligned background and pause" hidden>Add instanton</button>
           <div class="sizebox kh ph" id="sizeBox"><label for="sizeSel">Grid</label>
@@ -255,7 +263,7 @@ body.poke #field{touch-action:none;cursor:crosshair;-webkit-user-select:none;use
           <button class="btn" data-preset="brk">Broken</button>
         </div>
         <label class="tog kh ph"><input type="checkbox" id="cluChk" checked><b>Cluster updates</b></label>
-        <p class="small kh ph" style="margin-top:0" id="cluNote">Flips whole same-sign regions at once, which beats the slowing-down of ordinary updates near κ = 0.340.</p>
+        <p class="small kh ph" style="margin-top:0" id="cluNote">Flips whole same-sign regions at once, which beats the slowing-down of ordinary updates near κ = 0.340. Without them, settling after a change can take minutes in the ordered phase, and walls stretched right across the grid can get stuck for good.</p>
         <p class="stat kh ph" id="coolLine" hidden>–</p>
         <p class="stat kh ph" id="speed">–</p>
       </div>
@@ -318,6 +326,11 @@ body.poke #field{touch-action:none;cursor:crosshair;-webkit-user-select:none;use
           <p class="hint">Thin strip only: sites of space (time is a long strip of sites).</p>
           <input type="range" id="lsl" min="4" max="32" step="1" value="12">
         </div>
+        <div class="slider" id="jBox" hidden>
+          <div class="top"><label for="jsl">J  source strength</label><span class="val" id="jslV"></span></div>
+          <p class="hint">How hard each source pulls on φ: + towards orange, − towards blue. Tap the picture to place a source, tap it again to remove it, drag to move it; press and hold for a source that lasts only while you hold.</p>
+          <input type="range" id="jsl" min="-5" max="5" step="0.1" value="3">
+        </div>
         <p class="warn" id="warn" hidden>With λ = 0 and κ ≥ 0.25 the field is unstable (it runs away); the simulation clips it at ±30.</p>
         <p class="eq" id="eqLine">S = Σ −2κ φφ′ + φ² + λ(φ²−1)²</p>
       </div>
@@ -340,6 +353,18 @@ body.poke #field{touch-action:none;cursor:crosshair;-webkit-user-select:none;use
         <h2 style="margin-top:var(--space-3)">The field at the centre, over time</h2>
         <canvas class="plot" id="kPlotT" aria-label="The field at x = 0 against time; each dip below zero is a bounce"></canvas>
         <p class="small">φ(0, t) in the same time window as the picture. It starts at +1 (orange between the kinks). Each dip below 0, marked with a dot, is counted as a bounce; a bion keeps dipping.</p>
+      </div>
+
+      <div class="panel" id="haloPanel" hidden>
+        <h2>Around your source</h2>
+        <p class="small" id="haloHint" style="margin-top:0">Tap the picture to place a source.</p>
+        <canvas class="plot tall" id="haloCv" aria-label="Average of phi against distance from the source, log scale, with the fitted curve"></canvas>
+        <div class="cards" style="margin-top:var(--space-2)">
+          <div class="card"><div class="k">m from the halo</div><div class="v" id="hM">–</div><div class="s" id="hME">&nbsp;</div></div>
+          <div class="card"><div class="k">m from the correlator</div><div class="v" id="hRef">–</div><div class="s" id="hRefE">measured before the source</div></div>
+        </div>
+        <p class="small">A source adds −J φ to the action at one site, so φ there is pulled one way, and its neighbours follow, less and less with distance. Averaged over many steps, the pull fades like e<sup>−m r</sup> (more exactly the Bessel function K₀(m r), the propagator of a particle of mass m in two dimensions). So the size of the cloud is the correlation length ξ = 1/m, and the fade-out gives the mass a second way. The cloud is round although one direction is space and the other is time: in Euclidean time the two are on an equal footing. Points: the average of φ at distance r, minus its average outside the measuring circle (radius up to 40 sites); line: the fit over the filled points.</p>
+        <p class="small" id="haloBrk" hidden>In the ordered phase a source decides which vacuum the whole grid sits in: the field turns to agree with it (a tiny push is enough to pick one of two equal vacua). The particle here is heavy, so its cloud is about one site across, too small to measure. While a source is in, the simulation also refuses the rare jumps of the whole grid to the other vacuum: an infinitely large grid never makes them, but this finite one would, and the picture would flicker.</p>
       </div>
 
       <div class="panel pb" id="pReadPanel">
@@ -418,9 +443,9 @@ body.poke #field{touch-action:none;cursor:crosshair;-webkit-user-select:none;use
         <p class="small">The phase angle of every 8×8 block average, averaged over the last ~100 steps. It should be flat: the circle of vacua has no preferred direction, because the field keeps wandering around it. The dashed line is perfectly flat.</p>
         </div>
         <div id="qSec" hidden>
-        <h2 style="margin-top:var(--space-3)">Topological charge over time</h2>
+        <h2 style="margin-top:var(--space-3)">Topological charge, sample by sample</h2>
         <canvas class="plot" id="qCv" aria-label="Topological charge Q over the last few hundred measurements, a staircase"></canvas>
-        <p class="small">Q after each recent measurement (about one per update step). It only ever changes by whole numbers, so the line is a staircase; at weak coupling it changes rarely, because an instanton has to shrink to a point before it can unwrap.</p>
+        <p class="small">Q in each recent sample (about one per update step), in the order the computer drew them: this axis is not time. Q is always a whole number, so the line is a staircase. At weak coupling it changes rarely from one sample to the next, because the small local updates have to shrink an instanton to a point before they can unwrap it (lattice physicists call this topological freezing; it is a limit of the method, not of nature).</p>
         </div>
       </div>
     </div>
@@ -464,7 +489,7 @@ seedRng((Date.now() ^ (Math.random() * 4294967296)) | 0);
 
 /* ---------- Monte Carlo ---------- */
 function sweep(){
-  var nx = Nx, nt = Nt, k2 = 2 * kappa, lam = lambda, d = delta, acc = 0, F = f;
+  var nx = Nx, nt = Nt, k2 = 2 * kappa, lam = lambda, d = delta, acc = 0, F = f, J = srcJ;
   for (var par = 0; par < 2; par++){
     for (var y = 0; y < nt; y++){
       var row = y * nx, up = (y === 0 ? nt - 1 : y - 1) * nx, dn = (y === nt - 1 ? 0 : y + 1) * nx;
@@ -474,6 +499,7 @@ function sweep(){
         var p = o + d * (rnd() - 0.5);
         var o2 = o * o, p2 = p * p, a = p2 - 1, b = o2 - 1;
         var dS = -k2 * (p - o) * s + (p2 - o2) + lam * (a * a - b * b);
+        if (J) dS -= J[i] * (p - o);
         if (p > -LIM && p < LIM && (dS <= 0 || rnd() < Math.exp(-dS))){ F[i] = p; acc++; }
       }
     }
@@ -501,8 +527,128 @@ function wolff(){
       }
     }
   }
+  if (srcJ){          /* the source term -J phi is not in the bond rule: accept the whole flip with min(1, exp(-dS_J)), dS_J = sum 2 J phi over source sites in the cluster */
+    var dSJ = 0;
+    for (q = 0; q < srcSites.length; q++){ var ss = srcSites[q]; if (V[ss] === g) dSJ += 2 * srcJ[ss] * F[ss]; }
+    if (dSJ > 0 && rnd() >= Math.exp(-dSJ)) return tail;
+    /* ordered phase: a big cluster can jump the whole field into the vacuum against the source, which a large system never does (the source
+       only makes it ~50x rarer, so the picture flickered). Refuse flips that take the mean from the source's side past -0.5 (Stage 9 fix). */
+    if (tail > n2 >> 4){
+      var sj = srcStr > 0 ? 1 : -1, cs = 0, tot = 0;
+      for (q = 0; q < tail; q++) cs += F[Q[q]];
+      if (cs * sj > 0){
+        for (q = 0; q < n2; q++) tot += F[q];
+        if (tot * sj >= -0.5 * n2 && (tot - 2 * cs) * sj < -0.5 * n2) return tail;
+      }
+    }
+  }
   for (q = 0; q < tail; q++){ var s = Q[q]; F[s] = -F[s]; }
   return tail;
+}
+/* ---------- sources (Stage 9): S -> S - sum J phi on the source sites, real mode, square grid only ----------
+   srcList: {x, y, pin, id} (pin = placed by a tap and stays; otherwise held by a finger); every source has strength srcStr (sign = which way it pulls).
+   srcJ: per-site J (null when there are none), srcSites: the sites with J != 0. The halo is measured around the last source in srcList. */
+var srcList = [], srcJ = null, srcSites = [], srcStr = 3, srcVer = 0;
+function rebuildSrc(){
+  srcVer++;
+  if (!srcList.length || strip || Nx !== Nt){ srcJ = null; srcSites = []; haloReset(); return; }
+  var n = Nx * Nt, q, i;
+  if (!srcJ || srcJ.length !== n) srcJ = new Float64Array(n); else srcJ.fill(0);
+  srcSites = [];
+  for (q = 0; q < srcList.length; q++){ i = srcList[q].y * Nx + srcList[q].x; if (!srcJ[i]) srcSites.push(i); srcJ[i] += srcStr; }
+  haloReset();
+}
+/* Halo: radial profile of phi - (mean of phi outside the disk) around the halo source, times the sign of J, averaged in blocks of HBLK update steps
+   (after HSETTLE steps of settling). Fit A K0(m r) for 2 <= r <= the last bin clearly above its error, at most N/4. */
+var HBLK = 20, HSETTLE = 40, HMAXB = 2000;
+var hOffX = null, hOffY = null, hBin = null, hCnt = null, hR = 0, hN0 = 0;
+var hCur = null, hCurN = 0, hBlocks = [], hSettle = 0, hFitRes = null, hFitBlocks = -1;
+function haloGeom(){
+  var n = Nx, R = Math.min(40, (n >> 1) - 1), dx, dy, k = 0, cnt = 0;
+  if (hR === R && hN0 === n) return;
+  hR = R; hN0 = n;
+  for (dy = -R; dy <= R; dy++) for (dx = -R; dx <= R; dx++) if (dx * dx + dy * dy <= R * R + R) cnt++;
+  hOffX = new Int16Array(cnt); hOffY = new Int16Array(cnt); hBin = new Uint8Array(cnt); hCnt = new Float64Array(R + 1);
+  for (dy = -R; dy <= R; dy++) for (dx = -R; dx <= R; dx++){
+    if (dx * dx + dy * dy > R * R + R) continue;
+    var b = Math.round(Math.sqrt(dx * dx + dy * dy));
+    if (b > R) continue;
+    hOffX[k] = dx; hOffY[k] = dy; hBin[k] = b; hCnt[b]++; k++;
+  }
+  hOffX = hOffX.subarray(0, k); hOffY = hOffY.subarray(0, k); hBin = hBin.subarray(0, k);
+}
+function haloReset(){ haloGeom(); hCur = new Float64Array(hR + 1); hCurN = 0; hBlocks = []; hSettle = HSETTLE; hFitRes = null; hFitBlocks = -1; }
+function haloStep(){
+  if (!srcJ || !srcList.length) return;
+  if (hSettle > 0){ hSettle--; return; }
+  var S = srcList[srcList.length - 1], n = Nx, F = f, sg = srcStr >= 0 ? 1 : -1, k, cx = S.x, cy = S.y, disk = 0, v;
+  for (k = 0; k < hBin.length; k++){
+    var x = cx + hOffX[k], y = cy + hOffY[k];
+    if (x < 0) x += n; else if (x >= n) x -= n;
+    if (y < 0) y += n; else if (y >= n) y -= n;
+    v = F[y * n + x]; hCur[hBin[k]] += v; disk += v;
+  }
+  /* background = mean of phi outside the disk: the grid-wide mean would include the source's own pull (J chi / N^2) and steepen the tail */
+  var out = n * n - hBin.length, bg = out >= 64 ? (meanPhi() * n * n - disk) / out : meanPhi();
+  for (k = 0; k <= hR; k++) hCur[k] -= bg * hCnt[k];
+  if (++hCurN >= HBLK){
+    var blk = new Float64Array(hR + 1);
+    for (k = 0; k <= hR; k++) blk[k] = sg * hCur[k] / (hCnt[k] * hCurN);
+    hBlocks.push(blk); if (hBlocks.length > HMAXB) hBlocks.shift();
+    hCur.fill(0); hCurN = 0;
+  }
+}
+/* modified Bessel K0 (Abramowitz & Stegun 9.8.1, 9.8.5, 9.8.6; |error| < 1e-7 relative) */
+function besselK0(x){
+  if (x <= 2){
+    var t = x / 3.75, t2 = t * t, i0 = 1 + t2 * (3.5156229 + t2 * (3.0899424 + t2 * (1.2067492 + t2 * (0.2659732 + t2 * (0.0360768 + t2 * 0.0045813)))));
+    var u = x * x / 4;
+    return -Math.log(x / 2) * i0 + (-0.57721566 + u * (0.42278420 + u * (0.23069756 + u * (0.03488590 + u * (0.00262698 + u * (0.00010750 + u * 0.0000074))))));
+  }
+  var z = 2 / x;
+  return Math.exp(-x) / Math.sqrt(x) * (1.25331414 + z * (-0.07832358 + z * (0.02189568 + z * (-0.01062446 + z * (0.00587872 + z * (-0.00251540 + z * 0.00053208))))));
+}
+/* weighted fit of A K0(m r) over bins r0..r1: golden-section search in m, A solved exactly; returns { m, A, chi2 } */
+function haloFitM(G, sd, r0, r1){
+  function chi(m){
+    var num = 0, den = 0, r, c = 0;
+    for (r = r0; r <= r1; r++){ var k = besselK0(m * r), w = 1 / (sd[r] * sd[r]); num += w * G[r] * k; den += w * k * k; }
+    var A = num / den;
+    for (r = r0; r <= r1; r++){ var d = G[r] - A * besselK0(m * r); c += d * d / (sd[r] * sd[r]); }
+    return { c: c, A: A };
+  }
+  var a = 0.01, b = 3, gr = 0.6180339887, x1 = b - gr * (b - a), x2 = a + gr * (b - a), f1 = chi(x1).c, f2 = chi(x2).c, it;
+  for (it = 0; it < 60; it++){
+    if (f1 < f2){ b = x2; x2 = x1; f2 = f1; x1 = b - gr * (b - a); f1 = chi(x1).c; }
+    else { a = x1; x1 = x2; f1 = f2; x2 = a + gr * (b - a); f2 = chi(x2).c; }
+  }
+  var m = (a + b) / 2, r = chi(m);
+  return { m: m, A: r.A, chi2: r.c };
+}
+/* profile (mean and standard error over blocks), fit window and jackknife error of m (10 groups of blocks) */
+function haloResult(){
+  var nb = hBlocks.length, R = hR, G = new Float64Array(R + 1), sd = new Float64Array(R + 1), k, r;
+  if (nb < 10) return { nb: nb, G: null };
+  for (k = 0; k < nb; k++) for (r = 0; r <= R; r++) G[r] += hBlocks[k][r];
+  for (r = 0; r <= R; r++) G[r] /= nb;
+  for (k = 0; k < nb; k++) for (r = 0; r <= R; r++){ var d = hBlocks[k][r] - G[r]; sd[r] += d * d; }
+  for (r = 0; r <= R; r++) sd[r] = Math.max(Math.sqrt(sd[r] / (nb * (nb - 1))), 1e-9);
+  var r0 = 2, r1 = r0 - 1, rcap = Math.min(R, Math.floor(Nx / 4));
+  while (r1 + 1 <= rcap && G[r1 + 1] > 3 * sd[r1 + 1]) r1++;
+  var out = { nb: nb, G: G, sd: sd, r0: r0, r1: r1, m: null, mErr: null, A: null };
+  if (r1 - r0 < 2) return out;
+  var fit = haloFitM(G, sd, r0, r1), ng = 10, per = Math.floor(nb / ng), jm = [], gq;
+  out.m = fit.m; out.A = fit.A; out.chi2 = fit.chi2;
+  for (gq = 0; gq < ng; gq++){            /* jackknife: leave out one group of blocks, recompute the profile and refit */
+    var Gj = new Float64Array(R + 1), cnt = 0;
+    for (k = 0; k < nb; k++){ if (Math.floor(k / per) === gq) continue; cnt++; for (r = r0; r <= r1; r++) Gj[r] += hBlocks[k][r]; }
+    for (r = r0; r <= r1; r++) Gj[r] /= cnt;
+    jm.push(haloFitM(Gj, sd, r0, r1).m);
+  }
+  var mj = 0; for (k = 0; k < ng; k++) mj += jm[k]; mj /= ng;
+  var v = 0; for (k = 0; k < ng; k++) v += (jm[k] - mj) * (jm[k] - mj);
+  out.mErr = Math.sqrt((ng - 1) / ng * v);
+  return out;
 }
 /* One update step = a Metropolis sweep, then about N^2 sites' worth of Wolff clusters. The number of clusters is set from a slowly
    updated running mean of the cluster size (capped), not from this step's own sizes: stopping when N^2 sites have flipped would
@@ -538,7 +684,7 @@ function wellMin(){            /* mean-field minimum +v of (1-4k)p^2 + lam(p^2-1
 function resetField(how){
   if (kink || poke) return;
   if (cplx){ u1Reset(U, how, wellMin()); snap = true; histInit = false; resetMeasure(); return; }
-  if (o3){ o3Reset(O, how); snap = true; coolLeft = 0; qHistN = 0; $("coolLine").textContent = ""; $("coolLine").hidden = true; resetMeasure(); return; }
+  if (o3){ o3Reset(O, how); snap = true; coolLeft = 0; oMade = null; qHistN = 0; $("coolLine").textContent = ""; $("coolLine").hidden = true; resetMeasure(); return; }
   var n = Nx * Nt, i, v;
   if (how === "cold"){ v = wellMin(); for (i = 0; i < n; i++) f[i] = v; }
   else { for (i = 0; i < n; i++) f[i] = (rnd() * 2 - 1) * 1.6; }
@@ -546,6 +692,7 @@ function resetField(how){
   resetMeasure();
 }
 function allocLattice(nx, nt){
+  avgF = null;
   Nx = nx; Nt = nt; f = new Float64Array(nx * nt); visited = new Uint32Array(nx * nt); gen = 0; queue = new Int32Array(nx * nt);
   cluAvg = 1; cluPer = 1;
 }
@@ -553,7 +700,7 @@ function setSize(n){
   if (kink || poke) return;
   if (cplx){ allocU(n); return; }
   if (o3){ allocO(n); return; }
-  N = n; sq = null;
+  N = n; sq = null; srcList = []; srcRef = null;
   if (strip){ setGeometry("square"); return; }
   allocLattice(N, N);
   resetField("hot"); tuneDelta(40); dirty = true;
@@ -565,7 +712,28 @@ function tuneDelta(nsw){ for (var i = 0; i < nsw; i++) tune(sweep() / (Nx * Nt),
    G is averaged in blocks of BLK steps (last MAXB blocks kept) for jackknife errors. On a periodic lattice
    G(tau) = c + A cosh(m (tau - N/2)), where c is a constant (zero mode / tunnelling piece). The differences
    D(tau) = G(tau) - G(tau+1) ~ sinh(m (h - tau)), h = (N-1)/2, cancel c; the ratio D(tau)/D(tau+1) gives m_eff(tau). */
-var MAXB = 200, BLK = 50, THERM = 200;
+var MAXB = 200, BLK = 50, THERM = 200, THERM_NC = 1000;   /* settling steps: THERM with cluster updates, THERM_NC (at least) without */
+function thermMin(){ return useClusters ? THERM : THERM_NC; }
+/* Settling in the real mode (square grid): thermLeft counts down the minimum, then holds at 1 until the wall density and |mean phi|
+   (sampled every 10 steps) have stopped drifting: their means over the last third of the settling so far must match the third before it.
+   Coarsening domains (wall density ~ t^-1/2) never pass this, whatever their age; equilibrium noise does. A band of the other vacuum stuck
+   across the grid (Metropolis only) keeps the walls steady but |mean phi| wanders as its walls diffuse; SETTLE_MAX ends the wait regardless. */
+var SETTLE_MAX = 30000, settleN = 0, settleW = [], settleM = [];
+function drifts(v, rel, abs){
+  var n = v.length, k = Math.floor(n / 3), a = 0, b = 0, i;
+  for (i = n - 2 * k; i < n - k; i++) a += v[i];
+  for (i = n - k; i < n; i++) b += v[i];
+  a /= k; b /= k;
+  return Math.abs(a - b) > rel * b + abs;
+}
+function settleDrifting(){ return drifts(settleW, 0.03, 0.001) || drifts(settleM, 0.03, 0.02); }
+function settleStep(){
+  settleN++;
+  if (settleN % 10 === 0){ settleW.push(computeWalls()); settleM.push(Math.abs(meanPhi())); }
+  if (thermLeft > 1){ thermLeft--; return; }
+  if (settleN % 10 !== 0 || (settleN < SETTLE_MAX && settleDrifting())) return;
+  thermLeft = 0;
+}
 var HN = N >> 1, rowS = new Float64Array(N), colS = new Float64Array(N), curG = new Float64Array(HN + 1), curN = 0;
 var ring = [], ringPos = 0, blocksDone = 0, thermLeft = THERM, est = null, estBlocks = -1, lastSign = 0;
 function resetMeasure(){
@@ -573,7 +741,8 @@ function resetMeasure(){
   if (cplx){ resetCMeasure(); return; }
   if (o3){ resetOMeasure(); return; }
   HN = N >> 1; rowS = new Float64Array(N); colS = new Float64Array(N); curG = new Float64Array(HN + 1); curN = 0;
-  ring = []; ringPos = 0; blocksDone = 0; thermLeft = THERM; est = null; estBlocks = -1; massDirty = true;
+  ring = []; ringPos = 0; blocksDone = 0; thermLeft = thermMin(); settleN = 0; settleW = []; settleM = []; est = null; estBlocks = -1; massDirty = true;
+  if (srcJ){ haloReset(); srcRef = null; }
   liveMeter = makeMeter(100, 25);      /* thin strip: skip ~100 update steps after any change */
 }
 function accumulate(){
@@ -1530,14 +1699,16 @@ function drawField(){
       }
     }
     fctx.stroke();
+    if (!strip) drawSources();
     return;
   }
   var scale = (LUTN - 1) / (2 * VMAX), top = LUTN - 1;
   if (!strip){
     ensureImg(nx, nt);
     var n = nx * nt;
+    if (viewMode === "avg" && avgF && avgF.length === n){ F = avgF; scale = (LUTN - 1) / (2 * VMAX_AVG); }
     for (i = 0; i < n; i++){
-      var k = ((F[i] + VMAX) * scale) | 0;
+      var k = (F[i] * scale + top / 2) | 0;
       img32[i] = lut[k < 0 ? 0 : (k > top ? top : k)];
     }
   } else {
@@ -1557,7 +1728,8 @@ function drawField(){
   octx.putImageData(img, 0, 0);
   fctx.imageSmoothingEnabled = false;
   fctx.drawImage(off, 0, 0, W, H);
-  if (!strip && est && est.m > 0){      /* scale bar: one correlation length xi */
+  if (!strip) drawSources();
+  if (!strip && est && est.m > 0 && !srcJ){      /* scale bar: one correlation length xi */
     var dpr = window.devicePixelRatio || 1, L = est.xi * fieldCv.width / N, x0 = 12 * dpr, y0 = fieldCv.height - 14 * dpr;
     if (L >= 3 * dpr && L < fieldCv.width - 2 * x0){
       fctx.lineCap = "round";
@@ -1746,7 +1918,7 @@ function syncU(){ U.kappa = kappa; U.lambda = lambda; U.clusters = useClusters; 
 function resetCMeasure(){
   if (!U) return;
   cEvery = U.n <= 64 ? 1 : (U.n <= 128 ? 2 : 4);
-  UM = newU1Meas(U.n, BLKC, MAXB); cCnt = 0; thermLeft = THERM; ures = null; uDone = -1; massDirty = true; histInit = false;
+  UM = newU1Meas(U.n, BLKC, MAXB); cCnt = 0; thermLeft = thermMin(); ures = null; uDone = -1; massDirty = true; histInit = false;
 }
 function allocU(n){
   U = newU1(n); syncU(); u1Reset(U, "hot");
@@ -1795,7 +1967,7 @@ var MODE_TEXT = {
     lamHint: "0 = soft free field, large = field pinned near ±1 (Ising).",
     eq: "S = Σ −2κ φφ′ + φ² + λ(φ²−1)²", wellH: "Mean-field well",
     wellNote: "V(φ) − 4κφ²: one valley means a symmetric vacuum, two valleys means the field must choose a side.",
-    clu: "Flips whole same-sign regions at once, which beats the slowing-down of ordinary updates near κ = 0.340.",
+    clu: "Flips whole same-sign regions at once, which beats the slowing-down of ordinary updates near κ = 0.340. Without them, settling after a change can take minutes in the ordered phase, and walls stretched right across the grid can get stuck for good.",
     cold: "All +v", coldTitle: "Every site set to the well minimum +v", pre: "Presets (λ = 1):", presets: ["Symmetric", "Critical", "Broken"], view2: "Domain walls",
     xiN: "The correlation length is comparable to the grid: near the critical point, try a bigger grid.",
     corr: "On a log plot a straight-ish fall-off means correlations die off like e<sup>−mτ</sup>, and the slope is the particle mass; it goes to zero at the critical point. Points show the measured correlation with error bars, the line is the fit."
@@ -1854,6 +2026,10 @@ function applyModeUI(){
   $("ylab").textContent = kink || poke ? "real time t ↑" : "Euclidean time ↑";
   $("xlab").textContent = kink || poke ? "space x →" : (strip ? "time →" : "space →");
   fieldCv.tabIndex = poke ? 0 : -1;
+  var srcOk = mode === "real" && !strip;
+  $("vAvg").hidden = !srcOk; $("jBox").hidden = !srcOk; $("haloPanel").hidden = !srcOk;
+  $("clrSrcBtn").hidden = !srcOk || !srcList.length;
+  document.body.classList.toggle("srcmode", srcOk);
   var pb = document.querySelectorAll("[data-preset]");
   for (i = 0; i < pb.length; i++) pb[i].textContent = T.presets[i];
   $("preLbl").textContent = T.pre;
@@ -1892,10 +2068,10 @@ function syncO(){ O.beta = kappa; O.clusters = useClusters; }
 function resetOMeasure(){
   if (!O) return;
   oEvery = O.n <= 64 ? 1 : (O.n <= 128 ? 2 : 4);
-  OM = newO3Meas(O.n, BLKO, MAXB); oCnt = 0; thermLeft = THERM; ores = null; omass = null; oDone = -1; massDirty = true; qHistN = 0;
+  OM = newO3Meas(O.n, BLKO, MAXB); oCnt = 0; thermLeft = thermMin(); ores = null; omass = null; oDone = -1; massDirty = true; qHistN = 0;
 }
 function allocO(n){
-  O = newO3(n); syncO(); o3Reset(O, "hot"); coolLeft = 0; snap = true; $("coolLine").textContent = "";
+  O = newO3(n); syncO(); o3Reset(O, "hot"); coolLeft = 0; oMade = null; snap = true; $("coolLine").textContent = "";
   resetOMeasure(); dirty = true;
 }
 function pushQ(q){ qHist[qHistN % QH] = q; qHistN++; }
@@ -2082,7 +2258,7 @@ function showO(){
   $("chiTV").textContent = fmtSci(r.Q2V, 2); $("chiTE").textContent = "± " + fmtSci(r.chiTErr, 1) + " · ⟨Q²⟩ = " + r.Q2.toFixed(2);
 }
 function finishCool(){
-  coolLeft = 0; paused = true; $("runBtn").textContent = "Run";
+  coolLeft = 0; paused = true; $("runBtn").textContent = "Run"; oMade = "cool";
   oQnow = Math.round(o3Charge(O, true)); oEnow = o3Energy(O);
   $("coolLine").textContent = "Cooled " + coolTotal + " sweeps: Q " + coolQ0 + " → " + oQnow + ", energy per link " + oEnow.toFixed(4) + ". Monte Carlo is paused (press Run to heat it up again).";
   $("coolLine").hidden = false;
@@ -2095,9 +2271,9 @@ function startCool(sweeps){
 }
 function addInstanton(){
   coolLeft = 0; o3Reset(O, "cold"); o3Instanton(O, O.n / 8, O.n / 2, O.n / 2, INST_SGN);
-  paused = true; $("runBtn").textContent = "Run";
+  paused = true; $("runBtn").textContent = "Run"; oMade = "inst";
   oQnow = Math.round(o3Charge(O, true)); oEnow = o3Energy(O);
-  $("coolLine").textContent = "Painted one instanton of radius " + (O.n / 8) + " on an aligned background: Q = " + (oQnow > 0 ? "+" : "") + oQnow + ", energy per link " + oEnow.toFixed(4) + ". Run melts it; Cool tightens it.";
+  $("coolLine").textContent = "Painted one instanton of radius " + (O.n / 8) + " on an aligned background: Q = " + (oQnow > 0 ? "+" : "") + oQnow + ", energy per link " + oEnow.toFixed(4) + ". Run goes back to sampling, and the samples soon stop showing it; Cool tightens it.";
   $("coolLine").hidden = false;
   resetOMeasure(); snap = true; dirty = true;
 }
@@ -2113,7 +2289,7 @@ function frameO(){
     else $("coolLine").textContent = "Cooling… " + (coolTotal - coolLeft) + " / " + coolTotal + " sweeps";
   } else if (!paused){
     var t0 = performance.now(), ns = 0, cl = 0;
-    syncO();
+    syncO(); oMade = null;
     do {
       O.cluFrozen = thermLeft === 0;       /* the cluster count adapts only while settling: no history bias in the data */
       o3Step(O); ns++; cl += O.lastCl || 0;
@@ -2489,7 +2665,11 @@ function setPressed(a, b, firstOn){
 }
 function applyUI(){
   var walls = viewMode === "walls";
-  setPressed("vField", "vWalls", !walls);
+  if (viewMode === "avg" && (mode !== "real" || strip)) viewMode = "field";
+  setPressed("vField", "vWalls", viewMode === "field");
+  $("vWalls").classList.toggle("on", walls); $("vWalls").setAttribute("aria-pressed", String(walls));
+  $("vAvg").classList.toggle("on", viewMode === "avg"); $("vAvg").setAttribute("aria-pressed", String(viewMode === "avg"));
+  $("cbLo").textContent = viewMode === "avg" ? "average φ = −" + VMAX_AVG : "φ = −1.3"; $("cbHi").textContent = viewMode === "avg" ? "+" + VMAX_AVG : "+1.3";
   setPressed("gSquare", "gStrip", !strip);
   $("frameBox").classList.toggle("strip", strip);
   $("slab").textContent = "↕ space (" + Nx + " sites)";
@@ -2505,10 +2685,11 @@ function applyUI(){
   applyModeUI();
   dirty = true;
 }
-function setView(v){ viewMode = v === "walls" ? "walls" : "field"; applyUI(); }
+function setView(v){ viewMode = v === "walls" || v === "avg" ? v : "field"; applyUI(); }
 /* square <-> thin strip. autoKap: the UI's default of kappa = 0.37 when kappa < 0.35 (the hook leaves kappa alone). */
 function setGeometry(g, L, T, autoKap){
   if (scan) return;
+  if (srcList.length){ srcList = []; srcRef = null; rebuildSrc(); }
   if (g === "strip"){
     if (L != null) Lsp = Math.max(3, Math.min(64, L | 0));
     if (T != null) Tt = T | 0; else if (!Tt) Tt = window.innerWidth < 600 ? 512 : 1024;
@@ -2523,10 +2704,11 @@ function setGeometry(g, L, T, autoKap){
     else { allocLattice(N, N); resetField("hot"); tuneDelta(40); }
     sq = null; tuneDelta(5);
   }
-  resetMeasure(); applyUI();
+  rebuildSrc(); resetMeasure(); applyUI();
 }
 $("vField").addEventListener("click", function(){ setView("field"); });
 $("vWalls").addEventListener("click", function(){ setView("walls"); });
+$("vAvg").addEventListener("click", function(){ setView("avg"); });
 $("gSquare").addEventListener("click", function(){ setGeometry("square"); });
 $("gStrip").addEventListener("click", function(){ setGeometry("strip", null, null, true); });
 $("lsl").addEventListener("input", function(){ Lsp = parseInt(this.value, 10); setGeometry("strip", Lsp); });
@@ -2605,6 +2787,7 @@ function setClusters(b){ useClusters = !!b; $("cluChk").checked = useClusters; r
 $("cluChk").addEventListener("change", function(){ setClusters(this.checked); });
 function showMass(){
   var k = $("massV"), e = $("massE"), xv = $("xiV"), xe = $("xiE"), note = $("xiNote");
+  if (srcJ){ k.textContent = xv.textContent = "paused"; e.textContent = xe.textContent = "while a source is in"; note.hidden = true; return; }
   if (est && est.m > 0){
     var pre = est.rough ? "≈ " : "", d = est.xi < 10 ? 2 : 1, dm = est.rough ? 2 : 3;
     k.textContent = pre + est.m.toFixed(dm); e.textContent = "± " + est.mErr.toFixed(dm) + (est.rough ? " (short plateau)" : "");
@@ -2931,6 +3114,156 @@ $("kspeed").addEventListener("change", function(){ kMult = parseFloat(this.value
 kapEl.addEventListener("change", function(){ if (kink) kinkFire(); });
 if (window.ResizeObserver){ ro.observe(kxCv); ro.observe(ktCv); ro.observe(ksCv); }
 
+/* ---------- sources in the real mode (Stage 9): Average view, markers, gestures, halo panel ---------- */
+var avgF = null, AVG_A = 0.005, VMAX_AVG = 0.6, srcRef = null, srcGrab = null, srcNextId = 1, SRC_MAX = 6;
+var haloCv = $("haloCv"), hctx2 = haloCv.getContext("2d");
+/* running average of phi over the last ~1/AVG_A update steps (the Average view) */
+function avgStep(){
+  var n = Nx * Nt, F = f, A = avgF, i, a = AVG_A;
+  if (!A || A.length !== n){ avgF = A = new Float32Array(n); for (i = 0; i < n; i++) A[i] = F[i]; return; }
+  for (i = 0; i < n; i++) A[i] += a * (F[i] - A[i]);
+}
+function drawSources(){
+  if (!srcList.length || mode !== "real") return;
+  var dpr = window.devicePixelRatio || 1, cw = fieldCv.width / Nx, ch = fieldCv.height / Nt, q, rr = Math.max(11 * dpr, 3.5 * cw);
+  fctx.font = "700 " + (12 * dpr) + "px " + getComputedStyle(document.body).fontFamily; fctx.textAlign = "left"; fctx.textBaseline = "bottom"; fctx.lineJoin = "round";
+  for (q = 0; q < srcList.length; q++){
+    var S = srcList[q], X = (S.x + 0.5) * cw, Y = (S.y + 0.5) * ch, held = !S.pin;
+    /* an open ring, wider than the cloud's core, so the middle stays visible; the sign sits outside it */
+    fctx.setLineDash(held ? [3 * dpr, 3 * dpr] : []);
+    fctx.lineWidth = 3.5 * dpr; fctx.strokeStyle = "rgba(0,0,0,0.5)"; fctx.beginPath(); fctx.arc(X, Y, rr, 0, 6.2832); fctx.stroke();
+    fctx.lineWidth = 1.5 * dpr; fctx.strokeStyle = "#ffffff"; fctx.beginPath(); fctx.arc(X, Y, rr, 0, 6.2832); fctx.stroke();
+    fctx.setLineDash([]);
+    var lab = srcStr >= 0 ? "+" : "−", lx = X + rr * 0.75, ly = Y - rr * 0.75;
+    fctx.lineWidth = 3 * dpr; fctx.strokeStyle = "rgba(0,0,0,0.6)"; fctx.strokeText(lab, lx, ly); fctx.fillStyle = "#ffffff"; fctx.fillText(lab, lx, ly);
+  }
+}
+function srcChanged(){
+  if (srcList.length && !srcJ && est && est.m > 0) srcRef = { m: est.m, mErr: est.mErr, rough: est.rough };   /* the correlator's last word before the first source */
+  var had = !!srcJ;
+  rebuildSrc();
+  if (had && !srcJ){ srcRef = null; resetMeasure(); }
+  $("clrSrcBtn").hidden = !srcList.length || mode !== "real" || strip;
+  massDirty = true; dirty = true;
+}
+function showHalo(){
+  if (mode !== "real" || strip) return;
+  var R = srcJ ? haloResult() : null, hint = $("haloHint"), which = srcList.length > 1 ? "last source placed" : "source";
+  if (!srcList.length) hint.textContent = "Tap the picture to place a source. For a clean cloud use one source; with several, the halo is measured around the last one placed.";
+  else if (hSettle > 0 || !R || !R.G) hint.textContent = "Measuring the cloud around the " + which + "… (it takes a few hundred update steps)";
+  else hint.textContent = "Averaged over " + R.nb * HBLK + " update steps around the " + which + ".";
+  hFitRes = R;
+  if (R && R.m){ var dm = R.mErr < 0.01 ? 3 : 2; $("hM").textContent = R.m.toFixed(dm); $("hME").textContent = "± " + R.mErr.toFixed(dm) + ", ξ ≈ " + (1 / R.m).toFixed(1) + " sites"; }
+  else if (R && R.G && R.r1 < R.r0 + 2){ $("hM").textContent = "–"; $("hME").textContent = "cloud too small to fit"; }
+  else { $("hM").textContent = srcList.length ? "measuring…" : "–"; $("hME").textContent = " "; }
+  if (srcRef){ var d2 = srcRef.rough ? 2 : 3; $("hRef").textContent = (srcRef.rough ? "≈ " : "") + srcRef.m.toFixed(d2); $("hRefE").textContent = "± " + srcRef.mErr.toFixed(d2) + ", measured before the source"; }
+  else if (est && est.m > 0 && !srcJ){ $("hRef").textContent = est.m.toFixed(3); $("hRefE").textContent = "± " + est.mErr.toFixed(3) + " (now, no source)"; }
+  else { $("hRef").textContent = "–"; $("hRefE").textContent = srcJ ? "remove the sources to measure it" : "measuring…"; }
+  $("haloBrk").hidden = !(emaAbs > 0.5);
+}
+function drawHalo(){
+  if (mode !== "real" || strip) return;
+  fitCanvas(haloCv);
+  var dpr = window.devicePixelRatio || 1, w = haloCv.width, h = haloCv.height, ctx = hctx2, R = hFitRes, r;
+  var pad = { l: 52 * dpr, r: 10 * dpr, t: 8 * dpr, b: 34 * dpr };
+  ctx.clearRect(0, 0, w, h);
+  ctx.font = (11 * dpr) + "px " + getComputedStyle(document.body).fontFamily; ctx.fillStyle = C["--muted"]; ctx.strokeStyle = C["--line"]; ctx.lineWidth = 1;
+  var rmax = R && R.G ? Math.min(hR, Math.max(12, R.r1 + 5)) : 12;
+  function X(v){ return pad.l + v / rmax * (w - pad.l - pad.r); }
+  ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+  ctx.fillText("distance r from the source (sites)", pad.l + (w - pad.l - pad.r) / 2, h - 1 * dpr);
+  ctx.save(); ctx.translate(11 * dpr, pad.t + (h - pad.t - pad.b) / 2); ctx.rotate(-Math.PI / 2); ctx.textBaseline = "top"; ctx.fillText("average φ", 0, -4 * dpr); ctx.restore();
+  ctx.textBaseline = "top";
+  var st = rmax > 24 ? 10 : (rmax > 12 ? 4 : 2);
+  for (r = 0; r <= rmax; r += st) ctx.fillText(String(r), X(r), h - pad.b + 3 * dpr);
+  ctx.beginPath(); ctx.moveTo(pad.l, h - pad.b); ctx.lineTo(w - pad.r, h - pad.b); ctx.stroke();
+  if (!R || !R.G){ ctx.textBaseline = "middle"; ctx.fillText(srcList.length ? "measuring…" : "no source yet", pad.l + (w - pad.l - pad.r) / 2, pad.t + (h - pad.t - pad.b) / 2); return; }
+  var G = R.G, sd = R.sd, ytop = 0, ylo = Infinity;
+  for (r = 1; r <= rmax; r++){ if (G[r] > ytop) ytop = G[r]; if (G[r] > 2 * sd[r] && G[r] < ylo) ylo = G[r]; }
+  if (!(ytop > 0)) return;
+  ytop *= 1.6; if (!(ylo < Infinity)) ylo = ytop * 1e-2; ylo = Math.max(ylo / 3, ytop * 1e-5);
+  var lt = Math.log10(ytop), ll = Math.log10(ylo);
+  function Y(v){ return pad.t + (lt - Math.log10(v)) / (lt - ll) * (h - pad.t - pad.b); }
+  ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  for (var e = Math.ceil(ll); e <= Math.floor(lt); e++){
+    var yy = Y(Math.pow(10, e));
+    ctx.globalAlpha = 0.5; ctx.beginPath(); ctx.moveTo(pad.l, yy); ctx.lineTo(w - pad.r, yy); ctx.stroke(); ctx.globalAlpha = 1;
+    ctx.fillText(sup(e), pad.l - 4 * dpr, yy);
+  }
+  ctx.save(); ctx.beginPath(); ctx.rect(pad.l, pad.t, w - pad.l - pad.r, h - pad.t - pad.b); ctx.clip();
+  if (R.m){                               /* fit curve A K0(m r): solid over the fit window, dashed outside it */
+    ctx.strokeStyle = C["--pos"]; ctx.lineWidth = 2 * dpr;
+    [[0.6, R.r0, true], [R.r0, R.r1, false], [R.r1, rmax, true]].forEach(function(seg){
+      ctx.setLineDash(seg[2] ? [5 * dpr, 4 * dpr] : []); ctx.beginPath();
+      for (var q = 0; q <= 40; q++){ var rq = seg[0] + (seg[1] - seg[0]) * q / 40, v = R.A * besselK0(R.m * rq); if (q === 0) ctx.moveTo(X(rq), Y(v)); else ctx.lineTo(X(rq), Y(v)); }
+      ctx.stroke();
+    });
+    ctx.setLineDash([]);
+  }
+  for (r = 1; r <= rmax; r++){
+    var c = G[r];
+    if (!(c > 0)) continue;
+    var x = X(r), lo = Math.max(c - sd[r], ylo), hi = c + sd[r];
+    ctx.strokeStyle = C["--accent"]; ctx.lineWidth = 1.5 * dpr;
+    ctx.beginPath(); ctx.moveTo(x, Y(Math.min(hi, ytop * 3))); ctx.lineTo(x, Y(lo)); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, Y(c), 3 * dpr, 0, 6.2832);
+    if (r >= R.r0 && r <= R.r1){ ctx.fillStyle = C["--accent"]; ctx.fill(); } else ctx.stroke();
+  }
+  ctx.restore();
+}
+/* gestures on the picture (real mode, square grid): a quick tap places a source that stays, or removes the one it hits;
+   press and hold makes a source that lasts only while held; dragging a source moves it */
+function siteAt(ev){
+  var rc = fieldCv.getBoundingClientRect();
+  return { x: Math.max(0, Math.min(Nx - 1, Math.floor((ev.clientX - rc.left) / rc.width * Nx))), y: Math.max(0, Math.min(Nt - 1, Math.floor((ev.clientY - rc.top) / rc.height * Nt))),
+           px: ev.clientX, py: ev.clientY, cell: rc.width / Nx };
+}
+function srcHit(p){
+  var best = -1, bd = Infinity, q, tol = Math.max(2, 16 / p.cell);
+  for (q = 0; q < srcList.length; q++){
+    var dx = srcList[q].x - p.x, dy = srcList[q].y - p.y, d = Math.sqrt(dx * dx + dy * dy);
+    if (d <= tol && d < bd){ bd = d; best = q; }
+  }
+  return best;
+}
+fieldCv.addEventListener("pointerdown", function(ev){
+  if (mode !== "real" || strip || srcGrab || scan) return;
+  ev.preventDefault();
+  try { fieldCv.setPointerCapture(ev.pointerId); } catch (e) {}
+  var p = siteAt(ev), q = srcHit(p), S;
+  if (q >= 0){ S = srcList.splice(q, 1)[0]; srcList.push(S); srcGrab = { S: S, fresh: false }; }   /* the grabbed one becomes the last: the halo follows it */
+  else {
+    if (srcList.length >= SRC_MAX) return;
+    S = { x: p.x, y: p.y, pin: false, id: srcNextId++ }; srcList.push(S); srcGrab = { S: S, fresh: true };
+  }
+  srcGrab.id = ev.pointerId; srcGrab.t0 = performance.now(); srcGrab.px = p.px; srcGrab.py = p.py; srcGrab.moved = false;
+  srcChanged();
+});
+fieldCv.addEventListener("pointermove", function(ev){
+  var g = srcGrab;
+  if (!g || g.id !== ev.pointerId) return;
+  var p = siteAt(ev);
+  if (Math.abs(p.px - g.px) + Math.abs(p.py - g.py) > 8) g.moved = true;
+  if (g.moved && (p.x !== g.S.x || p.y !== g.S.y)){ g.S.x = p.x; g.S.y = p.y; srcChanged(); }
+});
+function srcRelease(ev){
+  var g = srcGrab;
+  if (!g || g.id !== ev.pointerId) return;
+  srcGrab = null;
+  var tap = !g.moved && performance.now() - g.t0 < 350, i = srcList.indexOf(g.S);
+  if (g.fresh){ if (tap) g.S.pin = true; else if (i >= 0) srcList.splice(i, 1); }
+  else if (tap && i >= 0) srcList.splice(i, 1);
+  srcChanged();
+}
+fieldCv.addEventListener("pointerup", srcRelease);
+fieldCv.addEventListener("pointercancel", srcRelease);
+fieldCv.addEventListener("contextmenu", function(ev){ if (mode === "real" && !strip) ev.preventDefault(); });
+$("clrSrcBtn").addEventListener("click", function(){ srcList = []; srcGrab = null; srcChanged(); });
+function syncJ(){ $("jsl").value = srcStr; $("jslV").textContent = (srcStr > 0 ? "+" : (srcStr < 0 ? "−" : "")) + Math.abs(srcStr).toFixed(1); }
+$("jsl").addEventListener("input", function(){ srcStr = parseFloat(this.value); syncJ(); if (srcList.length) rebuildSrc(); dirty = true; });
+syncJ();
+if (window.ResizeObserver) ro.observe(haloCv);
+
 /* ---------- poke the field (Stage 8): the same classical phi^4 as the kink mode, plus a source J(x, t) from the visitor's finger ----------
    phi_tt = phi_xx + 2 phi (1 - phi^2) + J - sigma(x) phi_t, J = sum over pushes of amp * sgn * exp(-(x - xs)^2 / (2 PW^2)).
    Box +-60, phi = -1 at both ends, absorbing layer in the outer 20 (as in the kink core); the picture shows -25..25.
@@ -3207,8 +3540,27 @@ if (window.ResizeObserver) ro.observe(pxCv);
 
 /* ---------- main loop ---------- */
 var spsCount = 0, spsT = performance.now(), spsVal = 0, readoutT = 0;
+/* The pill on the picture: says when it is not a fair sample of the theory (settling after a change, cooling, a cooled or hand-made
+   O(3) field). While settling the picture is also dimmed. */
+var oMade = null, settleShown = "";
+function showSettle(){
+  var t = "", dim = false;
+  if (kink || poke) t = "";
+  else if (o3 && coolLeft > 0) t = "Cooling: smoothing the noise away, not sampling";
+  else if (o3 && oMade) t = (oMade === "cool" ? "Cooled" : "Hand-made") + ": not a fair sample (Run samples again)";
+  else {
+    dim = !o3 && !cplx ? (strip ? !!liveMeter && liveMeter.skip > 0 : (srcJ ? hSettle > 0 : thermLeft > 0)) : thermLeft > 0;
+    if (dim) t = "Settling: not a fair sample yet";
+  }
+  var key = t + (dim ? "|d" : "");
+  if (key === settleShown) return;
+  settleShown = key;
+  $("settle").textContent = t; $("settle").hidden = !t;
+  $("settle").parentNode.classList.toggle("settling", dim);
+}
 function frame(){
   requestAnimationFrame(frame);
+  showSettle();
   if (scan) return;          /* a width scan is running on its own lattices; the live picture waits */
   if (kink){ frameK(); return; }
   if (poke){ frameP(); return; }
@@ -3221,7 +3573,9 @@ function frame(){
       cluFreeze = strip ? (liveMeter && liveMeter.skip === 0) : thermLeft === 0;   /* count adapts only while settling: no history bias in the data */
       acc += updateStep(); ns++;
       if (strip) meterStep(liveMeter);
-      else if (thermLeft > 0) thermLeft--; else accumulate();
+      else if (srcJ) haloStep();                     /* a source biases the correlator: it waits, the halo is measured instead */
+      else if (thermLeft > 0) settleStep(); else accumulate();
+      if (!strip) avgStep();
     } while (performance.now() - t0 < 8);
     cluFreeze = false;   /* never leak into the width scan, which steps its own lattices */
     var a = acc / (ns * Nx * Nt);
@@ -3230,7 +3584,7 @@ function frame(){
     var mm = meanPhi(), m = Math.abs(mm);
     /* cluster flips can reverse the whole field between frames; Z2 symmetry makes flipping it back harmless and avoids strobing */
     var sgn = mm >= 0 ? 1 : -1;
-    if (m > 0.2){
+    if (m > 0.2 && !srcJ){
       if (lastSign && sgn !== lastSign){ for (var q = 0, nn = Nx * Nt; q < nn; q++) f[q] = -f[q]; } else lastSign = sgn;
     }
     if (snap){ emaAbs = m; snap = false; } else emaAbs += (1 - Math.pow(0.98, ns)) * (m - emaAbs);
@@ -3248,10 +3602,11 @@ function frame(){
   } else if (now - estT > 300 || massDirty){
     estT = now;
     if (blocksDone !== estBlocks){ estBlocks = blocksDone; est = estimate(ring, N); massDirty = true; }
-    if (massDirty || thermLeft > 0 || ring.length < 8){ showMass(); massDirty = false; changed = true; }
+    if (massDirty || thermLeft > 0 || ring.length < 8 || srcJ){ showMass(); massDirty = false; changed = true; }
+    showHalo();
   }
   if (changed){
-    if (strip){ drawSlice(); if (!scanCv.hidden) drawScan(); } else drawCorr();
+    if (strip){ drawSlice(); if (!scanCv.hidden) drawScan(); } else { drawCorr(); drawHalo(); }
     drawField();
     drawHist();
     $("absM").textContent = emaAbs.toFixed(3);
@@ -3310,6 +3665,38 @@ if (/[?&]debug\b/.test(location.search)){
       var nan = function(v){ return v === v ? v : null; };
       return { G: Array.from(e.G), Gerr: Array.from(e.Cse), meff: e.meff.map(nan), m: e.m, mErr: e.mErr, xi: e.xi, xiErr: e.xiErr, window: [e.t0, e.t1], rough: e.rough, blocks: e.nb };
     },
+    /* ----- Stage 9: sources and the halo (real mode, square grid) -----
+       measureHalo(k, l, J, therm, nsteps, init, opts) puts one source of strength J at the centre of the live grid, settles, runs nsteps update
+       steps measuring the halo, and returns haloResult() ({m, mErr, r0, r1, G, sd, nb}); opts.keep leaves the source in place. */
+    measureHalo: function(k, l, J, therm, nsteps, init, opts){
+      opts = opts || {};
+      if (mode !== "real") setMode("real");
+      setParams(k, l);
+      if (init) resetField(init);
+      srcStr = J; srcList = [{ x: N >> 1, y: N >> 1, pin: true, id: "hook" }]; rebuildSrc();
+      for (var i = 0; i < therm; i++){ var a = updateStep() / (Nx * Nt); if (i < therm / 2) tune(a, 0.3); }
+      hSettle = 0;
+      for (i = 0; i < nsteps; i++){ updateStep(); haloStep(); }
+      var R = haloResult();
+      if (!opts.keep){ srcList = []; rebuildSrc(); }
+      return { m: R.m, mErr: R.mErr, r0: R.r0, r1: R.r1, nb: R.nb, chi2: R.chi2, G: R.G && Array.from(R.G).slice(0, 16).map(function(v){ return +v.toFixed(4); }) };
+    },
+    get sources(){ return { list: srcList, J: srcStr, sites: srcSites, blocks: hBlocks.length }; },
+    addSource: function(x, y){ srcList.push({ x: x, y: y, pin: true, id: srcNextId++ }); srcChanged(); applyUI(); },
+    clearSources: function(){ srcList = []; srcChanged(); applyUI(); },
+    /* live real-mode steps as the frame loop does them (sources, halo, Average), then redraw: for a hidden pane */
+    liveSteps: function(n){
+      for (var i = 0; i < n; i++){
+        tune(updateStep() / (Nx * Nt), 0.05);
+        if (srcJ) haloStep(); else if (thermLeft > 0) settleStep(); else accumulate();
+        avgStep();
+      }
+      est = estimate(ring, N); emaAbs = Math.abs(meanPhi()); showMass(); showHalo(); drawField(); drawCorr(); drawHalo();
+    },
+    haloResult: haloResult,
+    get settle(){ return { thermLeft: thermLeft, steps: settleN, pill: $("settle").hidden ? "" : $("settle").textContent }; },
+    /* steps for the frame loop's real-mode settling only (no redraw): returns the number of steps until thermLeft reached 0, or -1 */
+    settleRun: function(max){ for (var i = 1; i <= max; i++){ tune(updateStep() / (Nx * Nt), 0.05); if (thermLeft > 0) settleStep(); if (thermLeft === 0) return i; } return -1; },
     measureCorr: function(k, l, therm, nsteps, init){
       lf.corrBegin(k, l, therm, nsteps, init); lf.corrRun(nsteps); return lf.corrResult();
     },
