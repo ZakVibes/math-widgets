@@ -135,6 +135,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
           </div>
           <label class="sl inl">strength <input type="range" id="srcQ" min="0.1" max="5" step="0.1" value="1"><output id="srcQo">1.0</output></label>
           <label class="sl inl" id="srcWwrap">frequency ω <input type="range" id="srcW" min="0.1" max="3" step="0.05" value="1"><output id="srcWo">1.00</output></label>
+          <label class="lab" id="srcSelfWrap" hidden><input type="checkbox" id="srcSelf"> feels its own field</label>
           <label class="sl inl" id="srcMwrap" hidden>mass <input type="range" id="srcM" min="0.2" max="5" step="0.1" value="1"><output id="srcMo">1.0</output></label>
           <label class="sl inl" id="srcAwrap" hidden>swing <input type="range" id="srcA" min="0.5" max="10" step="0.5" value="3"><output id="srcAo">3.0</output></label>
           <span class="lab" id="srcSpeed"></span>
@@ -216,7 +217,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 "use strict";
 /* ---------- grid and physics ---------- */
 const N=256, G=N+2, NN=G*G, dx=0.5, dt=0.1, L=N*dx;   // world is 128 x 128 length units, wave speed 1
-const SPONGE=22;                                          // absorbing rim width in cells
+let SPONGE=32, SPMAX=0.5, SPPOW=2;                     // absorbing rim: width in cells, peak damping, ramp shape (gentle, so long waves don't bounce off it)
 const phi=new Float64Array(NN), vel=new Float64Array(NN), F=new Float64Array(NN);
 const phi2=new Float64Array(NN), vel2=new Float64Array(NN), F2=new Float64Array(NN);   // imaginary part (complex), or A_x (EM)
 const phi3=new Float64Array(NN), vel3=new Float64Array(NN), F3=new Float64Array(NN);   // A_y (EM only); phi is then the scalar potential
@@ -224,10 +225,13 @@ const COMPS=[[phi,vel,F],[phi2,vel2,F2],[phi3,vel3,F3]];
 const Ex=new Float64Array(NN), Ey=new Float64Array(NN), Bz=new Float64Array(NN);
 const open=new Uint8Array(NN).fill(1), dampH=new Float64Array(NN), sponge=new Float64Array(NN);
 const K=(i,j)=>(j+1)*G+(i+1);
-for(let j=0;j<N;j++)for(let i=0;i<N;i++){
-  const d=Math.min(i,j,N-1-i,N-1-j);
-  sponge[K(i,j)]=d<SPONGE?0.45*Math.pow(1-d/SPONGE,2):0;
+function buildSponge(){
+  for(let j=0;j<N;j++)for(let i=0;i<N;i++){
+    const d=Math.min(i,j,N-1-i,N-1-j);
+    sponge[K(i,j)]=d<SPONGE?SPMAX*Math.pow(1-d/SPONGE,SPPOW):0;
+  }
 }
+buildSponge();
 
 const TH={
   kg:{name:'Waves (Klein–Gordon)', mMin:0, mMax:1.5, mDef:0, poke:1, scale:null,
@@ -272,7 +276,18 @@ function updateDamp(){
   updateLinkMasks();
 }
 
+/* Absorbing edge for the scalar tabs: besides the damping rim, the ghost cells follow Mur's one-way wave condition,
+   g(t+dt) = e(t) + k (e(t+dt) - g(t)), k = (dt - dx)/(dt + dx), so waves reaching the outer edge leave instead of bouncing. */
+const MURK=(dt-dx)/(dt+dx), murOld=[new Float64Array(NN),new Float64Array(NN),new Float64Array(NN)];
+const useMur=()=>P.edge==='absorb'&&!isEm()&&!isAh();
+function murEach(fn){   // fn(ghost cell, edge cell next to it)
+  for(let i=1;i<=N;i++){ fn(i,G+i); fn((N+1)*G+i,N*G+i); }
+  for(let j=1;j<=N;j++){ fn(j*G,j*G+1); fn(j*G+N+1,j*G+N); }
+}
+function murInit(){ for(let c=0;c<3;c++){ const a=COMPS[c][0], o=murOld[c]; murEach((g,e)=>{ a[g]=a[e]; o[g]=a[e]; }); } }
+function murStep(){ const nc=ncomp(); for(let c=0;c<nc;c++){ const a=COMPS[c][0], o=murOld[c]; murEach((g,e)=>{ a[g]=o[g]+MURK*(a[e]-a[g]); o[g]=a[e]; }); } }
 function ghostsOf(a,comp){
+  if(useMur()&&comp!=null&&comp<3&&(a===phi||a===phi2||a===phi3)) return;   // ghost cells are kept by murStep
   if(P.edge==='absorb'&&isEm()){   // EM: let the potentials continue straight through the edge, so a charge's static field fits the box
     for(let i=1;i<=N;i++){ a[i]=2*a[G+i]-a[2*G+i]; a[(N+1)*G+i]=2*a[N*G+i]-a[(N-1)*G+i]; }
     for(let j=1;j<=N;j++){ a[j*G]=2*a[j*G+1]-a[j*G+2]; a[j*G+N+1]=2*a[j*G+N]-a[j*G+N-1]; }
@@ -352,14 +367,19 @@ function force(time,frac){
 /* velocity Verlet (kick-drift-kick); damping folded into the half kicks; walls have dampH=0 */
 function stepOnce(frac,fracPrev){
   if(isAh()){ stepAH(); return; }
-  if(dirty){ force(t,fracPrev); dirty=false; }
+  const own=isEm()?owners():[];
+  if(dirty){ force(t,fracPrev); for(const s of own) ownForce(s,t,fracPrev); dirty=false; }
   const h=dt/2, nc=ncomp();
   for(let c=0;c<nc;c++){ const [a,v,f]=COMPS[c];
     for(let j=1;j<=N;j++){ let k=j*G+1; for(let i=0;i<N;i++,k++){ v[k]=dampH[k]*(v[k]+h*f[k]); a[k]+=dt*v[k]; } } }
+  for(const s of own) ownKick(s,true);
+  if(useMur()) murStep();
   t+=dt;
   force(t,frac);
+  for(const s of own) ownForce(s,t,frac);
   for(let c=0;c<nc;c++){ const [,v,f]=COMPS[c];
     for(let j=1;j<=N;j++){ let k=j*G+1; for(let i=0;i<N;i++,k++) v[k]=dampH[k]*(v[k]+h*f[k]); } }
+  for(const s of own) ownKick(s,false);
   if(isEm()) pushCharges();
 }
 /* Free charges: relativistic momentum p = gamma M v, pushed by the Lorentz force q(E + v x B). E and B are averaged over the
@@ -371,6 +391,10 @@ function pushCharges(){
     eachCellAt(s.x,s.y,(k,g)=>{ const w=g*A;
       ex+=w*(-(phi[k+1]-phi[k-1])*h-vel2[k]); ey+=w*(-(phi[k+G]-phi[k-G])*h-vel3[k]);
       bz+=w*(phi3[k+1]-phi3[k-1]-phi2[k+G]+phi2[k-G])*h; });
+    if(s.own){ const [o0,o1,o2]=s.own.a, [,u1,u2]=s.own.v;   // take away the charge's own field
+      eachCellAt(s.x,s.y,(k,g)=>{ const w=g*A;
+        ex-=w*(-(o0[k+1]-o0[k-1])*h-u1[k]); ey-=w*(-(o0[k+G]-o0[k-G])*h-u2[k]);
+        bz-=w*(o2[k+1]-o2[k-1]-o1[k+G]+o1[k-G])*h; }); }
     let g=Math.hypot(s.M,s.mx,s.my); const vx=s.mx/g, vy=s.my/g;
     s.mx+=dt*q*(ex+vy*bz); s.my+=dt*q*(ey-vx*bz);
     g=Math.hypot(s.M,s.mx,s.my);
@@ -559,7 +583,7 @@ function twistAt(cx,cy,w){
       if(lmX[k]) lx[k]+=prof(Math.hypot(i+0.5-cx,j-cy)*dx)*wrapA(al(i+1,j)-a0);
       if(lmY[k]) ly[k]+=prof(Math.hypot(i-cx,j+0.5-cy)*dx)*wrapA(al(i,j+1)-a0); }
   }
-  dirty=true;
+  murInit(); dirty=true;
 }
 /* winding of the phase around each grid square; +1 means the phase turns anticlockwise on screen */
 function findVortices(){
@@ -586,14 +610,15 @@ function walkSeg(a,b,stepCells,fn){
 function resetField(){
   const v0=TH[P.th].vac();
   for(let k=0;k<NN;k++){ phi[k]=open[k]?v0:0; vel[k]=0; phi2[k]=0; vel2[k]=0; phi3[k]=0; vel3[k]=0; lx[k]=ly[k]=lvx[k]=lvy[k]=0; }
-  dirty=true;
+  for(const s of sources) if(s.own) for(const arr of [...s.own.a,...s.own.v]) arr.fill(0);
+  murInit(); dirty=true;
 }
 function fillField(fn){              // fn(x,y) with x,y in units from the centre -> [phi, phidot, (imaginary part, its rate)]
   for(let j=0;j<N;j++)for(let i=0;i<N;i++){ const k=K(i,j);
     if(!open[k]){phi[k]=0;vel[k]=0;phi2[k]=0;vel2[k]=0;phi3[k]=0;vel3[k]=0;continue;}
     const r=fn((i-N/2+0.5)*dx,(j-N/2+0.5)*dx); phi[k]=r[0]; vel[k]=r[1]||0; phi2[k]=r[2]||0; vel2[k]=r[3]||0; }
   lx.fill(0); ly.fill(0); lvx.fill(0); lvy.fill(0);
-  dirty=true;
+  murInit(); dirty=true;
 }
 function clearWalls(){ open.fill(1); updateDamp(); }
 function addSource(o){
@@ -605,13 +630,38 @@ const U2C=u=>u/dx+N/2-0.5;          // units from centre -> cell coordinate
    integrated outward into a table, so the field doesn't have to re-settle (which would send out a pulse) */
 const STAT_DR=0.01, STAT=(()=>{ const n=Math.ceil(200/STAT_DR), tb=new Float64Array(n+1); let v=0;
   for(let q=1;q<=n;q++){ const r=(q-0.5)*STAT_DR; v-=(1-Math.exp(-r*r/(2*SIG*SIG)))/(2*Math.PI*r)*STAT_DR; tb[q]=v; } return tb; })();
-function addStatic(q,cx,cy){
+function addStatic(q,cx,cy,target){
+  const a0=target||phi;
   for(let j=0;j<N;j++)for(let i=0;i<N;i++){ const k=K(i,j); if(!open[k]) continue;
     const r=Math.hypot((i-cx)*dx,(j-cy)*dx)/STAT_DR, a=Math.min(STAT.length-2,r|0), f=r-a;
-    phi[k]+=q*(STAT[a]+(STAT[a+1]-STAT[a])*f); }
+    a0[k]+=q*(STAT[a]+(STAT[a+1]-STAT[a])*f); }
   dirty=true;
 }
-function addCharge(o){ const s=addSource(Object.assign({kind:'still',sign:1,q:1,w:1,A:3},o)); addStatic(s.sign*s.q,s.x,s.y); return s; }
+function addCharge(o){ const s=addSource(Object.assign({kind:'still',sign:1,q:1,w:1,A:3},o)); addStatic(s.sign*s.q,s.x,s.y); syncOwn(s,true); return s; }
+/* A free charge normally ignores its own field. It carries a private copy of the field it alone creates (same equations,
+   same edges) and subtracts it before the Lorentz force. The equations are linear, so this removes exactly its self-force:
+   its own wake, its own field bouncing off the edges, and radiation reaction. With s.self it feels everything. */
+function syncOwn(s,settled){
+  const need=s.kind==='free'&&!s.self;
+  if(!need){ s.own=null; return; }
+  if(s.own) return;
+  s.own={a:[0,1,2].map(()=>new Float64Array(NN)), v:[0,1,2].map(()=>new Float64Array(NN)), f:[0,1,2].map(()=>new Float64Array(NN))};
+  if(settled) addStatic(s.sign*s.q,s.x,s.y,s.own.a[0]);   // its field so far: the settled field of a still charge
+  dirty=true;
+}
+const owners=()=>sources.filter(s=>s.own);
+function ownForce(s,time,frac){
+  const o=s.own, inv=1/(dx*dx), m2=mass()*mass();
+  for(let c=0;c<3;c++){ const a=o.a[c], f=o.f[c]; ghostsOf(a,c);
+    for(let j=1;j<=N;j++){ let k=j*G+1; for(let i=0;i<N;i++,k++){ const p=a[k]; f[k]=(a[k-1]+a[k+1]+a[k-G]+a[k+G]-4*p)*inv-m2*p; } } }
+  const st=srcState(s,time,frac), q=s.sign*s.q, f0=o.f[0], f1=o.f[1], f2=o.f[2];
+  eachCellAt(st.x,st.y,(k,g)=>{ f0[k]+=q*g; f1[k]+=q*st.vx*g; f2[k]+=q*st.vy*g; });
+}
+function ownKick(s,drift){
+  const o=s.own, h=dt/2;
+  for(let c=0;c<3;c++){ const a=o.a[c], v=o.v[c], f=o.f[c];
+    for(let j=1;j<=N;j++){ let k=j*G+1; for(let i=0;i<N;i++,k++){ v[k]=dampH[k]*(v[k]+h*f[k]); if(drift) a[k]+=dt*v[k]; } } }
+}
 
 /* ---------- drawing ---------- */
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
@@ -648,23 +698,31 @@ function autoScales(){
   if(P.view==='bfield'&&isAh()){
     computePlaq(); const ib=1/(ech()*dx*dx);
     for(let q=0;q<N*N;q+=7){ const i=q%N, j=(q/N)|0; samp[n++]=Math.abs(wrapA(plq[K(i,j)]))*ib; }
-    const a=samp.subarray(0,n).sort(); fscale=ease(fscale,Math.max(0.01,a[Math.floor(n*0.995)]));
+    const a=samp.subarray(0,n).sort(); fscale=easeHold(fscale,Math.max(0.01,a[Math.floor(n*0.995)]));
   }
   if(P.view==='field'&&(P.th==='kg'||isEm())){
     const src=isEm()?Bz:phi;
     for(let q=0;q<N*N;q+=7){ const i=q%N, j=(q/N)|0; samp[n++]=Math.abs(src[K(i,j)]); }
-    const a=samp.subarray(0,n).sort(); const target=Math.max(0.03,a[Math.floor(n*0.985)]);
-    fscale=ease(fscale,target);
+    const a=samp.subarray(0,n).sort(); const target=Math.max(isEm()?0.03:0.04,a[Math.floor(n*0.985)]);
+    fscale=easeHold(fscale,target);
   }
   if(P.view==='energy'){
     ghosts();
     for(let q=0;q<N*N;q+=7){ const i=q%N, j=(q/N)|0; samp[n++]=edens(K(i,j)); }
     const a=samp.subarray(0,n).sort(); const target=Math.max(0.002,a[Math.floor(n*0.995)]);
-    escale=ease(escale,target);
+    escale=easeHold(escale,target);
   }
+  scaleReset=false;
 }
 // colour scales follow the field smoothly, but jump when far off (e.g. right after a preset)
 function ease(cur,target){ const r=target/cur; return r>3||r<1/3?target:cur*Math.pow(r,0.25); }
+// field brightness: rises quickly, then remembers a strong wave and fades slowly (half-life ~5 s), so faint echoes stay faint
+let scaleReset=true;
+function easeHold(cur,target){
+  if(scaleReset) return target;
+  if(target>cur) return target>3*cur?target:cur*Math.pow(target/cur,0.25);
+  return Math.max(target,cur*0.993);
+}
 function edens(k){
   if(!open[k]) return 0;
   if(isEm()) return 0.5*(Ex[k]*Ex[k]+Ey[k]*Ey[k]+Bz[k]*Bz[k]);
@@ -886,8 +944,8 @@ const ABOUT={
 <li><b>Orbiting charge:</b> circular motion sends out a spiral, the pattern of synchrotron light.</li>
 <li><b>Faraday cage:</b> barriers act as grounded metal. The field stops at the cage and the waves stay outside.</li>
 <li>Drag a charge yourself. It can't be moved faster than 0.9 times the speed of light, and every jerk sends out a ring of light.</li>
-<li><b>Free charges</b> are pushed by the fields: the electric force qE plus the magnetic force qv×B, with speeds kept below light by relativity. <b>Opposites attract</b> and <b>Likes repel</b> show the simplest cases. A thrown charge slowly slows down, which is real flat-world physics, not friction: its field reaches out without limit, so the faster it goes the more field it has to drag along, and its electromagnetic mass keeps growing (like ln t).</li>
-<li><b>Classical atom:</b> a free negative charge circles a fixed positive one. An orbiting charge radiates, so it should slowly lose energy and spiral inward. That collapse was one of the puzzles that led to quantum mechanics.</li>
+<li><b>Free charges</b> are pushed by the fields: the electric force qE plus the magnetic force qv×B, with speeds kept below light by relativity. <b>Opposites attract</b> and <b>Likes repel</b> show the simplest cases. Free charges ignore their own field, so a thrown charge coasts in a straight line. Tick <b>feels its own field</b> to include it: the charge then also feels its own wake, its own field coming back off the edges, and the recoil of the light it sends out. In this flat world that makes a thrown charge slowly slow down, because its field reaches out without limit and its electromagnetic mass keeps growing (like ln t).</li>
+<li><b>Classical atom:</b> a free negative charge circles a fixed positive one. This charge feels its own field, so the light it sends out pushes back on it (radiation reaction): it loses energy and spirals inward. That collapse was one of the puzzles that led to quantum mechanics. Untick <b>feels its own field</b> and the orbit stays put.</li>
 <li><b>Photon mass m:</b> gives light a mass (Proca theory). Still charges' fields now die off within 1/m, and slow wiggles stop radiating. Inside a superconductor light behaves just like this, because of the Higgs mechanism.</li></ul>
 <p class="note">Two simplifications: still, wiggling and orbiting charges are moved by you or the preset, not by the fields (only Free charges feel forces), and a charge you add pops into existence, which real electromagnetism forbids; its field then spreads out from where you put it at the speed of light.</p>`,
   ah:`<h2>A superconductor: the Higgs field meets light</h2>
@@ -994,7 +1052,7 @@ const PRESETS={
     // a light charge circling a fixed one. In 2D the pull is q^2/(2 pi r), so a circular orbit needs gamma v^2 = 1/(2 pi M) at any radius
     ['Classical atom',()=>{ setup({th:'em'}); addCharge({x:U2C(0),y:U2C(0)});
       const M=1, c0=1/(2*Math.PI*M), v=Math.sqrt((-c0*c0+Math.sqrt(c0**4+4*c0*c0))/2), g=1/Math.sqrt(1-v*v);
-      const e=addCharge({x:U2C(15),y:U2C(0),sign:-1,kind:'free',M,mx:0,my:-M*g*v}); sel=e; }],
+      const e=addCharge({x:U2C(15),y:U2C(0),sign:-1,kind:'free',M,mx:0,my:-M*g*v,self:true}); sel=e; }],
     ['Opposites attract',()=>{ setup({th:'em'}); addCharge({x:U2C(-20),y:U2C(0),kind:'free',M:1,mx:0,my:0}); addCharge({x:U2C(20),y:U2C(0),sign:-1,kind:'free',M:1,mx:0,my:0}); }],
     ['Likes repel',()=>{ setup({th:'em'}); addCharge({x:U2C(-3),y:U2C(-2),kind:'free',M:1,mx:0,my:0}); addCharge({x:U2C(3),y:U2C(2),kind:'free',M:1,mx:0,my:0}); }],
     ['Faraday cage',()=>{ setup({th:'em'});
@@ -1059,18 +1117,18 @@ function paramNote(){
   else s=`Domain walls are about ${(2/mass()*2).toFixed(1)} wide (a few times 1/m). Friction drains energy, which helps the field settle.`;
   $('paramNote').textContent=s;
 }
-function setEdge(e){ P.edge=e; pressSeg($('edgeSeg'),'e',e); updateDamp(); dirty=true; }
+function setEdge(e){ P.edge=e; pressSeg($('edgeSeg'),'e',e); updateDamp(); murInit(); dirty=true; }
 function setTool(tl){
   P.tool=tl; pressSeg($('toolSeg'),'tool',tl);
   for(const n of ['source','poke','paint','wall','twist']) $('opts-'+n).hidden=n!==tl;
   $('hint').textContent=isAh()&&tl==='poke'?HINT.ahPoke:isAh()&&tl==='twist'?HINT.fluxtube:isAh()&&tl==='wall'?HINT.ahWall:isCx()&&tl==='poke'?'Tap or drag to turn the phase. The turn spreads out as massless Goldstone waves.':isEm()&&tl==='poke'?HINT.flash:isEm()&&tl==='source'?HINT.charge:HINT[tl];
 }
-function afterChange(){ vortices=findVortices(); syncSliders(); syncSrcPanel(); drawLegend(); drawPlot(); readout(); if(!P.running) render(); }
+function afterChange(){ scaleReset=true; vortices=findVortices(); syncSliders(); syncSrcPanel(); drawLegend(); drawPlot(); readout(); if(!P.running) render(); }
 
 $('theorySeg').onclick=e=>{ const b=e.target.closest('button'); if(!b||b.dataset.th===P.th) return; setTheory(b.dataset.th); afterChange(); };
 $('toolSeg').onclick=e=>{ const b=e.target.closest('button'); if(b) setTool(b.dataset.tool); };
 $('edgeSeg').onclick=e=>{ const b=e.target.closest('button'); if(b){ setEdge(b.dataset.e); } };
-$('viewSeg').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; P.view=b.dataset.v; pressSeg($('viewSeg'),'v',P.view); autoScales(); escale=1e9; for(let n=0;n<40;n++) autoScales(); drawLegend(); if(!P.running) render(); };
+$('viewSeg').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; P.view=b.dataset.v; pressSeg($('viewSeg'),'v',P.view); scaleReset=true; autoScales(); drawLegend(); if(!P.running) render(); };
 $('mass').oninput=e=>{ P.m[P.th]=+e.target.value; $('massO').textContent=mass().toFixed(2); updateVmin(); paramNote(); dirty=true; };
 $('echg').oninput=e=>{ P.e=+e.target.value; $('echgO').textContent=P.e.toFixed(2); paramNote(); dirty=true; };
 $('eps').oninput=e=>{ P.eps=+e.target.value; $('epsO').textContent=P.eps.toFixed(3); updateVmin(); paramNote(); dirty=true; };
@@ -1092,6 +1150,7 @@ function srcTarget(){ return sel||(isEm()?P.newCharge:P.newSrc); }
 function syncSrcPanel(){
   const s=srcTarget(), em=isEm(), moving=em&&(s.kind==='wiggle'||s.kind==='orbit');
   $('srcLab').textContent=em?(sel?'Selected charge:':'New charges:'):(sel?'Selected source:':'New sources:');
+  $('srcSelfWrap').hidden=!(em&&s.kind==='free'); $('srcSelf').checked=!!s.self;
   $('srcMwrap').hidden=!(em&&s.kind==='free'); $('srcM').value=s.M||1; $('srcMo').textContent=(+(s.M||1)).toFixed(1);
   $('srcAwrap').hidden=!moving; $('srcA').value=s.A||3; $('srcAo').textContent=(+(s.A||3)).toFixed(1);
   $('srcSpeed').textContent=moving?`top speed ${(effAmp(s)*s.w).toFixed(2)} c`:'';
@@ -1102,7 +1161,8 @@ function syncSrcPanel(){
   $('srcDel').hidden=!sel; $('srcDel').textContent=em?'Delete charge':'Delete source';
 }
 $('srcKind').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; const s=srcTarget(); s.kind=b.dataset.k; if(sel) sel.t0=t;
-  if(s.kind==='free'){ s.M=s.M||1; s.mx=0; s.my=0; s.trail=[]; } syncSrcPanel(); dirty=true; };
+  if(s.kind==='free'){ s.M=s.M||1; s.mx=0; s.my=0; s.trail=[]; } if(sel) syncOwn(sel,true); syncSrcPanel(); dirty=true; };
+$('srcSelf').onchange=e=>{ const s=srcTarget(); s.self=e.target.checked; if(sel){ s.own=null; syncOwn(s,true); } dirty=true; };
 $('srcM').oninput=e=>{ srcTarget().M=+e.target.value; $('srcMo').textContent=(+e.target.value).toFixed(1); };
 $('srcSign').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; srcTarget().sign=+b.dataset.s; syncSrcPanel(); dirty=true; };
 $('srcQ').oninput=e=>{ srcTarget().q=+e.target.value; $('srcQo').textContent=(+e.target.value).toFixed(1); dirty=true; };
@@ -1139,7 +1199,7 @@ cv.addEventListener('pointerdown',e=>{
   const c=toCell(e);
   if(P.tool==='source'){
     let s=hitSource(c);
-    if(!s){ const n=isEm()?P.newCharge:P.newSrc; s=addSource({x:c.x,y:c.y,kind:n.kind,sign:n.sign,q:n.q,w:n.w,A:n.A,M:n.M,mx:0,my:0}); }
+    if(!s){ const n=isEm()?P.newCharge:P.newSrc; s=addSource({x:c.x,y:c.y,kind:n.kind,sign:n.sign,q:n.q,w:n.w,A:n.A,M:n.M,mx:0,my:0,self:n.self}); if(isEm()) syncOwn(s,false); }
     if(s.kind==='free'){ s.held=true; s.hvx=s.hvy=0; s.tx=s.x; s.ty=s.y; s.trail=[]; }
     sel=s; syncSrcPanel();
     drag={id:e.pointerId,src:s,dx:s.x-c.x,dy:s.y-c.y};
@@ -1183,7 +1243,7 @@ addEventListener('resize',()=>{ sizeCanvas(); if(!P.running) render(); });
 
 /* ---------- debug hook ---------- */
 if(/[?&]debug/.test(location.search)){
-  window.__fs={N,G,dx,dt,L,K,P,releaseFree,lx,ly,lvx,lvy,plq,computePlaq,fluxQuanta,energyAH,forceAH,stepAH,syncU,phi,vel,phi2,vel2,phi3,vel3,Ex,Ey,Bz,computeEB,srcState,addStatic,addCharge,twistAt,findVortices,get vortices(){return vortices},open,TH,PRESETS,energy,advance,force,fillField,resetField,addSource,setTheory,setEdge,updateDamp,updateVmin,vacPhi4,Vraw,poke,paint,U2C,
+  window.__fs={setSponge(w,g,pw){SPONGE=w;SPMAX=g;SPPOW=pw;buildSponge();updateDamp();},N,G,dx,dt,L,K,P,releaseFree,lx,ly,lvx,lvy,plq,computePlaq,fluxQuanta,energyAH,forceAH,stepAH,syncU,phi,vel,phi2,vel2,phi3,vel3,Ex,Ey,Bz,computeEB,srcState,addStatic,addCharge,twistAt,findVortices,get vortices(){return vortices},open,TH,PRESETS,energy,advance,force,fillField,resetField,addSource,setTheory,setEdge,updateDamp,updateVmin,vacPhi4,Vraw,poke,paint,U2C,
     get t(){return t}, set t(v){t=v}, get sources(){return sources}, set sources(v){sources=v}, frame, render,
     preset(th,name){ const p=PRESETS[th].find(q=>q[0]===name); p[1](); afterChange(); },
     setFric(f){P.fric=f; updateDamp();}, setMass(m){P.m[P.th]=m; updateVmin(); dirty=true;}, markDirty(){dirty=true;}};
