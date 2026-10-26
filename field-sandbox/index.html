@@ -1,0 +1,988 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Classical Field Sandbox</title>
+<link rel="manifest" href="../manifest.json"><link rel="icon" href="../icons/icon-192.png"><link rel="apple-touch-icon" href="../icons/icon-180.png"><meta name="apple-mobile-web-app-title" content="Math Widgets"><script>if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("../sw.js"));</script>
+<link rel="stylesheet" href="../site.css">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Classical Field Sandbox: a real scalar field on a 2D grid (Klein-Gordon, phi^4, sine-Gordon) with sources, pokes, paint and walls. */
+:root{
+  color-scheme: light;
+  --bg:#f4f2ee; --panel:#ffffff; --soft:#efece6; --line:#dcd7cc;
+  --fg:#1b2230; --muted:#5a6575; --accent:#d9682b; --on-accent:#fff;
+  --cool:#2c7fd6;
+  --font-display:"Fraunces", Georgia, "Times New Roman", serif;
+  --font-body:"Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono:"JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --bg:#0f1218; --panel:#171c24; --soft:#20262f; --line:#2e3642;
+    --fg:#e8ecf2; --muted:#9aa6b6; --accent:#ff9a4d; --on-accent:#1a0e05;
+    --cool:#6cb4ff;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#0f1218; --panel:#171c24; --soft:#20262f; --line:#2e3642;
+  --fg:#e8ecf2; --muted:#9aa6b6; --accent:#ff9a4d; --on-accent:#1a0e05;
+  --cool:#6cb4ff;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 var(--font-body);overflow-x:hidden}
+.wrap{max-width:1160px;margin:0 auto;padding:24px 16px 56px}
+h1{font:600 clamp(30px,6vw,46px)/1.05 var(--font-display);margin:0 0 8px;letter-spacing:-.01em}
+h2{font:600 19px/1.2 var(--font-display);margin:0 0 10px}
+h3{font:600 15px/1.3 var(--font-body);margin:0 0 6px}
+.lede{margin:0 0 20px;color:var(--muted);max-width:62ch}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:16px;min-width:0}
+button{font:inherit;color:inherit;cursor:pointer}
+[hidden]{display:none!important}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--soft)}
+.seg button{border:0;background:transparent;padding:8px 14px;font-size:15px;min-height:40px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent);font-weight:600}
+.theory button{flex:1 1 auto}
+@media (max-width:520px){.theory button{padding:6px 10px;font-size:14px;min-height:36px}}
+.seg.sm button{padding:4px 10px;font-size:14px;min-height:34px}
+.btn{border:1px solid var(--line);background:var(--soft);border-radius:8px;padding:4px 12px;min-height:34px;font-size:14px}
+.btn:hover,.presets button:hover{border-color:var(--accent)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.row{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}
+.eq{font-family:var(--font-mono);font-size:14px;color:var(--muted);margin:12px 0 4px;overflow-wrap:anywhere}
+.main{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;margin-top:12px}
+@media (min-width:920px){.main{grid-template-columns:minmax(0,1fr) 310px}}
+.stage{min-width:0}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin-bottom:8px}
+.toolopts{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;align-content:flex-start;min-height:78px;margin-bottom:8px;font-size:14px}
+.toolopts .lab{color:var(--muted);font-size:13px}
+.cvwrap{position:relative;width:100%;max-width:720px;margin:0 auto}
+#cv{display:block;width:100%;aspect-ratio:1/1;border-radius:12px;background:#0a0e18;touch-action:none;cursor:crosshair}
+.legend{display:flex;align-items:center;gap:8px;max-width:720px;margin:6px auto 0;font:12px var(--font-mono);color:var(--muted)}
+.legend canvas{flex:1;height:10px;border-radius:5px;min-width:0}
+.hint{font-size:14px;color:var(--muted);margin:6px auto 0;max-width:720px}
+.side{display:flex;flex-direction:column;gap:14px;min-width:0}
+.side .blk{border-top:1px solid var(--line);padding-top:12px}
+.side .blk:first-child{border-top:0;padding-top:0}
+.presets{display:flex;flex-wrap:wrap;gap:6px}
+.presets button{border:1px solid var(--line);background:var(--soft);border-radius:8px;padding:4px 10px;min-height:34px;font-size:14px}
+.sl{display:grid;grid-template-columns:96px minmax(0,1fr) 52px;gap:8px;align-items:center;font-size:14px;margin:4px 0}
+.sl output{font-family:var(--font-mono);font-size:13px;text-align:right}
+.sl.inl{display:inline-grid;grid-template-columns:auto 120px 44px;margin:0}
+input[type=range]{width:100%;accent-color:var(--accent)}
+#plot{width:100%;height:120px;display:block;border-radius:8px;background:var(--soft)}
+.read{font:13px/1.6 var(--font-mono);color:var(--muted)}
+.read b{color:var(--fg);font-weight:500}
+.note{font-size:13px;color:var(--muted);margin:4px 0 0}
+.about p{margin:0 0 10px;max-width:75ch}
+.about .try{margin:0;padding-left:20px}
+.about .try li{margin:0 0 4px}
+</style>
+</head>
+
+<div class="wrap">
+  <header>
+    <a class="back-link" href="../index.html">← All widgets</a>
+    <h1>Classical field sandbox</h1>
+    <p class="lede">A field spread over a flat world, moving by its own equation. Drop in sources, poke the field, paint it, build barriers, and watch waves, domain walls and long-lived lumps appear.</p>
+  </header>
+
+  <section class="panel">
+    <div class="seg theory" id="theorySeg" role="group" aria-label="Field theory">
+      <button type="button" data-th="kg" aria-pressed="true">Waves (Klein–Gordon)</button>
+      <button type="button" data-th="phi4" aria-pressed="false">φ⁴ (two vacua)</button>
+      <button type="button" data-th="sg" aria-pressed="false">Sine-Gordon</button>
+      <button type="button" data-th="cx" aria-pressed="false">Complex φ (vortices)</button>
+      <button type="button" data-th="em" aria-pressed="false">Electromagnetism</button>
+    </div>
+    <p class="eq" id="eq"></p>
+
+    <div class="main">
+      <div class="stage">
+        <div class="toolbar">
+          <div class="seg sm" id="toolSeg" role="group" aria-label="Tool">
+            <button type="button" data-tool="poke" aria-pressed="true">Poke</button>
+            <button type="button" data-tool="twist" aria-pressed="false" id="twistBtn" hidden>Twist</button>
+            <button type="button" data-tool="source" aria-pressed="false" id="srcToolBtn">Source</button>
+            <button type="button" data-tool="paint" aria-pressed="false" id="paintBtn">Paint</button>
+            <button type="button" data-tool="wall" aria-pressed="false">Barrier</button>
+          </div>
+          <div class="row">
+            <button type="button" class="btn" id="playBtn">Pause</button>
+            <button type="button" class="btn" id="resetBtn" title="Put the field back in its vacuum (keeps sources and barriers)">Reset field</button>
+            <button type="button" class="btn" id="clearBtn" title="Remove sources and barriers too">Clear all</button>
+          </div>
+        </div>
+
+        <div class="toolopts" id="opts-source" hidden>
+          <span class="lab" id="srcLab">New sources:</span>
+          <div class="seg sm" id="srcKind" role="group" aria-label="Source kind">
+            <button type="button" data-k="steady" aria-pressed="false" class="sck">Steady</button>
+            <button type="button" data-k="osc" aria-pressed="true" class="sck">Oscillating</button>
+            <button type="button" data-k="still" aria-pressed="false" class="emk" hidden>Still</button>
+            <button type="button" data-k="wiggle" aria-pressed="false" class="emk" hidden>Wiggle</button>
+            <button type="button" data-k="orbit" aria-pressed="false" class="emk" hidden>Orbit</button>
+          </div>
+          <div class="seg sm" id="srcSign" role="group" aria-label="Source sign">
+            <button type="button" data-s="1" aria-pressed="true">+</button>
+            <button type="button" data-s="-1" aria-pressed="false">−</button>
+          </div>
+          <label class="sl inl">strength <input type="range" id="srcQ" min="0.1" max="5" step="0.1" value="1"><output id="srcQo">1.0</output></label>
+          <label class="sl inl" id="srcWwrap">frequency ω <input type="range" id="srcW" min="0.1" max="3" step="0.05" value="1"><output id="srcWo">1.00</output></label>
+          <label class="sl inl" id="srcAwrap" hidden>swing <input type="range" id="srcA" min="0.5" max="10" step="0.5" value="3"><output id="srcAo">3.0</output></label>
+          <span class="lab" id="srcSpeed"></span>
+          <button type="button" class="btn" id="srcDel" hidden>Delete source</button>
+        </div>
+        <div class="toolopts" id="opts-poke">
+          <div class="seg sm" id="pokeSign" role="group" aria-label="Poke direction">
+            <button type="button" data-s="1" aria-pressed="true" id="pokeUp">Push up</button>
+            <button type="button" data-s="-1" aria-pressed="false" id="pokeDown">Push down</button>
+          </div>
+          <span class="lab">size</span><div class="seg sm brushSeg" role="group" aria-label="Brush size"></div>
+        </div>
+        <div class="toolopts" id="opts-paint" hidden>
+          <span class="lab">set field to</span><div class="seg sm" id="paintSeg" role="group" aria-label="Paint value"></div>
+          <span class="lab">size</span><div class="seg sm brushSeg" role="group" aria-label="Brush size"></div>
+        </div>
+        <div class="toolopts" id="opts-twist" hidden>
+          <span class="lab">winding</span>
+          <div class="seg sm" id="twistSign" role="group" aria-label="Vortex winding">
+            <button type="button" data-s="1" aria-pressed="true">+1 (phase turns anticlockwise)</button>
+            <button type="button" data-s="-1" aria-pressed="false">−1 (clockwise)</button>
+          </div>
+        </div>
+        <div class="toolopts" id="opts-wall" hidden>
+          <div class="seg sm" id="wallMode" role="group" aria-label="Barrier mode">
+            <button type="button" data-w="draw" aria-pressed="true">Draw</button>
+            <button type="button" data-w="erase" aria-pressed="false">Erase</button>
+          </div>
+          <span class="lab">size</span><div class="seg sm brushSeg" role="group" aria-label="Brush size"></div>
+        </div>
+
+        <div class="cvwrap"><canvas id="cv" aria-label="The field. Use the tools to add sources, poke, paint or draw barriers."></canvas></div>
+        <div class="legend"><span id="legLo">−1</span><canvas id="leg" width="256" height="1"></canvas><span id="legHi">+1</span></div>
+        <p class="hint" id="hint"></p>
+      </div>
+
+      <aside class="side">
+        <div class="blk">
+          <h3>Try a preset</h3>
+          <div class="presets" id="presets"></div>
+        </div>
+        <div class="blk">
+          <div class="sl"><span id="mLab">mass m</span><input type="range" id="mass" min="0" max="1.5" step="0.05" value="0"><output id="massO">0.00</output></div>
+          <div class="sl" id="epsWrap" hidden><span>tilt ε</span><input type="range" id="eps" min="0" max="0.15" step="0.005" value="0"><output id="epsO">0.000</output></div>
+          <div class="sl"><span>friction</span><input type="range" id="fric" min="0" max="0.5" step="0.01" value="0"><output id="fricO">0.00</output></div>
+          <div class="sl"><span>speed</span><input type="range" id="speed" min="1" max="10" step="1" value="2"><output id="speedO">2</output></div>
+          <p class="note" id="paramNote"></p>
+        </div>
+        <div class="blk">
+          <div class="row" style="margin-bottom:8px"><span class="note" style="margin:0;min-width:44px">edges</span>
+            <div class="seg sm" id="edgeSeg" role="group" aria-label="Edges">
+              <button type="button" data-e="absorb" aria-pressed="true">Absorb</button>
+              <button type="button" data-e="reflect" aria-pressed="false">Reflect</button>
+              <button type="button" data-e="wrap" aria-pressed="false">Wrap</button>
+            </div></div>
+          <div class="row"><span class="note" style="margin:0;min-width:44px">show</span>
+            <div class="seg sm" id="viewSeg" role="group" aria-label="View">
+              <button type="button" data-v="field" aria-pressed="true" id="viewField">Field φ</button>
+              <button type="button" data-v="energy" aria-pressed="false">Energy density</button>
+            </div></div>
+        </div>
+        <div class="blk" id="plotBlk">
+          <h3>Potential V(φ) <span class="note" style="font-weight:400">and where the field sits</span></h3>
+          <canvas id="plot" width="600" height="240"></canvas>
+          <p class="note" id="plotNote"></p>
+        </div>
+        <div class="blk read" id="readout"></div>
+      </aside>
+    </div>
+  </section>
+
+  <section class="panel about" id="about"></section>
+</div>
+
+<script>
+(()=>{
+"use strict";
+/* ---------- grid and physics ---------- */
+const N=256, G=N+2, NN=G*G, dx=0.5, dt=0.1, L=N*dx;   // world is 128 x 128 length units, wave speed 1
+const SPONGE=22;                                          // absorbing rim width in cells
+const phi=new Float64Array(NN), vel=new Float64Array(NN), F=new Float64Array(NN);
+const phi2=new Float64Array(NN), vel2=new Float64Array(NN), F2=new Float64Array(NN);   // imaginary part (complex), or A_x (EM)
+const phi3=new Float64Array(NN), vel3=new Float64Array(NN), F3=new Float64Array(NN);   // A_y (EM only); phi is then the scalar potential
+const COMPS=[[phi,vel,F],[phi2,vel2,F2],[phi3,vel3,F3]];
+const Ex=new Float64Array(NN), Ey=new Float64Array(NN), Bz=new Float64Array(NN);
+const open=new Uint8Array(NN).fill(1), dampH=new Float64Array(NN), sponge=new Float64Array(NN);
+const K=(i,j)=>(j+1)*G+(i+1);
+for(let j=0;j<N;j++)for(let i=0;i<N;i++){
+  const d=Math.min(i,j,N-1-i,N-1-j);
+  sponge[K(i,j)]=d<SPONGE?0.45*Math.pow(1-d/SPONGE,2):0;
+}
+
+const TH={
+  kg:{name:'Waves (Klein–Gordon)', mMin:0, mMax:1.5, mDef:0, poke:1, scale:null,
+      targets:[[1,'+1'],[0,'0'],[-1,'−1']], vac:()=>0, plot:[-2,2]},
+  phi4:{name:'φ⁴', mMin:0.4, mMax:1.5, mDef:1, poke:1.3, scale:1,
+      targets:[[1,'+1 vacuum'],[-1,'−1 vacuum'],[0,'0 (hilltop)']], vac:()=>vacPhi4(1), plot:[-1.9,1.9]},
+  sg:{name:'Sine-Gordon', mMin:0.4, mMax:1.5, mDef:1, poke:Math.PI, scale:Math.PI,
+      targets:[[0,'0'],[2*Math.PI,'2π'],[-2*Math.PI,'−2π'],[4*Math.PI,'4π']], vac:()=>0, plot:[-2.6*Math.PI,2.6*Math.PI]},
+  cx:{name:'Complex φ', mMin:0.4, mMax:1.5, mDef:1, poke:Math.PI/2, scale:1,
+      targets:[[0,'phase 0'],[Math.PI/2,'π/2'],[Math.PI,'π'],[-Math.PI/2,'−π/2'],[null,'0 (hilltop)']], vac:()=>vacPhi4(1), plot:[-1.9,1.9]},
+  em:{name:'Electromagnetism', mMin:0, mMax:1, mDef:0, poke:1, scale:null, targets:[[0,'0']], vac:()=>0, plot:[-2,2]}
+};
+const P={th:'kg', m:{kg:0,phi4:1,sg:1,cx:1,em:0}, eps:0, fric:0, speed:2, edge:'absorb', view:'field',
+  tool:'poke', brush:3, shade:1.2, pokeSign:1, twistSign:1, paintIdx:0, wallMode:'draw', running:true,
+  newSrc:{kind:'osc', sign:1, q:1, w:1}, newCharge:{kind:'still', sign:1, q:1, w:0.3, A:3}};
+let t=0, dirty=true, sources=[], sel=null, nextId=1, vortices=[];
+const isCx=()=>P.th==='cx', isEm=()=>P.th==='em';
+const ncomp=()=>P.th==='em'?3:P.th==='cx'?2:1;
+
+const mass=()=>P.m[P.th];
+const lam=()=>mass()*mass()/2;            // phi^4 and complex: V=lam/4 (|phi|^2-1)^2 - eps Re(phi), size-ripple mass m
+function vacPhi4(s){                       // vacuum of the tilted double well near s=+1 or -1
+  const l=lam(); let p=s;
+  for(let n=0;n<40;n++){ const f=l*p*(p*p-1)-P.eps, d=l*(3*p*p-1); p-=f/d; }
+  return p;
+}
+function Vraw(p,q2){
+  const m2=mass()*mass();
+  if(P.th==='kg') return 0.5*m2*p*p;
+  if(P.th==='phi4'){ const q=p*p-1; return lam()/4*q*q-P.eps*p; }
+  if(P.th==='cx'){ const q=p*p+(q2||0)*(q2||0)-1; return lam()/4*q*q-P.eps*p; }
+  return m2*(1-Math.cos(p));
+}
+let Vmin=0;
+function updateVmin(){ Vmin=P.th==='phi4'||P.th==='cx'?Vraw(vacPhi4(1),0):0; }
+
+function updateDamp(){
+  const useSp=P.edge==='absorb';
+  for(let k=0;k<NN;k++) dampH[k]=open[k]?Math.exp(-(P.fric+(useSp?sponge[k]:0))*dt/2):0;
+}
+
+function ghostsOf(a,comp){
+  if(P.edge==='absorb'&&isEm()){   // EM: let the potentials continue straight through the edge, so a charge's static field fits the box
+    for(let i=1;i<=N;i++){ a[i]=2*a[G+i]-a[2*G+i]; a[(N+1)*G+i]=2*a[N*G+i]-a[(N-1)*G+i]; }
+    for(let j=1;j<=N;j++){ a[j*G]=2*a[j*G+1]-a[j*G+2]; a[j*G+N+1]=2*a[j*G+N]-a[j*G+N-1]; }
+  } else if(P.edge==='reflect'&&isEm()){
+    // EM: the edge is a grounded metal wall, a true mirror for light. phi and the part of A along the wall vanish there
+    // (value 0 half a cell outside); the part of A pointing into the wall is free (zero slope).
+    const sx=comp===1?1:-1, sy=comp===2?1:-1;   // comp 1 = A_x (normal to the left/right walls), 2 = A_y
+    for(let i=1;i<=N;i++){ a[i]=sy*a[G+i]; a[(N+1)*G+i]=sy*a[N*G+i]; }
+    for(let j=1;j<=N;j++){ a[j*G]=sx*a[j*G+1]; a[j*G+N+1]=sx*a[j*G+N]; }
+  } else if(P.edge==='wrap'){
+    for(let i=1;i<=N;i++){ a[i]=a[N*G+i]; a[(N+1)*G+i]=a[G+i]; }
+    for(let j=1;j<=N;j++){ a[j*G]=a[j*G+N]; a[j*G+N+1]=a[j*G+1]; }
+  } else {
+    for(let i=1;i<=N;i++){ a[i]=a[G+i]; a[(N+1)*G+i]=a[N*G+i]; }
+    for(let j=1;j<=N;j++){ a[j*G]=a[j*G+1]; a[j*G+N+1]=a[j*G+N]; }
+  }
+}
+function ghosts(){ const nc=ncomp(); ghostsOf(phi,0); if(nc>1) ghostsOf(phi2,1); if(nc>2) ghostsOf(phi3,2); }
+
+/* Sources: rho = q * a(t) * gaussian(sigma=1) with unit integral. Positions in grid cells (float). */
+const SIG=1, SIGC=SIG/dx, RAD=Math.ceil(3*SIGC), NORM=1/(2*Math.PI*SIG*SIG);
+function srcAmp(s,time){ return s.kind==='osc'?Math.sin(s.w*(time-s.t0)):1; }
+/* Position (cells) and velocity (units per time) of a source. Dragging moves its anchor (s.x, s.y), interpolated over
+   the frame's sub-steps; in EM a charge can also wiggle, orbit or jump around its anchor. */
+let stepsNow=1;
+const effAmp=s=>Math.min(s.A||0,0.9/s.w);     // keeps a wiggling or orbiting charge below 0.9 c
+function srcState(s,time,frac){
+  let x=s.px+(s.x-s.px)*frac, y=s.py+(s.y-s.py)*frac;
+  let vx=(s.x-s.px)*dx/(stepsNow*dt), vy=(s.y-s.py)*dx/(stepsNow*dt);
+  if(isEm()){ const w=s.w, ph=w*(time-s.t0);
+    if(s.kind==='wiggle'){ const A=effAmp(s), d=A/dx*Math.sin(ph), v=A*w*Math.cos(ph); if(s.vert){ y+=d; vy+=v; } else { x+=d; vx+=v; } }   // vert: wiggles up and down
+    else if(s.kind==='orbit'){ const A=effAmp(s); x+=A/dx*Math.cos(ph); y-=A/dx*Math.sin(ph); vx-=A*w*Math.sin(ph); vy-=A*w*Math.cos(ph); }
+    else if(s.kind==='jump'){ const u=Math.min(1,Math.max(0,(time-s.t0)/s.T)); x+=s.L/dx*u*u*(3-2*u); vx+=s.L*6*u*(1-u)/s.T; } }
+  return {x,y,vx,vy};
+}
+function eachSourceCell(s,time,frac,fn){ const st=srcState(s,time,frac); eachCellAt(st.x,st.y,fn); }
+function eachCellAt(x,y,fn){
+  const i0=Math.max(0,Math.floor(x-RAD)), i1=Math.min(N-1,Math.ceil(x+RAD));
+  const j0=Math.max(0,Math.floor(y-RAD)), j1=Math.min(N-1,Math.ceil(y+RAD));
+  for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){
+    const ddx=(i-x)*dx, ddy=(j-y)*dx, r2=ddx*ddx+ddy*ddy;
+    if(r2>9*SIG*SIG) continue;
+    fn(K(i,j),NORM*Math.exp(-r2/(2*SIG*SIG)));
+  }
+}
+
+function force(time,frac){
+  ghosts();
+  const inv=1/(dx*dx), m2=mass()*mass();
+  if(P.th==='kg'){
+    for(let j=1;j<=N;j++){ let k=j*G+1; for(let i=0;i<N;i++,k++){ const p=phi[k];
+      F[k]=(phi[k-1]+phi[k+1]+phi[k-G]+phi[k+G]-4*p)*inv-m2*p; } }
+  } else if(P.th==='phi4'){
+    const l=lam(), e=P.eps;
+    for(let j=1;j<=N;j++){ let k=j*G+1; for(let i=0;i<N;i++,k++){ const p=phi[k];
+      F[k]=(phi[k-1]+phi[k+1]+phi[k-G]+phi[k+G]-4*p)*inv-l*p*(p*p-1)+e; } }
+  } else if(P.th==='sg'){
+    for(let j=1;j<=N;j++){ let k=j*G+1; for(let i=0;i<N;i++,k++){ const p=phi[k];
+      F[k]=(phi[k-1]+phi[k+1]+phi[k-G]+phi[k+G]-4*p)*inv-m2*Math.sin(p); } }
+  } else if(P.th==='cx'){
+    const l=lam(), e=P.eps;
+    for(let j=1;j<=N;j++){ let k=j*G+1; for(let i=0;i<N;i++,k++){ const p=phi[k], q=phi2[k], u=l*(p*p+q*q-1);
+      F[k]=(phi[k-1]+phi[k+1]+phi[k-G]+phi[k+G]-4*p)*inv-u*p+e;
+      F2[k]=(phi2[k-1]+phi2[k+1]+phi2[k-G]+phi2[k+G]-4*q)*inv-u*q; } }
+  } else {
+    // EM in Lorenz gauge: each of phi, A_x, A_y obeys the wave equation (Proca if m > 0), driven by rho, J_x, J_y
+    for(let c=0;c<3;c++){ const a=COMPS[c][0], f=COMPS[c][2];
+      for(let j=1;j<=N;j++){ let k=j*G+1; for(let i=0;i<N;i++,k++){ const p=a[k];
+        f[k]=(a[k-1]+a[k+1]+a[k-G]+a[k+G]-4*p)*inv-m2*p; } } }
+  }
+  if(isEm()){ for(const s of sources){ const st=srcState(s,time,frac), q=s.sign*s.q;
+    eachCellAt(st.x,st.y,(k,g)=>{ F[k]+=q*g; F2[k]+=q*st.vx*g; F3[k]+=q*st.vy*g; }); } }
+  else for(const s of sources){ const a=s.sign*s.q*srcAmp(s,time); if(a!==0) eachSourceCell(s,time,frac,(k,g)=>{F[k]+=a*g;}); }
+}
+
+/* velocity Verlet (kick-drift-kick); damping folded into the half kicks; walls have dampH=0 */
+function stepOnce(frac,fracPrev){
+  if(dirty){ force(t,fracPrev); dirty=false; }
+  const h=dt/2, nc=ncomp();
+  for(let c=0;c<nc;c++){ const [a,v,f]=COMPS[c];
+    for(let j=1;j<=N;j++){ let k=j*G+1; for(let i=0;i<N;i++,k++){ v[k]=dampH[k]*(v[k]+h*f[k]); a[k]+=dt*v[k]; } } }
+  t+=dt;
+  force(t,frac);
+  for(let c=0;c<nc;c++){ const [,v,f]=COMPS[c];
+    for(let j=1;j<=N;j++){ let k=j*G+1; for(let i=0;i<N;i++,k++) v[k]=dampH[k]*(v[k]+h*f[k]); } }
+}
+function advance(S){
+  stepsNow=S;
+  for(const s of sources){        // a dragged charge follows the pointer, but never faster than 0.9 c
+    let ddx=s.tx-s.px, ddy=s.ty-s.py;
+    if(isEm()){ const mx=0.9*S*dt/dx, d=Math.hypot(ddx,ddy); if(d>mx){ ddx*=mx/d; ddy*=mx/d; } }
+    s.x=s.px+ddx; s.y=s.py+ddy; }
+  for(let s=0;s<S;s++) stepOnce((s+1)/S,s/S);
+  for(const s of sources){ s.px=s.x; s.py=s.y; }
+}
+/* E = -grad phi - dA/dt and B_z = dA_y/dx - dA_x/dy, at cell centres */
+function computeEB(){
+  ghosts(); const h=1/(2*dx);
+  for(let j=1;j<=N;j++){ let k=j*G+1; for(let i=0;i<N;i++,k++){
+    if(!open[k]){ Ex[k]=Ey[k]=Bz[k]=0; continue; }
+    Ex[k]=-(phi[k+1]-phi[k-1])*h-vel2[k]; Ey[k]=-(phi[k+G]-phi[k-G])*h-vel3[k];
+    Bz[k]=(phi3[k+1]-phi3[k-1]-phi2[k+G]+phi2[k-G])*h; } }
+}
+
+function energy(){
+  if(isEm()){ computeEB(); let e=0;
+    for(let j=1;j<=N;j++){ let k=j*G+1; for(let i=0;i<N;i++,k++) e+=0.5*(Ex[k]*Ex[k]+Ey[k]*Ey[k]+Bz[k]*Bz[k]); }
+    return {field:e*dx*dx}; }
+  ghosts();
+  let Ek=0,Eg=0,Ev=0; const cx=isCx();
+  for(let j=1;j<=N;j++){ let k=j*G+1; for(let i=0;i<N;i++,k++){
+    if(!open[k]) continue;
+    const p=phi[k], v=vel[k], de=phi[k+1]-p, ds=phi[k+G]-p;
+    Ek+=0.5*v*v; Ev+=Vraw(p,phi2[k])-Vmin;
+    Eg+=0.5*(de*de+ds*ds);   // per-link energy, already times area dx^2
+    if(cx){ const q=phi2[k], w=vel2[k], fe=phi2[k+1]-q, fs=phi2[k+G]-q; Ek+=0.5*w*w; Eg+=0.5*(fe*fe+fs*fs); }
+  } }
+  // links into walls from the west/north side are counted by the open cell on the other side
+  for(let j=1;j<=N;j++){ let k=j*G+1; for(let i=0;i<N;i++,k++){
+    if(open[k]) continue;
+    const p=phi[k];
+    if(open[k+1]){ const d=phi[k+1]-p; Eg+=0.5*d*d; if(cx){ const e=phi2[k+1]; Eg+=0.5*e*e; } }
+    if(open[k+G]){ const d=phi[k+G]-p; Eg+=0.5*d*d; if(cx){ const e=phi2[k+G]; Eg+=0.5*e*e; } }
+  } }
+  const A=dx*dx, field=(Ek+Ev)*A+Eg;
+  let coup=0; for(const s of sources){ const a=s.sign*s.q*srcAmp(s,t); eachSourceCell(s,t,1,(k,g)=>{coup-=a*g*phi[k];}); }
+  return {field, kinetic:Ek*A, gradient:Eg, potential:Ev*A, total:field+coup*A};
+}
+
+/* ---------- field edits ---------- */
+function forDisc(cx,cy,R,fn){        // cx,cy in cells, R in units
+  const Rc=R/dx, i0=Math.max(0,Math.floor(cx-Rc)), i1=Math.min(N-1,Math.ceil(cx+Rc));
+  const j0=Math.max(0,Math.floor(cy-Rc)), j1=Math.min(N-1,Math.ceil(cy+Rc));
+  for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){
+    const r=Math.hypot(i-cx,j-cy)*dx; if(r<=R) fn(K(i,j),r);
+  }
+}
+function poke(cx,cy,amp){             // complex field: turns the phase by up to amp radians
+  const s=P.brush/2, c=isCx();
+  if(isEm()){   // a flash: a little swirl of E (divergence-free, so no charge), which spreads as a ring of light
+    forDisc(cx,cy,3*s,(k,r)=>{ if(!open[k]) return; const X=((k%G)-1-cx)*dx, Y=(((k/G)|0)-1-cy)*dx, g=amp*Math.exp(-r*r/(2*s*s))/s;
+      vel2[k]+=-Y*g; vel3[k]+=X*g; });
+    dirty=true; return; }
+  forDisc(cx,cy,3*s,(k,r)=>{ if(!open[k]) return; const a=amp*Math.exp(-r*r/(2*s*s));
+    if(!c){ phi[k]+=a; return; }
+    const co=Math.cos(a), si=Math.sin(a), p=phi[k], q=phi2[k], v=vel[k], w=vel2[k];
+    phi[k]=co*p-si*q; phi2[k]=si*p+co*q; vel[k]=co*v-si*w; vel2[k]=si*v+co*w; });
+  dirty=true;
+}
+function paint(cx,cy,target,target2){
+  const R=P.brush, c=isCx();
+  forDisc(cx,cy,R,(k,r)=>{ if(!open[k]) return;
+    let w=Math.min(1,(R-r)/(0.45*R)); w=w*w*(3-2*w)*0.85;
+    phi[k]+=w*(target-phi[k]); vel[k]*=1-w;
+    if(c){ phi2[k]+=w*(target2-phi2[k]); vel2[k]*=1-w; } });
+  dirty=true;
+}
+function wallAt(cx,cy,erase){
+  forDisc(cx,cy,Math.max(0.6,P.brush/3),k=>{ open[k]=erase?1:0; if(!erase){phi[k]=0;vel[k]=0;phi2[k]=0;vel2[k]=0;phi3[k]=0;vel3[k]=0;} });
+}
+/* multiply the complex field by f(r) e^{i w theta} around (cx,cy): a vortex of winding w (theta measured anticlockwise on screen) */
+function twistAt(cx,cy,w){
+  const a=0.6*mass();
+  for(let j=0;j<N;j++)for(let i=0;i<N;i++){ const k=K(i,j); if(!open[k]) continue;
+    const X=(i-cx)*dx, Y=-(j-cy)*dx, r=Math.hypot(X,Y), f=Math.tanh(a*r), th=w*Math.atan2(Y,X);
+    const co=f*Math.cos(th), si=f*Math.sin(th), p=phi[k], q=phi2[k], v=vel[k], u=vel2[k];
+    phi[k]=co*p-si*q; phi2[k]=si*p+co*q; vel[k]=co*v-si*u; vel2[k]=si*v+co*u; }
+  dirty=true;
+}
+/* winding of the phase around each grid square; +1 means the phase turns anticlockwise on screen */
+function findVortices(){
+  const out=[]; if(!isCx()) return out;
+  const ang=k=>Math.atan2(phi2[k],phi[k]), wr=d=>d>Math.PI?d-2*Math.PI:d<-Math.PI?d+2*Math.PI:d;
+  const a2=k=>phi[k]*phi[k]+phi2[k]*phi2[k];
+  for(let j=0;j<N-1;j++)for(let i=0;i<N-1;i++){
+    const k00=K(i,j), k10=k00+1, k01=k00+G, k11=k01+1;
+    if(!(open[k00]&&open[k10]&&open[k01]&&open[k11])) continue;
+    if(Math.min(a2(k00),a2(k10),a2(k01),a2(k11))>0.5) continue;   // a vortex core always has a small |phi| corner
+    const b0=ang(k00), b1=ang(k10), b2=ang(k11), b3=ang(k01);
+    const s=wr(b1-b0)+wr(b2-b1)+wr(b3-b2)+wr(b0-b3);   // this loop runs clockwise on screen (y points down)
+    const w=-Math.round(s/(2*Math.PI));
+    if(w) out.push({x:i+0.5,y:j+0.5,w});
+  }
+  return out;
+}
+function walkSeg(a,b,stepCells,fn){
+  const d=Math.hypot(b.x-a.x,b.y-a.y), n=Math.max(1,Math.ceil(d/stepCells));
+  for(let s=1;s<=n;s++) fn(a.x+(b.x-a.x)*s/n,a.y+(b.y-a.y)*s/n);
+}
+function resetField(){
+  const v0=TH[P.th].vac();
+  for(let k=0;k<NN;k++){ phi[k]=open[k]?v0:0; vel[k]=0; phi2[k]=0; vel2[k]=0; phi3[k]=0; vel3[k]=0; }
+  dirty=true;
+}
+function fillField(fn){              // fn(x,y) with x,y in units from the centre -> [phi, phidot, (imaginary part, its rate)]
+  for(let j=0;j<N;j++)for(let i=0;i<N;i++){ const k=K(i,j);
+    if(!open[k]){phi[k]=0;vel[k]=0;phi2[k]=0;vel2[k]=0;phi3[k]=0;vel3[k]=0;continue;}
+    const r=fn((i-N/2+0.5)*dx,(j-N/2+0.5)*dx); phi[k]=r[0]; vel[k]=r[1]||0; phi2[k]=r[2]||0; vel2[k]=r[3]||0; }
+  dirty=true;
+}
+function clearWalls(){ open.fill(1); updateDamp(); }
+function addSource(o){
+  const s=Object.assign({id:nextId++,kind:'osc',sign:1,q:1,w:1,t0:t},o);
+  s.px=s.tx=s.x; s.py=s.ty=s.y; sources.push(s); dirty=true; return s;
+}
+const U2C=u=>u/dx+N/2-0.5;          // units from centre -> cell coordinate
+/* EM presets start with each charge's settled potential: the 2D field of the Gaussian charge, E_r = q (1 - e^{-r^2/2 sigma^2}) / (2 pi r),
+   integrated outward into a table, so the field doesn't have to re-settle (which would send out a pulse) */
+const STAT_DR=0.01, STAT=(()=>{ const n=Math.ceil(200/STAT_DR), tb=new Float64Array(n+1); let v=0;
+  for(let q=1;q<=n;q++){ const r=(q-0.5)*STAT_DR; v-=(1-Math.exp(-r*r/(2*SIG*SIG)))/(2*Math.PI*r)*STAT_DR; tb[q]=v; } return tb; })();
+function addStatic(q,cx,cy){
+  for(let j=0;j<N;j++)for(let i=0;i<N;i++){ const k=K(i,j); if(!open[k]) continue;
+    const r=Math.hypot((i-cx)*dx,(j-cy)*dx)/STAT_DR, a=Math.min(STAT.length-2,r|0), f=r-a;
+    phi[k]+=q*(STAT[a]+(STAT[a+1]-STAT[a])*f); }
+  dirty=true;
+}
+function addCharge(o){ const s=addSource(Object.assign({kind:'still',sign:1,q:1,w:1,A:3},o)); addStatic(s.sign*s.q,s.x,s.y); return s; }
+
+/* ---------- drawing ---------- */
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+const off=document.createElement('canvas'); off.width=off.height=N;
+const octx=off.getContext('2d'), img=octx.createImageData(N,N), pix=new Uint32Array(img.data.buffer);
+const pack=(r,g,b)=>(255<<24)|(b<<16)|(g<<8)|r;
+function ramp(stops,n){
+  const out=new Uint32Array(n);
+  for(let q=0;q<n;q++){ const u=q/(n-1);
+    let a=0; while(a<stops.length-2&&u>stops[a+1][0]) a++;
+    const s0=stops[a], s1=stops[a+1], f=Math.min(1,Math.max(0,(u-s0[0])/(s1[0]-s0[0])));
+    out[q]=pack(Math.round(s0[1]+(s1[1]-s0[1])*f),Math.round(s0[2]+(s1[2]-s0[2])*f),Math.round(s0[3]+(s1[3]-s0[3])*f)); }
+  return out;
+}
+// field: u in [-2.5,2.5]; dark at 0, orange at +1, blue at -1, paler beyond
+const UMAX=2.5, LN=1024;
+const lutF=ramp([[0,255,255,255],[0.1,200,235,255],[0.3,60,155,255],[0.4,22,70,140],[0.5,10,14,26],
+                 [0.6,140,52,22],[0.7,255,150,55],[0.9,255,232,190],[1,255,255,255]],LN);
+const lutE=ramp([[0,8,10,20],[0.25,58,28,108],[0.5,168,48,118],[0.75,250,128,58],[1,255,242,184]],LN);
+// phase wheel for the complex field: -pi blue, -pi/2 green, 0 orange, pi/2 rose, pi blue
+const lutP=ramp([[0,60,155,255],[0.25,70,200,140],[0.5,255,150,55],[0.75,235,90,170],[1,60,155,255]],LN);
+const amp=new Float64Array(NN);
+// polynomial atan2 for colouring only (error < 0.01 rad); the vortex finder uses Math.atan2
+function fastAtan2(y,x){
+  const ax=Math.abs(x), ay=Math.abs(y), mx=ax>ay?ax:ay; if(mx===0) return 0;
+  const a=(ax<ay?ax:ay)/mx, s=a*a; let r=((-0.0464964749*s+0.15931422)*s-0.327622764)*s*a+a;
+  if(ay>ax) r=1.5707963-r; if(x<0) r=3.1415927-r; return y<0?-r:r;
+}
+const WALL=pack(150,156,168);
+let fscale=1, escale=1;
+const samp=new Float64Array(Math.ceil(N*N/7));
+function autoScales(){
+  let n=0;
+  if(P.view==='field'&&(P.th==='kg'||isEm())){
+    const src=isEm()?Bz:phi;
+    for(let q=0;q<N*N;q+=7){ const i=q%N, j=(q/N)|0; samp[n++]=Math.abs(src[K(i,j)]); }
+    const a=samp.subarray(0,n).sort(); const target=Math.max(0.03,a[Math.floor(n*0.985)]);
+    fscale=ease(fscale,target);
+  }
+  if(P.view==='energy'){
+    ghosts();
+    for(let q=0;q<N*N;q+=7){ const i=q%N, j=(q/N)|0; samp[n++]=edens(K(i,j)); }
+    const a=samp.subarray(0,n).sort(); const target=Math.max(0.002,a[Math.floor(n*0.995)]);
+    escale=ease(escale,target);
+  }
+}
+// colour scales follow the field smoothly, but jump when far off (e.g. right after a preset)
+function ease(cur,target){ const r=target/cur; return r>3||r<1/3?target:cur*Math.pow(r,0.25); }
+function edens(k){
+  if(!open[k]) return 0;
+  if(isEm()) return 0.5*(Ex[k]*Ex[k]+Ey[k]*Ey[k]+Bz[k]*Bz[k]);
+  const p=phi[k], v=vel[k], a=phi[k+1]-p, b=phi[k-1]-p, c=phi[k+G]-p, d=phi[k-G]-p;
+  let e=0.5*v*v+Vraw(p,phi2[k])-Vmin+0.25*(a*a+b*b+c*c+d*d)/(dx*dx);
+  if(isCx()){ const q=phi2[k], w=vel2[k], a2=phi2[k+1]-q, b2=phi2[k-1]-q, c2=phi2[k+G]-q, d2=phi2[k-G]-q;
+    e+=0.5*w*w+0.25*(a2*a2+b2*b2+c2*c2+d2*d2)/(dx*dx); }
+  return e;
+}
+function curScale(){ return P.th==='kg'||isEm()?fscale:TH[P.th].scale; }
+let cssW=0;
+function sizeCanvas(){
+  const r=cv.getBoundingClientRect(), dpr=Math.min(2,window.devicePixelRatio||1);
+  cssW=r.width; const w=Math.round(r.width*dpr);
+  if(cv.width!==w){ cv.width=cv.height=w; }
+}
+function render(){
+  if(isEm()) computeEB();
+  if(P.view==='field'&&isEm()){
+    // colour = magnetic field B_z (orange out of the screen, blue into it), plus a soft glow where the electric field is strong
+    const inv=1/fscale, sc=(LN-1)/(2*UMAX);
+    for(let j=0;j<N;j++){ let k=K(0,j), o=j*N; for(let i=0;i<N;i++,k++,o++){
+      if(!open[k]){pix[o]=WALL;continue;}
+      let q=((Bz[k]*inv*0.8+UMAX)*sc)|0; q=q<0?0:q>LN-1?LN-1:q;
+      const e=Math.sqrt(Ex[k]*Ex[k]+Ey[k]*Ey[k]), gl=Math.min(1,Math.sqrt(e*12))*0.42, c=lutF[q];
+      const r=(c&255)+190*gl, g=((c>>8)&255)+195*gl, b=((c>>16)&255)+230*gl;
+      pix[o]=(255<<24)|((b>255?255:b)<<16)|((g>255?255:g)<<8)|(r>255?255:r); } }
+  } else if(P.view==='field'&&isCx()){
+    // colour = phase, brightness = size |phi|, relief shading from |phi|
+    ghosts();
+    for(let k=0;k<NN;k++) amp[k]=Math.sqrt(phi[k]*phi[k]+phi2[k]*phi2[k]);
+    const sc=(LN-1)/(2*Math.PI), sh=P.shade;
+    for(let j=0;j<N;j++){ let k=K(0,j), o=j*N; for(let i=0;i<N;i++,k++,o++){
+      if(!open[k]){pix[o]=WALL;continue;}
+      let q=((fastAtan2(phi2[k],phi[k])+Math.PI)*sc)|0; q=q<0?0:q>LN-1?LN-1:q;
+      const b=amp[k]; let f=1+sh*(amp[k-1]-amp[k+1]+amp[k-G]-amp[k+G]); f=f<0.55?0.55:f>1.6?1.6:f;
+      const dim=(b<1?b:1)*f, wh=b>1?Math.min(0.5,(b-1)*1.5):0, c=lutP[q];
+      let r=(c&255), g=(c>>8)&255, bl=(c>>16)&255;
+      r=r*dim+(255-r)*wh; g=g*dim+(255-g)*wh; bl=bl*dim+(255-bl)*wh;
+      pix[o]=(255<<24)|((bl>255?255:bl)<<16)|((g>255?255:g)<<8)|(r>255?255:r); } }
+  } else if(P.view==='field'){
+    ghosts();
+    const inv=1/curScale(), sc=(LN-1)/(2*UMAX), sh=P.shade*inv;
+    for(let j=0;j<N;j++){ let k=K(0,j), o=j*N; for(let i=0;i<N;i++,k++,o++){
+      if(!open[k]){pix[o]=WALL;continue;}
+      let q=((phi[k]*inv+UMAX)*sc)|0; q=q<0?0:q>LN-1?LN-1:q;
+      if(sh===0){ pix[o]=lutF[q]; continue; }
+      // relief shading, light from the top left: brighter where the surface tilts toward it
+      let f=1+sh*(phi[k-1]-phi[k+1]+phi[k-G]-phi[k+G]); f=f<0.55?0.55:f>1.6?1.6:f;
+      const c=lutF[q], r=Math.min(255,(c&255)*f+12*(f-1)), g=Math.min(255,((c>>8)&255)*f+12*(f-1)), b=Math.min(255,((c>>16)&255)*f+12*(f-1));
+      pix[o]=(255<<24)|((b<0?0:b)<<16)|((g<0?0:g)<<8)|(r<0?0:r); } }
+  } else {
+    ghosts(); const inv=1/escale;
+    for(let j=0;j<N;j++){ let k=K(0,j), o=j*N; for(let i=0;i<N;i++,k++,o++){
+      if(!open[k]){pix[o]=WALL;continue;}
+      let q=(Math.sqrt(edens(k)*inv)*(LN-1)*0.92)|0; q=q>LN-1?LN-1:q; pix[o]=lutE[q]; } }
+  }
+  octx.putImageData(img,0,0);
+  const W=cv.width; ctx.imageSmoothingEnabled=true;
+  ctx.drawImage(off,0,0,W,W);
+  if(P.edge==='absorb'){            // shade the absorbing rim
+    const rim=SPONGE/N*W;
+    for(const [x0,y0,x1,y1,rx,ry,rw,rh] of [[0,0,rim,0,0,0,rim,W],[W,0,W-rim,0,W-rim,0,rim,W],[0,0,0,rim,0,0,W,rim],[0,W,0,W-rim,0,W-rim,W,rim]]){
+      const g=ctx.createLinearGradient(x0,y0,x1,y1); g.addColorStop(0,'rgba(0,0,0,0.45)'); g.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=g; ctx.fillRect(rx,ry,rw,rh);
+    }
+  }
+  const s2p=W/N, dpr=W/(cssW||W);
+  if(isEm()){
+    ctx.setLineDash([3*dpr,4*dpr]); ctx.lineWidth=1*dpr; ctx.strokeStyle='rgba(255,255,255,0.35)';
+    for(const s of sources){ const ax=(s.x+0.5)*s2p, ay=(s.y+0.5)*s2p, A=effAmp(s)/dx*s2p;   // the path a wiggle or orbit follows
+      if(s.kind==='wiggle'){ ctx.beginPath(); if(s.vert){ ctx.moveTo(ax,ay-A); ctx.lineTo(ax,ay+A); } else { ctx.moveTo(ax-A,ay); ctx.lineTo(ax+A,ay); } ctx.stroke(); }
+      else if(s.kind==='orbit'){ ctx.beginPath(); ctx.arc(ax,ay,A,0,7); ctx.stroke(); } }
+    ctx.setLineDash([]);
+  }
+  for(const s of sources){
+    const st=srcState(s,t,1), x=(st.x+0.5)*s2p, y=(st.y+0.5)*s2p, a=isEm()?0:srcAmp(s,t);
+    if(s.kind==='osc'){
+      ctx.beginPath(); ctx.arc(x,y,(9+5*Math.abs(a))*dpr,0,7);
+      ctx.strokeStyle='rgba(255,255,255,'+(0.25+0.45*Math.abs(a)).toFixed(2)+')'; ctx.lineWidth=1.5*dpr; ctx.stroke();
+    }
+    ctx.beginPath(); ctx.arc(x,y,7*dpr,0,7);
+    ctx.fillStyle=s.sign>0?'#fff4e8':'#e6f2ff'; ctx.fill();
+    if(s===sel){ ctx.lineWidth=2.5*dpr; ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--accent')||'#f80'; ctx.stroke(); }
+    ctx.fillStyle='#10141c'; ctx.font=`600 ${12*dpr}px Inter, system-ui, sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(s.sign>0?'+':'−',x,y+0.5*dpr);
+  }
+  if(isCx()&&vortices.length<=400){   // vortex cores: solid ring = +1, dashed ring = -1
+    for(const v of vortices){ const x=(v.x+0.5)*s2p, y=(v.y+0.5)*s2p;
+      ctx.beginPath(); ctx.arc(x,y,6.5*dpr,0,7); ctx.setLineDash(v.w>0?[]:[3*dpr,2.5*dpr]);
+      ctx.lineWidth=3.5*dpr; ctx.strokeStyle='rgba(10,14,24,0.55)'; ctx.stroke();
+      ctx.lineWidth=2*dpr; ctx.strokeStyle='#ffffff'; ctx.stroke(); ctx.setLineDash([]); }
+  }
+}
+function drawLegend(){
+  const lg=document.getElementById('leg'), c=lg.getContext('2d'), id=c.createImageData(256,1), p32=new Uint32Array(id.data.buffer);
+  if(P.view==='field'&&isCx()){
+    for(let q=0;q<256;q++) p32[q]=lutP[Math.round(q/255*(LN-1))];
+    document.getElementById('legLo').textContent='phase −π'; document.getElementById('legHi').textContent='+π';
+  } else if(P.view==='field'){
+    for(let q=0;q<256;q++){ const u=-1.6+3.2*q/255; p32[q]=lutF[Math.round((u+UMAX)/(2*UMAX)*(LN-1))]; }
+    const s=curScale()*(isEm()?2:1.6), f=P.th==='sg'?fmtPi:(v=>(v>=0?'+':'−')+Math.abs(v).toPrecision(2));
+    document.getElementById('legLo').textContent=(isEm()?'B ':'')+f(-s); document.getElementById('legHi').textContent=f(s);
+  } else {
+    for(let q=0;q<256;q++) p32[q]=lutE[Math.round(q/255*(LN-1))];
+    document.getElementById('legLo').textContent='0'; document.getElementById('legHi').textContent=(escale*1.18).toPrecision(2);
+  }
+  c.putImageData(id,0,0);
+}
+function fmtPi(v){ const r=v/Math.PI; return (r>=0?'+':'−')+Math.abs(r).toFixed(1)+'π'; }
+
+/* potential plot with a histogram of the field values */
+const pl=document.getElementById('plot'), pctx=pl.getContext('2d');
+const HB=80, hist=new Float64Array(HB);
+function drawPlot(){
+  if(isEm()) return;
+  const W=pl.width, H=pl.height, cs=getComputedStyle(document.documentElement);
+  const fg=cs.getPropertyValue('--fg').trim()||'#222', mu=cs.getPropertyValue('--muted').trim()||'#888', ac=cs.getPropertyValue('--accent').trim()||'#f80';
+  pctx.clearRect(0,0,W,H);
+  let [a,b]=TH[P.th].plot; if(P.th==='kg'){ a*=fscale; b*=fscale; }
+  hist.fill(0); let hmax=0;
+  const cx=isCx();
+  for(let q=0;q<N*N;q+=5){ const i=q%N, j=(q/N)|0, k=K(i,j); if(!open[k]) continue;
+    const val=cx?Math.sqrt(phi[k]*phi[k]+phi2[k]*phi2[k]):phi[k];
+    const bin=Math.floor((val-a)/(b-a)*HB); if(bin>=0&&bin<HB){ hist[bin]++; } }
+  for(let q=0;q<HB;q++) hmax=Math.max(hmax,hist[q]);
+  const pad=14, X=p=>pad+(p-a)/(b-a)*(W-2*pad);
+  pctx.fillStyle=ac; pctx.globalAlpha=0.28;
+  for(let q=0;q<HB;q++){ if(!hist[q]) continue; const h=Math.max(2,Math.sqrt(hist[q]/hmax)*(H-24)); pctx.fillRect(X(a+(q/HB)*(b-a)),H-6-h,(W-2*pad)/HB+0.5,h); }
+  pctx.globalAlpha=1;
+  const n=300; let vmax=-1e9, vmin=1e9; const vs=[];
+  for(let q=0;q<=n;q++){ const p=a+(b-a)*q/n, v=Vraw(p,0)-Vmin; vs.push(v); vmax=Math.max(vmax,v); vmin=Math.min(vmin,v); }
+  if(P.th==='phi4'||cx) vmax=Math.max(lam()/4*2.2, 1e-3); else if(P.th==='sg') vmax=2.6*mass()*mass();
+  if(vmax-vmin<1e-6) vmax=vmin+1;
+  const Y=v=>H-8-(v-vmin)/(vmax-vmin)*(H-22);
+  pctx.strokeStyle=mu; pctx.lineWidth=1; pctx.beginPath(); pctx.moveTo(X(0),6); pctx.lineTo(X(0),H-4); pctx.stroke();
+  pctx.strokeStyle=fg; pctx.lineWidth=3; pctx.beginPath();
+  for(let q=0;q<=n;q++){ const x=pad+(W-2*pad)*q/n, y=Math.max(2,Y(vs[q])); q?pctx.lineTo(x,y):pctx.moveTo(x,y); }
+  pctx.stroke();
+  pctx.fillStyle=mu; pctx.font='22px JetBrains Mono, monospace'; pctx.textBaseline='top';
+  const lab=P.th==='sg'?[[-2*Math.PI,'−2π'],[0,'0'],[2*Math.PI,'2π']]:P.th==='phi4'||cx?[[-1,'−1'],[0,'0'],[1,'+1']]:[[a/2,(a/2).toPrecision(1)],[0,'0'],[b/2,'+'+(b/2).toPrecision(1)]];
+  pctx.textAlign='center'; for(const [p,s] of lab) pctx.fillText(s,X(p),4);
+  $('plotNote').textContent=cx?'A slice through the Mexican hat. The bars show the size |φ| across the grid; the phase can sit anywhere around the rim.':'';
+}
+
+/* ---------- readouts and text ---------- */
+const $=id=>document.getElementById(id);
+function readout(){
+  const E=energy(); let extra='';
+  if(P.th==='phi4'&&P.eps>0){
+    const dV=Vraw(vacPhi4(-1))-Vraw(vacPhi4(1));
+    extra=`<br>bubble needs radius > <b>${(2*mass()/3/dV).toFixed(1)}</b> to grow`;
+  }
+  if(P.th==='phi4') extra+=`<br>domain wall energy per length <b>${(2*mass()/3).toFixed(3)}</b>`;
+  if(P.th==='sg') extra+=`<br>domain wall energy per length <b>${(8*mass()).toFixed(2)}</b>`;
+  if(isEm()&&sel&&(sel.kind==='wiggle'||sel.kind==='orbit')) extra+=`<br>selected charge's top speed <b>${(effAmp(sel)*sel.w).toFixed(2)}</b> c`;
+  if(isCx()){ let np=0,nm=0; for(const v of vortices){ if(v.w>0) np+=v.w; else nm-=v.w; }
+    extra+=`<br>vortices <b>${np}</b> with +1 (solid ring), <b>${nm}</b> with −1 (dashed)`;
+    if(P.eps>0) extra+=`<br>domain wall energy per length ≈ <b>${(8*Math.sqrt(P.eps)).toFixed(2)}</b>`; }
+  $('readout').innerHTML=`time <b>${t.toFixed(1)}</b><br>field energy <b>${E.field.toPrecision(5)}</b>${extra}`;
+}
+const EQ={
+  kg:'∂²φ/∂t² = ∇²φ − m²φ + ρ',
+  phi4:'∂²φ/∂t² = ∇²φ − λφ(φ² − 1) + ε + ρ,   λ = m²/2',
+  sg:'∂²φ/∂t² = ∇²φ − m² sin φ + ρ',
+  cx:'∂²φ/∂t² = ∇²φ − λ(|φ|² − 1)φ + ε + ρ,   φ complex,   λ = m²/2',
+  em:'(∂²/∂t² − ∇² + m²)(φ, A) = (ρ, J),   E = −∇φ − ∂A/∂t,   B = ∂ₓA_y − ∂_yA_x'
+};
+const ABOUT={
+  kg:`<h2>Waves and the Klein–Gordon field</h2>
+<p>With mass m = 0 this is the plain wave equation, a one-component cousin of light: ripples spread at speed 1 in every direction. Turn the mass up and it becomes the Klein–Gordon field. Now a wave needs frequency ω above m to travel at all (ω² = k² + m²), and the field of a steady source dies away over a distance of about 1/m. That's Yukawa's picture of the nuclear force, with the pion as the massive field. In quantum theory the ripples of this field become particles of mass m.</p>
+<ul class="try"><li><b>Mass gap:</b> two sources shake at the same time, one below m and one above. Only one of them radiates.</li>
+<li>Drag a source around quickly: every jerk sends out a ripple, and a fast-moving source drags a wake behind it.</li>
+<li>Put a steady source in with m = 0 and with m = 0.3. In a flat 2D world the massless field around a source keeps growing like log r; the massive one settles into a cloud of size 1/m.</li>
+<li>Switch to Reflect edges and poke the field: the energy readout stays constant, because nothing leaks away.</li></ul>`,
+  phi4:`<h2>φ⁴ theory: two vacua</h2>
+<p>The potential V = (λ/4)(φ² − 1)² has two lowest points, φ = +1 and φ = −1 (we use λ = m²/2, so small ripples have mass m). Where a region in one vacuum meets a region in the other, the field has to climb over the hill in between, and that costs energy: a domain wall, the 2D version of the φ⁴ kink φ = tanh(m x/2). Its energy per unit length is 2m/3. Walls are tense, so a closed bubble shrinks. A small bubble (radius about 3 to 5) doesn't vanish cleanly: it leaves an oscillon, a throbbing lump that lives for a very long time. A bigger one radiates all its energy away. This double well is the shape behind the Higgs field, and in quantum theory the kinks become particles of their own (solitons).</p>
+<ul class="try"><li><b>Tilt ε</b> makes −1 a false vacuum, slightly higher than +1. A bubble of true vacuum grows if its radius beats the critical size in the readout and shrinks if not. This is a classical picture of false vacuum decay.</li>
+<li><b>Quench:</b> start the field near the hilltop and watch domains form and coarsen as the walls straighten and shrink.</li>
+<li><b>Kinks collide:</b> slow walls stick together and wobble away as radiation; fast ones bounce back.</li>
+<li>Paint a patch of the other vacuum, or poke hard enough to flip the field.</li></ul>`,
+  sg:`<h2>Sine-Gordon</h2>
+<p>V = m²(1 − cos φ) has infinitely many vacua, φ = 0, ±2π, ±4π, …, and a wall between neighbouring vacua carries energy 8m per unit length. In one dimension this theory is integrable: kinks pass straight through each other, and a breather (a kink and antikink bound together, throbbing) lives forever. Straight walls in our 2D world behave exactly like the 1D theory; round shapes don't, because 2D sine-Gordon is not integrable. In quantum theory, Coleman showed the sine-Gordon kink is the same thing as the fermion of the Thirring model.</p>
+<ul class="try"><li><b>Kinks pass through:</b> compare with the φ⁴ collision, where they stick or bounce.</li>
+<li><b>Line breather:</b> a 1D breather stretched along a line. Push on it with the Poke tool and see whether it survives.</li>
+<li><b>Ring:</b> a circular wall shrinks, bursts through itself and comes back.</li></ul>`,
+  cx:`<h2>A complex field and its vortices</h2>
+<p>Now the field has a size |φ| and a phase. The colour shows the phase (orange, rose, blue, green going round the circle) and dark means small. The potential is a Mexican hat, V = (λ/4)(|φ|² − 1)²: every phase on the rim |φ| = 1 is an equally good vacuum. Ripples in size have mass m, like the Higgs boson. Turning the phase costs nothing in a uniform field, so phase ripples travel as massless Goldstone waves. A vortex is a point the phase winds around once, with all four colours in a circle and a dark core where |φ| = 0. It can't be smoothed away, because its winding number is a topological charge; only a vortex and an antivortex meeting can cancel. In superfluids these are the quantized vortices, and in cosmology they are cosmic strings. With a gauge field added (a later stage) they become the magnetic flux tubes of a superconductor.</p>
+<ul class="try"><li><b>Vortex + antivortex:</b> they pull together and annihilate in a flash of waves.</li>
+<li><b>Two alike:</b> two vortices with the same winding push each other apart.</li>
+<li><b>Kibble quench:</b> start near the top of the hat. Different places pick different phases, which leaves a tangle of vortices; watch the count fall as pairs find each other. This is how defects form as the early universe cools.</li>
+<li><b>Tilt ε</b> makes one phase (orange) slightly preferred, which gives the Goldstone a small mass √ε. Going once round a vortex the phase must pass through every colour, including the unfavoured blue, so each vortex grows a domain wall, like axion strings. In <b>Strings and walls</b> the wall joins a vortex to an antivortex and drags them together.</li>
+<li>Use <b>Twist</b> to place vortices yourself. A single vortex turns the phase everywhere around it, so its energy grows like π·ln(size of the box). Lone vortices are expensive; a vortex–antivortex pair is cheap.</li></ul>`,
+  em:`<h2>Electromagnetism in a flat world</h2>
+<p>This is Maxwell's theory, solved through its potentials φ and A (in Lorenz gauge, each one obeys the same wave equation as the first tab). Charges live and move in the plane. The soft glow shows where the electric field is strong, and the colour is the magnetic field B, which points straight out of the screen (orange) or into it (blue). A still charge has only an electric field; in this flat world it falls off like 1/r, like a charged wire in 3D. Move a charge and the news travels outward at the speed of light. Far away, the field still points to where the charge used to be, and a ring joins the old field to the new one. That ring is light. It gets stronger the harder the charge accelerates, which is why a shaken charge radiates and a steadily moving one doesn't. One flat-world quirk: in 2D a flash of light leaves a fading wake behind it instead of passing cleanly, so the field takes a while to settle after a ring goes by.</p>
+<ul class="try"><li><b>Kink:</b> a charge jumps a short distance. Watch a ring of light race outward.</li>
+<li><b>Antenna:</b> a charge wiggles next to an opposite still charge. The light goes out sideways, and none goes along the line of the wiggle.</li>
+<li><b>Orbiting charge:</b> circular motion sends out a spiral, the pattern of synchrotron light.</li>
+<li><b>Faraday cage:</b> barriers act as grounded metal. The field stops at the cage and the waves stay outside.</li>
+<li>Drag a charge yourself. It can't be moved faster than 0.9 times the speed of light, and every jerk sends out a ring of light.</li>
+<li><b>Photon mass m:</b> gives light a mass (Proca theory). Still charges' fields now die off within 1/m, and slow wiggles stop radiating. Inside a superconductor light behaves just like this, because of the Higgs mechanism.</li></ul>
+<p class="note">Two simplifications: the fields don't push the charges back (you or the preset moves them), and a charge you add pops into existence, which real electromagnetism forbids; its field then spreads out from where you put it at the speed of light.</p>`
+};
+const HINT={
+  source:'Tap an empty spot to add a source. Drag a source to move it; tap one to select it and change it.',
+  poke:'Tap or drag to push the field up or down. Each poke sends out ripples.',
+  paint:'Drag to set the field to the chosen value. The edge of the brush is soft.',
+  wall:'Draw barriers that hold the field at 0. Waves bounce off them.',
+  charge:'Tap to add a charge; drag one to move it. Choose Wiggle or Orbit to make it radiate by itself.',
+  flash:'Tap or drag to make a flash: a small swirl of electric field that spreads out as a ring of light.',
+  twist:'Tap to put a vortex there. With Wrap edges, add them in +1/−1 pairs: a wrapped world must have zero total winding.'
+};
+
+/* ---------- presets ---------- */
+function setup(o){
+  sources=[]; sel=null; clearWalls(); t=0;
+  setTheory(o.th,true);
+  P.m[o.th]=o.m!=null?o.m:TH[o.th].mDef; P.eps=o.eps||0; P.fric=o.fric||0;
+  setEdge(o.edge||'absorb'); syncSliders(); updateVmin(); updateDamp();
+  resetField();
+}
+const tanh=Math.tanh, sech=x=>1/Math.cosh(x), atan=Math.atan;
+function kinkPair(v,x0){             // phi^4 kink at -x0 moving +v, antikink at +x0 moving -v, +1 in between
+  const g=1/Math.sqrt(1-v*v), a=mass()/2*g;
+  fillField(x=>{ const u1=a*(x+x0), u2=a*(x-x0);
+    return [tanh(u1)-tanh(u2)-1, -v*a*(sech(u1)**2+sech(u2)**2)]; });
+}
+function rng(seed){                 // mulberry32, values in [-0.5, 0.5)
+  let s=seed|0;
+  return ()=>{ s=(s+0x6D2B79F5)|0; let z=Math.imul(s^(s>>>15),1|s); z=(z+Math.imul(z^(z>>>7),61|z))^z; return ((z^(z>>>14))>>>0)/4294967296-0.5; };
+}
+const PRESETS={
+  kg:[
+    ['Ripples',()=>{ setup({th:'kg',m:0}); addSource({x:N/2,y:N/2,kind:'osc',w:1,q:1}); }],
+    ['Interference',()=>{ setup({th:'kg',m:0}); for(const s of [-1,1]) addSource({x:U2C(0),y:U2C(s*8),kind:'osc',w:1.2,q:1}); }],
+    ['Double slit',()=>{ setup({th:'kg',m:0});
+      const xw=Math.round(U2C(-20));
+      for(let j=0;j<N;j++){ const y=(j-N/2+0.5)*dx; if(Math.abs(Math.abs(y)-7)<1.6) continue; for(let i=xw-2;i<=xw+2;i++) open[K(i,j)]=0; }
+      updateDamp(); resetField(); addSource({x:U2C(-42),y:N/2,kind:'osc',w:1.5,q:2}); }],
+    ['Mass gap',()=>{ setup({th:'kg',m:1}); addSource({x:U2C(-25),y:N/2,kind:'osc',w:0.7,q:2}); addSource({x:U2C(25),y:N/2,kind:'osc',w:1.6,q:2}); }],
+    ['Yukawa cloud',()=>{ setup({th:'kg',m:0.3}); addSource({x:N/2,y:N/2,kind:'steady',q:1}); }],
+    ['Pond',()=>{ setup({th:'kg',m:0,edge:'reflect'}); setTool('poke'); }]
+  ],
+  phi4:[
+    // a bubble of radius 3-5 leaves an oscillon; radius 6 and up radiates away completely
+    ['Bubble → oscillon',()=>{ setup({th:'phi4',m:1}); const R=5; fillField((x,y)=>[tanh(mass()/2*(Math.hypot(x,y)-R)),0]); }],
+    ['False vacuum decay',()=>{ setup({th:'phi4',m:1,eps:0.03}); const vf=vacPhi4(-1), vt=vacPhi4(1);
+      // false vacuum outside, true vacuum inside two seeds: radius 7 (below the critical ~11) and 16 (above)
+      fillField((x,y)=>{ const r1=Math.hypot(x+38,y), r2=Math.hypot(x-26,y);
+        const inside=Math.max(0.5-0.5*tanh(mass()/2*(r1-7)),0.5-0.5*tanh(mass()/2*(r2-16)));
+        return [vf+(vt-vf)*inside,0]; }); }],
+    ['Quench',()=>{ setup({th:'phi4',m:1,fric:0.08,edge:'wrap'}); const rnd=rng(12345);
+      fillField(()=>[0.2*rnd(),0]); }],
+    ['Kinks collide (slow)',()=>{ setup({th:'phi4',m:1,edge:'wrap'}); kinkPair(0.15,18); }],
+    ['Kinks collide (fast)',()=>{ setup({th:'phi4',m:1,edge:'wrap'}); kinkPair(0.45,18); }]
+  ],
+  sg:[
+    ['Kinks pass through',()=>{ setup({th:'sg',m:1,edge:'wrap'}); const v=0.4, g=1/Math.sqrt(1-v*v), m=mass(), x0=18;
+      fillField(x=>{ const u1=m*g*(x+x0), u2=m*g*(x-x0);
+        return [4*atan(Math.exp(u1))+4*atan(Math.exp(-u2))-2*Math.PI, -2*m*g*v*(sech(u1)+sech(u2))]; }); }],
+    ['Line breather',()=>{ setup({th:'sg',m:1,edge:'wrap'}); const w=0.5, m=mass(), e=Math.sqrt(1-w*w);
+      // phi = 4 atan( e/w * sin(w m t) / cosh(e m x) ), started at t = pi/(2 w m) (maximum swing, at rest)
+      fillField(x=>[4*atan(e/w/Math.cosh(e*m*x)),0]); }],
+    ['Ring',()=>{ setup({th:'sg',m:1}); const R=22; fillField((x,y)=>[4*atan(Math.exp(-mass()*(Math.hypot(x,y)-R))),0]); }]
+  ],
+  cx:[
+    ['Single vortex',()=>{ setup({th:'cx',m:1}); twistAt(U2C(0),U2C(0),1); }],
+    ['Vortex + antivortex',()=>{ setup({th:'cx',m:1}); twistAt(U2C(-25),U2C(0),1); twistAt(U2C(25),U2C(0),-1); }],
+    ['Two alike',()=>{ setup({th:'cx',m:1}); twistAt(U2C(-8),U2C(0),1); twistAt(U2C(8),U2C(0),1); }],
+    ['Kibble quench',()=>{ setup({th:'cx',m:1,fric:0.1,edge:'wrap'}); const r=rng(777); fillField(()=>[0.2*r(),0,0.2*r(),0]); }],
+    // with the tilt, phase pi is no longer a vacuum: a wall forms between the vortex and the antivortex and pulls them together.
+    // The tilt must stay well below the hat's central bump (m^2/8), or the wall tears through the middle of the hat instead.
+    ['Strings and walls',()=>{ setup({th:'cx',m:1.5,eps:0.02,fric:0.2}); twistAt(U2C(-35),U2C(0),1); twistAt(U2C(35),U2C(0),-1); }]
+  ],
+  em:[
+    // the charge sits still until t = 6, then slides 10 units in 20 time units (top speed 0.75 c)
+    ['Kink',()=>{ setup({th:'em'}); addCharge({x:U2C(-12),y:U2C(0),kind:'jump',L:10,T:20,t0:6}); }],
+    ['Dipole',()=>{ setup({th:'em'}); addCharge({x:U2C(-10),y:U2C(0)}); addCharge({x:U2C(10),y:U2C(0),sign:-1}); }],
+    ['Antenna',()=>{ setup({th:'em'}); addCharge({x:U2C(0),y:U2C(0),kind:'wiggle',w:0.25,A:3}); addCharge({x:U2C(0),y:U2C(0),sign:-1}); }],
+    ['Orbiting charge',()=>{ setup({th:'em'}); addCharge({x:U2C(0),y:U2C(0),kind:'orbit',w:0.15,A:5}); addCharge({x:U2C(0),y:U2C(0),sign:-1}); }],
+    ['Faraday cage',()=>{ setup({th:'em'});
+      for(let j=0;j<N;j++)for(let i=0;i<N;i++){ const r=Math.hypot(i-U2C(0),j-U2C(0))*dx; if(Math.abs(r-16)<0.8) open[K(i,j)]=0; }
+      updateDamp(); resetField(); addCharge({x:U2C(-36),y:U2C(0),kind:'wiggle',w:0.4,A:2,vert:true}); }],
+    ['Light through a slit',()=>{ setup({th:'em'});
+      const xw=Math.round(U2C(-5)); for(let j=0;j<N;j++){ if(Math.abs((j-N/2+0.5)*dx)<3) continue; for(let i=xw-1;i<=xw+1;i++) open[K(i,j)]=0; }
+      updateDamp(); resetField(); addCharge({x:U2C(-40),y:U2C(0),kind:'wiggle',w:0.6,A:1.2,vert:true}); }]
+  ]
+};
+function buildPresets(){
+  const box=$('presets'); box.innerHTML='';
+  for(const [name,fn] of PRESETS[P.th]){ const b=document.createElement('button'); b.type='button'; b.textContent=name; b.onclick=()=>{fn(); afterChange();}; box.appendChild(b); }
+}
+
+/* ---------- controls ---------- */
+function pressSeg(seg,attr,val){ for(const b of seg.querySelectorAll('button')) b.setAttribute('aria-pressed',String(b.dataset[attr]===String(val))); }
+function setTheory(th,keepField){
+  if((P.th==='em')!==(th==='em')){ sources=[]; sel=null; }   // scalar sources and charges are different things
+  P.th=th; pressSeg($('theorySeg'),'th',th);
+  const em=th==='em';
+  $('plotBlk').hidden=em; $('paintBtn').hidden=em; $('srcToolBtn').textContent=em?'Charge':'Source';
+  for(const b of document.querySelectorAll('#srcKind .sck')) b.hidden=em;
+  for(const b of document.querySelectorAll('#srcKind .emk')) b.hidden=!em;
+  $('eq').textContent=EQ[th]; $('about').innerHTML=ABOUT[th];
+  const tilt=th==='phi4'||th==='cx';
+  $('epsWrap').hidden=!tilt; if(!tilt) P.eps=0;
+  $('twistBtn').hidden=th!=='cx';
+  $('pokeUp').textContent=th==='cx'?'Turn phase +':em?'Flash ↺':'Push up'; $('pokeDown').textContent=th==='cx'?'Turn phase −':em?'Flash ↻':'Push down';
+  $('viewField').textContent=th==='cx'?'Phase':em?'B and E':'Field φ';
+  $('mLab').textContent=em?'photon mass':'mass m';
+  vortices=[];
+  let tl=P.tool; if(tl==='twist'&&th!=='cx') tl='poke'; if(tl==='paint'&&em) tl='poke';
+  setTool(tl);
+  const ms=$('mass'); ms.min=TH[th].mMin; ms.max=TH[th].mMax;
+  P.paintIdx=0; buildPaint(); buildPresets(); syncSliders(); updateVmin();
+  if(!keepField) resetField();
+  dirty=true;
+}
+function buildPaint(){
+  const seg=$('paintSeg'); seg.innerHTML='';
+  TH[P.th].targets.forEach(([v,lab],n)=>{ const b=document.createElement('button'); b.type='button'; b.textContent=lab; b.dataset.n=n;
+    b.setAttribute('aria-pressed',String(n===P.paintIdx)); b.onclick=()=>{P.paintIdx=n; pressSeg(seg,'n',n);}; seg.appendChild(b); });
+}
+function syncSliders(){
+  $('mass').value=mass(); $('massO').textContent=mass().toFixed(2);
+  $('eps').value=P.eps; $('epsO').textContent=P.eps.toFixed(3);
+  $('fric').value=P.fric; $('fricO').textContent=P.fric.toFixed(2);
+  $('speed').value=P.speed; $('speedO').textContent=P.speed;
+  paramNote();
+}
+function paramNote(){
+  let s='';
+  if(P.th==='kg') s=mass()>0?`Waves need ω > m = ${mass().toFixed(2)} to travel. A steady source's cloud has size about 1/m = ${(1/mass()).toFixed(1)}.`:'Massless: waves of every frequency travel at speed 1.';
+  else if(isEm()) s=mass()>0?`Light has mass m = ${mass().toFixed(2)}: still charges' fields die off within 1/m = ${(1/mass()).toFixed(1)}, and wiggles slower than ω = m don't radiate.`:'Light travels at speed 1. Charges can be moved at up to 0.9 of that.';
+  else if(isCx()) s=`Size ripples have mass m = ${mass().toFixed(2)}; phase ripples are massless${P.eps>0?`, or have mass √ε = ${Math.sqrt(P.eps).toFixed(2)} with the tilt`:''}. Vortex cores are about ${(2/mass()).toFixed(1)} across.`;
+  else s=`Domain walls are about ${(2/mass()*2).toFixed(1)} wide (a few times 1/m). Friction drains energy, which helps the field settle.`;
+  $('paramNote').textContent=s;
+}
+function setEdge(e){ P.edge=e; pressSeg($('edgeSeg'),'e',e); updateDamp(); dirty=true; }
+function setTool(tl){
+  P.tool=tl; pressSeg($('toolSeg'),'tool',tl);
+  for(const n of ['source','poke','paint','wall','twist']) $('opts-'+n).hidden=n!==tl;
+  $('hint').textContent=isCx()&&tl==='poke'?'Tap or drag to turn the phase. The turn spreads out as massless Goldstone waves.':isEm()&&tl==='poke'?HINT.flash:isEm()&&tl==='source'?HINT.charge:HINT[tl];
+}
+function afterChange(){ vortices=findVortices(); syncSliders(); syncSrcPanel(); drawLegend(); drawPlot(); readout(); if(!P.running) render(); }
+
+$('theorySeg').onclick=e=>{ const b=e.target.closest('button'); if(!b||b.dataset.th===P.th) return; setTheory(b.dataset.th); afterChange(); };
+$('toolSeg').onclick=e=>{ const b=e.target.closest('button'); if(b) setTool(b.dataset.tool); };
+$('edgeSeg').onclick=e=>{ const b=e.target.closest('button'); if(b){ setEdge(b.dataset.e); } };
+$('viewSeg').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; P.view=b.dataset.v; pressSeg($('viewSeg'),'v',P.view); autoScales(); escale=1e9; for(let n=0;n<40;n++) autoScales(); drawLegend(); if(!P.running) render(); };
+$('mass').oninput=e=>{ P.m[P.th]=+e.target.value; $('massO').textContent=mass().toFixed(2); updateVmin(); paramNote(); dirty=true; };
+$('eps').oninput=e=>{ P.eps=+e.target.value; $('epsO').textContent=P.eps.toFixed(3); updateVmin(); paramNote(); dirty=true; };
+$('fric').oninput=e=>{ P.fric=+e.target.value; $('fricO').textContent=P.fric.toFixed(2); updateDamp(); };
+$('speed').oninput=e=>{ P.speed=+e.target.value; $('speedO').textContent=P.speed; };
+$('playBtn').onclick=()=>{ P.running=!P.running; $('playBtn').textContent=P.running?'Pause':'Play'; };
+$('resetBtn').onclick=()=>{ resetField(); t=0; afterChange(); };
+$('clearBtn').onclick=()=>{ sources=[]; sel=null; clearWalls(); resetField(); t=0; afterChange(); };
+$('pokeSign').onclick=e=>{ const b=e.target.closest('button'); if(b){ P.pokeSign=+b.dataset.s; pressSeg($('pokeSign'),'s',b.dataset.s); } };
+$('twistSign').onclick=e=>{ const b=e.target.closest('button'); if(b){ P.twistSign=+b.dataset.s; pressSeg($('twistSign'),'s',b.dataset.s); } };
+$('wallMode').onclick=e=>{ const b=e.target.closest('button'); if(b){ P.wallMode=b.dataset.w; pressSeg($('wallMode'),'w',P.wallMode); } };
+for(const seg of document.querySelectorAll('.brushSeg')){
+  for(const [r,lab] of [[1.5,'S'],[3,'M'],[6,'L']]){ const b=document.createElement('button'); b.type='button'; b.textContent=lab; b.dataset.r=r; seg.appendChild(b); }
+  seg.onclick=e=>{ const b=e.target.closest('button'); if(!b) return; P.brush=+b.dataset.r; for(const s of document.querySelectorAll('.brushSeg')) pressSeg(s,'r',P.brush); };
+  pressSeg(seg,'r',P.brush);
+}
+/* source panel: edits the selected source, or the settings for new ones */
+function srcTarget(){ return sel||(isEm()?P.newCharge:P.newSrc); }
+function syncSrcPanel(){
+  const s=srcTarget(), em=isEm(), moving=em&&(s.kind==='wiggle'||s.kind==='orbit');
+  $('srcLab').textContent=em?(sel?'Selected charge:':'New charges:'):(sel?'Selected source:':'New sources:');
+  $('srcAwrap').hidden=!moving; $('srcA').value=s.A||3; $('srcAo').textContent=(+(s.A||3)).toFixed(1);
+  $('srcSpeed').textContent=moving?`top speed ${(effAmp(s)*s.w).toFixed(2)} c`:'';
+  pressSeg($('srcKind'),'k',s.kind); pressSeg($('srcSign'),'s',s.sign);
+  $('srcQ').value=s.q; $('srcQo').textContent=(+s.q).toFixed(1);
+  $('srcW').value=s.w; $('srcWo').textContent=(+s.w).toFixed(2);
+  $('srcWwrap').style.display=s.kind==='osc'||moving?'':'none';
+  $('srcDel').hidden=!sel; $('srcDel').textContent=em?'Delete charge':'Delete source';
+}
+$('srcKind').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; const s=srcTarget(); s.kind=b.dataset.k; if(sel) sel.t0=t; syncSrcPanel(); dirty=true; };
+$('srcSign').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; srcTarget().sign=+b.dataset.s; syncSrcPanel(); dirty=true; };
+$('srcQ').oninput=e=>{ srcTarget().q=+e.target.value; $('srcQo').textContent=(+e.target.value).toFixed(1); dirty=true; };
+$('srcW').oninput=e=>{ const s=srcTarget(), w=+e.target.value;
+  if(sel){ const ph=s.w*(t-s.t0); s.t0=t-ph/w; }   // keep the phase continuous
+  s.w=w; $('srcWo').textContent=w.toFixed(2); if(isEm()) syncSrcPanel(); dirty=true; };
+$('srcA').oninput=e=>{ srcTarget().A=+e.target.value; syncSrcPanel(); dirty=true; };
+$('srcDel').onclick=()=>{ sources=sources.filter(s=>s!==sel); sel=null; syncSrcPanel(); dirty=true; if(!P.running) render(); };
+
+/* ---------- pointer ---------- */
+let drag=null;
+function toCell(e){ const r=cv.getBoundingClientRect(); return {x:(e.clientX-r.left)/r.width*N-0.5, y:(e.clientY-r.top)/r.height*N-0.5}; }
+function hitSource(c){
+  const r=cv.getBoundingClientRect(), R=16/r.width*N; let best=null, bd=R;
+  for(const s of sources){ const st=srcState(s,t,1), d=Math.hypot(st.x-c.x,st.y-c.y); if(d<bd){bd=d;best=s;} }
+  return best;
+}
+function applyBrush(a,b){
+  if(P.tool==='poke'){ const amp=P.pokeSign*TH[P.th].poke*(P.th==='kg'?Math.max(0.3,fscale*1.5):1);
+    if(!a){ poke(b.x,b.y,amp); return; }
+    walkSeg(a,b,P.brush/dx/2,(x,y)=>poke(x,y,amp*0.25)); }
+  else if(P.tool==='paint'){ const v=TH[P.th].targets[P.paintIdx][0]; let tv=v, tv2=0;
+    if(isCx()){ const r0=vacPhi4(1); if(v===null) tv=0; else { tv=r0*Math.cos(v); tv2=r0*Math.sin(v); } }
+    else if(P.th==='phi4'&&Math.abs(v)===1) tv=vacPhi4(v);
+    if(!a) paint(b.x,b.y,tv,tv2); else walkSeg(a,b,P.brush/dx/3,(x,y)=>paint(x,y,tv,tv2)); }
+  else if(P.tool==='twist'){ if(!a) twistAt(b.x,b.y,P.twistSign); }
+  else if(P.tool==='wall'){ const er=P.wallMode==='erase';
+    if(!a) wallAt(b.x,b.y,er); else walkSeg(a,b,0.5,(x,y)=>wallAt(x,y,er));
+    updateDamp(); dirty=true; }
+  if(!P.running) render();
+}
+cv.addEventListener('pointerdown',e=>{
+  e.preventDefault(); cv.setPointerCapture(e.pointerId);
+  const c=toCell(e);
+  if(P.tool==='source'){
+    let s=hitSource(c);
+    if(!s){ const n=isEm()?P.newCharge:P.newSrc; s=addSource({x:c.x,y:c.y,kind:n.kind,sign:n.sign,q:n.q,w:n.w,A:n.A}); }
+    sel=s; syncSrcPanel();
+    drag={id:e.pointerId,src:s,dx:s.x-c.x,dy:s.y-c.y};
+    if(!P.running) render();
+  } else { drag={id:e.pointerId,last:c}; applyBrush(null,c); }
+});
+cv.addEventListener('pointermove',e=>{
+  if(!drag||drag.id!==e.pointerId) return;
+  const c=toCell(e);
+  if(drag.src){ const s=drag.src; s.tx=Math.max(0,Math.min(N-1,c.x+drag.dx)); s.ty=Math.max(0,Math.min(N-1,c.y+drag.dy));
+    if(!P.running){ s.px=s.x=s.tx; s.py=s.y=s.ty; render(); } dirty=true; }
+  else { applyBrush(drag.last,c); drag.last=c; }
+});
+const endDrag=e=>{ if(drag&&drag.id===e.pointerId) drag=null; };
+cv.addEventListener('pointerup',endDrag); cv.addEventListener('pointercancel',endDrag);
+
+/* ---------- main loop ---------- */
+let frameNo=0;
+function frame(){
+  if(P.running){ advance(2*P.speed); }
+  sizeCanvas();
+  if(frameNo%3===0){ autoScales(); vortices=findVortices(); }
+  render();
+  if(frameNo%6===0){ drawPlot(); drawLegend(); }
+  if(frameNo%10===0) readout();
+  frameNo++;
+  if(!window.NO_TICK) requestAnimationFrame(frame);
+}
+
+setTheory('kg'); setTool('poke'); syncSrcPanel();
+setup({th:'kg',m:0}); poke(N/2-0.5,N/2-0.5,1); afterChange();   // open on a single ripple
+requestAnimationFrame(frame);
+addEventListener('resize',()=>{ sizeCanvas(); if(!P.running) render(); });
+
+/* ---------- debug hook ---------- */
+if(/[?&]debug/.test(location.search)){
+  window.__fs={N,G,dx,dt,L,K,P,phi,vel,phi2,vel2,phi3,vel3,Ex,Ey,Bz,computeEB,srcState,addStatic,addCharge,twistAt,findVortices,get vortices(){return vortices},open,TH,PRESETS,energy,advance,force,fillField,resetField,addSource,setTheory,setEdge,updateDamp,updateVmin,vacPhi4,Vraw,poke,paint,U2C,
+    get t(){return t}, set t(v){t=v}, get sources(){return sources}, set sources(v){sources=v}, frame, render,
+    preset(th,name){ const p=PRESETS[th].find(q=>q[0]===name); p[1](); afterChange(); },
+    setFric(f){P.fric=f; updateDamp();}, setMass(m){P.m[P.th]=m; updateVmin(); dirty=true;}, markDirty(){dirty=true;}};
+}
+})();
+</script>
