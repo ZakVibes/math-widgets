@@ -126,6 +126,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
             <button type="button" data-k="still" aria-pressed="false" class="emk" hidden>Still</button>
             <button type="button" data-k="wiggle" aria-pressed="false" class="emk" hidden>Wiggle</button>
             <button type="button" data-k="orbit" aria-pressed="false" class="emk" hidden>Orbit</button>
+            <button type="button" data-k="free" aria-pressed="false" class="emk" hidden>Free</button>
           </div>
           <div class="seg sm" id="srcSign" role="group" aria-label="Source sign">
             <button type="button" data-s="1" aria-pressed="true">+</button>
@@ -133,6 +134,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
           </div>
           <label class="sl inl">strength <input type="range" id="srcQ" min="0.1" max="5" step="0.1" value="1"><output id="srcQo">1.0</output></label>
           <label class="sl inl" id="srcWwrap">frequency ω <input type="range" id="srcW" min="0.1" max="3" step="0.05" value="1"><output id="srcWo">1.00</output></label>
+          <label class="sl inl" id="srcMwrap" hidden>mass <input type="range" id="srcM" min="0.2" max="5" step="0.1" value="1"><output id="srcMo">1.0</output></label>
           <label class="sl inl" id="srcAwrap" hidden>swing <input type="range" id="srcA" min="0.5" max="10" step="0.5" value="3"><output id="srcAo">3.0</output></label>
           <span class="lab" id="srcSpeed"></span>
           <button type="button" class="btn" id="srcDel" hidden>Delete source</button>
@@ -237,7 +239,7 @@ const TH={
 };
 const P={th:'kg', m:{kg:0,phi4:1,sg:1,cx:1,em:0}, eps:0, fric:0, speed:2, edge:'absorb', view:'field',
   tool:'poke', brush:3, shade:1.2, pokeSign:1, twistSign:1, paintIdx:0, wallMode:'draw', running:true,
-  newSrc:{kind:'osc', sign:1, q:1, w:1}, newCharge:{kind:'still', sign:1, q:1, w:0.3, A:3}};
+  newSrc:{kind:'osc', sign:1, q:1, w:1}, newCharge:{kind:'still', sign:1, q:1, w:0.3, A:3, M:1}};
 let t=0, dirty=true, sources=[], sel=null, nextId=1, vortices=[];
 const isCx=()=>P.th==='cx', isEm=()=>P.th==='em';
 const ncomp=()=>P.th==='em'?3:P.th==='cx'?2:1;
@@ -292,6 +294,7 @@ function srcAmp(s,time){ return s.kind==='osc'?Math.sin(s.w*(time-s.t0)):1; }
 let stepsNow=1;
 const effAmp=s=>Math.min(s.A||0,0.9/s.w);     // keeps a wiggling or orbiting charge below 0.9 c
 function srcState(s,time,frac){
+  if(s.kind==='free'&&!s.held){ const g=Math.hypot(s.M,s.mx,s.my); return {x:s.x,y:s.y,vx:s.mx/g,vy:s.my/g}; }
   let x=s.px+(s.x-s.px)*frac, y=s.py+(s.y-s.py)*frac;
   let vx=(s.x-s.px)*dx/(stepsNow*dt), vy=(s.y-s.py)*dx/(stepsNow*dt);
   if(isEm()){ const w=s.w, ph=w*(time-s.t0);
@@ -350,15 +353,38 @@ function stepOnce(frac,fracPrev){
   force(t,frac);
   for(let c=0;c<nc;c++){ const [,v,f]=COMPS[c];
     for(let j=1;j<=N;j++){ let k=j*G+1; for(let i=0;i<N;i++,k++) v[k]=dampH[k]*(v[k]+h*f[k]); } }
+  if(isEm()) pushCharges();
 }
+/* Free charges: relativistic momentum p = gamma M v, pushed by the Lorentz force q(E + v x B). E and B are averaged over the
+   charge's own Gaussian, the same weights that spread its charge onto the grid. They bounce off the box edges and barriers. */
+function pushCharges(){
+  const h=1/(2*dx), A=dx*dx;
+  for(const s of sources){ if(s.kind!=='free'||s.held) continue;
+    let ex=0,ey=0,bz=0; const q=s.sign*s.q;
+    eachCellAt(s.x,s.y,(k,g)=>{ const w=g*A;
+      ex+=w*(-(phi[k+1]-phi[k-1])*h-vel2[k]); ey+=w*(-(phi[k+G]-phi[k-G])*h-vel3[k]);
+      bz+=w*(phi3[k+1]-phi3[k-1]-phi2[k+G]+phi2[k-G])*h; });
+    let g=Math.hypot(s.M,s.mx,s.my); const vx=s.mx/g, vy=s.my/g;
+    s.mx+=dt*q*(ex+vy*bz); s.my+=dt*q*(ey-vx*bz);
+    g=Math.hypot(s.M,s.mx,s.my);
+    let nx=s.x+s.mx/g*dt/dx, ny=s.y+s.my/g*dt/dx;
+    if(nx<2||nx>N-3){ s.mx=-s.mx; nx=s.x; }
+    if(ny<2||ny>N-3){ s.my=-s.my; ny=s.y; }
+    if(!open[K(Math.round(nx),Math.round(ny))]){ s.mx=-s.mx; s.my=-s.my; nx=s.x; ny=s.y; }
+    s.x=s.px=s.tx=nx; s.y=s.py=s.ty=ny; }
+}
+function freeKinetic(){ let e=0; for(const s of sources) if(s.kind==='free'&&!s.held) e+=Math.hypot(s.M,s.mx,s.my)-s.M; return e; }
 function advance(S){
   stepsNow=S;
   for(const s of sources){        // a dragged charge follows the pointer, but never faster than 0.9 c
+    if(s.kind==='free'&&!s.held) continue;
     let ddx=s.tx-s.px, ddy=s.ty-s.py;
     if(isEm()){ const mx=0.9*S*dt/dx, d=Math.hypot(ddx,ddy); if(d>mx){ ddx*=mx/d; ddy*=mx/d; } }
+    s.hvx=ddx*dx/(S*dt); s.hvy=ddy*dx/(S*dt);   // remembered so a free charge can be thrown
     s.x=s.px+ddx; s.y=s.py+ddy; }
   for(let s=0;s<S;s++) stepOnce((s+1)/S,s/S);
-  for(const s of sources){ s.px=s.x; s.py=s.y; }
+  for(const s of sources){ s.px=s.x; s.py=s.y;
+    if(s.kind==='free'){ (s.trail=s.trail||[]).push(s.x,s.y); if(s.trail.length>1200) s.trail.splice(0,2); } }
 }
 /* E = -grad phi - dA/dt and B_z = dA_y/dx - dA_x/dy, at cell centres */
 function computeEB(){
@@ -604,6 +630,9 @@ function render(){
       if(s.kind==='wiggle'){ ctx.beginPath(); if(s.vert){ ctx.moveTo(ax,ay-A); ctx.lineTo(ax,ay+A); } else { ctx.moveTo(ax-A,ay); ctx.lineTo(ax+A,ay); } ctx.stroke(); }
       else if(s.kind==='orbit'){ ctx.beginPath(); ctx.arc(ax,ay,A,0,7); ctx.stroke(); } }
     ctx.setLineDash([]);
+    ctx.lineWidth=1.5*dpr; ctx.strokeStyle='rgba(255,255,255,0.4)';
+    for(const s of sources){ const T=s.trail; if(s.kind!=='free'||!T||T.length<4) continue;
+      ctx.beginPath(); ctx.moveTo((T[0]+0.5)*s2p,(T[1]+0.5)*s2p); for(let q=2;q<T.length;q+=2) ctx.lineTo((T[q]+0.5)*s2p,(T[q+1]+0.5)*s2p); ctx.stroke(); }
   }
   for(const s of sources){
     const st=srcState(s,t,1), x=(st.x+0.5)*s2p, y=(st.y+0.5)*s2p, a=isEm()?0:srcAmp(s,t);
@@ -685,6 +714,9 @@ function readout(){
   }
   if(P.th==='phi4') extra+=`<br>domain wall energy per length <b>${(2*mass()/3).toFixed(3)}</b>`;
   if(P.th==='sg') extra+=`<br>domain wall energy per length <b>${(8*mass()).toFixed(2)}</b>`;
+  if(isEm()&&sources.some(s=>s.kind==='free')){ const ke=freeKinetic();
+    extra+=`<br>moving charges' kinetic energy <b>${ke.toPrecision(4)}</b><br>field + kinetic <b>${(E.field+ke).toPrecision(5)}</b>`;
+    if(sel&&sel.kind==='free'&&!sel.held) extra+=`<br>selected charge's speed <b>${(Math.hypot(sel.mx,sel.my)/Math.hypot(sel.M,sel.mx,sel.my)).toFixed(2)}</b> c`; }
   if(isEm()&&sel&&(sel.kind==='wiggle'||sel.kind==='orbit')) extra+=`<br>selected charge's top speed <b>${(effAmp(sel)*sel.w).toFixed(2)}</b> c`;
   if(isCx()){ let np=0,nm=0; for(const v of vortices){ if(v.w>0) np+=v.w; else nm-=v.w; }
     extra+=`<br>vortices <b>${np}</b> with +1 (solid ring), <b>${nm}</b> with −1 (dashed)`;
@@ -730,15 +762,17 @@ const ABOUT={
 <li><b>Orbiting charge:</b> circular motion sends out a spiral, the pattern of synchrotron light.</li>
 <li><b>Faraday cage:</b> barriers act as grounded metal. The field stops at the cage and the waves stay outside.</li>
 <li>Drag a charge yourself. It can't be moved faster than 0.9 times the speed of light, and every jerk sends out a ring of light.</li>
+<li><b>Free charges</b> are pushed by the fields: the electric force qE plus the magnetic force qv×B, with speeds kept below light by relativity. <b>Opposites attract</b> and <b>Likes repel</b> show the simplest cases. A thrown charge slowly slows down, which is real flat-world physics, not friction: its field reaches out without limit, so the faster it goes the more field it has to drag along, and its electromagnetic mass keeps growing (like ln t).</li>
+<li><b>Classical atom:</b> a free negative charge circles a fixed positive one. An orbiting charge radiates, so it should slowly lose energy and spiral inward. That collapse was one of the puzzles that led to quantum mechanics.</li>
 <li><b>Photon mass m:</b> gives light a mass (Proca theory). Still charges' fields now die off within 1/m, and slow wiggles stop radiating. Inside a superconductor light behaves just like this, because of the Higgs mechanism.</li></ul>
-<p class="note">Two simplifications: the fields don't push the charges back (you or the preset moves them), and a charge you add pops into existence, which real electromagnetism forbids; its field then spreads out from where you put it at the speed of light.</p>`
+<p class="note">Two simplifications: still, wiggling and orbiting charges are moved by you or the preset, not by the fields (only Free charges feel forces), and a charge you add pops into existence, which real electromagnetism forbids; its field then spreads out from where you put it at the speed of light.</p>`
 };
 const HINT={
   source:'Tap an empty spot to add a source. Drag a source to move it; tap one to select it and change it.',
   poke:'Tap or drag to push the field up or down. Each poke sends out ripples.',
   paint:'Drag to set the field to the chosen value. The edge of the brush is soft.',
   wall:'Draw barriers that hold the field at 0. Waves bounce off them.',
-  charge:'Tap to add a charge; drag one to move it. Choose Wiggle or Orbit to make it radiate by itself.',
+  charge:'Tap to add a charge; drag one to move it. Wiggle and Orbit make it radiate by itself. Free lets the fields push it, and you can throw it as you let go.',
   flash:'Tap or drag to make a flash: a small swirl of electric field that spreads out as a ring of light.',
   twist:'Tap to put a vortex there. With Wrap edges, add them in +1/−1 pairs: a wrapped world must have zero total winding.'
 };
@@ -810,6 +844,12 @@ const PRESETS={
     ['Dipole',()=>{ setup({th:'em'}); addCharge({x:U2C(-10),y:U2C(0)}); addCharge({x:U2C(10),y:U2C(0),sign:-1}); }],
     ['Antenna',()=>{ setup({th:'em'}); addCharge({x:U2C(0),y:U2C(0),kind:'wiggle',w:0.25,A:3}); addCharge({x:U2C(0),y:U2C(0),sign:-1}); }],
     ['Orbiting charge',()=>{ setup({th:'em'}); addCharge({x:U2C(0),y:U2C(0),kind:'orbit',w:0.15,A:5}); addCharge({x:U2C(0),y:U2C(0),sign:-1}); }],
+    // a light charge circling a fixed one. In 2D the pull is q^2/(2 pi r), so a circular orbit needs gamma v^2 = 1/(2 pi M) at any radius
+    ['Classical atom',()=>{ setup({th:'em'}); addCharge({x:U2C(0),y:U2C(0)});
+      const M=1, c0=1/(2*Math.PI*M), v=Math.sqrt((-c0*c0+Math.sqrt(c0**4+4*c0*c0))/2), g=1/Math.sqrt(1-v*v);
+      const e=addCharge({x:U2C(15),y:U2C(0),sign:-1,kind:'free',M,mx:0,my:-M*g*v}); sel=e; }],
+    ['Opposites attract',()=>{ setup({th:'em'}); addCharge({x:U2C(-20),y:U2C(0),kind:'free',M:1,mx:0,my:0}); addCharge({x:U2C(20),y:U2C(0),sign:-1,kind:'free',M:1,mx:0,my:0}); }],
+    ['Likes repel',()=>{ setup({th:'em'}); addCharge({x:U2C(-3),y:U2C(-2),kind:'free',M:1,mx:0,my:0}); addCharge({x:U2C(3),y:U2C(2),kind:'free',M:1,mx:0,my:0}); }],
     ['Faraday cage',()=>{ setup({th:'em'});
       for(let j=0;j<N;j++)for(let i=0;i<N;i++){ const r=Math.hypot(i-U2C(0),j-U2C(0))*dx; if(Math.abs(r-16)<0.8) open[K(i,j)]=0; }
       updateDamp(); resetField(); addCharge({x:U2C(-36),y:U2C(0),kind:'wiggle',w:0.4,A:2,vert:true}); }],
@@ -899,6 +939,7 @@ function srcTarget(){ return sel||(isEm()?P.newCharge:P.newSrc); }
 function syncSrcPanel(){
   const s=srcTarget(), em=isEm(), moving=em&&(s.kind==='wiggle'||s.kind==='orbit');
   $('srcLab').textContent=em?(sel?'Selected charge:':'New charges:'):(sel?'Selected source:':'New sources:');
+  $('srcMwrap').hidden=!(em&&s.kind==='free'); $('srcM').value=s.M||1; $('srcMo').textContent=(+(s.M||1)).toFixed(1);
   $('srcAwrap').hidden=!moving; $('srcA').value=s.A||3; $('srcAo').textContent=(+(s.A||3)).toFixed(1);
   $('srcSpeed').textContent=moving?`top speed ${(effAmp(s)*s.w).toFixed(2)} c`:'';
   pressSeg($('srcKind'),'k',s.kind); pressSeg($('srcSign'),'s',s.sign);
@@ -907,7 +948,9 @@ function syncSrcPanel(){
   $('srcWwrap').style.display=s.kind==='osc'||moving?'':'none';
   $('srcDel').hidden=!sel; $('srcDel').textContent=em?'Delete charge':'Delete source';
 }
-$('srcKind').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; const s=srcTarget(); s.kind=b.dataset.k; if(sel) sel.t0=t; syncSrcPanel(); dirty=true; };
+$('srcKind').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; const s=srcTarget(); s.kind=b.dataset.k; if(sel) sel.t0=t;
+  if(s.kind==='free'){ s.M=s.M||1; s.mx=0; s.my=0; s.trail=[]; } syncSrcPanel(); dirty=true; };
+$('srcM').oninput=e=>{ srcTarget().M=+e.target.value; $('srcMo').textContent=(+e.target.value).toFixed(1); };
 $('srcSign').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; srcTarget().sign=+b.dataset.s; syncSrcPanel(); dirty=true; };
 $('srcQ').oninput=e=>{ srcTarget().q=+e.target.value; $('srcQo').textContent=(+e.target.value).toFixed(1); dirty=true; };
 $('srcW').oninput=e=>{ const s=srcTarget(), w=+e.target.value;
@@ -943,7 +986,8 @@ cv.addEventListener('pointerdown',e=>{
   const c=toCell(e);
   if(P.tool==='source'){
     let s=hitSource(c);
-    if(!s){ const n=isEm()?P.newCharge:P.newSrc; s=addSource({x:c.x,y:c.y,kind:n.kind,sign:n.sign,q:n.q,w:n.w,A:n.A}); }
+    if(!s){ const n=isEm()?P.newCharge:P.newSrc; s=addSource({x:c.x,y:c.y,kind:n.kind,sign:n.sign,q:n.q,w:n.w,A:n.A,M:n.M,mx:0,my:0}); }
+    if(s.kind==='free'){ s.held=true; s.hvx=s.hvy=0; s.tx=s.x; s.ty=s.y; s.trail=[]; }
     sel=s; syncSrcPanel();
     drag={id:e.pointerId,src:s,dx:s.x-c.x,dy:s.y-c.y};
     if(!P.running) render();
@@ -956,7 +1000,14 @@ cv.addEventListener('pointermove',e=>{
     if(!P.running){ s.px=s.x=s.tx; s.py=s.y=s.ty; render(); } dirty=true; }
   else { applyBrush(drag.last,c); drag.last=c; }
 });
-const endDrag=e=>{ if(drag&&drag.id===e.pointerId) drag=null; };
+function releaseFree(s){   // a free charge let go keeps the speed it was dragged at (capped at 0.9 c)
+  let vx=P.running?s.hvx||0:0, vy=P.running?s.hvy||0:0; const v=Math.hypot(vx,vy);
+  if(v>0.9){ vx*=0.9/v; vy*=0.9/v; } const g=1/Math.sqrt(1-Math.min(0.81,vx*vx+vy*vy));
+  s.mx=s.M*g*vx; s.my=s.M*g*vy; s.held=false; s.x=s.px=s.tx; s.y=s.py=s.ty; dirty=true;
+}
+const endDrag=e=>{ if(!drag||drag.id!==e.pointerId) return;
+  const s=drag.src; if(s&&s.kind==='free'&&s.held) releaseFree(s);
+  drag=null; };
 cv.addEventListener('pointerup',endDrag); cv.addEventListener('pointercancel',endDrag);
 
 /* ---------- main loop ---------- */
@@ -979,7 +1030,7 @@ addEventListener('resize',()=>{ sizeCanvas(); if(!P.running) render(); });
 
 /* ---------- debug hook ---------- */
 if(/[?&]debug/.test(location.search)){
-  window.__fs={N,G,dx,dt,L,K,P,phi,vel,phi2,vel2,phi3,vel3,Ex,Ey,Bz,computeEB,srcState,addStatic,addCharge,twistAt,findVortices,get vortices(){return vortices},open,TH,PRESETS,energy,advance,force,fillField,resetField,addSource,setTheory,setEdge,updateDamp,updateVmin,vacPhi4,Vraw,poke,paint,U2C,
+  window.__fs={N,G,dx,dt,L,K,P,releaseFree,phi,vel,phi2,vel2,phi3,vel3,Ex,Ey,Bz,computeEB,srcState,addStatic,addCharge,twistAt,findVortices,get vortices(){return vortices},open,TH,PRESETS,energy,advance,force,fillField,resetField,addSource,setTheory,setEdge,updateDamp,updateVmin,vacPhi4,Vraw,poke,paint,U2C,
     get t(){return t}, set t(v){t=v}, get sources(){return sources}, set sources(v){sources=v}, frame, render,
     preset(th,name){ const p=PRESETS[th].find(q=>q[0]===name); p[1](); afterChange(); },
     setFric(f){P.fric=f; updateDamp();}, setMass(m){P.m[P.th]=m; updateVmin(); dirty=true;}, markDirty(){dirty=true;}};
