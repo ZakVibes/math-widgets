@@ -92,6 +92,8 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .ceq input{flex:1;min-width:0}
 .ceq input.bad,.dom.bad{border-color:var(--bad)}
 .dom{width:96px;min-height:34px;font-size:14px}
+#cp{display:block;width:100%;max-width:560px;aspect-ratio:1/1;margin:0 auto;border-radius:12px;background:#0a0e18;touch-action:none;cursor:crosshair}
+.dimrow{margin-bottom:10px}
 .chk{display:flex;gap:8px;align-items:center;font-size:14px;margin-top:8px}
 .about p{margin:0 0 10px;max-width:75ch}
 .about .try{margin:0;padding-left:20px}
@@ -107,6 +109,10 @@ input[type=range]{width:100%;accent-color:var(--accent)}
   </header>
 
   <section class="panel">
+    <div class="row dimrow"><div class="seg sm" id="dimSeg" role="group" aria-label="Dimensions">
+      <button type="button" data-d="1" aria-pressed="true">1D: u(x, t)</button>
+      <button type="button" data-d="2" aria-pressed="false">2D: u(x, y, t)</button>
+    </div></div>
     <div class="seg theory" id="eqSeg" role="group" aria-label="Equation"></div>
     <p class="eq" id="eq"></p>
     <div class="ceq" id="ceq" hidden>
@@ -120,8 +126,15 @@ input[type=range]{width:100%;accent-color:var(--accent)}
       <p class="err" id="rhsErr" hidden></p>
       <p class="note">Write the right-hand side with u, u_x, u_xx, u_xxx, u_xxxx (and u_t, after u<sub>tt</sub> =), x, t and the sliders a and b. The source f(x, t) below is added on. Press Enter to use it: it takes over from the current state.</p>
     </div>
+    <div class="ceq" id="ceq2" hidden>
+      <div class="row"><span class="eq" style="margin:0;min-width:44px">u<sub>t</sub> =</span><input type="text" id="rhsUIn" spellcheck="false" autocomplete="off" aria-label="Right-hand side for u"></div>
+      <p class="err" id="rhsUErr" hidden></p>
+      <div class="row" style="margin-top:6px"><span class="eq" style="margin:0;min-width:44px">v<sub>t</sub> =</span><input type="text" id="rhsVIn" spellcheck="false" autocomplete="off" aria-label="Right-hand side for v"></div>
+      <p class="err" id="rhsVErr" hidden></p>
+      <p class="note">Two fields u and v. Use u, v, lap_u, lap_v (the Laplacians u<sub>xx</sub> + u<sub>yy</sub> and v<sub>xx</sub> + v<sub>yy</sub>), x, y, t and the sliders a and b. The source f(x, y, t) is added to the u equation. Press Enter to use it.</p>
+    </div>
     <div class="main">
-      <div class="stage">
+      <div class="stage" id="stage1">
         <div class="toolbar">
           <div class="seg sm" id="toolSeg" role="group" aria-label="What dragging on the curve does">
             <button type="button" data-tool="draw" aria-pressed="true">Draw u</button>
@@ -140,6 +153,24 @@ input[type=range]{width:100%;accent-color:var(--accent)}
         <p class="warn" id="warn" hidden></p>
         <p class="hint" id="hint"></p>
       </div>
+      <div class="stage" id="stage2" hidden>
+        <div class="toolbar">
+          <div class="row"><span class="note" style="margin:0">show</span>
+            <div class="seg sm" id="viewSeg2" role="group" aria-label="Which field to show">
+              <button type="button" data-v="u" aria-pressed="true">u</button>
+              <button type="button" data-v="v" aria-pressed="false">v</button>
+            </div></div>
+          <div class="row">
+            <button type="button" class="btn" id="playBtn2">Pause</button>
+            <button type="button" class="btn" id="restartBtn2" title="Start again from the starting shape">Restart</button>
+          </div>
+        </div>
+        <div class="cvwrap" style="max-width:560px"><canvas id="cp" aria-label="The field on a square plate, seen from above. Drag to draw on it."></canvas></div>
+        <div class="cap" style="max-width:560px"><span>t = <b id="tNow2">0</b></span><span id="capKey2"></span></div>
+        <div class="legend" style="max-width:560px"><span id="leg2Lo">0</span><canvas id="leg2" width="256" height="1"></canvas><span id="leg2Hi">1</span></div>
+        <p class="warn" id="warn2" hidden style="max-width:560px"></p>
+        <p class="hint" id="hint2" style="max-width:560px"></p>
+      </div>
 
       <aside class="side">
         <div class="blk">
@@ -151,10 +182,10 @@ input[type=range]{width:100%;accent-color:var(--accent)}
           <div class="sl"><span>speed</span><input type="range" id="speed" min="1" max="9" step="1" value="5"><output id="speedO">×1</output></div>
         </div>
         <div class="blk">
-          <div class="fld"><label for="initIn">Starting shape u(x, 0)</label><input type="text" id="initIn" spellcheck="false" autocomplete="off"><p class="err" id="initErr" hidden></p></div>
-          <div class="fld" id="velFld" hidden><label for="velIn">Starting speed u<sub>t</sub>(x, 0)</label><input type="text" id="velIn" spellcheck="false" autocomplete="off"><p class="err" id="velErr" hidden></p></div>
-          <div class="fld"><label for="srcIn">Source f(x, t)</label><input type="text" id="srcIn" spellcheck="false" autocomplete="off"><p class="err" id="srcErr" hidden></p></div>
-          <p class="note">Press Enter to use a formula. You can write x, t, pi, + − * / ^, and sin, cos, exp, log, sqrt, abs, tanh, sech, step (0 left of zero, 1 right of it), min, max, rand().</p>
+          <div class="fld"><label for="initIn" id="initLab">Starting shape u(x, 0)</label><input type="text" id="initIn" spellcheck="false" autocomplete="off"><p class="err" id="initErr" hidden></p></div>
+          <div class="fld" id="velFld" hidden><label for="velIn" id="velLab">Starting speed u<sub>t</sub>(x, 0)</label><input type="text" id="velIn" spellcheck="false" autocomplete="off"><p class="err" id="velErr" hidden></p></div>
+          <div class="fld"><label for="srcIn" id="srcLab">Source f(x, t)</label><input type="text" id="srcIn" spellcheck="false" autocomplete="off"><p class="err" id="srcErr" hidden></p></div>
+          <p class="note">Press Enter to use a formula. You can write x, t, pi, + − * / ^, and sin, cos, exp, log, sqrt, abs, tanh, sech, step (0 left of zero, 1 right of it), min, max, rand(), and box(X, Y, r) or disk(X, Y, r) (1 inside a square or circle of size r around 0, like disk(x-0.5, y-0.5, 0.1)).</p>
         </div>
         <div class="blk">
           <div class="row"><span class="note" style="margin:0">edges</span>
@@ -164,7 +195,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
               <button type="button" data-e="wrap" aria-pressed="true">Wrap</button>
             </div></div>
           <p class="note" id="edgeNote"></p>
-          <div class="row" id="domRow" hidden style="margin-top:8px"><span class="note" style="margin:0">x from</span><input type="text" id="domA" class="dom" spellcheck="false" aria-label="Left end of x"><span class="note" style="margin:0">to</span><input type="text" id="domB" class="dom" spellcheck="false" aria-label="Right end of x"></div>
+          <div class="row" id="domRow" hidden style="margin-top:8px"><span class="note" style="margin:0" id="domLab">x from</span><input type="text" id="domA" class="dom" spellcheck="false" aria-label="Left end of x"><span class="note" style="margin:0">to</span><input type="text" id="domB" class="dom" spellcheck="false" aria-label="Right end of x"></div>
           <p class="err" id="domErr" hidden></p>
           <label class="chk"><input type="checkbox" id="exactChk" checked> Show the exact answer (dashed)</label>
         </div>
@@ -187,11 +218,12 @@ function rand(){ rngState=rngState+0x6D2B79F5|0; let q=Math.imul(rngState^rngSta
 const FN={sin:[1,Math.sin],cos:[1,Math.cos],tan:[1,Math.tan],asin:[1,Math.asin],acos:[1,Math.acos],atan:[1,Math.atan],
   sinh:[1,Math.sinh],cosh:[1,Math.cosh],tanh:[1,Math.tanh],sech:[1,x=>1/Math.cosh(x)],exp:[1,Math.exp],log:[1,Math.log],ln:[1,Math.log],
   sqrt:[1,Math.sqrt],abs:[1,Math.abs],sign:[1,Math.sign],step:[1,x=>x>0?1:x<0?0:0.5],floor:[1,Math.floor],ceil:[1,Math.ceil],round:[1,Math.round],
-  min:[-2,Math.min],max:[-2,Math.max],mod:[2,(a,b)=>a-b*Math.floor(a/b)],rand:[0,rand]};
+  min:[-2,Math.min],max:[-2,Math.max],mod:[2,(a,b)=>a-b*Math.floor(a/b)],rand:[0,rand],
+  box:[3,(X,Y,r)=>Math.abs(X)<r&&Math.abs(Y)<r?1:0],disk:[3,(X,Y,r)=>X*X+Y*Y<r*r?1:0]};
 const CONSTS={pi:Math.PI,e:Math.E};
 // slots in the env array E; shapes and sources may use x and t, a typed equation also u and its derivatives
-const NAMES=['x','t','u','u_x','u_xx','u_xxx','u_xxxx','u_t','a','b'];
-const SLOT={x:0,t:1,u:2,u_x:3,ux:3,u_xx:4,uxx:4,u_xxx:5,uxxx:5,u_xxxx:6,uxxxx:6,u_t:7,ut:7,a:8,b:9};
+const NAMES=['x','t','u','u_x','u_xx','u_xxx','u_xxxx','u_t','a','b','y','v','lap_u','lap_v'];
+const SLOT={x:0,t:1,u:2,u_x:3,ux:3,u_xx:4,uxx:4,u_xxx:5,uxxx:5,u_xxxx:6,uxxxx:6,u_t:7,ut:7,a:8,b:9,y:10,v:11,lap_u:12,lapu:12,lap_v:13,lapv:13};
 const OPS={'+':(a,b)=>a+b,'-':(a,b)=>a-b,'*':(a,b)=>a*b,'/':(a,b)=>a/b,'^':Math.pow};
 function compile(src,allow){
   allow=allow||[0,1];
@@ -462,12 +494,12 @@ EQS.custom={name:'Your own', a:0, b:1, N:400, get order(){ return P.cOrder; }, k
 const EQ_ORDER=['heat','adv','wave','burg','kdv','fisher','ac','custom'];
 
 /* ---------- state ---------- */
-const P={cOrder:1, rhsStr:'', domA:'0', domB:'1', eq:'burg', preset:null, par:{}, edge:'wrap', initStr:'', velStr:'0', srcStr:'0', mult:1, running:true, tool:'draw', showExact:true, rate:0.25, window:2, range:null};
+const P={dim:1, eq2:'gs', view2:'v', rate2:1, init2v:'0', rhsU:'', rhsV:'', cOrder:1, rhsStr:'', domA:'0', domB:'1', eq:'burg', preset:null, par:{}, edge:'wrap', initStr:'', velStr:'0', srcStr:'0', mult:1, running:true, tool:'draw', showExact:true, rate:0.25, window:2, range:null};
 let N=400, dx=0.005, xa=-1, xb=1, t=0, bL=0, bR=0;
 let u, v, k1, k2, k3, acc0, xs, paint, painted=false, Sbuf;
 let srcC={f:()=>0,usesT:false,zero:true}, srcCache=null;
 const E=new Float64Array(NAMES.length);
-const def=()=>EQS[P.eq], par=()=>P.par[P.eq];
+const curKey=()=>P.dim===2?P.eq2:P.eq, def=()=>P.dim===2?D2[P.eq2]:EQS[P.eq], par=()=>P.par[curKey()];
 let edited=false, blew=false;
 
 function alloc(){
@@ -840,6 +872,7 @@ function niceUp(q){ if(!(q>0)) return 1; const e=Math.pow(10,Math.floor(Math.log
 let lastTs=0, frameNo=0;
 function frame(ts){
   const dtReal=lastTs?Math.min(0.05,Math.max(0,(ts-lastTs)/1000)):1/60; lastTs=ts;
+  if(P.dim===2){ frame2(dtReal); frameNo++; if(!window.NO_TICK) requestAnimationFrame(frame); return; }
   if(P.running) advanceBy(P.rate*P.mult*dtReal);
   checkBlowup(); autoScale();
   drawCurve(); drawStrip();
@@ -888,7 +921,7 @@ function buildParams(){
     const fromS=s=>q.log?q.min*Math.pow(q.max/q.min,s/1000):+s;
     if(q.log){ inp.min=0; inp.max=1000; inp.step=1; } else { inp.min=q.min; inp.max=q.max; inp.step=q.step||0.01; }
     inp.value=toS(par()[q.k]); out.textContent=fmt(par()[q.k]);
-    inp.addEventListener('input',()=>{ par()[q.k]=fromS(inp.value); out.textContent=fmt(par()[q.k]); changed(); });
+    inp.addEventListener('input',()=>{ par()[q.k]=fromS(inp.value); out.textContent=fmt(par()[q.k]); if(P.dim===2) rates2=null; else changed(); });
     row.append(lab,inp,out); box.append(row);
   }
 }
@@ -898,7 +931,7 @@ function syncEdges(){
     const k=d.edges.indexOf(b.dataset.e), idx=['fixed','insulated','wrap'].indexOf(b.dataset.e);
     b.hidden=k<0; b.textContent=d.edgeLabels[idx]||b.textContent; b.setAttribute('aria-pressed',String(b.dataset.e===P.edge));
   }
-  const notes={fixed:'Fixed: the two ends are held at their starting values.',insulated:P.eq==='wave'?'Free: the ends move freely (zero slope there).':P.eq==='heat'?'Insulated: no heat flows through the ends (zero slope).':'Zero slope: nothing flows through the ends.',wrap:'Wrap: the right end joins back onto the left, like a ring.'};
+  const notes={fixed:'Fixed: the two ends are held at their starting values.',insulated:P.eq==='wave'?'Free: the ends move freely (zero slope there).':curKey().startsWith('heat')?'Insulated: no heat flows through the edges (zero slope).':'Zero slope: nothing flows through the ends.',wrap:'Wrap: the right end joins back onto the left, like a ring.'};
   $('edgeNote').textContent=notes[P.edge]+(d.edges.length===1?' This equation needs the ring.':'');
 }
 function loadPreset(name){
@@ -925,7 +958,7 @@ function setEq(key){
   P.eq=key; alloc();
   for(const b of $('eqSeg').children) b.setAttribute('aria-pressed',String(b.dataset.eq===key));
   const d=def();
-  $('eq').innerHTML=d.eq; $('eq').hidden=!!d.custom; $('ceq').hidden=!d.custom; $('domRow').hidden=!d.custom; $('domErr').hidden=true;
+  $('eq').innerHTML=d.eq; $('eq').hidden=!!d.custom; $('ceq').hidden=!d.custom; $('ceq2').hidden=true; $('domRow').hidden=!d.custom; $('domErr').hidden=true;
   $('velFld').hidden=d.order!==2;
   $('exactChk').parentElement.hidden=!d.exact;
   const pb=$('presets'); pb.innerHTML='';
@@ -952,22 +985,333 @@ function setDom(quiet){                // read the x range boxes (they take form
   return true;
 }
 
+/* ---------- 2D: u(x, y, t) on a square ---------- */
+// One ghost ring; explicit Euler, with u updated first and v computed from the new u (so a typed pair u_t = v, v_t = lap_u is a stable wave).
+let N2=128, G2=130, x2a=0, x2b=1, dx2=1/128, t2=0, u2, v2, du2, dv2, sb2, xs2, S2=1, rates2=null, blew2=false, lastDt2=0, lastSub2=0, slowed2=false;
+let src2={f:()=>0,usesT:false,zero:true}, src2Cache=null, fU={f:()=>0,uses:new Set()}, fV={f:()=>0,uses:new Set()};
+const E2=new Float64Array(NAMES.length);
+const ALLOW_SHAPE2=[0,1,10], ALLOW_RHS2=[0,1,10,2,11,12,13,8,9];
+function alloc2(){
+  const d=def(); N2=d.N; G2=N2+2; dx2=(x2b-x2a)/N2;
+  u2=new Float64Array(G2*G2); v2=new Float64Array(G2*G2); du2=new Float64Array(G2*G2); dv2=new Float64Array(G2*G2); sb2=new Float64Array(G2*G2);
+  xs2=new Float64Array(N2); for(let i=0;i<N2;i++) xs2[i]=x2a+(i+0.5)*dx2;
+  src2Cache=null;
+}
+function ghosts2(w,rest){
+  const n=N2, G=G2, e=P.edge, top=(n+1)*G;
+  for(let j=1;j<=n;j++){ const r=j*G;
+    if(e==='wrap'){ w[r]=w[r+n]; w[r+n+1]=w[r+1]; }
+    else if(e==='fixed'){ w[r]=2*rest-w[r+1]; w[r+n+1]=2*rest-w[r+n]; }
+    else { w[r]=w[r+1]; w[r+n+1]=w[r+n]; } }
+  for(let i=1;i<=n;i++){
+    if(e==='wrap'){ w[i]=w[n*G+i]; w[top+i]=w[G+i]; }
+    else if(e==='fixed'){ w[i]=2*rest-w[G+i]; w[top+i]=2*rest-w[n*G+i]; }
+    else { w[i]=w[G+i]; w[top+i]=w[n*G+i]; } }
+}
+function src2At(tt){
+  if(src2.zero) return null;
+  if(src2Cache) return src2Cache;
+  E2[1]=tt;
+  for(let j=0;j<N2;j++){ E2[10]=xs2[j]; for(let i=0;i<N2;i++){ E2[0]=xs2[i]; sb2[(j+1)*G2+i+1]=src2.f(E2); } }
+  if(!src2.usesT) src2Cache=sb2;
+  return sb2;
+}
+const lap2=(w,k)=>w[k-1]+w[k+1]+w[k-G2]+w[k+G2]-4*w[k];
+function fill2(k,i,j,tt,p){
+  E2[0]=xs2[i]; E2[10]=xs2[j]; E2[1]=tt; E2[2]=u2[k]; E2[11]=v2[k]; E2[8]=p.a; E2[9]=p.b;
+  E2[12]=lap2(u2,k)/(dx2*dx2); E2[13]=lap2(v2,k)/(dx2*dx2);
+}
+const D2={
+  heat2:{name:'Heat on a plate', N:128, L:[0,1], fields:1, view:'u', kind:'signed', rest:[0,0], brush:{u:1,r:0.04},
+    edges:['fixed','insulated','wrap'], edgeLabels:['Fixed temperature','Insulated','Wrap'],
+    eq:'u<sub>t</sub> = D (u<sub>xx</sub> + u<sub>yy</sub>) + f(x, y, t)',
+    params:[{k:'D',lab:'diffusion D',min:0.001,max:0.05,log:true,def:0.005}],
+    step(dt,p,S){
+      ghosts2(u2,0); const c=p.D/(dx2*dx2);
+      for(let j=1;j<=N2;j++) for(let k=j*G2+1,e=k+N2;k<e;k++) du2[k]=c*lap2(u2,k)+(S?S[k]:0);
+      for(let j=1;j<=N2;j++) for(let k=j*G2+1,e=k+N2;k<e;k++) u2[k]+=dt*du2[k];
+    },
+    dtMax(p){ return 0.9*dx2*dx2/(4*p.D); },
+    presets:[
+      {name:'Hot spots', u:'disk(x-0.3, y-0.65, 0.1) + disk(x-0.7, y-0.35, 0.06)', edge:'fixed', rate:1, range:1},
+      {name:'Heated corner', u:'0', src:'20disk(x-0.2, y-0.2, 0.05)', edge:'fixed', rate:2, range:0.2},
+      {name:'Hot meets cold', u:'step(0.5-x)', edge:'insulated', rate:3, range:1},
+      {name:'Pulsing heater', u:'0', src:'40sin(3t)disk(x-0.5, y-0.5, 0.05)', edge:'insulated', rate:1, range:0.2}
+    ]},
+  gs:{name:'Gray–Scott patterns', N:128, L:[0,1.28], fields:2, view:'v', kind:'seq', rest:[1,0], brush:{u:0.5,v:0.25,r:0.03},
+    edges:['fixed','insulated','wrap'], edgeLabels:['Fixed','Zero slope','Wrap'],
+    eq:'u<sub>t</sub> = D<sub>u</sub>∇²u − uv² + F(1 − u) + f &nbsp;&nbsp; v<sub>t</sub> = D<sub>v</sub>∇²v + uv² − (F + k)v',
+    params:[{k:'F',lab:'feed F',min:0.01,max:0.08,step:0.0005,def:0.0367},{k:'k',lab:'kill k',min:0.04,max:0.07,step:0.0005,def:0.0649}],
+    step(dt,p,S){
+      ghosts2(u2,1); ghosts2(v2,0); const cu=2e-5/(dx2*dx2), cv=1e-5/(dx2*dx2), F=p.F, fk=p.F+p.k;
+      for(let j=1;j<=N2;j++) for(let k=j*G2+1,e=k+N2;k<e;k++){ const U=u2[k], V=v2[k], uvv=U*V*V;
+        du2[k]=cu*lap2(u2,k)-uvv+F*(1-U)+(S?S[k]:0); dv2[k]=cv*lap2(v2,k)+uvv-fk*V; }
+      for(let j=1;j<=N2;j++) for(let k=j*G2+1,e=k+N2;k<e;k++){ u2[k]+=dt*du2[k]; v2[k]+=dt*dv2[k]; }
+    },
+    dtMax(p){ return Math.min(1,0.9*dx2*dx2/(4*2e-5)); },
+    presets:[
+      {name:'Dividing spots', params:{F:0.0367,k:0.0649}},
+      {name:'Coral', params:{F:0.0545,k:0.062}},
+      {name:'Maze', params:{F:0.029,k:0.057}},
+      {name:'Restless waves', params:{F:0.026,k:0.051}}
+    ].map(q=>Object.assign({u:'1 - 0.5box(x-0.64, y-0.64, 0.05)', v:'0.25box(x-0.64, y-0.64, 0.05) + 0.02rand()', edge:'wrap', rate:2000, range:0.4},q))},
+  spiral:{name:'Spiral waves', N:160, L:[0,80], fields:2, view:'u', kind:'seq', rest:[0,0], brush:{u:1,r:2},
+    edges:['fixed','insulated','wrap'], edgeLabels:['Fixed','Zero slope','Wrap'],
+    eq:'u<sub>t</sub> = ∇²u + u(1 − u)(u − (v + b)/a)/ε + f &nbsp;&nbsp; v<sub>t</sub> = u − v &nbsp;&nbsp; (ε = 0.02)',
+    params:[{k:'a',lab:'a',min:0.5,max:1,step:0.01,def:0.75},{k:'b',lab:'threshold b',min:0,max:0.1,step:0.002,def:0.02}],
+    step(dt,p,S){
+      ghosts2(u2,0); const c=1/(dx2*dx2), ia=1/p.a, b=p.b, ie=1/0.02;
+      for(let j=1;j<=N2;j++) for(let k=j*G2+1,e=k+N2;k<e;k++){ const U=u2[k], V=v2[k];
+        du2[k]=c*lap2(u2,k)+ie*U*(1-U)*(U-(V+b)*ia)+(S?S[k]:0); dv2[k]=U-V; }
+      for(let j=1;j<=N2;j++) for(let k=j*G2+1,e=k+N2;k<e;k++){ u2[k]+=dt*du2[k]; v2[k]+=dt*dv2[k]; }
+    },
+    dtMax(p){ return 0.9*Math.min(dx2*dx2/4,0.02); },
+    presets:[
+      {name:'Spiral', u:'step(x-38)step(42-x)step(40-y)', v:'0.6step(38-x)step(40-y)', edge:'insulated', rate:8, range:1},
+      {name:'Spiral pair', u:'step(x-38)step(42-x)step(abs(y-40)-8)', v:'0.6step(38-x)step(abs(y-40)-8)', edge:'insulated', rate:8, range:1},
+      {name:'Rings from sparks', u:'disk(x-20, y-58, 3) + disk(x-55, y-25, 3)', v:'0', edge:'insulated', rate:8, range:1}
+    ]},
+  own2:{name:'Your own', N:128, L:[0,1], fields:2, view:'u', kind:'signed', rest:[0,0], brush:{u:1,r:0.04}, custom:true,
+    edges:['fixed','insulated','wrap'], edgeLabels:['Fixed (at 0)','Zero slope','Wrap'],
+    eq:'',
+    params:[{k:'a',lab:'a',min:-2,max:2,step:0.0005,def:0},{k:'b',lab:'b',min:-2,max:2,step:0.0005,def:0}],
+    step(dt,p,S){
+      const F=fU.f, Gf=fV.f;
+      ghosts2(u2,0); ghosts2(v2,0);
+      for(let j=1;j<=N2;j++) for(let i=1;i<=N2;i++){ const k=j*G2+i; fill2(k,i-1,j-1,t2,p); du2[k]=F(E2)+(S?S[k]:0); }
+      for(let j=1;j<=N2;j++) for(let k=j*G2+1,e=k+N2;k<e;k++) u2[k]+=dt*du2[k];
+      ghosts2(u2,0);
+      for(let j=1;j<=N2;j++) for(let i=1;i<=N2;i++){ const k=j*G2+i; fill2(k,i-1,j-1,t2,p); dv2[k]=Gf(E2); }
+      for(let j=1;j<=N2;j++) for(let k=j*G2+1,e=k+N2;k<e;k++) v2[k]+=dt*dv2[k];
+    },
+    dtMax(p){ return rates2Of(p); },
+    presets:[
+      {name:'Domains shrink', fu:'0.0001lap_u + u - u^3', fv:'0', u:'0.2(2rand() - 1)', v:'0', edge:'insulated', rate:6, range:1.1, view:'u', kindOf:'signed'},
+      {name:'Waves as a pair', fu:'v', fv:'lap_u - a v', u:'exp(-400((x-0.5)^2 + (y-0.5)^2))', v:'0', edge:'fixed', rate:0.3, range:0.4, view:'u'},
+      {name:'Gray–Scott, typed', fu:'2e-5 lap_u - u v^2 + a(1 - u)', fv:'1e-5 lap_v + u v^2 - (a + b)v', params:{a:0.0367,b:0.0649}, L:['0','0.96'], N:96,
+        u:'1 - 0.5box(x-0.48, y-0.48, 0.05)', v:'0.25box(x-0.48, y-0.48, 0.05) + 0.02rand()', edge:'wrap', rate:250, range:0.4, view:'v', kindOf:'seq'},
+      {name:'Heat, typed', fu:'0.005lap_u', fv:'0', u:'disk(x-0.3, y-0.65, 0.1) + disk(x-0.7, y-0.35, 0.06)', v:'0', edge:'fixed', rate:1, range:1, view:'u'}
+    ]}
+};
+const ORDER2=['heat2','gs','spiral','own2'];
+function rates2Of(p){
+  // sampled partial derivatives of both typed right-hand sides; the fastest mode on the grid has lap = -8/dx²
+  ghosts2(u2,0); ghosts2(v2,0);
+  const pd=(f,q)=>{ const v0=E2[q], h=1e-4*(1+Math.abs(v0)); E2[q]=v0+h; const a=f(E2); E2[q]=v0-h; const b=f(E2); E2[q]=v0; return (a-b)/(2*h); };
+  let Fu=0,Fv=0,Flu=0,Flv=0,Gu=0,Gv=0,Glu=0,Glv=0, minD=Infinity, seen=0;
+  const st=Math.max(1,Math.floor(N2/24));
+  for(let j=0;j<N2;j+=st) for(let i=(j/st)%st;i<N2;i+=st){ const k=(j+1)*G2+i+1; fill2(k,i,j,t2,p);
+    const a=[pd(fU.f,2),pd(fU.f,11),pd(fU.f,12),pd(fU.f,13),pd(fV.f,2),pd(fV.f,11),pd(fV.f,12),pd(fV.f,13)];
+    if(!a.every(isFinite)) continue; seen++;
+    Fu=Math.max(Fu,Math.abs(a[0])); Fv=Math.max(Fv,Math.abs(a[1])); Flu=Math.max(Flu,Math.abs(a[2])); Flv=Math.max(Flv,Math.abs(a[3]));
+    Gu=Math.max(Gu,Math.abs(a[4])); Gv=Math.max(Gv,Math.abs(a[5])); Glu=Math.max(Glu,Math.abs(a[6])); Glv=Math.max(Glv,Math.abs(a[7]));
+    if(fU.uses.has(12)) minD=Math.min(minD,a[2]); if(fV.uses.has(13)) minD=Math.min(minD,a[7]);
+  }
+  if(!seen&&rates2) return rates2.dt;
+  const L=8/(dx2*dx2), d1=Fu+L*Flu, d2=Gv+L*Glv, off=Math.sqrt((Fv+L*Flv)*(Gu+L*Glu));
+  const rho=Math.max(d1,d2)+off, dt=Math.min(1,1.6/Math.max(rho,1e-9));
+  const diff=L*Math.max(Flu,Glv), top=diff>=Math.max(Fu,Gv)&&diff>=off?'diffusion (lap)':off>=Math.max(Fu,Gv)?'coupling between u and v':'reaction';
+  const bad=minD<-1e-12?'A Laplacian has a minus sign in front: that is diffusion run backwards, which sharpens every tiny wiggle without limit (an ill-posed equation).':'';
+  rates2={dt,top,bad};
+  return dt;
+}
+
+const cp=$('cp'), cpCtx=cp.getContext('2d'), off2=document.createElement('canvas'), off2Ctx=off2.getContext('2d');
+let img2=null;
+const kind2=()=>{ const pr=def().presets.find(q=>q.name===P.preset2); return (pr&&pr.kindOf)||def().kind; };
+function draw2(){
+  const dpr=fitCanvas(cp), W=cp.width, H=cp.height;
+  if(off2.width!==N2||!img2){ off2.width=N2; off2.height=N2; img2=off2Ctx.createImageData(N2,N2); }
+  const pix=new Uint32Array(img2.data.buffer), f=P.view2==='v'?v2:u2, signed=kind2()==='signed', lut=signed?lutS:lutQ;
+  for(let j=0;j<N2;j++){ const o=(N2-1-j)*N2, b=(j+1)*G2+1;
+    for(let i=0;i<N2;i++){ const q=f[b+i]; let x=signed?(q+S2)/(2*S2):q/S2; x=x<0?0:x>1?1:x; pix[o+i]=lut[(x*(LN-1))|0]; } }
+  off2Ctx.putImageData(img2,0,0); cpCtx.imageSmoothingEnabled=true; cpCtx.drawImage(off2,0,0,W,H);
+  cpCtx.font=`${11*dpr}px "JetBrains Mono", monospace`; cpCtx.textBaseline='middle';
+  const lab=`x, y = ${fmt(x2a)} … ${fmt(x2b)}`, lw=cpCtx.measureText(lab).width;
+  cpCtx.fillStyle='rgba(10,14,26,.7)'; cpCtx.fillRect(4*dpr,H-22*dpr,lw+8*dpr,16*dpr);
+  cpCtx.fillStyle='rgba(232,236,242,.85)'; cpCtx.fillText(lab,8*dpr,H-14*dpr);
+}
+function drawLegend2(){
+  const c=$('leg2'), g=c.getContext('2d'), signed=kind2()==='signed', lut=signed?lutS:lutQ, img=g.createImageData(256,1), p32=new Uint32Array(img.data.buffer);
+  for(let q=0;q<256;q++) p32[q]=lut[Math.round(q/255*(LN-1))];
+  g.putImageData(img,0,0); $('leg2Lo').textContent=signed?fmt(-S2):'0'; $('leg2Hi').textContent=fmt(S2);
+}
+function autoScale2(){
+  const f=P.view2==='v'?v2:u2, signed=kind2()==='signed'; let m=0;
+  for(let j=1;j<=N2;j++) for(let k=j*G2+1,e=k+N2;k<e;k++){ const q=signed?Math.abs(f[k]):f[k]; if(q>m) m=q; }
+  if(m>S2*1.02){ S2=niceUp(m*1.2); drawLegend2(); }
+}
+function advance2(T){
+  const d=def(), p=par(), dm=d.dtMax(p);
+  let nsub=Math.ceil(T/dm-1e-9), left=T; slowed2=false;
+  const cap=d.custom?150:400;
+  if(nsub>cap){ nsub=cap; left=cap*dm; slowed2=true; }
+  if(nsub<1) nsub=1;
+  const dt=left/nsub;
+  for(let n=0;n<nsub;n++){ d.step(dt,p,src2At(t2)); t2+=dt; }
+  lastDt2=dt; lastSub2=nsub;
+}
+function checkBlowup2(){
+  for(let k=G2+1;k<G2*(N2+1);k+=7){ if(!(Math.abs(u2[k])<1e8)||!(Math.abs(v2[k])<1e8)){
+    blew2=true; P.running=false; syncPlay(); const w=$('warn2'); w.hidden=false; w.textContent=`The solution blew up (grew without limit) near t = ${fmt(t2)}. Restart, or change the equation, source or starting shape.`;
+    u2.fill(0); v2.fill(0); return; } }
+}
+function readout2(){
+  const lines=[`t = <b>${fmt(t2)}</b>`, `time step ${fmt(lastDt2)} · ${lastSub2} per frame${slowed2?' <b>(slowed down: this needs tiny steps)</b>':''}`];
+  if(P.eq2==='heat2'){ let s=0; for(let j=1;j<=N2;j++) for(let k=j*G2+1,e=k+N2;k<e;k++) s+=u2[k]; lines.push(`total heat ∬u dA = <b>${fmt(s*dx2*dx2)}</b>${P.edge==='insulated'&&src2.zero?' (stays fixed)':''}`); }
+  if(P.eq2==='gs') lines.push('F and k pick the pattern: small changes give spots, stripes, mazes or restless waves');
+  if(P.eq2==='spiral') lines.push('drag across a wave to break it: each broken end curls into a new spiral');
+  if(def().custom&&rates2){ lines.push(`the time step is set by the <b>${rates2.top}</b>`); if(rates2.bad) lines.push(`<b style="color:var(--bad)">${rates2.bad}</b>`); }
+  $('readout').innerHTML=lines.join('<br>'); $('tNow2').textContent=fmt(t2);
+}
+function frame2(dtReal){
+  if(P.running) advance2(P.rate2*P.mult*dtReal);
+  checkBlowup2(); autoScale2(); draw2();
+  if(frameNo%6===0) readout2();
+}
+function restart2(){
+  let fu, fv;
+  try{ fu=compile(P.initStr,ALLOW_SHAPE2); setErr('init',''); }catch(err){ setErr('init',err.message); return; }
+  try{ fv=compile(P.init2v,ALLOW_SHAPE2); setErr('vel',''); }catch(err){ setErr('vel',err.message); return; }
+  rngState=12345; E2[1]=0;
+  u2.fill(0); v2.fill(0);
+  for(let j=0;j<N2;j++){ E2[10]=xs2[j]; for(let i=0;i<N2;i++){ E2[0]=xs2[i]; const k=(j+1)*G2+i+1; const a=fu.f(E2), b=def().fields===2?fv.f(E2):0; u2[k]=isFinite(a)?a:0; v2[k]=isFinite(b)?b:0; } }
+  t2=0; blew2=false; $('warn2').hidden=true; rates2=null; src2Cache=null;
+  const pr=def().presets.find(q=>q.name===P.preset2);
+  S2=(pr&&pr.range)||1; drawLegend2(); draw2(); readout2();
+}
+function setRhs2(){
+  let ok=true;
+  try{ fU=compile(P.rhsU,ALLOW_RHS2); setErr('rhsU',''); }catch(err){ setErr('rhsU',err.message); ok=false; }
+  try{ fV=compile(P.rhsV,ALLOW_RHS2); setErr('rhsV',''); }catch(err){ setErr('rhsV',err.message); ok=false; }
+  rates2=null; return ok;
+}
+function setDom2(quiet){
+  let A, B;
+  try{ A=compile(P.domA).f(E); B=compile(P.domB).f(E); }catch(err){ A=NaN; }
+  const bad=!(isFinite(A)&&isFinite(B)&&B>A);
+  $('domErr').hidden=!bad; $('domErr').textContent=bad?'Give two numbers with the left end smaller, like 0 and 1.':'';
+  $('domA').classList.toggle('bad',bad); $('domB').classList.toggle('bad',bad);
+  if(bad) return false;
+  x2a=A; x2b=B; alloc2(); if(!quiet) restart2();
+  return true;
+}
+function loadPreset2(name){
+  const d=def(), pr=d.presets.find(q=>q.name===name)||d.presets[0];
+  P.preset2=pr.name;
+  const pv={}; for(const q of d.params) pv[q.k]=q.def; Object.assign(pv,pr.params||{}); P.par[P.eq2]=pv;
+  P.edge=pr.edge||'wrap'; P.view2=pr.view||d.view; P.rate2=pr.rate||1;
+  P.initStr=pr.u; P.init2v=pr.v||'0'; P.srcStr=pr.src||'0';
+  $('initIn').value=P.initStr; $('velIn').value=P.init2v; $('srcIn').value=P.srcStr;
+  setErr('init',''); setErr('vel',''); setErr('src','');
+  try{ src2=compile(P.srcStr,ALLOW_SHAPE2); }catch(err){ src2=compile('0'); }
+  const L=pr.L||[String(d.L[0]),String(d.L[1])];
+  if(d.custom){ d.N=pr.N||128; P.rhsU=pr.fu; P.rhsV=pr.fv; $('rhsUIn').value=P.rhsU; $('rhsVIn').value=P.rhsV; setRhs2(); P.domA=L[0]; P.domB=L[1]; $('domA').value=P.domA; $('domB').value=P.domB; setDom2(true); }
+  else { x2a=d.L[0]; x2b=d.L[1]; alloc2(); }
+  buildParams(); syncEdges(); syncView2();
+  for(const b of $('presets').children) b.setAttribute('aria-pressed',String(b.textContent===pr.name));
+  restart2();
+  if(!P.running){ P.running=true; syncPlay(); }
+}
+function syncView2(){ const two=def().fields===2; $('viewSeg2').parentElement.hidden=!two; for(const b of $('viewSeg2').children) b.setAttribute('aria-pressed',String(b.dataset.v===P.view2)); }
+function setEq2(key){
+  P.eq2=key;
+  for(const b of $('eqSeg').children) b.setAttribute('aria-pressed',String(b.dataset.eq===key));
+  const d=def();
+  $('eq').innerHTML=d.eq; $('eq').hidden=!!d.custom; $('ceq').hidden=true; $('ceq2').hidden=!d.custom; $('domRow').hidden=!d.custom; $('domErr').hidden=true;
+  $('domLab').textContent='x and y from';
+  $('velFld').hidden=d.fields!==2; $('exactChk').parentElement.hidden=true;
+  $('initLab').textContent='Starting u(x, y)'; $('velLab').textContent='Starting v(x, y)'; $('srcLab').textContent=d.fields===2?'Source f(x, y, t), added to u':'Source f(x, y, t)';
+  const pb=$('presets'); pb.innerHTML='';
+  for(const pr of d.presets){ const b=document.createElement('button'); b.type='button'; b.textContent=pr.name; b.addEventListener('click',()=>loadPreset2(pr.name)); pb.append(b); }
+  $('about').innerHTML=ABOUT2[key];
+  loadPreset2(d.presets[0].name);
+}
+function syncPlay(){ $('playBtn').textContent=$('playBtn2').textContent=P.running?'Pause':'Play'; }
+function buildTabs(){
+  const box=$('eqSeg'); box.innerHTML='';
+  for(const k of (P.dim===2?ORDER2:EQ_ORDER)){ const b=document.createElement('button'); b.type='button'; b.dataset.eq=k; b.textContent=(P.dim===2?D2:EQS)[k].name; b.setAttribute('aria-pressed','false'); b.addEventListener('click',()=>P.dim===2?setEq2(k):setEq(k)); box.append(b); }
+}
+function setDim(dd){
+  P.dim=dd;
+  for(const b of $('dimSeg').children) b.setAttribute('aria-pressed',String(+b.dataset.d===dd));
+  $('stage1').hidden=dd===2; $('stage2').hidden=dd!==2; $('ceq2').hidden=true;
+  buildTabs();
+  if(dd===2) setEq2(P.eq2);
+  else { $('domLab').textContent='x from'; $('initLab').textContent='Starting shape u(x, 0)'; $('velLab').innerHTML='Starting speed u<sub>t</sub>(x, 0)'; $('srcLab').textContent='Source f(x, t)'; setEq(P.eq); }
+}
+const ABOUT2={
+heat2:`<h2>Heat on a plate</h2>
+<p>The same heat equation as in 1D, now on a square plate seen from above: u<sub>t</sub> = D(u<sub>xx</sub> + u<sub>yy</sub>). The sum u<sub>xx</sub> + u<sub>yy</sub> is the Laplacian ∇²u. It compares each point with the average of its neighbours, so hot spots cool and cold spots warm. A round hot spot stays round as it spreads, because the Laplacian treats every direction alike.</p>
+<ul class="try"><li><b>Heated corner:</b> the source keeps pumping heat in and the cold edges drain it, so the plate settles into a steady glow.</li>
+<li>Drag on the plate to add hot spots.</li></ul>`,
+gs:`<h2>Gray–Scott patterns</h2>
+<p>Two chemicals react and spread. u is fed in at rate F, v eats u to make more of itself (the uv² term) and is removed at rate F + k, and v spreads half as fast as u. That's all, yet tiny changes in F and k give spots that divide like cells, coral, mazes or restless waves (John Pearson mapped them in 1993). Alan Turing predicted in 1952 that reaction plus unequal spreading could make patterns like these in living things.</p>
+<ul class="try"><li>Start with <b>Dividing spots</b> and watch the first spot split again and again until it fills the plate.</li>
+<li>Drag on the plate to drop new seeds. Switch the view to u to see the food that v is eating.</li>
+<li>Nudge F or k by a small step while it runs and watch the pattern change character.</li></ul>`,
+spiral:`<h2>Spiral waves</h2>
+<p>An excitable medium, like heart muscle or the Belousov–Zhabotinsky reaction. u is the excitation and v the recovery (Barkley's model). A kick above the threshold fires a wave. Behind it the medium needs time to recover, so waves can't pass through each other: when two meet, they annihilate. A broken wave curls around its free end into a spiral that keeps rotating. In the heart, spirals like these are what make some dangerous arrhythmias.</p>
+<ul class="try"><li><b>Spiral:</b> the free end of the wave curls up and keeps turning.</li>
+<li><b>Rings from sparks:</b> two expanding rings meet and wipe each other out.</li>
+<li>Drag a line across a wave to break it, and watch two new spirals appear.</li></ul>`,
+own2:`<h2>Your own 2D system</h2>
+<p>Type two equations, u<sub>t</sub> = … and v<sub>t</sub> = …, using u, v and their Laplacians lap_u and lap_v. Each step updates u first and then v from the new u. That keeps pairs like u<sub>t</sub> = v, v<sub>t</sub> = lap_u stable, and that pair is just the wave equation u<sub>tt</sub> = ∇²u in disguise. The time step is chosen from how strongly your equations react to each term, as in 1D.</p>
+<ul class="try"><li><b>Domains shrink:</b> the 2D Allen–Cahn equation. Unlike in 1D, curved walls move: each domain shrinks at a speed set by its curvature, so small blobs vanish first.</li>
+<li><b>Waves as a pair:</b> set a above 0 to add damping.</li>
+<li><b>Gray–Scott, typed:</b> the same model as the Gray–Scott tab, with the sliders a and b as F and k. It's slower than the built-in version because every term is read from your formula.</li></ul>`
+};
+
 /* ---------- controls ---------- */
-for(const k of EQ_ORDER){ const b=document.createElement('button'); b.type='button'; b.dataset.eq=k; b.textContent=EQS[k].name; b.setAttribute('aria-pressed','false'); b.addEventListener('click',()=>setEq(k)); $('eqSeg').append(b); }
-$('playBtn').addEventListener('click',()=>{ P.running=!P.running; $('playBtn').textContent=P.running?'Pause':'Play'; if(P.running&&blew){ restart(); } });
+buildTabs();
+for(const b of $('dimSeg').querySelectorAll('button')) b.addEventListener('click',()=>{ if(+b.dataset.d!==P.dim) setDim(+b.dataset.d); });
+for(const b of $('viewSeg2').querySelectorAll('button')) b.addEventListener('click',()=>{ P.view2=b.dataset.v; syncView2(); S2=1e-9; autoScale2(); drawLegend2(); draw2(); });
+$('playBtn2').addEventListener('click',()=>{ P.running=!P.running; syncPlay(); if(P.running&&blew2) restart2(); });
+$('restartBtn2').addEventListener('click',()=>restart2());
+$('rhsUIn').addEventListener('change',e=>{ P.rhsU=e.target.value; if(setRhs2()){ blew2=false; $('warn2').hidden=true; } });
+$('rhsVIn').addEventListener('change',e=>{ P.rhsV=e.target.value; if(setRhs2()){ blew2=false; $('warn2').hidden=true; } });
+// drawing on the plate
+let drag2=false;
+function at2(e){ const r=cp.getBoundingClientRect(); return [x2a+(e.clientX-r.left)/r.width*(x2b-x2a), x2b-(e.clientY-r.top)/r.height*(x2b-x2a)]; }
+function brush2(X,Y){
+  const br=def().brush, rr=br.r*(x2b-x2a)/(def().L[1]-def().L[0]), n=Math.ceil(rr/dx2);
+  const ci=Math.floor((X-x2a)/dx2), cj=Math.floor((Y-x2a)/dx2);
+  for(let j=cj-n;j<=cj+n;j++) for(let i=ci-n;i<=ci+n;i++){
+    if(i<0||j<0||i>=N2||j>=N2) continue;
+    const ddx=xs2[i]-X, ddy=xs2[j]-Y; if(ddx*ddx+ddy*ddy>rr*rr) continue;
+    const k=(j+1)*G2+i+1; if(br.u!=null) u2[k]=br.u; if(br.v!=null) v2[k]=br.v;
+  }
+}
+let last2=null;
+function drag2To(pt){
+  if(last2){ const dd=Math.hypot(pt[0]-last2[0],pt[1]-last2[1]), n=Math.max(1,Math.ceil(dd/dx2)); for(let s=1;s<=n;s++) brush2(last2[0]+(pt[0]-last2[0])*s/n,last2[1]+(pt[1]-last2[1])*s/n); }
+  else brush2(pt[0],pt[1]);
+  last2=pt; if(!P.running) draw2();
+}
+cp.addEventListener('pointerdown',e=>{ drag2=true; last2=null; cp.setPointerCapture(e.pointerId); drag2To(at2(e)); e.preventDefault(); });
+cp.addEventListener('pointermove',e=>{ const pt=at2(e); if(drag2) drag2To(pt); else { const i=Math.max(0,Math.min(N2-1,Math.floor((pt[0]-x2a)/dx2))), j=Math.max(0,Math.min(N2-1,Math.floor((pt[1]-x2a)/dx2))), k=(j+1)*G2+i+1;
+  $('hint2').innerHTML=`<span class="probe">x = ${fmt(xs2[i])} · y = ${fmt(xs2[j])} · u = ${fmt(u2[k])}${def().fields===2?` · v = ${fmt(v2[k])}`:''}</span>`; } });
+const end2=()=>{ drag2=false; last2=null; };
+cp.addEventListener('pointerup',end2); cp.addEventListener('pointercancel',end2);
+cp.addEventListener('pointerleave',()=>{ if(!drag2) $('hint2').textContent='Drag on the plate to draw. Hover to read values.'; });
+$('hint2').textContent='Drag on the plate to draw. Hover to read values.';
+$('playBtn').addEventListener('click',()=>{ P.running=!P.running; syncPlay(); if(P.running&&blew){ restart(); } });
 $('restartBtn').addEventListener('click',()=>{ restart(); });
 $('clearPaint').addEventListener('click',()=>{ paint.fill(0); painted=false; srcMax=0; changed(); });
 $('speed').addEventListener('input',e=>{ P.mult=Math.pow(2,(e.target.value-5)/2); $('speedO').textContent='×'+(P.mult<1?P.mult.toFixed(2):P.mult.toFixed(P.mult%1?1:0)); });
-$('initIn').addEventListener('change',e=>{ P.initStr=e.target.value; restart(); });
+$('initIn').addEventListener('change',e=>{ P.initStr=e.target.value; P.dim===2?restart2():restart(); });
 $('rhsIn').addEventListener('change',e=>{ if(setRhs(e.target.value)){ primeAcc(); blew=false; $('warn').hidden=true; readout(); } });
 for(const b of $('ordSeg').querySelectorAll('button')) b.addEventListener('click',()=>{ P.cOrder=+b.dataset.o; syncOrder(); setRhs($('rhsIn').value); restart(); });
-$('domA').addEventListener('change',e=>{ P.domA=e.target.value; setDom(false); });
-$('domB').addEventListener('change',e=>{ P.domB=e.target.value; setDom(false); });
-$('velIn').addEventListener('change',e=>{ P.velStr=e.target.value; restart(); });
-$('srcIn').addEventListener('change',e=>{ setSource(e.target.value); readout(); });
+$('domA').addEventListener('change',e=>{ P.domA=e.target.value; P.dim===2?setDom2(false):setDom(false); });
+$('domB').addEventListener('change',e=>{ P.domB=e.target.value; P.dim===2?setDom2(false):setDom(false); });
+$('velIn').addEventListener('change',e=>{ if(P.dim===2){ P.init2v=e.target.value; restart2(); } else { P.velStr=e.target.value; restart(); } });
+$('srcIn').addEventListener('change',e=>{
+  if(P.dim===2){ try{ src2=compile(e.target.value,ALLOW_SHAPE2); P.srcStr=e.target.value; setErr('src',''); src2Cache=null; }catch(err){ setErr('src',err.message); } return; }
+  setSource(e.target.value); readout(); });
 $('exactChk').addEventListener('change',e=>{ P.showExact=e.target.checked; readout(); });
 for(const b of $('edgeSeg').querySelectorAll('button')) b.addEventListener('click',()=>{
   if(P.edge===b.dataset.e) return;
+  if(P.dim===2){ P.edge=b.dataset.e; syncEdges(); rates2=null; return; }
   P.edge=b.dataset.e; bL=u[O]; bR=u[N-1+O];
   if(P.edge==='fixed'){ const d=EQS[P.eq]; if(d.exact==='hopf'&&Math.abs(bL)<0.02&&Math.abs(bR)<0.02){ bL=0; bR=0; } }
   syncEdges(); changed();
@@ -1058,7 +1402,7 @@ custom:`<h2>Your own equation</h2>
 setHint();
 setEq('burg');
 requestAnimationFrame(frame);
-addEventListener('resize',()=>{ drawCurve(); drawStrip(); });
+addEventListener('resize',()=>{ if(P.dim===2) draw2(); else { drawCurve(); drawStrip(); } });
 
 /* ---------- debug hook ---------- */
 if(/[?&]debug/.test(location.search)){
@@ -1068,6 +1412,8 @@ if(/[?&]debug/.test(location.search)){
     gap(){ const b=new Float64Array(N); if(!exactAt(t,b)) return NaN; let g=0; for(let i=0;i<N;i++) g=Math.max(g,Math.abs(b[i]-u[i+O])); return g; },
     exact(){ const b=new Float64Array(N); return exactAt(t,b)?b:null; },
     setRhs(s){ $('rhsIn').value=s; const ok=setRhs(s); primeAcc(); return ok||$('rhsErr').textContent; }, get rates(){ return rates; },
+    setDim, setEq2, loadPreset2, advance2(T,chunk){ chunk=chunk||T; while(T>1e-12){ const d=Math.min(chunk,T); advance2(d); T-=d; } return t2; }, draw2, get u2(){ return u2; }, get v2(){ return v2; }, get N2(){ return N2; }, get G2(){ return G2; }, get dx2(){ return dx2; }, get t2(){ return t2; }, get rates2(){ return rates2; }, get xs2(){ return xs2; },
+    setRhs2(a,b){ P.rhsU=a; P.rhsV=b; $('rhsUIn').value=a; $('rhsVIn').value=b; return setRhs2(); },
     setParam(k,val){ par()[k]=val; buildParams(); changed(); }, setSrc(s){ $('srcIn').value=s; setSource(s); }, setInit(s){ $('initIn').value=s; P.initStr=s; restart(); },
     setEdge(e){ P.edge=e; bL=u[O]; bR=u[N-1+O]; syncEdges(); changed(); }, draw:drawCurve, strip:drawStrip, frame};
 }
