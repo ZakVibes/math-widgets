@@ -1401,7 +1401,65 @@ custom:`<h2>Your own equation</h2>
 
 setHint();
 setEq('burg');
-requestAnimationFrame(frame);
+if(/[?&]record\b/.test(location.search)) recordMode(); else requestAnimationFrame(frame);
+
+/* ---------- ?record: a YouTube Short of spiral waves (see ../shorts-rec.js) ---------- */
+/* 1080×1920: a caption band on top, the plate edge to edge below it on a background the colour of the plate's
+   rest state, so the waves seem to float. A finer grid than the page (320² instead of 160²) for a sharp picture,
+   with a smaller time step to match.
+   One take per preset, with a quick fade between takes. */
+function recordMode(){
+  const W=1080, H=1920, PY=490, BG='#080a14', FADEF=8;
+  const TAKES=[{preset:'Rings from sparks', sec:5, speed:0.35}, {preset:'Spiral', sec:10, speed:1}, {preset:'Spiral pair', sec:12, speed:1}];   // speed: × the preset's own rate
+  const start=[]; let n=0; for(const tk of TAKES){ start.push(n); n+=tk.sec*30; }
+  const cv=document.createElement('canvas'), ctx=cv.getContext('2d');
+  cv.width=W; cv.height=H;
+  for(const el of document.body.children) el.style.display='none';
+  document.body.style.background=BG;
+  cv.style.cssText='display:block;margin:0 auto;width:min(100vw,56.25vh);height:min(100vh,177.78vw)';
+  document.body.append(cv);
+  D2.spiral.N=320; P.eq2='spiral';
+  D2.spiral.dtMax=()=>0.9*Math.min(dx2*dx2/8,0.02);   // half the page's diffusion limit: on the finer grid the page's step left a checkerboard ripple
+  setDim(2);
+  const off=document.createElement('canvas'), octx=off.getContext('2d');
+  let img=null, take=-1, cur=0;
+  const short={
+    name:'pde-spirals', seconds:n/30, captionY:260,
+    music:{ file:'chopin-prelude15.mp3', start:0.9, fade:4 },
+    captions:[
+      {from:0, to:4.6, text:'Two sparks\nsend out rings'},
+      {from:5.4, to:14.6, text:'Break a wave and it\ncurls into a spiral'},
+      {from:15.4, to:22.6, text:'Two spirals'},
+      {from:23.2, to:n/30+1, text:'Try it yourself,\nlink in description'}
+    ],
+    reset(){ take=-1; },
+    tick(fi){
+      cur=fi;
+      for(let k=TAKES.length-1;k>=0;k--) if(fi>=start[k]){ if(take!==k){ take=k; loadPreset2(TAKES[k].preset); } break; }
+      advance2(P.rate2*TAKES[take].speed/30);
+    },
+    render(){
+      if(off.width!==N2||!img){ off.width=off.height=N2; img=octx.createImageData(N2,N2); }
+      const pix=new Uint32Array(img.data.buffer);
+      for(let j=0;j<N2;j++){ const o=(N2-1-j)*N2, b=(j+1)*G2+1;
+        for(let i=0;i<N2;i++){ let x=u2[b+i]/S2; x=x<0?0:x>1?1:x; pix[o+i]=lutQ[(x*(LN-1))|0]; } }
+      octx.putImageData(img,0,0);
+      ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle=BG; ctx.fillRect(0,0,W,H);
+      ctx.imageSmoothingEnabled=true; ctx.drawImage(off,0,PY,W,W);
+      let f=0; for(let k=1;k<TAKES.length;k++) f=Math.max(f,1-Math.abs(cur-start[k]+0.5)/FADEF);
+      if(f>0){ ctx.globalAlpha=f; ctx.fillStyle=BG; ctx.fillRect(0,0,W,H); ctx.globalAlpha=1; }
+    }
+  };
+  window.__short=short;
+  const fl=document.createElement('link');   // the caption font, which this page doesn't otherwise load
+  fl.rel='stylesheet'; fl.href='https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&display=swap';
+  fl.onload=fl.onerror=()=>{   // shorts-rec.js waits for the font, so load it once the font is declared
+    const sc=document.createElement('script'); sc.src='../shorts-rec.js';
+    sc.onload=()=>{ short.canvas=cv; ShortsRec(short); };
+    document.head.append(sc);
+  };
+  document.head.append(fl);
+}
 addEventListener('resize',()=>{ if(P.dim===2) draw2(); else { drawCurve(); drawStrip(); } });
 
 /* ---------- debug hook ---------- */
