@@ -3621,7 +3621,86 @@ readColors(); buildLut(); buildElut(); buildWheel(); buildBall(); afFit(); syncS
 resetField("hot"); tuneDelta(40);
 setParams(0.285, 1);
 applyUI();
-requestAnimationFrame(frame);
+if (/[?&]record\b/.test(location.search)) recordMode(); else requestAnimationFrame(frame);
+
+/* ---------- ?record: a YouTube Short of kink collisions (see ../shorts-rec.js) ---------- */
+/* 1080×1920: a caption band on top, below it the space-time film in the dark colours (x from -20 to 20 across,
+   real time up, newest row at the top). One take per collision speed, with a quick fade between takes.
+   The approach and the flight apart play at double speed, the crash itself at normal speed. */
+function recordMode(){
+  var W = 1080, H = 1920, TOP = 470, PW = 540, PH = (H - TOP) / 2, XH = 20, ROWSTEPS = 5;   /* 540×725 cells drawn 2×; 0.125 time units per row */
+  var BG = "#10141c", FADEF = 8;
+  var TAKES = [{ v: 0.35, sec: 8 }, { v: 0.198, sec: 10 }, { v: 0.16, sec: 12 }];
+  var start = [], n = 0, i;
+  for (i = 0; i < TAKES.length; i++){ start.push(n); n += TAKES[i].sec * 30; }
+  var SEC = n / 30;
+  var cv = document.createElement("canvas"), ctx = cv.getContext("2d");
+  cv.width = W; cv.height = H;
+  for (i = 0; i < document.body.children.length; i++) document.body.children[i].style.display = "none";
+  document.body.style.background = BG;
+  cv.style.cssText = "display:block;margin:0 auto;width:min(100vw,56.25vh);height:min(100vh,177.78vw)";
+  document.body.appendChild(cv);
+  var off = document.createElement("canvas"), octx = off.getContext("2d");
+  off.width = PW; off.height = PH;
+  var img = octx.createImageData(PW, PH), px = new Uint32Array(img.data.buffer);
+  var rlut = new Uint32Array(LUTN), st = STOPS_D, k, j;
+  for (i = 0; i < LUTN; i++){
+    var t = i / (LUTN - 1) * 2 - 1; k = 0;
+    while (k < st.length - 2 && t > st[k + 1][0]) k++;
+    var a = st[k], b = st[k + 1], u = (t - a[0]) / (b[0] - a[0]);
+    rlut[i] = (255 << 24) | (Math.round(a[1][2] + (b[1][2] - a[1][2]) * u) << 16) | (Math.round(a[1][1] + (b[1][1] - a[1][1]) * u) << 8) | Math.round(a[1][0] + (b[1][0] - a[1][0]) * u);
+  }
+  var bgPx = (255 << 24) | (0x1c << 16) | (0x14 << 8) | 0x10;
+  var data = new Float32Array(PW * PH), rows = 0, run = null, take = -1, cur = 0;
+  function begin(kk){ take = kk; run = KINK.newRun(TAKES[kk].v, { stop: false }); rows = 0; addRow(); }
+  function addRow(){   /* newest row goes to the top: shift the film down one row */
+    data.copyWithin(PW, 0, (PH - 1) * PW);
+    var s = run.s, bb = s.b;
+    for (var jj = 0; jj < PW; jj++) data[jj] = bb[s.i0 + Math.round((-XH + (jj + 0.5) * 2 * XH / PW) / s.dx)];
+    if (rows < PH) rows++;
+  }
+  var short = {
+    name: "lattice-kinks", seconds: SEC, captionY: 220,
+    captions: [
+      { from: 0, to: 17.4, text: "Watch two kinks\nin a field collide,\ninteract, and fly apart", size: 72 },
+      { from: 18.4, to: 26, text: "Slower, and\nthey get stuck", size: 72 },
+      { from: 26.6, to: SEC + 1, text: "Try it yourself,\nlink in description", size: 72 }
+    ],
+    reset: function(){ take = -1; },
+    tick: function(fi){
+      cur = fi;
+      for (var kk = TAKES.length - 1; kk >= 0; kk--) if (fi >= start[kk]){ if (take !== kk) begin(kk); break; }
+      var d = run.T.d, fast = d === d && d > 4, nr = fast ? 4 : 2;
+      for (var r = 0; r < nr; r++){ run.advance(ROWSTEPS); addRow(); }
+    },
+    render: function(){
+      var scale = (LUTN - 1) / (2 * VMAX), top = LUTN - 1, empty = PH - rows;
+      for (var y = 0; y < PH; y++){   /* the film grows up from the bottom until it fills the frame */
+        var o = y * PW, src = (y - empty) * PW;
+        if (y < empty) for (var x = 0; x < PW; x++) px[o + x] = bgPx;
+        else for (x = 0; x < PW; x++){ var q = ((data[src + x] + VMAX) * scale) | 0; px[o + x] = rlut[q < 0 ? 0 : (q > top ? top : q)]; }
+      }
+      octx.putImageData(img, 0, 0);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.fillStyle = BG; ctx.fillRect(0, 0, W, TOP);
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(off, 0, TOP, W, H - TOP);
+      var f = 0;
+      for (var kk = 1; kk < TAKES.length; kk++) f = Math.max(f, 1 - Math.abs(cur - start[kk] + 0.5) / FADEF);
+      if (f > 0){ ctx.globalAlpha = f; ctx.fillStyle = BG; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+    }
+  };
+  window.__short = short;
+  var fl = document.createElement("link");   /* the caption font, which this page doesn't otherwise load */
+  fl.rel = "stylesheet"; fl.href = "https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&display=swap";
+  fl.onload = fl.onerror = function(){   /* shorts-rec.js waits for the font, so load it once the font is declared */
+    var sc = document.createElement("script");
+    sc.src = "../shorts-rec.js";
+    sc.onload = function(){ short.canvas = cv; ShortsRec(short); };
+    document.head.appendChild(sc);
+  };
+  document.head.appendChild(fl);
+}
 
 /* ---------- debug hook ---------- */
 if (/[?&]debug\b/.test(location.search)){
