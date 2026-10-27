@@ -6,8 +6,11 @@
      tick(i)  advance the scene by one video frame (i = frame number)
      render() draw the scene
      captions [{ from, to, text, size? }] in seconds, "\n" breaks lines; captionY in pixels
+     music    optional { file, start, fade }: a recording in shorts/music/, played from <start> s into the
+              file and fading out over the last <fade> s of the video
    This file adds the captions, plays a looping preview, and on "Record" (or the R key) steps through
-   every frame and sends it to .claude/record-server.py, which makes the MP4.
+   every frame and sends it to .claude/record-server.py, which makes the MP4 and then adds the music.
+   __rec.music() puts the music under an already recorded video (no re-recording).
    No site address in the video (Zak's choice): the link goes in the YouTube description. */
 (() => {
 const FADE = 0.35;
@@ -81,11 +84,21 @@ window.ShortsRec = function (o) {
       say('making the MP4…');
       const r = await post(`/__rec/done?name=${o.name}&fps=${fps}`, '');
       if (r.error) throw new Error(r.error);
+      if (o.music) await music();
       result.file = r.file; say('saved ' + r.file);
     } catch (e) { result.error = String(e); say('failed: ' + e); }
     recording = false; btn.disabled = false; window.__rec.last = result;
     restart(); raf = requestAnimationFrame(preview);
     return result;
+  }
+
+  async function music() {
+    const m = o.music;
+    say('adding the music…');
+    const r = await post(`/__rec/music?name=${o.name}&file=${m.file}&start=${m.start || 0}&fade=${m.fade || 3}`, '');
+    if (r.error) throw new Error(r.error);
+    say('music added to ' + r.file);
+    return r;
   }
 
   // test pictures at chosen times (seconds), saved as shorts/_frames/<name>-stills/00000.jpg …
@@ -108,6 +121,6 @@ window.ShortsRec = function (o) {
 
   const ready = document.fonts.load('700 76px "Bricolage Grotesque"').catch(() => {});
   ready.then(() => { restart(); raf = requestAnimationFrame(preview); });
-  window.__rec = { record, stills, N, fps, last: null };
+  window.__rec = { record, stills, music, N, fps, last: null };
 };
 })();
