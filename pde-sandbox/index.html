@@ -86,6 +86,12 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .read{font:13px/1.6 var(--font-mono);color:var(--muted)}
 .read b{color:var(--fg);font-weight:500}
 .note{font-size:13px;color:var(--muted);margin:4px 0 0}
+.ceq{margin:12px 0 4px}
+.ceq .row{flex-wrap:nowrap;gap:8px}
+.ceq input,.dom{font:15px var(--font-mono);color:var(--fg);background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:6px 8px;min-height:40px}
+.ceq input{flex:1;min-width:0}
+.ceq input.bad,.dom.bad{border-color:var(--bad)}
+.dom{width:96px;min-height:34px;font-size:14px}
 .chk{display:flex;gap:8px;align-items:center;font-size:14px;margin-top:8px}
 .about p{margin:0 0 10px;max-width:75ch}
 .about .try{margin:0;padding-left:20px}
@@ -103,6 +109,17 @@ input[type=range]{width:100%;accent-color:var(--accent)}
   <section class="panel">
     <div class="seg theory" id="eqSeg" role="group" aria-label="Equation"></div>
     <p class="eq" id="eq"></p>
+    <div class="ceq" id="ceq" hidden>
+      <div class="row">
+        <div class="seg sm" id="ordSeg" role="group" aria-label="Time derivative">
+          <button type="button" data-o="1" aria-pressed="true">u<sub>t</sub> =</button>
+          <button type="button" data-o="2" aria-pressed="false">u<sub>tt</sub> =</button>
+        </div>
+        <input type="text" id="rhsIn" spellcheck="false" autocomplete="off" aria-label="Right-hand side of your equation">
+      </div>
+      <p class="err" id="rhsErr" hidden></p>
+      <p class="note">Write the right-hand side with u, u_x, u_xx, u_xxx, u_xxxx (and u_t, after u<sub>tt</sub> =), x, t and the sliders a and b. The source f(x, t) below is added on. Press Enter to use it: it takes over from the current state.</p>
+    </div>
     <div class="main">
       <div class="stage">
         <div class="toolbar">
@@ -147,6 +164,8 @@ input[type=range]{width:100%;accent-color:var(--accent)}
               <button type="button" data-e="wrap" aria-pressed="true">Wrap</button>
             </div></div>
           <p class="note" id="edgeNote"></p>
+          <div class="row" id="domRow" hidden style="margin-top:8px"><span class="note" style="margin:0">x from</span><input type="text" id="domA" class="dom" spellcheck="false" aria-label="Left end of x"><span class="note" style="margin:0">to</span><input type="text" id="domB" class="dom" spellcheck="false" aria-label="Right end of x"></div>
+          <p class="err" id="domErr" hidden></p>
           <label class="chk"><input type="checkbox" id="exactChk" checked> Show the exact answer (dashed)</label>
         </div>
         <div class="blk read" id="readout"></div>
@@ -170,11 +189,15 @@ const FN={sin:[1,Math.sin],cos:[1,Math.cos],tan:[1,Math.tan],asin:[1,Math.asin],
   sqrt:[1,Math.sqrt],abs:[1,Math.abs],sign:[1,Math.sign],step:[1,x=>x>0?1:x<0?0:0.5],floor:[1,Math.floor],ceil:[1,Math.ceil],round:[1,Math.round],
   min:[-2,Math.min],max:[-2,Math.max],mod:[2,(a,b)=>a-b*Math.floor(a/b)],rand:[0,rand]};
 const CONSTS={pi:Math.PI,e:Math.E};
-const VARS=['x','t'];                      // slots in the env array E
+// slots in the env array E; shapes and sources may use x and t, a typed equation also u and its derivatives
+const NAMES=['x','t','u','u_x','u_xx','u_xxx','u_xxxx','u_t','a','b'];
+const SLOT={x:0,t:1,u:2,u_x:3,ux:3,u_xx:4,uxx:4,u_xxx:5,uxxx:5,u_xxxx:6,uxxxx:6,u_t:7,ut:7,a:8,b:9};
 const OPS={'+':(a,b)=>a+b,'-':(a,b)=>a-b,'*':(a,b)=>a*b,'/':(a,b)=>a/b,'^':Math.pow};
-function compile(src){
+function compile(src,allow){
+  allow=allow||[0,1];
+  const uses=new Set(), known=allow.map(q=>NAMES[q]).join(', ');
   const s=String(src).replace(/[−–]/g,'-').replace(/[·×]/g,'*').replace(/π/g,'pi').replace(/\*\*/g,'^').replace(/²/g,'^2').replace(/³/g,'^3').trim();
-  if(!s) return {f:()=>0,usesT:false,zero:true};
+  if(!s) return {f:()=>0,usesT:false,zero:true,uses};
   const tk=[]; let i=0;
   while(i<s.length){
     const ch=s[i];
@@ -252,17 +275,20 @@ function compile(src){
         return {c:null,t,f:E=>fn(...g.map(h=>h(E)))};
       }
       if(name in CONSTS) return C(CONSTS[name]);
-      const slot=VARS.indexOf(k.v);
-      if(slot>=0) return {c:null,t:k.v==='t',f:E=>E[slot]};
-      if(/^[xt]{2,}$/.test(k.v)) throw new Error(`Unknown name “${k.v}”. Write ${k.v.split('').join('*')} for a product.`);
-      throw new Error(`Unknown name “${k.v}”. You can use ${VARS.join(' and ')}, pi, e and functions like sin, exp, sech, step.`);
+      if(k.v in SLOT){
+        const slot=SLOT[k.v];
+        if(!allow.includes(slot)) throw new Error(slot===7&&allow.includes(2)?'u_t can only appear after u_tt = (use the button on the left).':`“${k.v}” can't be used in this box. Here you can use ${known}.`);
+        uses.add(slot); return {c:null,t:slot===1,f:E=>E[slot]};
+      }
+      if(/^[xtu_]{2,}$/.test(k.v)) throw new Error(`Unknown name “${k.v}”. Put * or a space between names, like x*t or u*u_x.`);
+      throw new Error(`Unknown name “${k.v}”. You can use ${known}, pi, e and functions like sin, exp, sech, step.`);
     }
     if(k.ty===')') throw new Error('There is a “)” without a matching “(”.');
     throw new Error(`Something is missing before “${k.ty}”.`);
   }
   const root=expr();
   if(p<tk.length) throw new Error(tk[p].ty===')'?'There is a “)” without a matching “(”.':'Something extra is at the end of the formula.');
-  return {f:fnOf(root),usesT:root.t,zero:root.c===0};
+  return {f:fnOf(root),usesT:root.t,zero:root.c===0,uses};
 }
 
 /* ---------- the equations ---------- */
@@ -373,14 +399,74 @@ const EQS={
       {name:'Far walls stay', init:'1 - 2step(x-0.35)step(0.65-x)', edge:'insulated', params:{eps:0.02}, rate:2, window:30, range:1.1}
     ]}
 };
-const EQ_ORDER=['heat','adv','wave','burg','kdv','fisher','ac'];
+// "Your own": central differences for every term, time step chosen from how strongly the typed right-hand side reacts to each term
+let cRhs={f:()=>0,uses:new Set()}, rates=null;
+const EC=new Float64Array(NAMES.length);
+function cFill(w,vv,i,p,tt){
+  const j=i+O, us=cRhs.uses, d2=dx*dx;
+  EC[0]=xs[i]; EC[1]=tt; EC[2]=w[j]; EC[8]=p.a; EC[9]=p.b;
+  if(us.has(3)) EC[3]=(w[j+1]-w[j-1])/(2*dx);
+  if(us.has(4)) EC[4]=(w[j+1]-2*w[j]+w[j-1])/d2;
+  if(us.has(5)) EC[5]=(w[j+2]-2*w[j+1]+2*w[j-1]-w[j-2])/(2*d2*dx);
+  if(us.has(6)) EC[6]=(w[j+2]-4*w[j+1]+6*w[j]-4*w[j-1]+w[j-2])/(d2*d2);
+  if(us.has(7)) EC[7]=vv?vv[j]:0;
+}
+function cEval(w,vv,out,p,S,tt){ const f=cRhs.f; for(let i=0;i<N;i++){ cFill(w,vv,i,p,tt); out[i]=f(EC)+(S?S[i]:0); } }
+const TERM=['','','u','u_x','u_xx','u_xxx','u_xxxx','u_t'];
+function cRates(p){
+  // numerical partial derivatives of the right-hand side along the current state: the size of each term's coefficient
+  ghosts(u);
+  const f=cRhs.f, mx=new Float64Array(8), hi=new Float64Array(8).fill(-Infinity), lo=new Float64Array(8).fill(Infinity);
+  const slots=[2,3,4,5,6,7].filter(q=>q===2||cRhs.uses.has(q));
+  let seen=0;
+  for(let i=0;i<N;i++){
+    cFill(u,v,i,p,t);
+    for(const q of slots){ const v0=EC[q], h=1e-4*(1+Math.abs(v0)); EC[q]=v0+h; const fp=f(EC); EC[q]=v0-h; const fm=f(EC); EC[q]=v0;
+      const d=(fp-fm)/(2*h); if(!isFinite(d)) continue; seen++; mx[q]=Math.max(mx[q],Math.abs(d)); hi[q]=Math.max(hi[q],d); lo[q]=Math.min(lo[q],d); }
+  }
+  if(!seen&&rates) return rates.dt;          // a broken (non-finite) state: keep the last verdict
+  let parts, dt, bad='';
+  if(P.cOrder===1){
+    parts={2:0.4*mx[2],3:0.58*mx[3]/dx,4:1.6*mx[4]/(dx*dx),5:1.5*mx[5]/(dx*dx*dx),6:6.4*mx[6]/(dx*dx*dx*dx)};
+    let r=0; for(const k in parts) r+=parts[k];
+    dt=0.8/Math.max(r,1e-9);
+    if(cRhs.uses.has(6)&&hi[6]>1e-12) bad='The u_xxxx term has a plus sign. That pumps up the finest wiggles faster and faster, so no computer can follow it (an ill-posed equation). Try a minus sign.';
+    else if(!cRhs.uses.has(6)&&cRhs.uses.has(4)&&lo[4]<-1e-12) bad='The u_xx term has a minus sign somewhere: that runs diffusion backwards, which sharpens every tiny wiggle without limit (an ill-posed equation).';
+  } else {
+    const w2=4*mx[4]/(dx*dx)+16*mx[6]/(dx*dx*dx*dx)+mx[2];
+    parts={4:4*mx[4]/(dx*dx),6:16*mx[6]/(dx*dx*dx*dx),2:mx[2],3:(mx[3]/dx)**2,7:mx[7]**2};
+    dt=0.9*Math.min(1.8/Math.sqrt(w2+1e-12),0.5*dx/(mx[3]+1e-12),1/(mx[7]+1e-12));
+    if(cRhs.uses.has(4)&&!cRhs.uses.has(6)&&lo[4]<-1e-12) bad='With u_tt, the u_xx term needs a plus sign (a wave). A minus sign makes it ill-posed: wiggles grow without limit.';
+    if(cRhs.uses.has(6)&&hi[6]>1e-12) bad='With u_tt, the u_xxxx term needs a minus sign (a vibrating beam). A plus sign makes it ill-posed.';
+  }
+  let top=2, tv=-1; for(const k in parts) if(parts[k]>tv){ tv=parts[k]; top=+k; }
+  rates={dt,bad,top:tv>0?TERM[top]:''};
+  return dt;
+}
+EQS.custom={name:'Your own', a:0, b:1, N:400, get order(){ return P.cOrder; }, kind:'signed', edges:['fixed','insulated','wrap'], edgeLabels:['Fixed','Zero slope','Wrap'],
+    eq:'', custom:true,
+    params:[{k:'a',lab:'a',min:-2,max:2,step:0.005,def:0},{k:'b',lab:'b',min:-2,max:2,step:0.005,def:0}],
+    rhs(w,out,p,S,tt){ cEval(w,null,out,p,S,tt); },
+    acc(w,vv,out,p,S,tt){ cEval(w,vv,out,p,S,tt); },
+    dtMax(p){ return cRates(p); },
+    exact:null,
+    presets:[
+      {name:'Kuramoto–Sivashinsky', order:1, rhs:'-u u_x - u_xx - u_xxxx', dom:['0','32pi'], N:200, init:'cos(x/16)(1 + sin(x/16))', edge:'wrap', rate:12, window:150, range:3},
+      {name:'Swift–Hohenberg stripes', order:1, rhs:'a u - u - 2u_xx - u_xxxx - u^3', params:{a:0.3}, dom:['0','20pi'], N:160, init:'0.1(2rand() - 1)', edge:'wrap', rate:4, window:60, range:1},
+      {name:'Sine-Gordon kinks', order:2, rhs:'u_xx - sin(u)', dom:['-20','20'], N:400, init:'4atan(exp(1.1547(x+10))) + 4atan(exp(-1.1547(x-10))) - 2pi', vel:'-1.1547(sech(1.1547(x+10)) + sech(1.1547(x-10)))', edge:'fixed', rate:2, window:30, range:7},
+      {name:'Spreading with a sharp edge', order:1, rhs:'a(u u_xx + u_x^2)', params:{a:0.05}, dom:['0','1'], N:200, init:'exp(-300(x-0.5)^2)', edge:'insulated', rate:1, window:12, range:1},
+      {name:'Heat with decay', order:1, rhs:'0.01u_xx - a u', params:{a:0.5}, dom:['0','1'], N:200, init:'exp(-200(x-0.5)^2)', edge:'fixed', rate:0.5, window:5},
+      {name:'Burgers, typed', order:1, rhs:'-u u_x + a u_xx', params:{a:0.02}, dom:['-1','1'], N:400, init:'-sin(pi x)', edge:'wrap', rate:0.25, window:2},
+      {name:'Backward heat (breaks)', order:1, rhs:'-0.01u_xx', dom:['0','1'], N:200, init:'exp(-200(x-0.5)^2)', edge:'fixed', rate:0.25, window:2}
+    ]};
+const EQ_ORDER=['heat','adv','wave','burg','kdv','fisher','ac','custom'];
 
 /* ---------- state ---------- */
-const P={eq:'burg', preset:null, par:{}, edge:'wrap', initStr:'', velStr:'0', srcStr:'0', mult:1, running:true, tool:'draw', showExact:true, rate:0.25, window:2, range:null};
+const P={cOrder:1, rhsStr:'', domA:'0', domB:'1', eq:'burg', preset:null, par:{}, edge:'wrap', initStr:'', velStr:'0', srcStr:'0', mult:1, running:true, tool:'draw', showExact:true, rate:0.25, window:2, range:null};
 let N=400, dx=0.005, xa=-1, xb=1, t=0, bL=0, bR=0;
 let u, v, k1, k2, k3, acc0, xs, paint, painted=false, Sbuf;
 let srcC={f:()=>0,usesT:false,zero:true}, srcCache=null;
-const E=new Float64Array(VARS.length);
+const E=new Float64Array(NAMES.length);
 const def=()=>EQS[P.eq], par=()=>P.par[P.eq];
 let edited=false, blew=false;
 
@@ -414,21 +500,21 @@ function dtMax(){ return def().dtMax(par(),umaxOf(u)); }
 function step(dt){
   const d=def(), p=par();
   if(d.order===1){
-    ghosts(u); d.rhs(u,k3,p,srcAt(t));
+    ghosts(u); d.rhs(u,k3,p,srcAt(t),t);
     for(let i=0;i<N;i++) k1[i+O]=u[i+O]+dt*k3[i];
-    ghosts(k1); d.rhs(k1,k3,p,srcAt(t+dt));
+    ghosts(k1); d.rhs(k1,k3,p,srcAt(t+dt),t+dt);
     for(let i=0;i<N;i++) k2[i+O]=0.75*u[i+O]+0.25*(k1[i+O]+dt*k3[i]);
-    ghosts(k2); d.rhs(k2,k3,p,srcAt(t+0.5*dt));
+    ghosts(k2); d.rhs(k2,k3,p,srcAt(t+0.5*dt),t+0.5*dt);
     for(let i=0;i<N;i++) u[i+O]=u[i+O]/3+2/3*(k2[i+O]+dt*k3[i]);
   } else {
-    const damp=Math.exp(-0.5*p.g*dt);
+    const damp=Math.exp(-0.5*(p.g||0)*dt);
     for(let i=0;i<N;i++){ const j=i+O; v[j]=(v[j]+0.5*dt*acc0[i])*damp; u[j]+=dt*v[j]; }
-    ghosts(u); d.acc(u,v,acc0,p,srcAt(t+dt));
+    ghosts(u); d.acc(u,v,acc0,p,srcAt(t+dt),t+dt);
     for(let i=0;i<N;i++){ const j=i+O; v[j]=v[j]*damp+0.5*dt*acc0[i]; }
   }
   t+=dt;
 }
-function primeAcc(){ const d=def(); if(d.order===2){ ghosts(u); d.acc(u,v,acc0,par(),srcAt(t)); } }
+function primeAcc(){ const d=def(); if(d.order===2){ ghosts(u); d.acc(u,v,acc0,par(),srcAt(t),t); } }
 
 /* ---------- space-time strip history ---------- */
 const ROWS=300;
@@ -699,6 +785,10 @@ function readout(){
   lines.push(`t = <b>${fmt(t)}</b>`);
   lines.push(`time step ${fmt(lastDt)} · ${lastSub} per frame${slowed?' <b>(slowed down: this needs tiny steps)</b>':''}`);
   const e=P.eq;
+  if(e==='custom'&&rates){
+    if(rates.top) lines.push(`the time step is set by the <b>${rates.top}</b> term`);
+    if(rates.bad) lines.push(`<b style="color:var(--bad)">${rates.bad}</b>`);
+  }
   if(e==='heat') lines.push(`total heat ∫u dx = <b>${fmt(integral(q=>q))}</b>${P.edge!=='fixed'&&srcC.zero&&!painted?' (stays fixed: no heat gets in or out)':''}`);
   if(e==='adv'||e==='burg') lines.push(`∫u dx = <b>${fmt(integral(q=>q))}</b>${P.edge==='wrap'&&srcC.zero&&!painted?' (stays fixed)':''}`);
   if(e==='kdv') lines.push(`∫u dx = <b>${fmt(integral(q=>q))}</b> · ∫u² dx = <b>${fmt(integral(q=>q*q))}</b> (both stay fixed)`);
@@ -814,6 +904,11 @@ function syncEdges(){
 function loadPreset(name){
   const d=def(), pr=d.presets.find(q=>q.name===name)||d.presets[0];
   P.preset=pr.name;
+  if(d.custom){
+    P.cOrder=pr.order; P.domA=pr.dom[0]; P.domB=pr.dom[1]; d.N=pr.N;
+    $('domA').value=P.domA; $('domB').value=P.domB; setDom(true);
+    $('rhsIn').value=pr.rhs; setRhs(pr.rhs); syncOrder();
+  }
   const pv={}; for(const q of d.params) pv[q.k]=q.def; Object.assign(pv,pr.params||{}); P.par[P.eq]=pv;
   P.edge=pr.edge||d.edges[d.edges.length-1];
   P.initStr=pr.init; P.velStr=pr.vel||'0'; P.rate=pr.rate; P.window=pr.window; P.range=pr.range||null;
@@ -830,13 +925,31 @@ function setEq(key){
   P.eq=key; alloc();
   for(const b of $('eqSeg').children) b.setAttribute('aria-pressed',String(b.dataset.eq===key));
   const d=def();
-  $('eq').innerHTML=d.eq;
+  $('eq').innerHTML=d.eq; $('eq').hidden=!!d.custom; $('ceq').hidden=!d.custom; $('domRow').hidden=!d.custom; $('domErr').hidden=true;
   $('velFld').hidden=d.order!==2;
   $('exactChk').parentElement.hidden=!d.exact;
   const pb=$('presets'); pb.innerHTML='';
   for(const pr of d.presets){ const b=document.createElement('button'); b.type='button'; b.textContent=pr.name; b.addEventListener('click',()=>loadPreset(pr.name)); pb.append(b); }
   $('about').innerHTML=ABOUT[key];
   loadPreset(d.presets[0].name);
+}
+
+function rhsAllow(){ return P.cOrder===2?[0,1,2,3,4,5,6,7,8,9]:[0,1,2,3,4,5,6,8,9]; }
+function setRhs(str){
+  try{ cRhs=compile(str,rhsAllow()); P.rhsStr=str; setErr('rhs',''); }catch(err){ setErr('rhs',err.message); return false; }
+  rates=null; return true;
+}
+function syncOrder(){ for(const b of $('ordSeg').children) b.setAttribute('aria-pressed',String(+b.dataset.o===P.cOrder)); $('velFld').hidden=P.cOrder!==2; }
+function setDom(quiet){                // read the x range boxes (they take formulas like 32pi); reallocate the grid
+  let A, B;
+  try{ A=compile(P.domA).f(E); B=compile(P.domB).f(E); }catch(err){ A=NaN; }
+  const bad=!(isFinite(A)&&isFinite(B)&&B>A);
+  $('domErr').hidden=!bad; $('domErr').textContent=bad?'Give two numbers with the left end smaller, like 0 and 32pi.':'';
+  $('domA').classList.toggle('bad',bad); $('domB').classList.toggle('bad',bad);
+  if(bad) return false;
+  const d=EQS.custom; d.a=A; d.b=B; alloc();
+  if(!quiet) restart();
+  return true;
 }
 
 /* ---------- controls ---------- */
@@ -846,6 +959,10 @@ $('restartBtn').addEventListener('click',()=>{ restart(); });
 $('clearPaint').addEventListener('click',()=>{ paint.fill(0); painted=false; srcMax=0; changed(); });
 $('speed').addEventListener('input',e=>{ P.mult=Math.pow(2,(e.target.value-5)/2); $('speedO').textContent='×'+(P.mult<1?P.mult.toFixed(2):P.mult.toFixed(P.mult%1?1:0)); });
 $('initIn').addEventListener('change',e=>{ P.initStr=e.target.value; restart(); });
+$('rhsIn').addEventListener('change',e=>{ if(setRhs(e.target.value)){ primeAcc(); blew=false; $('warn').hidden=true; readout(); } });
+for(const b of $('ordSeg').querySelectorAll('button')) b.addEventListener('click',()=>{ P.cOrder=+b.dataset.o; syncOrder(); setRhs($('rhsIn').value); restart(); });
+$('domA').addEventListener('change',e=>{ P.domA=e.target.value; setDom(false); });
+$('domB').addEventListener('change',e=>{ P.domB=e.target.value; setDom(false); });
 $('velIn').addEventListener('change',e=>{ P.velStr=e.target.value; restart(); });
 $('srcIn').addEventListener('change',e=>{ setSource(e.target.value); readout(); });
 $('exactChk').addEventListener('change',e=>{ P.showExact=e.target.checked; readout(); });
@@ -927,7 +1044,15 @@ ac:`<h2>The Allen–Cahn equation</h2>
 <p>u = −1 and u = +1 are two stable phases (think of two kinds of magnetised domain, or oil and water), and u = 0 is unstable. From a random start, regions quickly pick a phase, separated by walls about ε√2 wide. In 1D the walls then barely move: they attract only exponentially weakly, so a pattern can freeze for a very long time (metastability).</p>
 <p>A constant source h tips the balance towards one phase, and the walls then march at speed 3ε|b|/√2, where b is the middle root of u³ − u = h (about −h when h is small).</p>
 <ul class="try"><li><b>Close walls merge</b> and <b>Far walls stay</b>: same shape, different spacing.</li>
-<li><b>Wall pushed by a source:</b> try a source of −0.2 to push it back.</li></ul>`
+<li><b>Wall pushed by a source:</b> try a source of −0.2 to push it back.</li></ul>`,
+custom:`<h2>Your own equation</h2>
+<p>Type any equation of the form u<sub>t</sub> = … or u<sub>tt</sub> = … using u and its x-derivatives up to u_xxxx. The computer replaces each derivative by a difference of neighbouring grid values (central differences) and steps forward in time. It picks the time step itself by testing how strongly your right-hand side reacts to each term: the readout names the term that forces the smallest step. Higher derivatives force much smaller steps (u_xx by dx², u_xxxx by dx⁴), which is the CFL condition at work.</p>
+<p>Some equations can't be solved forward in time at all. Diffusion run backwards (a minus sign in front of u_xx) sharpens every tiny wiggle faster and faster until the numbers blow up, however small the time step. The page warns you when it spots one. Try <b>Backward heat</b> to see it happen.</p>
+<ul class="try"><li><b>Kuramoto–Sivashinsky:</b> −u_xx pumps energy into medium wiggles, −u_xxxx kills the finest ones, and −u u_x passes energy along. The result is chaos, with cells that split and merge forever.</li>
+<li><b>Swift–Hohenberg stripes:</b> random noise settles into stripes of one preferred wavelength (2π). Turn a below 0 and they fade away.</li>
+<li><b>Sine-Gordon kinks:</b> a kink and an antikink run into each other and pass through unchanged.</li>
+<li><b>Spreading with a sharp edge:</b> diffusion that depends on u itself (a gas through a porous rock). Unlike heat, the edge moves at a finite speed.</li>
+<li>Edit a preset: change a sign, add a term like + a u, or switch to u<sub>tt</sub> = and see what changes.</li></ul>`
 };
 
 setHint();
@@ -942,6 +1067,7 @@ if(/[?&]debug/.test(location.search)){
     advance(T,chunk){ chunk=chunk||0.01; while(T>1e-12){ const d=Math.min(chunk,T); advanceBy(d); T-=d; } return t; },
     gap(){ const b=new Float64Array(N); if(!exactAt(t,b)) return NaN; let g=0; for(let i=0;i<N;i++) g=Math.max(g,Math.abs(b[i]-u[i+O])); return g; },
     exact(){ const b=new Float64Array(N); return exactAt(t,b)?b:null; },
+    setRhs(s){ $('rhsIn').value=s; const ok=setRhs(s); primeAcc(); return ok||$('rhsErr').textContent; }, get rates(){ return rates; },
     setParam(k,val){ par()[k]=val; buildParams(); changed(); }, setSrc(s){ $('srcIn').value=s; setSource(s); }, setInit(s){ $('initIn').value=s; P.initStr=s; restart(); },
     setEdge(e){ P.edge=e; bL=u[O]; bR=u[N-1+O]; syncEdges(); changed(); }, draw:drawCurve, strip:drawStrip, frame};
 }
