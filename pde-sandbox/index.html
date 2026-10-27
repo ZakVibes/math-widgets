@@ -1,0 +1,949 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PDE Sandbox</title>
+<link rel="manifest" href="../manifest.json"><link rel="icon" href="../icons/icon-192.png"><link rel="apple-touch-icon" href="../icons/icon-180.png"><meta name="apple-mobile-web-app-title" content="Math Widgets"><script>if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("../sw.js"));</script>
+<link rel="stylesheet" href="../site.css">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* PDE Sandbox: famous partial differential equations in (x, t), solved live. The curve shows u(x) now; the strip below keeps the whole history. */
+:root{
+  color-scheme: light;
+  --bg:#f4f2ee; --panel:#ffffff; --soft:#efece6; --line:#dcd7cc;
+  --fg:#1b2230; --muted:#5a6575; --accent:#d9682b; --on-accent:#fff;
+  --cool:#2c7fd6; --bad:#b4372a;
+  --font-display:"Fraunces", Georgia, "Times New Roman", serif;
+  --font-body:"Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono:"JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --bg:#0f1218; --panel:#171c24; --soft:#20262f; --line:#2e3642;
+    --fg:#e8ecf2; --muted:#9aa6b6; --accent:#ff9a4d; --on-accent:#1a0e05;
+    --cool:#6cb4ff; --bad:#ff8a7a;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#0f1218; --panel:#171c24; --soft:#20262f; --line:#2e3642;
+  --fg:#e8ecf2; --muted:#9aa6b6; --accent:#ff9a4d; --on-accent:#1a0e05;
+  --cool:#6cb4ff; --bad:#ff8a7a;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.5 var(--font-body);overflow-x:hidden}
+.wrap{max-width:1160px;margin:0 auto;padding:24px 16px 56px}
+h1{font:600 clamp(30px,6vw,46px)/1.05 var(--font-display);margin:0 0 8px;letter-spacing:-.01em}
+h2{font:600 19px/1.2 var(--font-display);margin:0 0 10px}
+h3{font:600 15px/1.3 var(--font-body);margin:0 0 6px}
+.lede{margin:0 0 20px;color:var(--muted);max-width:62ch}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:16px;min-width:0}
+button{font:inherit;color:inherit;cursor:pointer}
+[hidden]{display:none!important}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--soft)}
+.seg button{border:0;background:transparent;padding:8px 14px;font-size:15px;min-height:40px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent);font-weight:600}
+.theory button{flex:1 1 auto}
+@media (max-width:520px){.theory button{padding:6px 10px;font-size:14px;min-height:36px}}
+.seg.sm button{padding:4px 10px;font-size:14px;min-height:34px}
+.btn{border:1px solid var(--line);background:var(--soft);border-radius:8px;padding:4px 12px;min-height:34px;font-size:14px}
+.btn:hover,.presets button:hover{border-color:var(--accent)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.row{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}
+.eq{font-family:var(--font-mono);font-size:15px;margin:12px 0 4px;overflow-wrap:anywhere}
+.eq sub,.eq sup{font-size:.72em}
+.main{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;margin-top:12px}
+@media (min-width:920px){.main{grid-template-columns:minmax(0,1fr) 320px}}
+.stage{min-width:0}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin-bottom:8px}
+.cvwrap{position:relative;width:100%;max-width:780px;margin:0 auto}
+#cu{display:block;width:100%;aspect-ratio:2.7/1;border-radius:12px;background:#0a0e18;touch-action:none;cursor:crosshair}
+#cs{display:block;width:100%;aspect-ratio:2.1/1;border-radius:12px;background:#0a0e18;margin-top:8px;cursor:crosshair}
+@media (max-width:600px){#cu{aspect-ratio:2/1}#cs{aspect-ratio:1.5/1}}
+.cap{display:flex;justify-content:space-between;gap:8px;max-width:780px;margin:4px auto 0;font-size:13px;color:var(--muted)}
+.legend{display:flex;align-items:center;gap:8px;max-width:780px;margin:6px auto 0;font:12px var(--font-mono);color:var(--muted)}
+.legend canvas{flex:1;height:10px;border-radius:5px;min-width:0}
+.hint{font-size:14px;color:var(--muted);margin:6px auto 0;max-width:780px;min-height:1.5em}
+.probe{font:13px var(--font-mono);color:var(--fg)}
+.warn{color:var(--bad);font-size:14px;margin:6px auto 0;max-width:780px}
+.side{display:flex;flex-direction:column;gap:14px;min-width:0}
+.side .blk{border-top:1px solid var(--line);padding-top:12px}
+.side .blk:first-child{border-top:0;padding-top:0}
+.presets{display:flex;flex-wrap:wrap;gap:6px}
+.presets button{border:1px solid var(--line);background:var(--soft);border-radius:8px;padding:4px 10px;min-height:34px;font-size:14px}
+.presets button[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.sl{display:grid;grid-template-columns:104px minmax(0,1fr) 56px;gap:8px;align-items:center;font-size:14px;margin:4px 0}
+.sl output{font-family:var(--font-mono);font-size:13px;text-align:right}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.fld{margin:0 0 10px}
+.fld label{display:block;font-size:14px;margin:0 0 3px}
+.fld input[type=text]{width:100%;font:14px var(--font-mono);color:var(--fg);background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:6px 8px;min-height:36px}
+.fld input.bad{border-color:var(--bad)}
+.err{color:var(--bad);font-size:13px;margin:3px 0 0}
+.read{font:13px/1.6 var(--font-mono);color:var(--muted)}
+.read b{color:var(--fg);font-weight:500}
+.note{font-size:13px;color:var(--muted);margin:4px 0 0}
+.chk{display:flex;gap:8px;align-items:center;font-size:14px;margin-top:8px}
+.about p{margin:0 0 10px;max-width:75ch}
+.about .try{margin:0;padding-left:20px}
+.about .try li{margin:0 0 4px}
+</style>
+</head>
+
+<div class="wrap">
+  <header>
+    <a class="back-link" href="../index.html">← All widgets</a>
+    <h1>PDE sandbox</h1>
+    <p class="lede">Famous partial differential equations, solved as you watch. Pick an equation, choose how it starts and what drives it, and see the solution unfold: the curve shows u(x) right now, and the strip below keeps the whole history, with time running down the page.</p>
+  </header>
+
+  <section class="panel">
+    <div class="seg theory" id="eqSeg" role="group" aria-label="Equation"></div>
+    <p class="eq" id="eq"></p>
+    <div class="main">
+      <div class="stage">
+        <div class="toolbar">
+          <div class="seg sm" id="toolSeg" role="group" aria-label="What dragging on the curve does">
+            <button type="button" data-tool="draw" aria-pressed="true">Draw u</button>
+            <button type="button" data-tool="paint" aria-pressed="false">Paint source</button>
+          </div>
+          <div class="row">
+            <button type="button" class="btn" id="playBtn">Pause</button>
+            <button type="button" class="btn" id="restartBtn" title="Start again from the starting shape">Restart</button>
+            <button type="button" class="btn" id="clearPaint" title="Remove the painted source">Clear painted source</button>
+          </div>
+        </div>
+        <div class="cvwrap"><canvas id="cu" aria-label="The solution u(x) right now. Drag on it to redraw u, or to paint a source."></canvas></div>
+        <div class="cap"><span>Now: u(x) at t = <b id="tNow">0</b></span><span id="capKey"></span></div>
+        <div class="cvwrap"><canvas id="cs" aria-label="Space-time strip: x across, time running down. Hover to read values."></canvas></div>
+        <div class="legend"><span id="legLo">−1</span><canvas id="leg" width="256" height="1"></canvas><span id="legHi">+1</span></div>
+        <p class="warn" id="warn" hidden></p>
+        <p class="hint" id="hint"></p>
+      </div>
+
+      <aside class="side">
+        <div class="blk">
+          <h3>Try a preset</h3>
+          <div class="presets" id="presets"></div>
+        </div>
+        <div class="blk">
+          <div id="params"></div>
+          <div class="sl"><span>speed</span><input type="range" id="speed" min="1" max="9" step="1" value="5"><output id="speedO">×1</output></div>
+        </div>
+        <div class="blk">
+          <div class="fld"><label for="initIn">Starting shape u(x, 0)</label><input type="text" id="initIn" spellcheck="false" autocomplete="off"><p class="err" id="initErr" hidden></p></div>
+          <div class="fld" id="velFld" hidden><label for="velIn">Starting speed u<sub>t</sub>(x, 0)</label><input type="text" id="velIn" spellcheck="false" autocomplete="off"><p class="err" id="velErr" hidden></p></div>
+          <div class="fld"><label for="srcIn">Source f(x, t)</label><input type="text" id="srcIn" spellcheck="false" autocomplete="off"><p class="err" id="srcErr" hidden></p></div>
+          <p class="note">Press Enter to use a formula. You can write x, t, pi, + − * / ^, and sin, cos, exp, log, sqrt, abs, tanh, sech, step (0 left of zero, 1 right of it), min, max, rand().</p>
+        </div>
+        <div class="blk">
+          <div class="row"><span class="note" style="margin:0">edges</span>
+            <div class="seg sm" id="edgeSeg" role="group" aria-label="Edges">
+              <button type="button" data-e="fixed" aria-pressed="false">Fixed</button>
+              <button type="button" data-e="insulated" aria-pressed="false">Zero slope</button>
+              <button type="button" data-e="wrap" aria-pressed="true">Wrap</button>
+            </div></div>
+          <p class="note" id="edgeNote"></p>
+          <label class="chk"><input type="checkbox" id="exactChk" checked> Show the exact answer (dashed)</label>
+        </div>
+        <div class="blk read" id="readout"></div>
+      </aside>
+    </div>
+  </section>
+
+  <section class="panel about" id="about"></section>
+</div>
+
+<script>
+(()=>{
+"use strict";
+const $=id=>document.getElementById(id);
+
+/* ---------- formulas typed by the visitor (a small safe parser: no eval) ---------- */
+let rngState=12345;
+function rand(){ rngState=rngState+0x6D2B79F5|0; let q=Math.imul(rngState^rngState>>>15,1|rngState); q=q+Math.imul(q^q>>>7,61|q)^q; return ((q^q>>>14)>>>0)/4294967296; }
+const FN={sin:[1,Math.sin],cos:[1,Math.cos],tan:[1,Math.tan],asin:[1,Math.asin],acos:[1,Math.acos],atan:[1,Math.atan],
+  sinh:[1,Math.sinh],cosh:[1,Math.cosh],tanh:[1,Math.tanh],sech:[1,x=>1/Math.cosh(x)],exp:[1,Math.exp],log:[1,Math.log],ln:[1,Math.log],
+  sqrt:[1,Math.sqrt],abs:[1,Math.abs],sign:[1,Math.sign],step:[1,x=>x>0?1:x<0?0:0.5],floor:[1,Math.floor],ceil:[1,Math.ceil],round:[1,Math.round],
+  min:[-2,Math.min],max:[-2,Math.max],mod:[2,(a,b)=>a-b*Math.floor(a/b)],rand:[0,rand]};
+const CONSTS={pi:Math.PI,e:Math.E};
+const VARS=['x','t'];                      // slots in the env array E
+const OPS={'+':(a,b)=>a+b,'-':(a,b)=>a-b,'*':(a,b)=>a*b,'/':(a,b)=>a/b,'^':Math.pow};
+function compile(src){
+  const s=String(src).replace(/[−–]/g,'-').replace(/[·×]/g,'*').replace(/π/g,'pi').replace(/\*\*/g,'^').replace(/²/g,'^2').replace(/³/g,'^3').trim();
+  if(!s) return {f:()=>0,usesT:false,zero:true};
+  const tk=[]; let i=0;
+  while(i<s.length){
+    const ch=s[i];
+    if(/\s/.test(ch)){ i++; continue; }
+    let m=/^(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?/.exec(s.slice(i));
+    if(m){ tk.push({ty:'n',v:parseFloat(m[0])}); i+=m[0].length; continue; }
+    m=/^[A-Za-z_][A-Za-z_0-9]*/.exec(s.slice(i));
+    if(m){ tk.push({ty:'id',v:m[0]}); i+=m[0].length; continue; }
+    if('+-*/^(),'.includes(ch)){ tk.push({ty:ch}); i++; continue; }
+    throw new Error(`I don't understand “${ch}”.`);
+  }
+  let p=0;
+  const peek=()=>tk[p], next=()=>tk[p++];
+  const C=v=>({c:v,t:false});
+  const fnOf=n=>{ if(n.c!=null){ const v=n.c; return ()=>v; } return n.f; };
+  const expect=ty=>{ const k=next(); if(!k||k.ty!==ty) throw new Error(ty===')'?'A closing bracket “)” is missing.':`Expected “${ty}”.`); };
+  function bin(o,a,b){
+    if(a.c!=null&&b.c!=null) return C(OPS[o](a.c,b.c));
+    const fa=fnOf(a), fb=fnOf(b); let f;
+    if(o==='+') f=E=>fa(E)+fb(E);
+    else if(o==='-') f=E=>fa(E)-fb(E);
+    else if(o==='*') f=E=>fa(E)*fb(E);
+    else if(o==='/') f=E=>fa(E)/fb(E);
+    else if(b.c===2) f=E=>{ const v=fa(E); return v*v; };
+    else f=E=>Math.pow(fa(E),fb(E));
+    return {c:null,t:a.t||b.t,f};
+  }
+  const startsPrimary=k=>k&&(k.ty==='n'||k.ty==='id'||k.ty==='(');
+  function expr(){
+    let a=term();
+    while(peek()&&(peek().ty==='+'||peek().ty==='-')){ const o=next().ty; a=bin(o,a,term()); }
+    return a;
+  }
+  function term(){
+    let a=unary();
+    for(;;){
+      const k=peek();
+      if(k&&(k.ty==='*'||k.ty==='/')){ next(); a=bin(k.ty,a,unary()); }
+      else if(startsPrimary(k)) a=bin('*',a,unary());          // implicit product: 2x, 3sin(x), x(1-x)
+      else return a;
+    }
+  }
+  function unary(){
+    const k=peek();
+    if(k&&k.ty==='-'){ next(); const a=unary(); if(a.c!=null) return C(-a.c); const fa=a.f; return {c:null,t:a.t,f:E=>-fa(E)}; }
+    if(k&&k.ty==='+'){ next(); return unary(); }
+    return power();
+  }
+  function power(){
+    const a=primary();
+    if(peek()&&peek().ty==='^'){ next(); return bin('^',a,unary()); }
+    return a;
+  }
+  function primary(){
+    const k=next();
+    if(!k) throw new Error('The formula ends too early.');
+    if(k.ty==='n') return C(k.v);
+    if(k.ty==='('){ const e=expr(); expect(')'); return e; }
+    if(k.ty==='id'){
+      const name=k.v.toLowerCase();
+      if(FN[name]){
+        if(!peek()||peek().ty!=='(') throw new Error(`Write ${name}(…) with brackets.`);
+        next(); const args=[];
+        if(peek()&&peek().ty===')') next();
+        else { args.push(expr()); while(peek()&&peek().ty===','){ next(); args.push(expr()); } expect(')'); }
+        const [ar,fn]=FN[name];
+        if(ar>=0&&args.length!==ar) throw new Error(`${name}(…) takes ${ar===0?'no':ar} input${ar===1?'':'s'}.`);
+        if(ar===-2&&args.length<2) throw new Error(`${name}(…) needs at least two inputs, like ${name}(x, 0).`);
+        const isRand=name==='rand';
+        if(!isRand&&args.every(q=>q.c!=null)) return C(fn(...args.map(q=>q.c)));
+        const g=args.map(fnOf), t=isRand||args.some(q=>q.t);
+        if(g.length===0) return {c:null,t,f:()=>fn()};
+        if(g.length===1){ const g0=g[0]; return {c:null,t,f:E=>fn(g0(E))}; }
+        if(g.length===2){ const g0=g[0], g1=g[1]; return {c:null,t,f:E=>fn(g0(E),g1(E))}; }
+        return {c:null,t,f:E=>fn(...g.map(h=>h(E)))};
+      }
+      if(name in CONSTS) return C(CONSTS[name]);
+      const slot=VARS.indexOf(k.v);
+      if(slot>=0) return {c:null,t:k.v==='t',f:E=>E[slot]};
+      if(/^[xt]{2,}$/.test(k.v)) throw new Error(`Unknown name “${k.v}”. Write ${k.v.split('').join('*')} for a product.`);
+      throw new Error(`Unknown name “${k.v}”. You can use ${VARS.join(' and ')}, pi, e and functions like sin, exp, sech, step.`);
+    }
+    if(k.ty===')') throw new Error('There is a “)” without a matching “(”.');
+    throw new Error(`Something is missing before “${k.ty}”.`);
+  }
+  const root=expr();
+  if(p<tk.length) throw new Error(tk[p].ty===')'?'There is a “)” without a matching “(”.':'Something extra is at the end of the formula.');
+  return {f:fnOf(root),usesT:root.t,zero:root.c===0};
+}
+
+/* ---------- the equations ---------- */
+// Each u has three ghost cells on each side: cell i (0..N-1, centred at a+(i+0.5)dx) lives at index i+3.
+const O=3;
+const lap=(w,j,dx2)=>(w[j-1]-2*w[j]+w[j+1])/dx2;
+function mc(l,r){ if(l*r<=0) return 0; const s=l>0?1:-1; return s*Math.min(2*Math.abs(l),2*Math.abs(r),0.5*Math.abs(l+r)); }
+const SL=new Float64Array(2048), FI=new Float64Array(2048);
+// conservative MUSCL (MC limiter) + Rusanov flux: out[i] = -(F_{i+1/2} - F_{i-1/2})/dx
+function fluxDiv(w,out,burg,c){
+  for(let j=O-1;j<=N+O;j++) SL[j]=mc(w[j]-w[j-1],w[j+1]-w[j]);
+  for(let j=O-1;j<N+O;j++){
+    const uL=w[j]+0.5*SL[j], uR=w[j+1]-0.5*SL[j+1];
+    if(burg){ const s=Math.max(Math.abs(uL),Math.abs(uR)); FI[j]=0.25*(uL*uL+uR*uR)-0.5*s*(uR-uL); }
+    else FI[j]=0.5*c*(uL+uR)-0.5*Math.abs(c)*(uR-uL);
+  }
+  for(let i=0;i<N;i++){ const j=i+O; out[i]=-(FI[j]-FI[j-1])/dx; }
+}
+
+const EQS={
+  heat:{name:'Heat', a:0, b:1, N:200, order:1, kind:'signed', edges:['fixed','insulated','wrap'], edgeLabels:['Fixed temperature','Insulated','Wrap'],
+    eq:'u<sub>t</sub> = D u<sub>xx</sub> + f(x, t)',
+    params:[{k:'D',lab:'diffusion D',min:0.001,max:0.1,log:true,def:0.01}],
+    rhs(w,out,p,S){ const d2=dx*dx; for(let i=0;i<N;i++){ const j=i+O; out[i]=p.D*lap(w,j,d2)+(S?S[i]:0); } },
+    dtMax(p){ return 0.5*dx*dx/p.D; },
+    exact:'spectral',
+    presets:[
+      {name:'Hot spot', init:'exp(-200(x-0.5)^2)', edge:'fixed', rate:0.5, window:5},
+      {name:'Ripples fade first', init:'sin(pi x) + 0.3sin(9pi x)', edge:'fixed', rate:0.5, window:5},
+      {name:'Hot meets cold', init:'step(0.5-x)', edge:'insulated', rate:1, window:10},
+      {name:'Heated middle', init:'0', src:'5exp(-200(x-0.5)^2)', edge:'fixed', rate:1, window:12, range:0.6},
+      {name:'Pulsing heater', init:'0', src:'8sin(4t)exp(-300(x-0.3)^2)', edge:'insulated', rate:1, window:12, range:0.5}
+    ]},
+  adv:{name:'Advection', a:0, b:1, N:400, order:1, kind:'signed', edges:['wrap'], edgeLabels:['','','Wrap'],
+    eq:'u<sub>t</sub> + c u<sub>x</sub> = f(x, t)',
+    params:[{k:'c',lab:'speed c',min:-1,max:1,step:0.05,def:0.5}],
+    rhs(w,out,p,S){ fluxDiv(w,out,false,p.c); if(S) for(let i=0;i<N;i++) out[i]+=S[i]; },
+    dtMax(p){ return 0.5*dx/Math.max(Math.abs(p.c),1e-3); },
+    exact:'shift',
+    presets:[
+      {name:'Smooth bump', init:'exp(-200(x-0.3)^2)', rate:0.5, window:4},
+      {name:'Square pulse', init:'step(x-0.2)step(0.4-x)', rate:0.5, window:4},
+      {name:'Bump and box', init:'exp(-300(x-0.25)^2) + step(x-0.55)step(0.75-x)', rate:0.5, window:4},
+      {name:'Fed by a source', init:'0', src:'3sin(2pi t)exp(-400(x-0.2)^2)', rate:0.5, window:4, range:0.6}
+    ]},
+  wave:{name:'Wave', a:0, b:1, N:400, order:2, kind:'signed', edges:['fixed','insulated','wrap'], edgeLabels:['Tied','Free','Wrap'],
+    eq:'u<sub>tt</sub> = c<sup>2</sup> u<sub>xx</sub> − γ u<sub>t</sub> + f(x, t)',
+    params:[{k:'c',lab:'wave speed c',min:0.2,max:2,step:0.05,def:1},{k:'g',lab:'damping γ',min:0,max:2,step:0.05,def:0}],
+    acc(w,vv,out,p,S){ const d2=dx*dx, c2=p.c*p.c; for(let i=0;i<N;i++){ const j=i+O; out[i]=c2*lap(w,j,d2)+(S?S[i]:0); } },
+    dtMax(p){ return 0.9*dx/p.c; },
+    exact:'spectral',
+    presets:[
+      {name:'Plucked string', init:'min(x/0.3, (1-x)/0.7)', edge:'fixed', rate:0.25, window:4},
+      {name:'Pulse splits', init:'exp(-400(x-0.5)^2)', edge:'fixed', rate:0.25, window:4},
+      {name:'Free ends', init:'exp(-400(x-0.5)^2)', edge:'insulated', rate:0.25, window:4},
+      {name:'Standing wave', init:'sin(2pi x)', edge:'fixed', rate:0.25, window:4},
+      {name:'Hammer strike', init:'0', vel:'8exp(-400(x-0.3)^2)', edge:'fixed', rate:0.25, window:4, range:0.4},
+      {name:'Resonance', init:'0', src:'3sin(pi t)exp(-200(x-0.3)^2)', edge:'fixed', rate:1, window:24, range:1}
+    ]},
+  burg:{name:'Burgers (shocks)', a:-1, b:1, N:400, order:1, kind:'signed', edges:['fixed','wrap'], edgeLabels:['Fixed','','Wrap'],
+    eq:'u<sub>t</sub> + u u<sub>x</sub> = ν u<sub>xx</sub> + f(x, t)',
+    params:[{k:'nu',lab:'viscosity ν',min:0.001,max:0.1,log:true,def:0.005}],
+    rhs(w,out,p,S){ fluxDiv(w,out,true,0); const d2=dx*dx; for(let i=0;i<N;i++){ const j=i+O; out[i]+=p.nu*lap(w,j,d2)+(S?S[i]:0); } },
+    dtMax(p,um){ return 1/(2*p.nu/(dx*dx)+2*um/dx+1e-9); },
+    exact:'hopf',
+    presets:[
+      {name:'Sine steepens', init:'-sin(pi x)', edge:'wrap', rate:0.25, window:2},
+      {name:'Shock and fan', init:'step(x+0.5)step(0.5-x)', edge:'wrap', rate:0.25, window:3},
+      {name:'Big hump catches small', init:'1.2exp(-40(x+0.5)^2) + 0.5exp(-40(x-0.1)^2)', edge:'wrap', rate:0.25, window:3},
+      {name:'Steady push', init:'0', src:'-sin(pi x)', edge:'fixed', rate:0.5, window:5, range:1.2}
+    ]},
+  kdv:{name:'KdV (solitons)', a:-20, b:20, N:600, order:1, kind:'seq', edges:['wrap'], edgeLabels:['','','Wrap'],
+    eq:'u<sub>t</sub> + 6u u<sub>x</sub> + u<sub>xxx</sub> = f(x, t)',
+    params:[],
+    rhs(w,out,p,S){ const d3=8*dx*dx*dx, d36=36*dx;          // fourth-order differences
+      for(let i=0;i<N;i++){ const j=i+O, a=w[j-2], b=w[j-1], c=w[j+1], d=w[j+2];
+        const uux=(8*(c*c-b*b)-(d*d-a*a)+w[j]*(8*(c-b)-(d-a)))/d36;   // (1/3)[(u²)_x + u u_x]: keeps ∫u and ∫u² exact in space
+        out[i]=-6*uux-(-w[j+3]+8*d-13*c+13*b-8*a+w[j-3])/d3+(S?S[i]:0); } },
+    dtMax(p,um){ return 1.4/(4.61/(dx*dx*dx)+8.3*um/dx); },
+    exact:'formula',
+    presets:[
+      {name:'One soliton', init:'2sech(x+10)^2', rate:0.5, window:5, sol:{k:2,x0:-10}},
+      {name:'Overtake', init:'8sech(2(x+12))^2 + 2sech(x+4)^2', rate:0.2, window:2, two:{k1:4,k2:2,d1:48,d2:8+Math.log(9),tmax:1.75}},
+      {name:'Splits in two', init:'6sech(x+8)^2', rate:0.2, window:2, two:{k1:4,k2:2,d1:Math.log(3)+32,d2:Math.log(3)+16,tmax:1.5}},
+      {name:'Hump breaks up', init:'3exp(-(x+10)^2/9)', rate:0.25, window:5}
+    ]},
+  fisher:{name:'Fisher–KPP', a:0, b:100, N:400, order:1, kind:'seq', edges:['fixed','insulated','wrap'], edgeLabels:['Fixed','Zero slope','Wrap'],
+    eq:'u<sub>t</sub> = D u<sub>xx</sub> + r u(1 − u) + f(x, t)',
+    params:[{k:'D',lab:'spreading D',min:0.1,max:4,log:true,def:1},{k:'r',lab:'growth r',min:0.1,max:2,log:true,def:1}],
+    rhs(w,out,p,S){ const d2=dx*dx; for(let i=0;i<N;i++){ const j=i+O, q=w[j]; out[i]=p.D*lap(w,j,d2)+p.r*q*(1-q)+(S?S[i]:0); } },
+    dtMax(p){ return 1/(2*p.D/(dx*dx)+p.r); },
+    exact:null,
+    presets:[
+      {name:'Invasion', init:'step(5-x)', edge:'insulated', rate:4, window:44, range:1},
+      {name:'Spread from a spot', init:'exp(-(x-50)^2)', edge:'insulated', rate:3, window:26, range:1},
+      {name:'Sprinkled start', init:'0.02rand()', edge:'insulated', rate:2, window:16, range:1}
+    ]},
+  ac:{name:'Allen–Cahn', a:0, b:1, N:400, order:1, kind:'signed', edges:['fixed','insulated','wrap'], edgeLabels:['Fixed','Zero slope','Wrap'],
+    eq:'u<sub>t</sub> = ε<sup>2</sup> u<sub>xx</sub> + u − u<sup>3</sup> + f(x, t)',
+    params:[{k:'eps',lab:'wall width ε',min:0.003,max:0.05,log:true,def:0.01}],
+    rhs(w,out,p,S){ const d2=dx*dx, e2=p.eps*p.eps; for(let i=0;i<N;i++){ const j=i+O, q=w[j]; out[i]=e2*lap(w,j,d2)+q-q*q*q+(S?S[i]:0); } },
+    dtMax(p,um){ return 1/(2*p.eps*p.eps/(dx*dx)+1+3*um*um); },
+    exact:null,
+    presets:[
+      {name:'Random start', init:'0.1(2rand() - 1)', edge:'insulated', rate:2, window:30, range:1.1},
+      {name:'Wall pushed by a source', init:'tanh((x-0.75)/0.04)', src:'0.2', edge:'insulated', params:{eps:0.03}, rate:3, window:45, range:1.2},
+      {name:'Close walls merge', init:'1 - 2step(x-0.455)step(0.545-x)', edge:'insulated', params:{eps:0.02}, rate:2, window:30, range:1.1},
+      {name:'Far walls stay', init:'1 - 2step(x-0.35)step(0.65-x)', edge:'insulated', params:{eps:0.02}, rate:2, window:30, range:1.1}
+    ]}
+};
+const EQ_ORDER=['heat','adv','wave','burg','kdv','fisher','ac'];
+
+/* ---------- state ---------- */
+const P={eq:'burg', preset:null, par:{}, edge:'wrap', initStr:'', velStr:'0', srcStr:'0', mult:1, running:true, tool:'draw', showExact:true, rate:0.25, window:2, range:null};
+let N=400, dx=0.005, xa=-1, xb=1, t=0, bL=0, bR=0;
+let u, v, k1, k2, k3, acc0, xs, paint, painted=false, Sbuf;
+let srcC={f:()=>0,usesT:false,zero:true}, srcCache=null;
+const E=new Float64Array(VARS.length);
+const def=()=>EQS[P.eq], par=()=>P.par[P.eq];
+let edited=false, blew=false;
+
+function alloc(){
+  const d=def(); N=d.N; xa=d.a; xb=d.b; dx=(xb-xa)/N;
+  u=new Float64Array(N+2*O); v=new Float64Array(N+2*O); acc0=new Float64Array(N);
+  k1=new Float64Array(N+2*O); k2=new Float64Array(N+2*O); k3=new Float64Array(N);
+  xs=new Float64Array(N); for(let i=0;i<N;i++) xs[i]=xa+(i+0.5)*dx;
+  paint=new Float64Array(N); painted=false; Sbuf=new Float64Array(N); srcCache=null;
+  rowBuf=new Float32Array(ROWS*N);
+}
+function ghosts(w){
+  const n=N;
+  if(P.edge==='wrap') for(let k=1;k<=O;k++){ w[O-k]=w[O+n-k]; w[O+n-1+k]=w[O+k-1]; }
+  else if(P.edge==='fixed') for(let k=1;k<=O;k++){ w[O-k]=2*bL-w[O+k-1]; w[O+n-1+k]=2*bR-w[O+n-k]; }
+  else for(let k=1;k<=O;k++){ w[O-k]=w[O+k-1]; w[O+n-1+k]=w[O+n-k]; }
+}
+// source array at time tt (null when there is none); cached when it doesn't change in time
+function srcAt(tt){
+  if(srcC.zero&&!painted) return null;
+  if(srcCache) return srcCache;
+  E[1]=tt;
+  for(let i=0;i<N;i++){ E[0]=xs[i]; Sbuf[i]=(srcC.zero?0:srcC.f(E))+paint[i]; }
+  if(!srcC.usesT) srcCache=Sbuf;
+  return Sbuf;
+}
+function umaxOf(w){ let m=0; for(let i=0;i<N;i++){ const q=Math.abs(w[i+O]); if(q>m) m=q; } return m; }
+function dtMax(){ return def().dtMax(par(),umaxOf(u)); }
+
+// one time step: SSP Runge-Kutta 3 for u_t = ..., kick-drift-kick (leapfrog) for u_tt = ...
+function step(dt){
+  const d=def(), p=par();
+  if(d.order===1){
+    ghosts(u); d.rhs(u,k3,p,srcAt(t));
+    for(let i=0;i<N;i++) k1[i+O]=u[i+O]+dt*k3[i];
+    ghosts(k1); d.rhs(k1,k3,p,srcAt(t+dt));
+    for(let i=0;i<N;i++) k2[i+O]=0.75*u[i+O]+0.25*(k1[i+O]+dt*k3[i]);
+    ghosts(k2); d.rhs(k2,k3,p,srcAt(t+0.5*dt));
+    for(let i=0;i<N;i++) u[i+O]=u[i+O]/3+2/3*(k2[i+O]+dt*k3[i]);
+  } else {
+    const damp=Math.exp(-0.5*p.g*dt);
+    for(let i=0;i<N;i++){ const j=i+O; v[j]=(v[j]+0.5*dt*acc0[i])*damp; u[j]+=dt*v[j]; }
+    ghosts(u); d.acc(u,v,acc0,p,srcAt(t+dt));
+    for(let i=0;i<N;i++){ const j=i+O; v[j]=v[j]*damp+0.5*dt*acc0[i]; }
+  }
+  t+=dt;
+}
+function primeAcc(){ const d=def(); if(d.order===2){ ghosts(u); d.acc(u,v,acc0,par(),srcAt(t)); } }
+
+/* ---------- space-time strip history ---------- */
+const ROWS=300;
+let rowBuf, rowT=new Float64Array(ROWS), nRows=0, head=0, rowDt=0.01, nextRowT=0;
+const track=[];                               // (t, front/wall position) samples
+function recordRows(){
+  while(t>=nextRowT-1e-12){
+    rowBuf.set(u.subarray(O,O+N),head*N); rowT[head]=t; head=(head+1)%ROWS; if(nRows<ROWS) nRows++;
+    nextRowT+=rowDt;
+    const X=frontPos(); track.push([t,X]); if(track.length>400) track.shift();
+  }
+}
+
+/* ---------- exact answers ---------- */
+let EX=null;      // {kind, t0, ...} or null; exReason explains when there is none
+let exReason='';
+function extSeq(w,parity){            // extend cells to a periodic sequence (odd/even reflection for fixed/zero-slope ends)
+  const n=N, M=P.edge==='wrap'?n:2*n, s=new Float64Array(M);
+  for(let i=0;i<n;i++) s[i]=w[i];
+  if(M>n) for(let i=0;i<n;i++) s[2*n-1-i]=parity*w[i];
+  return s;
+}
+function dft(s){
+  const M=s.length, H=M/2, re=new Float64Array(H+1), im=new Float64Array(H+1);
+  for(let k=0;k<=H;k++){ let r=0,q=0; for(let j=0;j<M;j++){ const ph=(k*j)%M; r+=s[j]*COS[ph]; q-=s[j]*SIN[ph]; } re[k]=r/M; im[k]=q/M; }
+  return [re,im];
+}
+let COS=null, SIN=null, TRIG_M=0;
+function trig(M){ if(TRIG_M===M) return; COS=new Float64Array(M); SIN=new Float64Array(M); for(let q=0;q<M;q++){ COS[q]=Math.cos(2*Math.PI*q/M); SIN[q]=Math.sin(2*Math.PI*q/M); } TRIG_M=M; }
+function lin(i){ return P.edge==='fixed'?bL+(bR-bL)*(i+0.5)/N:0; }
+function buildExact(){
+  EX=null; exReason=''; exShown=false;
+  const d=def(), p=par(), noSrc=srcC.zero&&!painted;
+  if(!d.exact){ exReason='No exact formula for this equation: the computer is the only way to see it.'; return; }
+  if(d.exact==='spectral'){
+    if(srcC.usesT){ exReason='The exact answer needs a source that doesn\'t change in time.'; return; }
+    const n=N, par1=P.edge==='fixed'?-1:1, w=new Float64Array(n), wv=new Float64Array(n), wf=new Float64Array(n);
+    const S=srcAt(t);
+    for(let i=0;i<n;i++){ w[i]=u[i+O]-lin(i); wv[i]=v[i+O]; wf[i]=S?S[i]:0; }
+    const M=P.edge==='wrap'?n:2*n; trig(M);
+    const [ur,ui]=dft(extSeq(w,par1)), [vr,vi]=d.order===2?dft(extSeq(wv,par1)):[null,null], [fr,fi]=dft(extSeq(wf,par1));
+    EX={kind:'spectral', t0:t, M, ur,ui,vr,vi,fr,fi};
+  } else if(d.exact==='shift'){
+    if(!noSrc){ exReason='The exact answer (slide the start along) only holds with no source.'; return; }
+    EX={kind:'shift', t0:t, s:u.slice(O,O+N)};
+  } else if(d.exact==='hopf'){
+    if(!noSrc){ exReason='The exact answer (Cole–Hopf) only holds with no source.'; return; }
+    if(P.edge==='fixed'&&(Math.abs(bL)>1e-9||Math.abs(bR)>1e-9)){ exReason='The exact answer needs the fixed ends held at 0.'; return; }
+    const s=extSeq(u.subarray(O,O+N),-1), M=s.length;
+    let m=0; if(P.edge==='wrap'){ for(let i=0;i<M;i++) m+=s[i]; m/=M; }
+    const R=1, Mf=M*R, h=dx/R, G=new Float64Array(Mf+1), wf=new Float64Array(Mf+1);
+    let wmax=0;
+    for(let q=0;q<=Mf;q++){ const pos=q/R, j=Math.floor(pos)%M, fr=pos-Math.floor(pos); wf[q]=(1-fr)*(s[j]-m)+fr*(s[(j+1)%M]-m); wmax=Math.max(wmax,Math.abs(wf[q])); }
+    for(let q=0;q<Mf;q++) G[q+1]=G[q]+0.5*(wf[q]+wf[q+1])*h;
+    const drift=G[Mf]/Mf; for(let q=0;q<=Mf;q++) G[q]-=drift*q;
+    EX={kind:'hopf', t0:t, m, G, Mf, h, wmax, s:u.slice(O,O+N), g:u.slice(O,O+N), gT:0};
+  } else if(d.exact==='formula'){
+    const pr=d.presets.find(q=>q.name===P.preset);
+    if(!pr||!(pr.sol||pr.two)){ exReason='There is an exact formula for the soliton presets only.'; return; }
+    if(edited||P.initStr!==pr.init||!noSrc||t>1e-12){ exReason='The exact formula is for the preset as it starts, with no source and no drawing.'; return; }
+    EX={kind:'formula', t0:0, sol:pr.sol, two:pr.two};
+  }
+}
+function exactAt(tt,out){            // fills out[0..N-1]; returns false when unavailable now
+  if(!EX) return false;
+  const tau=tt-EX.t0, p=par(), d=def();
+  if(EX.kind==='spectral'){
+    const M=EX.M, H=M/2, cr=new Float64Array(H+1), ci=new Float64Array(H+1);
+    for(let k=0;k<=H;k++){
+      const kap=2*Math.PI*k/(M*dx);
+      if(d.order===1){
+        const lam=p.D*kap*kap;
+        if(lam<1e-14){ cr[k]=EX.ur[k]+EX.fr[k]*tau; ci[k]=EX.ui[k]+EX.fi[k]*tau; }
+        else { const e=Math.exp(-lam*tau), g=(1-e)/lam; cr[k]=EX.ur[k]*e+EX.fr[k]*g; ci[k]=EX.ui[k]*e+EX.fi[k]*g; }
+      } else {
+        const w=p.c*kap; cr[k]=osc(EX.ur[k],EX.vr[k],EX.fr[k],w,p.g,tau); ci[k]=osc(EX.ui[k],EX.vi[k],EX.fi[k],w,p.g,tau);
+      }
+    }
+    for(let i=0;i<N;i++){
+      let s=cr[0];
+      for(let k=1;k<H;k++){ const ph=(k*i)%M; s+=2*(cr[k]*COS[ph]-ci[k]*SIN[ph]); }
+      s+=cr[H]*((i&1)?-1:1);
+      out[i]=s+lin(i);
+    }
+    return true;
+  }
+  if(EX.kind==='shift'){
+    const sh=p.c*tau/dx;
+    for(let i=0;i<N;i++){ let q=i-sh; q-=N*Math.floor(q/N); const j=Math.floor(q), f=q-j; out[i]=(1-f)*EX.s[j%N]+f*EX.s[(j+1)%N]; }
+    return true;
+  }
+  if(EX.kind==='hopf'){
+    if(tau<1e-9){ out.set(EX.s); return true; }
+    // Hopf: u = m + Σ (X-y)/τ e^{-Φ/2ν} / Σ e^{-Φ/2ν}, Φ = G(y) + (X-y)²/2τ. The weight sits near the foot of the
+    // characteristic, y ≈ X - τ(u - m), so each point only searches around the feet of its neighbours (within a few shock widths) in the last exact answer.
+    const nu=p.nu, {G,Mf,h,m,wmax,g}=EX, i2t=1/(2*tau), i2n=1/(2*nu);
+    const wrap=P.edge==='wrap', near=Math.abs(tau-EX.gT)<0.1, mar=7*Math.sqrt(2*nu*tau)+3*h+Math.abs(tau-EX.gT)*wmax+0.02, K=Math.ceil((0.05+40*nu)/dx);
+    for(let i=0;i<N;i++){
+      const X=i*dx-m*tau;
+      let lo, hi;
+      if(near){ let a=Infinity, b=-Infinity;
+        for(let j=i-K;j<=i+K;j++){                    // neighbours across the ends: wrapped, or mirrored with a sign flip (fixed ends at 0)
+          const q=(wrap?g[(j%N+N)%N]:j<0?-g[-1-j]:j>=N?-g[2*N-1-j]:g[j])-m; if(q<a) a=q; if(q>b) b=q; }
+        lo=X-tau*b-mar; hi=X-tau*a+mar; }
+      else { lo=X-wmax*tau-mar; hi=X+wmax*tau+mar; }
+      const q0=Math.ceil(lo/h), q1=Math.floor(hi/h);
+      let mn=Infinity;
+      for(let q=q0;q<=q1;q++){ const y=q*h, qq=((q%Mf)+Mf)%Mf, ph=G[qq]+(X-y)*(X-y)*i2t; if(ph<mn) mn=ph; }
+      let num=0, den=0;
+      for(let q=q0;q<=q1;q++){ const y=q*h, qq=((q%Mf)+Mf)%Mf, ex=(G[qq]+(X-y)*(X-y)*i2t-mn)*i2n; if(ex>40) continue; const wgt=Math.exp(-ex); num+=(X-y)*wgt; den+=wgt; }
+      out[i]=m+num/den/tau;
+    }
+    g.set(out.subarray(0,N)); EX.gT=tau;
+    return true;
+  }
+  if(EX.kind==='formula'){
+    if(EX.sol){ const {k,x0}=EX.sol, L=xb-xa;
+      for(let i=0;i<N;i++){ let s=0; for(let mI=-1;mI<=1;mI++){ const z=0.5*k*(xs[i]+mI*L-x0-k*k*tau); const c=1/Math.cosh(z); s+=0.5*k*k*c*c; } out[i]=s; }
+      return true; }
+    const {k1,k2,d1,d2,tmax}=EX.two;
+    if(tau>tmax) return false;
+    const A=((k1-k2)/(k1+k2))**2;
+    for(let i=0;i<N;i++){
+      const x=xs[i], e1=Math.exp(k1*x-k1**3*tau+d1), e2=Math.exp(k2*x-k2**3*tau+d2), e12=A*e1*e2;
+      const T=1+e1+e2+e12, T1=k1*e1+k2*e2+(k1+k2)*e12, T2=k1*k1*e1+k2*k2*e2+(k1+k2)**2*e12;
+      out[i]=2*(T2*T-T1*T1)/(T*T);
+    }
+    return true;
+  }
+  return false;
+}
+function osc(c,vv,F,w,g,tau){        // u'' + g u' + w² u = F, u(0)=c, u'(0)=vv
+  if(w<1e-12){ if(g<1e-12) return c+vv*tau+0.5*F*tau*tau; const e=Math.exp(-g*tau); return c+vv*(1-e)/g+F*(tau/g-(1-e)/(g*g)); }
+  const pp=F/(w*w), A=c-pp, disc=w*w-0.25*g*g;
+  if(disc>1e-12){ const W=Math.sqrt(disc), e=Math.exp(-0.5*g*tau); return pp+e*(A*Math.cos(W*tau)+(vv+0.5*g*A)/W*Math.sin(W*tau)); }
+  if(disc<-1e-12){ const W=Math.sqrt(-disc), l1=-0.5*g+W, l2=-0.5*g-W, A1=(vv-l2*A)/(l1-l2); return pp+A1*Math.exp(l1*tau)+(A-A1)*Math.exp(l2*tau); }
+  const e=Math.exp(-0.5*g*tau); return pp+e*(A+(vv+0.5*g*A)*tau);
+}
+
+/* ---------- measurements ---------- */
+function integral(f){ let s=0; for(let i=0;i<N;i++) s+=f(u[i+O],i); return s*dx; }
+function frontPos(){                 // Fisher: rightmost place where u crosses 1/2. Allen-Cahn: the single wall, if there is one.
+  if(P.eq==='fisher'){
+    for(let i=N-1;i>0;i--){ const a=u[i-1+O], b=u[i+O]; if(a>=0.5&&b<0.5) return xs[i-1]+(a-0.5)/(a-b)*dx; }
+    return NaN;
+  }
+  if(P.eq==='ac'){
+    let X=NaN, n=0;
+    for(let i=1;i<N;i++){ const a=u[i-1+O], b=u[i+O]; if(a*b<0){ n++; X=xs[i-1]+a/(a-b)*dx; } }
+    return n===1?X:NaN;
+  }
+  return NaN;
+}
+function wallCount(){ let n=0, s=0; for(let i=0;i<N;i++){ const q=u[i+O]; const z=q>0.5?1:q<-0.5?-1:0; if(z&&s&&z!==s) n++; if(z) s=z; } return n; }
+function frontSpeed(span){
+  if(track.length<3) return NaN;
+  const [tn,Xn]=track[track.length-1];
+  for(let k=track.length-2;k>=0;k--){ const [tk,Xk]=track[k]; if(tn-tk>=span){ if(isNaN(Xn)||isNaN(Xk)) return NaN; return (Xn-Xk)/(tn-tk); } }
+  return NaN;
+}
+function waveEnergy(){
+  ghosts(u); const c2=par().c**2; let s=0;
+  for(let i=0;i<N;i++) s+=0.5*v[i+O]**2;
+  const lo=P.edge==='wrap'?1:0;
+  for(let j=O-1+lo;j<N+O;j++){ const g=(u[j+1]-u[j])/dx; s+=0.5*c2*g*g; }
+  return s*dx;
+}
+function middleRoot(h){ let q=-h; for(let n=0;n<40;n++){ q-=(q*q*q-q-h)/(3*q*q-1); } return q; }  // root of u³ - u - h near 0
+
+/* ---------- drawing ---------- */
+const cu=$('cu'), cs=$('cs'), cuCtx=cu.getContext('2d'), csCtx=cs.getContext('2d');
+const off=document.createElement('canvas'), offCtx=off.getContext('2d');
+let offImg=null;
+const LN=1024;
+function pack(r,g,b){ return (255<<24)|(b<<16)|(g<<8)|r; }
+function ramp(stops,n){
+  const out=new Uint32Array(n);
+  for(let q=0;q<n;q++){ const x=q/(n-1);
+    let a=0; while(a<stops.length-2&&x>stops[a+1][0]) a++;
+    const s0=stops[a], s1=stops[a+1], f=Math.min(1,Math.max(0,(x-s0[0])/(s1[0]-s0[0])));
+    out[q]=pack(Math.round(s0[1]+(s1[1]-s0[1])*f),Math.round(s0[2]+(s1[2]-s0[2])*f),Math.round(s0[3]+(s1[3]-s0[3])*f)); }
+  return out;
+}
+// signed: blue below zero, dark at zero, orange above (as in the field sandbox). seq: dark → purple → orange → cream.
+const lutS=ramp([[0,215,240,255],[0.22,60,155,255],[0.4,22,70,140],[0.5,10,14,26],[0.6,140,52,22],[0.78,255,150,55],[1,255,238,200]],LN);
+const lutQ=ramp([[0,8,10,20],[0.25,58,28,108],[0.5,168,48,118],[0.75,250,128,58],[1,255,242,184]],LN);
+const EMPTY=pack(10,14,26);
+let S=1;   // colour and plot scale
+function yRange(){ return def().kind==='signed'?[-S,S]:[-0.08*S,1.08*S]; }
+function colourIdx(q){ const d=def(); let f=d.kind==='signed'?(q+S)/(2*S):q/S; f=f<0?0:f>1?1:f; return (f*(LN-1))|0; }
+function fitCanvas(c){
+  const r=c.getBoundingClientRect(), dpr=Math.min(2,window.devicePixelRatio||1), w=Math.max(10,Math.round(r.width*dpr)), h=Math.max(10,Math.round(r.height*dpr));
+  if(c.width!==w||c.height!==h){ c.width=w; c.height=h; }
+  return dpr;
+}
+const exBuf=new Float64Array(2048);
+let srcMax=0;                                   // largest |source| seen since the source last changed
+const srcScale=()=>Math.max(S,niceUp(srcMax)); // a big source is drawn shrunk to fit, on its own scale
+let exShown=false, exGap=NaN;
+function drawCurve(){
+  const dpr=fitCanvas(cu), W=cu.width, H=cu.height, g=cuCtx;
+  g.clearRect(0,0,W,H); g.fillStyle='#0a0e18'; g.fillRect(0,0,W,H);
+  const [lo,hi]=yRange(), pad=10*dpr, Y=q=>pad+(hi-q)/(hi-lo)*(H-2*pad), X=i=>(i+0.5)/N*W;
+  g.font=`${11*dpr}px "JetBrains Mono", monospace`; g.textBaseline='middle';
+  if(lo<0&&hi>0){ g.strokeStyle='rgba(255,255,255,.18)'; g.lineWidth=dpr; g.beginPath(); g.moveTo(0,Y(0)); g.lineTo(W,Y(0)); g.stroke(); }
+  g.fillStyle='rgba(232,236,242,.55)'; g.fillText(fmt(hi),6*dpr,pad+6*dpr); g.fillText(fmt(lo),6*dpr,H-pad-6*dpr);
+  g.textAlign='right'; g.fillText(`x = ${fmt(xa)} … ${fmt(xb)}`,W-6*dpr,H-pad-6*dpr); g.textAlign='left';
+  const Sx=srcAt(t);
+  if(Sx){
+    let m=0; for(let i=0;i<N;i++) m=Math.max(m,Math.abs(Sx[i]));
+    if(m>srcMax) srcMax=m;
+    const k=S/srcScale(), y0=Y(Math.max(lo,Math.min(hi,0)));
+    g.beginPath(); g.moveTo(X(0),y0);
+    for(let i=0;i<N;i++) g.lineTo(X(i),Y(Math.max(lo,Math.min(hi,k*Sx[i]))));
+    g.lineTo(X(N-1),y0); g.closePath(); g.fillStyle='rgba(255,170,60,.22)'; g.fill();
+    g.strokeStyle='rgba(255,170,60,.7)'; g.lineWidth=dpr; g.stroke();
+  }
+  g.strokeStyle='#eef1f6'; g.lineWidth=2*dpr; g.lineJoin='round'; g.beginPath();
+  for(let i=0;i<N;i++){ const yy=Y(u[i+O]); i?g.lineTo(X(i),yy):g.moveTo(X(i),yy); } g.stroke();
+  exShown=false; exGap=NaN;
+  if(P.showExact&&EX&&!dragging&&exactAt(t,exBuf)){
+    exShown=true; let gap=0;
+    g.strokeStyle='#6cb4ff'; g.lineWidth=2*dpr; g.setLineDash([6*dpr,5*dpr]); g.beginPath();
+    for(let i=0;i<N;i++){ const yy=Y(exBuf[i]); i?g.lineTo(X(i),yy):g.moveTo(X(i),yy); gap=Math.max(gap,Math.abs(exBuf[i]-u[i+O])); }
+    g.stroke(); g.setLineDash([]); exGap=gap;
+  }
+}
+function drawStrip(){
+  const dpr=fitCanvas(cs), W=cs.width, H=cs.height, g=csCtx;
+  if(off.width!==N||off.height!==ROWS){ off.width=N; off.height=ROWS; offImg=offCtx.createImageData(N,ROWS); }
+  const pix=new Uint32Array(offImg.data.buffer), lut=def().kind==='signed'?lutS:lutQ;
+  const start=nRows<ROWS?0:head;
+  for(let r=0;r<ROWS;r++){
+    const o=r*N;
+    if(r>=nRows){ pix.fill(EMPTY,o,o+N); continue; }
+    const b=((start+r)%ROWS)*N;
+    for(let i=0;i<N;i++) pix[o+i]=lut[colourIdx(rowBuf[b+i])];
+  }
+  offCtx.putImageData(offImg,0,0);
+  g.imageSmoothingEnabled=true; g.drawImage(off,0,0,W,H);
+  g.font=`${11*dpr}px "JetBrains Mono", monospace`; g.textBaseline='middle';
+  const lab=(txt,y)=>{ const w=g.measureText(txt).width; g.fillStyle='rgba(10,14,26,.7)'; g.fillRect(4*dpr,y-8*dpr,w+8*dpr,16*dpr); g.fillStyle='rgba(232,236,242,.85)'; g.fillText(txt,8*dpr,y); };
+  if(nRows>0){
+    const t0=rowT[start]; lab(`t = ${fmt(t0)}`,10*dpr);
+    if(nRows<ROWS){ const y=nRows/ROWS*H; g.strokeStyle='rgba(255,255,255,.35)'; g.lineWidth=dpr; g.beginPath(); g.moveTo(0,y); g.lineTo(W,y); g.stroke(); lab(`t = ${fmt(t0+ROWS*rowDt)}`,H-10*dpr); }
+    else lab(`t = ${fmt(rowT[(head+ROWS-1)%ROWS])}`,H-10*dpr);
+  }
+}
+function drawLegend(){
+  const c=$('leg'), g=c.getContext('2d'), lut=def().kind==='signed'?lutS:lutQ, img=g.createImageData(256,1), p32=new Uint32Array(img.data.buffer);
+  for(let q=0;q<256;q++) p32[q]=lut[Math.round(q/255*(LN-1))];
+  g.putImageData(img,0,0);
+  $('legLo').textContent=def().kind==='signed'?fmt(-S):'0'; $('legHi').textContent=fmt(S);
+}
+function fmt(q){
+  if(!isFinite(q)) return '—';
+  const a=Math.abs(q);
+  if(a<1e-12) return '0';
+  if(a>=1e4||a<1e-3) return q.toExponential(1).replace('-','−');
+  const s=a>=100?q.toFixed(0):a>=10?q.toFixed(1):a>=1?q.toFixed(2):q.toPrecision(2);
+  return s.replace('-','−');
+}
+
+/* ---------- readout ---------- */
+let lastDt=0, lastSub=0, slowed=false;
+function readout(){
+  const p=par(), lines=[];
+  lines.push(`t = <b>${fmt(t)}</b>`);
+  lines.push(`time step ${fmt(lastDt)} · ${lastSub} per frame${slowed?' <b>(slowed down: this needs tiny steps)</b>':''}`);
+  const e=P.eq;
+  if(e==='heat') lines.push(`total heat ∫u dx = <b>${fmt(integral(q=>q))}</b>${P.edge!=='fixed'&&srcC.zero&&!painted?' (stays fixed: no heat gets in or out)':''}`);
+  if(e==='adv'||e==='burg') lines.push(`∫u dx = <b>${fmt(integral(q=>q))}</b>${P.edge==='wrap'&&srcC.zero&&!painted?' (stays fixed)':''}`);
+  if(e==='kdv') lines.push(`∫u dx = <b>${fmt(integral(q=>q))}</b> · ∫u² dx = <b>${fmt(integral(q=>q*q))}</b> (both stay fixed)`);
+  if(e==='wave') lines.push(`energy = <b>${fmt(waveEnergy())}</b>${p.g===0&&srcC.zero&&!painted?' (stays fixed)':''}`);
+  if(e==='fisher'){
+    const X=frontPos(), sp=frontSpeed(Math.min(5,P.window/4));
+    lines.push(`front (u = ½) at x = <b>${fmt(X)}</b>`);
+    lines.push(`front speed <b>${fmt(sp)}</b> · theory 2√(Dr) = <b>${fmt(2*Math.sqrt(p.D*p.r))}</b>`);
+  }
+  if(e==='ac'){
+    const n=wallCount(); lines.push(`walls: <b>${n}</b>`);
+    if(n===1&&!srcC.usesT&&!painted){
+      const sp=frontSpeed(Math.min(5,P.window/4)); E[0]=0; E[1]=t; const h=srcC.zero?0:srcC.f(E);
+      lines.push(`wall speed <b>${fmt(Math.abs(sp))}</b> · theory 3ε|b|/√2 = <b>${fmt(3*p.eps*Math.abs(middleRoot(h))/Math.SQRT2)}</b>`);
+    }
+  }
+  if(P.showExact){
+    if(exShown&&EX) lines.push(`largest gap from exact: <b>${fmt(exGap)}</b>${EX.t0>0?` (exact restarted at t = ${fmt(EX.t0)} after a change)`:''}`);
+    else if(EX&&EX.kind==='formula'&&EX.two) lines.push('exact formula is for an endless line: hidden once a soliton nears the edge');
+    else if(exReason&&def().exact) lines.push(exReason);
+  }
+  $('readout').innerHTML=lines.join('<br>');
+  const key=[];
+  if(exShown) key.push('<span style="color:var(--cool)">dashed = exact</span>');
+  if(srcAt(t)) key.push(`<span style="color:#e08a2e">orange = source</span>${srcScale()>S*1.001?` (its scale ±${fmt(srcScale())})`:''}`);
+  $('capKey').innerHTML=key.join(' · ');
+  $('tNow').textContent=fmt(t);
+}
+
+/* ---------- running ---------- */
+const MAXSUB=3000;
+function advanceBy(T){                     // advance sim time T (used by the frame loop and the debug hook)
+  let left=T, n=0;
+  const dm=dtMax(); let nsub=Math.ceil(left/dm-1e-9);
+  slowed=false;
+  if(nsub>MAXSUB){ nsub=MAXSUB; left=MAXSUB*dm; slowed=true; }
+  if(nsub<1) nsub=1;
+  const dt=left/nsub;
+  for(n=0;n<nsub;n++){ step(dt); recordRows(); }
+  lastDt=dt; lastSub=nsub;
+}
+function checkBlowup(){
+  let bad=false; for(let i=0;i<N;i++){ const q=u[i+O]; if(!(Math.abs(q)<1e8)){ bad=true; break; } }
+  if(bad){ blew=true; P.running=false; $('playBtn').textContent='Play'; const w=$('warn'); w.hidden=false; w.textContent=`The solution blew up (grew without limit) near t = ${fmt(t)}. Restart, or change the source or starting shape.`; for(let i=0;i<N+2*O;i++){ if(!isFinite(u[i])) u[i]=0; if(!isFinite(v[i])) v[i]=0; } }
+}
+function autoScale(){ let m=0; for(let i=0;i<N;i++) m=Math.max(m,def().kind==='signed'?Math.abs(u[i+O]):u[i+O]); if(m>S*1.02){ S=niceUp(m*1.2); drawLegend(); } }
+function niceUp(q){ if(!(q>0)) return 1; const e=Math.pow(10,Math.floor(Math.log10(q))), f=q/e; return (f<=1?1:f<=1.2?1.2:f<=1.5?1.5:f<=2?2:f<=2.5?2.5:f<=3?3:f<=4?4:f<=5?5:f<=6?6:f<=8?8:10)*e; }
+
+let lastTs=0, frameNo=0;
+function frame(ts){
+  const dtReal=lastTs?Math.min(0.05,Math.max(0,(ts-lastTs)/1000)):1/60; lastTs=ts;
+  if(P.running) advanceBy(P.rate*P.mult*dtReal);
+  checkBlowup(); autoScale();
+  drawCurve(); drawStrip();
+  if(frameNo%6===0) readout();
+  frameNo++;
+  if(!window.NO_TICK) requestAnimationFrame(frame);
+}
+
+/* ---------- setting up ---------- */
+function setErr(id,msg){ const e=$(id+'Err'), inp=$(id+'In'); e.hidden=!msg; e.textContent=msg||''; inp.classList.toggle('bad',!!msg); }
+function sampleInit(){
+  let fi, fv;
+  try{ fi=compile(P.initStr); setErr('init',''); }catch(err){ setErr('init',err.message); return false; }
+  if(def().order===2){ try{ fv=compile(P.velStr); setErr('vel',''); }catch(err){ setErr('vel',err.message); return false; } }
+  rngState=12345;
+  E[1]=0;
+  for(let i=0;i<N;i++){ E[0]=xs[i]; u[i+O]=fi.f(E); v[i+O]=fv?fv.f(E):0; }
+  for(let i=0;i<N;i++){ if(!isFinite(u[i+O])) u[i+O]=0; if(!isFinite(v[i+O])) v[i+O]=0; }
+  E[0]=xa; bL=fi.f(E); E[0]=xb; bR=fi.f(E);
+  if(!isFinite(bL)) bL=u[O]; if(!isFinite(bR)) bR=u[N-1+O];
+  return true;
+}
+function restart(){
+  if(!sampleInit()) return;
+  t=0; edited=false; blew=false; $('warn').hidden=true;
+  nRows=0; head=0; rowDt=P.window/ROWS; nextRowT=0; track.length=0;
+  srcCache=null; primeAcc();
+  S=P.range||niceUp(Math.max(umaxOf(u),Math.abs(bL),Math.abs(bR),1e-3)*1.1);
+  if(def().kind==='seq'&&!P.range){ let m=0; for(let i=0;i<N;i++) m=Math.max(m,u[i+O]); S=niceUp(Math.max(m,1e-3)*1.1); }
+  buildExact(); recordRows(); drawLegend(); readout();
+}
+function setSource(str){
+  try{ srcC=compile(str); P.srcStr=str; setErr('src',''); }catch(err){ setErr('src',err.message); return; }
+  srcCache=null; srcMax=0; primeAcc(); buildExact();
+}
+function changed(){ srcCache=null; primeAcc(); buildExact(); readout(); }   // after a parameter / edge / paint change: exact restarts from here
+
+function buildParams(){
+  const box=$('params'); box.innerHTML='';
+  for(const q of def().params){
+    const row=document.createElement('div'); row.className='sl';
+    const lab=document.createElement('span'); lab.textContent=q.lab;
+    const inp=document.createElement('input'); inp.type='range';
+    const out=document.createElement('output');
+    const toS=val=>q.log?Math.round(1000*Math.log(val/q.min)/Math.log(q.max/q.min)):val;
+    const fromS=s=>q.log?q.min*Math.pow(q.max/q.min,s/1000):+s;
+    if(q.log){ inp.min=0; inp.max=1000; inp.step=1; } else { inp.min=q.min; inp.max=q.max; inp.step=q.step||0.01; }
+    inp.value=toS(par()[q.k]); out.textContent=fmt(par()[q.k]);
+    inp.addEventListener('input',()=>{ par()[q.k]=fromS(inp.value); out.textContent=fmt(par()[q.k]); changed(); });
+    row.append(lab,inp,out); box.append(row);
+  }
+}
+function syncEdges(){
+  const d=def();
+  for(const b of $('edgeSeg').querySelectorAll('button')){
+    const k=d.edges.indexOf(b.dataset.e), idx=['fixed','insulated','wrap'].indexOf(b.dataset.e);
+    b.hidden=k<0; b.textContent=d.edgeLabels[idx]||b.textContent; b.setAttribute('aria-pressed',String(b.dataset.e===P.edge));
+  }
+  const notes={fixed:'Fixed: the two ends are held at their starting values.',insulated:P.eq==='wave'?'Free: the ends move freely (zero slope there).':P.eq==='heat'?'Insulated: no heat flows through the ends (zero slope).':'Zero slope: nothing flows through the ends.',wrap:'Wrap: the right end joins back onto the left, like a ring.'};
+  $('edgeNote').textContent=notes[P.edge]+(d.edges.length===1?' This equation needs the ring.':'');
+}
+function loadPreset(name){
+  const d=def(), pr=d.presets.find(q=>q.name===name)||d.presets[0];
+  P.preset=pr.name;
+  const pv={}; for(const q of d.params) pv[q.k]=q.def; Object.assign(pv,pr.params||{}); P.par[P.eq]=pv;
+  P.edge=pr.edge||d.edges[d.edges.length-1];
+  P.initStr=pr.init; P.velStr=pr.vel||'0'; P.rate=pr.rate; P.window=pr.window; P.range=pr.range||null;
+  $('initIn').value=P.initStr; $('velIn').value=P.velStr; $('srcIn').value=pr.src||'0';
+  setErr('init',''); setErr('vel',''); setErr('src','');
+  try{ srcC=compile(pr.src||'0'); P.srcStr=pr.src||'0'; }catch(err){ srcC=compile('0'); }
+  paint.fill(0); painted=false; srcCache=null; srcMax=0;
+  buildParams(); syncEdges();
+  for(const b of $('presets').children) b.setAttribute('aria-pressed',String(b.textContent===pr.name));
+  restart();
+  if(!P.running){ P.running=true; $('playBtn').textContent='Pause'; }
+}
+function setEq(key){
+  P.eq=key; alloc();
+  for(const b of $('eqSeg').children) b.setAttribute('aria-pressed',String(b.dataset.eq===key));
+  const d=def();
+  $('eq').innerHTML=d.eq;
+  $('velFld').hidden=d.order!==2;
+  $('exactChk').parentElement.hidden=!d.exact;
+  const pb=$('presets'); pb.innerHTML='';
+  for(const pr of d.presets){ const b=document.createElement('button'); b.type='button'; b.textContent=pr.name; b.addEventListener('click',()=>loadPreset(pr.name)); pb.append(b); }
+  $('about').innerHTML=ABOUT[key];
+  loadPreset(d.presets[0].name);
+}
+
+/* ---------- controls ---------- */
+for(const k of EQ_ORDER){ const b=document.createElement('button'); b.type='button'; b.dataset.eq=k; b.textContent=EQS[k].name; b.setAttribute('aria-pressed','false'); b.addEventListener('click',()=>setEq(k)); $('eqSeg').append(b); }
+$('playBtn').addEventListener('click',()=>{ P.running=!P.running; $('playBtn').textContent=P.running?'Pause':'Play'; if(P.running&&blew){ restart(); } });
+$('restartBtn').addEventListener('click',()=>{ restart(); });
+$('clearPaint').addEventListener('click',()=>{ paint.fill(0); painted=false; srcMax=0; changed(); });
+$('speed').addEventListener('input',e=>{ P.mult=Math.pow(2,(e.target.value-5)/2); $('speedO').textContent='×'+(P.mult<1?P.mult.toFixed(2):P.mult.toFixed(P.mult%1?1:0)); });
+$('initIn').addEventListener('change',e=>{ P.initStr=e.target.value; restart(); });
+$('velIn').addEventListener('change',e=>{ P.velStr=e.target.value; restart(); });
+$('srcIn').addEventListener('change',e=>{ setSource(e.target.value); readout(); });
+$('exactChk').addEventListener('change',e=>{ P.showExact=e.target.checked; readout(); });
+for(const b of $('edgeSeg').querySelectorAll('button')) b.addEventListener('click',()=>{
+  if(P.edge===b.dataset.e) return;
+  P.edge=b.dataset.e; bL=u[O]; bR=u[N-1+O];
+  if(P.edge==='fixed'){ const d=EQS[P.eq]; if(d.exact==='hopf'&&Math.abs(bL)<0.02&&Math.abs(bR)<0.02){ bL=0; bR=0; } }
+  syncEdges(); changed();
+});
+for(const b of $('toolSeg').querySelectorAll('button')) b.addEventListener('click',()=>{ P.tool=b.dataset.tool; for(const c of $('toolSeg').children) c.setAttribute('aria-pressed',String(c===b)); setHint(); });
+
+// drag on the curve: redraw u, or paint a source
+let dragging=false, lastPt=null;
+function ptOf(e){ const r=cu.getBoundingClientRect(), [lo,hi]=yRange(), pad=10/r.height;
+  const fx=(e.clientX-r.left)/r.width, fy=(e.clientY-r.top)/r.height;
+  return [Math.max(0,Math.min(N-1,Math.floor(fx*N))), Math.max(lo,Math.min(hi,hi-(fy-pad)/(1-2*pad)*(hi-lo)))]; }
+function applyPt(i,val){
+  if(P.tool==='draw'){ u[i+O]=val; v[i+O]=0; }
+  else { paint[i]=val*srcScale()/S; painted=true; srcCache=null; }
+}
+function dragTo(pt){
+  if(!lastPt){ applyPt(pt[0],pt[1]); }
+  else { const [i0,v0]=lastPt, [i1,v1]=pt, n=Math.abs(i1-i0); for(let s=0;s<=n;s++){ const f=n?s/n:1; applyPt(Math.round(i0+(i1-i0)*f),v0+(v1-v0)*f); } }
+  lastPt=pt;
+  if(P.tool==='draw') primeAcc();
+}
+cu.addEventListener('pointerdown',e=>{ dragging=true; lastPt=null; cu.setPointerCapture(e.pointerId); dragTo(ptOf(e)); e.preventDefault(); });
+cu.addEventListener('pointermove',e=>{ if(dragging) dragTo(ptOf(e)); else { const [i,val]=ptOf(e); $('hint').innerHTML=`<span class="probe">x = ${fmt(xs[i])} · u = ${fmt(u[i+O])}</span>`; } });
+const endDrag=()=>{ if(!dragging) return; dragging=false; lastPt=null; if(P.tool==='draw') edited=true; changed(); };
+cu.addEventListener('pointerup',endDrag); cu.addEventListener('pointercancel',endDrag);
+cu.addEventListener('pointerleave',()=>{ if(!dragging) setHint(); });
+function probeStrip(e){
+  const r=cs.getBoundingClientRect(), fx=(e.clientX-r.left)/r.width, fy=(e.clientY-r.top)/r.height;
+  const row=Math.floor(fy*ROWS), i=Math.max(0,Math.min(N-1,Math.floor(fx*N)));
+  if(row<0||row>=nRows){ setHint(); return; }
+  const start=nRows<ROWS?0:head, b=(start+row)%ROWS;
+  $('hint').innerHTML=`<span class="probe">x = ${fmt(xs[i])} · t = ${fmt(rowT[b])} · u = ${fmt(rowBuf[b*N+i])}</span>`;
+}
+cs.addEventListener('pointermove',probeStrip); cs.addEventListener('pointerdown',probeStrip);
+cs.addEventListener('pointerleave',()=>setHint());
+function setHint(){ $('hint').textContent=P.tool==='draw'?'Drag on the curve to redraw u (it carries on from your drawing). Hover the strip to read values.':'Drag on the curve to paint a steady source (orange). It adds to the typed f(x, t).'; }
+
+/* ---------- explanations ---------- */
+const ABOUT={
+heat:`<h2>The heat equation</h2>
+<p>Heat flows from hot to cold. How fast the temperature u changes at a point depends on how curved the temperature profile is there (u<sub>xx</sub>): a peak cools down and a dip warms up. Each wiggle of wavelength λ fades like e<sup>−D(2π/λ)²t</sup>, so sharp features vanish first and only the smoothest shape survives. The source f adds heat where it is positive and takes it away where it is negative.</p>
+<p>The dashed blue line is the exact answer, built from sine waves (Fourier's own method from 1822). The computer's answer should sit right on top of it.</p>
+<ul class="try"><li><b>Ripples fade first:</b> the fine ripple is gone in a fraction of a second, long before the big hump.</li>
+<li><b>Hot meets cold:</b> with insulated ends the total heat in the readout never changes; it just evens out to ½ everywhere.</li>
+<li><b>Heated middle:</b> the source pumps heat in, the cold ends drain it, and u settles into a steady arch.</li>
+<li>Draw a jagged shape and watch it smooth out.</li></ul>`,
+adv:`<h2>Advection</h2>
+<p>u<sub>t</sub> + c u<sub>x</sub> = 0 slides any shape along at speed c without changing it, so the exact answer is easy: u(x, t) = u(x − ct, 0). That makes it the classic test for a numerical method. On the strip, a sliding shape draws slanted stripes, and the tilt of a stripe is the speed.</p>
+<p>Compare the computer with the exact answer on the <b>Square pulse</b>: the corners get rounded off. That's numerical diffusion, the price of keeping the method stable. This sandbox uses a second-order "limited" scheme (MUSCL), which keeps edges fairly sharp without the wiggles that simpler schemes make.</p>
+<ul class="try"><li>Set c to a negative number: everything slides the other way.</li>
+<li><b>Fed by a source:</b> a source that pulses at one spot sends a train of bumps downstream.</li></ul>`,
+wave:`<h2>The wave equation</h2>
+<p>u<sub>tt</sub> = c² u<sub>xx</sub> describes a stretched string. Any starting shape splits into two halves that run left and right at speed c (d'Alembert's solution). On the strip, waves draw crossing diagonal lines. With tied ends, a pulse comes back upside down; with free ends, it comes back the same way up.</p>
+<p>A tied string of length 1 has natural frequencies ω = nπc (n = 1, 2, 3, …). A source that shakes at one of them (resonance) adds energy every cycle, and the wave grows and grows. Damping γ makes waves die out.</p>
+<ul class="try"><li><b>Pulse splits</b> and then <b>Free ends</b>: compare which way up the pulse comes back.</li>
+<li><b>Resonance:</b> the source shakes at ω = π, the string's lowest note. Change c to 1.3 and it stops growing.</li>
+<li><b>Hammer strike:</b> the string starts flat but moving (see the starting speed).</li></ul>`,
+burg:`<h2>Burgers' equation</h2>
+<p>This is the simplest equation that makes shock waves. Each bit of u moves at speed u, so tall parts overtake low parts and the front of a hump steepens until it would fold over. The small viscosity ν stops the fold and leaves a thin, steep shock instead. On the strip, shocks are sharp lines where the colours meet. Where fast stuff runs away from slow stuff, a fan opens (a rarefaction).</p>
+<p>The exact answer comes from the Cole–Hopf trick (1950–51): the substitution u = −2ν φ<sub>x</sub>/φ turns Burgers' equation into the heat equation, which we can solve exactly.</p>
+<ul class="try"><li><b>Sine steepens:</b> the shock forms at t = 1/π ≈ 0.32. Lower ν and it gets sharper.</li>
+<li><b>Shock and fan:</b> the shock moves at the average of the two sides (½), until the fan catches up and wears it down.</li>
+<li><b>Big hump catches small:</b> two shocks merge into one.</li></ul>`,
+kdv:`<h2>The Korteweg–de Vries equation</h2>
+<p>KdV describes shallow-water waves in a canal. The 6uu<sub>x</sub> term steepens waves, like Burgers'. The u<sub>xxx</sub> term spreads them out (dispersion: different wavelengths travel at different speeds). The two balance in a <b>soliton</b>, u = (c/2) sech²(√c (x − ct)/2): a hump that travels at speed c without changing shape. Taller ones are faster.</p>
+<p>When a fast soliton catches a slow one, they pass through each other and come out unchanged, only shifted a little (a phase shift). That discovery (Zabusky and Kruskal, 1965) gave solitons their name. The starting hump 6 sech² x splits into exactly two solitons, of heights 8 and 2. The dashed line is the exact two-soliton formula.</p>
+<ul class="try"><li><b>Overtake:</b> watch the small soliton get pushed back and the big one jump ahead as they cross.</li>
+<li><b>Hump breaks up:</b> a hump that isn't a soliton sorts itself into a few solitons plus ripples that drift back.</li></ul>`,
+fisher:`<h2>The Fisher–KPP equation</h2>
+<p>Here u is a population (0 = empty, 1 = full). It grows, r u(1 − u), and wanders, D u<sub>xx</sub>. Together they make an invasion front that moves at speed 2√(Dr). The front approaches that speed slowly, from below. Fisher used it in 1937 for the spread of a favourable gene, and Kolmogorov, Petrovsky and Piskunov studied it the same year.</p>
+<ul class="try"><li><b>Invasion:</b> compare the measured front speed with 2√(Dr). Double D and the speed goes up by √2.</li>
+<li><b>Sprinkled start:</b> with a little life everywhere, the whole line fills up at once instead.</li></ul>`,
+ac:`<h2>The Allen–Cahn equation</h2>
+<p>u = −1 and u = +1 are two stable phases (think of two kinds of magnetised domain, or oil and water), and u = 0 is unstable. From a random start, regions quickly pick a phase, separated by walls about ε√2 wide. In 1D the walls then barely move: they attract only exponentially weakly, so a pattern can freeze for a very long time (metastability).</p>
+<p>A constant source h tips the balance towards one phase, and the walls then march at speed 3ε|b|/√2, where b is the middle root of u³ − u = h (about −h when h is small).</p>
+<ul class="try"><li><b>Close walls merge</b> and <b>Far walls stay</b>: same shape, different spacing.</li>
+<li><b>Wall pushed by a source:</b> try a source of −0.2 to push it back.</li></ul>`
+};
+
+setHint();
+setEq('burg');
+requestAnimationFrame(frame);
+addEventListener('resize',()=>{ drawCurve(); drawStrip(); });
+
+/* ---------- debug hook ---------- */
+if(/[?&]debug/.test(location.search)){
+  window.__pde={P,EQS,compile,restart,setEq,loadPreset,advanceBy,step,dtMax,exactAt,buildExact,frontPos,frontSpeed,wallCount,waveEnergy,integral,middleRoot,
+    get u(){ return u.slice(O,O+N); }, get v(){ return v.slice(O,O+N); }, get t(){ return t; }, get N(){ return N; }, get dx(){ return dx; }, get xs(){ return xs; }, get EX(){ return EX; }, get exReason(){ return exReason; }, get S(){ return S; },
+    advance(T,chunk){ chunk=chunk||0.01; while(T>1e-12){ const d=Math.min(chunk,T); advanceBy(d); T-=d; } return t; },
+    gap(){ const b=new Float64Array(N); if(!exactAt(t,b)) return NaN; let g=0; for(let i=0;i<N;i++) g=Math.max(g,Math.abs(b[i]-u[i+O])); return g; },
+    exact(){ const b=new Float64Array(N); return exactAt(t,b)?b:null; },
+    setParam(k,val){ par()[k]=val; buildParams(); changed(); }, setSrc(s){ $('srcIn').value=s; setSource(s); }, setInit(s){ $('initIn').value=s; P.initStr=s; restart(); },
+    setEdge(e){ P.edge=e; bL=u[O]; bR=u[N-1+O]; syncEdges(); changed(); }, draw:drawCurve, strip:drawStrip, frame};
+}
+})();
+</script>
