@@ -1,19 +1,32 @@
-# Math Widgets
+# Zak's Math Widgets
 
-Final versions of Zak's math widgets, exported from Claude artifacts (October 2026).
-Each folder is one self-contained page: open its index.html in a browser.
+Interactive math and physics widgets: fractals, symmetry, gravity, chaos, quantum mechanics and waves.
 
-| Folder | Widget |
-|---|---|
-| rational-map-explorer | Rational map explorer: z^n + c/z^m |
-| mandelbrot-descent | Mandelbrot Descent (deep-zoom visualizer) |
-| gravity-well | Gravity Well (2D N-body simulator) |
-| gravity-well-3d | Gravity Well 3D |
-| double-pendulum-flip-map | Double Pendulum Flip Map |
-| hooke-newton-squaring-map | Hooke ↔ Newton: the squaring map |
-| schrodinger-sandbox | Schrödinger Sandbox (1D) |
-| schrodinger-sandbox-2d | Schrödinger Sandbox 2D |
-| kaleidoscope | Kaleidoscope |
-| bifurcation-mandelbrot | Bifurcation ↔ Mandelbrot |
+**Live site:** https://zakvibes.github.io/math-widgets/ (it can also be installed as an app on a phone).
 
-Goal: turn this folder into a website that showcases these widgets.
+Each folder is one self-contained page: open its `index.html` in a browser.
+
+| Section | Folder | Widget |
+|---|---|---|
+| Fractals & complex dynamics | `rational-map-explorer` | Rational Map Explorer |
+| | `mandelbrot-descent` | Mandelbrot Descent |
+| Symmetry | `kaleidoscope` | Kaleidoscope |
+| Gravity & orbits | `gravity-well` | Gravity Well |
+| | `gravity-well-3d` | Gravity Well 3D |
+| | `hooke-newton-squaring-map` | Hooke ↔ Newton |
+| Chaos | `double-pendulum-flip-map` | Double Pendulum Flip Map |
+| | `bifurcation-mandelbrot` | Bifurcation ↔ Mandelbrot |
+| | `three-body-chaos-map` | Three-Body Chaos Map |
+| Quantum mechanics | `schrodinger-sandbox` | Schrödinger Sandbox |
+| | `schrodinger-sandbox-2d` | Schrödinger Sandbox 2D |
+| | `inside-the-proton` | Inside the Atom |
+| | `lattice-field` | Quantum Field on a Lattice |
+| Waves & signals | `field-sandbox` | Classical Field Sandbox |
+| | `fourier-studio` | Fourier Studio |
+| | `hear-the-drum` | Can You Hear the Shape of a Drum? |
+| Number theory | `padic-warp` | p-adic Warp |
+| | `adelic-mirror` | The Adelic Mirror |
+| Algebra | `quotient-rings` | Quotient Rings |
+
+Other files: `index.html` (home page), `site.css` and `controls.css` (shared styles),
+`manifest.json`, `icons/` and `sw.js` (the installable app and offline copy), `previews/` (home page pictures).
