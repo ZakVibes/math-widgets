@@ -489,25 +489,29 @@ function fluxQuanta(){ computePlaq(); let s=0; for(let j=1;j<=N;j++){ let k=j*G+
    - The outer PML cells are a convolutional perfectly matched layer (Roden & Gedney): each derivative there gets a memory
      term, so outgoing waves of every frequency and angle die away instead of reflecting.
    Reflect: grounded metal walls (and their image charges). Wrap: opposite edges joined. */
-let PML=24, PSIG=0.8*4/dx, PALPHA=0.05, PAFLAT=0;
+let PML=12, PSIG=0.8*4/dx, PALPHA=0.05, PAFLAT=0;
 const pbC=new Float64Array(N), pcC=new Float64Array(N), pbF=new Float64Array(N+1), pcF=new Float64Array(N+1);   // face f = i+1 for i = -1..N-1
+let pCLo=0, pCHi=N, pFLo=0, pFHi=N-1;
 function buildPML(){
   pbC.fill(0); pcC.fill(0); pbF.fill(0); pcF.fill(0);
   const prof=(dist,B,C,ix)=>{ const d=dist<PML?(PML-dist)/PML:0, sg=PSIG*d*d*d, al=PAFLAT?PALPHA:PALPHA*(1-d);
     if(sg>0){ const b=Math.exp(-(sg+al)*dt); B[ix]=b; C[ix]=sg/(sg+al)*(b-1); } };
   for(let i=0;i<N;i++) prof(Math.min(i+0.5,N-0.5-i),pbC,pcC,i);
   for(let i=-1;i<N;i++) prof(Math.min(i+1,N-1-i),pbF,pcF,i+1);
+  // the inner square with no layer: cells [pCLo,pCHi), faces [pFLo,pFHi) along each axis (emStepF runs it in a tight loop)
+  pCLo=0; while(pCLo<N&&pcC[pCLo]!==0) pCLo++; pCHi=pCLo; while(pCHi<N&&pcC[pCHi]===0) pCHi++;
+  pFLo=0; while(pFLo<N-1&&pcF[pFLo+1]!==0) pFLo++; pFHi=pFLo; while(pFHi<N-1&&pcF[pFHi+1]===0) pFHi++;
 }
 buildPML();
 const R0=60;   // the formula field is measured from r = R0 (any constant works; this keeps it near 0 at the edges)
 function makeEMF(){
-  const F={dec:P.edge==='absorb', acInit:false, key:''};
+  const F={dec:P.edge==='absorb', acInit:false, key:'', live:[false,false,false]};   // live[c]: component c may be nonzero
   for(const key of ['a','p','qx','qy','Px','Py','Qx','Qy','S']) F[key]=[0,1,2].map(()=>new Float64Array(NN));
   F.ac=[0,1,2].map(()=>[0,1,2].map(()=>new Float64Array(NN)));   // formula field now, one step ago, two steps ago
   return F;
 }
 const EMF=makeEMF();
-function emClear(F){ for(const key of ['a','p','qx','qy','Px','Py','Qx','Qy','S']) for(const arr of F[key]) arr.fill(0); F.acInit=false; F.key=''; F.dec=P.edge==='absorb'; }
+function emClear(F){ for(const key of ['a','p','qx','qy','Px','Py','Qx','Qy','S']) for(const arr of F[key]) arr.fill(0); F.acInit=false; F.key=''; F.dec=P.edge==='absorb'; F.live.fill(false); }
 function wrapGhost(a){ for(let i=0;i<G;i++){ a[i]=a[N*G+i]; a[(N+1)*G+i]=a[G+i]; } for(let j=0;j<G;j++){ a[j*G]=a[j*G+N]; a[j*G+N+1]=a[j*G+1]; } }
 function zeroRing(a){ for(let i=0;i<G;i++){ a[i]=0; a[(N+1)*G+i]=0; } for(let j=0;j<G;j++){ a[j*G]=0; a[j*G+N+1]=0; } }
 /* formula field of the charges in list, on every cell including the ghost ring */
@@ -521,6 +525,7 @@ function computeAC(out,list,time,frac){
 }
 function emPrepare(F,list,time,frac){
   const [S0,S1,S2]=F.S;
+  for(const s of list){ const st=srcState(s,time,frac); F.live[0]=true; if(st.vx) F.live[1]=true; if(st.vy) F.live[2]=true; }   // A_x, A_y only once something moves that way
   if(!F.dec){   // reflect / wrap: the whole field is on the grid
     S0.fill(0); S1.fill(0); S2.fill(0);
     for(const s of list){ const st=srcState(s,time,frac), q=s.sign*s.q; eachCellAt(st.x,st.y,(k,g)=>{ S0[k]+=q*g; S1[k]+=q*st.vx*g; S2[k]+=q*st.vy*g; }); }
@@ -537,7 +542,7 @@ function emPrepare(F,list,time,frac){
   F.still=key===F.key; F.key=key;
   if(F.still) for(let c=0;c<3;c++){ lv[1][c].set(lv[0][c]); lv[2][c].set(lv[0][c]); }
   const inv=1/(dx*dx), it2=1/(dt*dt), m2=mass()*mass();
-  for(let c=0;c<3;c++){ const A=lv[0][c], B=lv[1][c], C=lv[2][c], Sc=F.S[c];
+  for(let c=0;c<3;c++){ if(!F.live[c]) continue; const A=lv[0][c], B=lv[1][c], C=lv[2][c], Sc=F.S[c];
     for(let j=1;j<=N;j++){ let k=j*G+1; for(let i=0;i<N;i++,k++)
       Sc[k]=(A[k-1]+A[k+1]+A[k-G]+A[k+G]-4*A[k])*inv-m2*A[k]-(A[k]-2*B[k]+C[k])*it2; } }
   for(const s of list){ const st=srcState(s,time,frac), q=s.sign*s.q; eachCellAt(st.x,st.y,(k,g)=>{ S0[k]+=q*g; S1[k]+=q*st.vx*g; S2[k]+=q*st.vy*g; }); }
@@ -567,7 +572,7 @@ function emSetDec(F,list,on){
   if(on){   // to open space: the walls' image fields have nowhere to come from, so start from the exact open-space field
     for(const key of ['a','p','qx','qy','Px','Py','Qx','Qy']) for(const arr of F[key]) arr.fill(0);
     F.dec=true; F.acInit=false; F.key=''; return; }
-  const tmp=[0,1,2].map(()=>new Float64Array(NN)); computeAC(tmp,list,t,1);
+  const tmp=[0,1,2].map(()=>new Float64Array(NN)); computeAC(tmp,list,t,1); if(list.length) F.live.fill(true);
   for(let c=0;c<3;c++){ const a=F.a[c], A=tmp[c], sg=on?-1:1; for(let k=0;k<NN;k++) a[k]+=sg*A[k];
     for(const arr of [F.Px[c],F.Py[c],F.Qx[c],F.Qy[c]]) arr.fill(0); zeroRing(a); zeroRing(F.p[c]); zeroRing(F.qx[c]); zeroRing(F.qy[c]); }
   F.dec=on; F.acInit=false; F.key='';
@@ -580,30 +585,56 @@ function emFacesFromA(F){
     for(let j=0;j<N-1;j++){ let k=K(0,j); for(let i=0;i<N;i++,k++) qy[k]=(a[k+G]-a[k])*idx; } }
 }
 function emStepF(F){
-  const pml=P.edge==='absorb', wrap=P.edge==='wrap', refl=P.edge==='reflect', idx=1/dx, m2=mass()*mass(), df=Math.exp(-P.fric*dt);
-  const dec=F.dec, A0=F.ac[0], A1=F.ac[1];
-  for(let c=0;c<3;c++){
-    const a=F.a[c], p=F.p[c], qx=F.qx[c], qy=F.qy[c], Px=F.Px[c], Py=F.Py[c], Qx=F.Qx[c], Qy=F.Qy[c], S=F.S[c];
-    if(wrap){ wrapGhost(qx); wrapGhost(qy); }
-    for(let j=0;j<N;j++){ let k=K(0,j); const by=pbC[j], cy=pml?pcC[j]:0;
-      for(let i=0;i<N;i++,k++){
-        if(!open[k]){   // a grounded conductor: the total potential is 0 there
-          if(dec){ a[k]=-A0[c][k]; p[k]=-(A0[c][k]-A1[c][k])/dt; } else { a[k]=0; p[k]=0; } continue; }
-        let gx=(qx[k]-qx[k-1])*idx, gy=(qy[k]-qy[k-G])*idx;
-        if(pml&&pcC[i]!==0){ Px[k]=pbC[i]*Px[k]+pcC[i]*gx; gx+=Px[k]; }
-        if(cy!==0){ Py[k]=by*Py[k]+cy*gy; gy+=Py[k]; }
-        p[k]=df*(p[k]+dt*(gx+gy-m2*a[k]+S[k])); a[k]+=dt*p[k]; } }
-    if(wrap){ wrapGhost(p); wrapGhost(a); }   // otherwise the ghost cells stay 0
-    const nX=refl&&c===1, nY=refl&&c===2;   // metal walls: the part of A pointing into the wall has zero slope there
-    for(let j=-1;j<N;j++){ let k=K(-1,j); const fy=j+1, by=pbF[fy], cy=pml?pcF[fy]:0;
-      for(let i=-1;i<N;i++,k++){
-        if(j>=0&&!(wrap&&i===-1)&&!(nX&&(i===-1||i===N-1))){ const cx=pml?pcF[i+1]:0;
-          if(cx!==0){ let g=(p[k+1]-p[k])*idx; Qx[k]=pbF[i+1]*Qx[k]+cx*g; g+=Qx[k]; qx[k]+=dt*g; }   // in the layer
-          else qx[k]=(a[k+1]-a[k])*idx; }                                                              // elsewhere: exactly grad a
-        if(i>=0&&!(wrap&&j===-1)&&!(nY&&(j===-1||j===N-1))){
-          if(cy!==0){ let g=(p[k+G]-p[k])*idx; Qy[k]=by*Qy[k]+cy*g; g+=Qy[k]; qy[k]+=dt*g; }
-          else qy[k]=(a[k+G]-a[k])*idx; } } }
+  const pml=P.edge==='absorb', wrap=P.edge==='wrap', refl=P.edge==='reflect', m2=mass()*mass(), df=Math.exp(-P.fric*dt);
+  // The grid is cut into rectangles that are wholly inside or outside the layer along each axis, so each runs a plain loop.
+  // A component that has never been touched (all zeros, no source) is skipped: it would stay exactly 0.
+  for(let c=0;c<3;c++){ if(!F.live[c]) continue;
+    if(wrap){ wrapGhost(F.qx[c]); wrapGhost(F.qy[c]); }
+    if(pml) bands9(pCLo,pCHi,0,N,(i0,i1,j0,j1,lx,ly)=>emCells(F,c,i0,i1,j0,j1,lx,ly,df,m2));
+    else emCells(F,c,0,N,0,N,false,false,df,m2);
+    if(wrap){ wrapGhost(F.p[c]); wrapGhost(F.a[c]); }   // otherwise the ghost cells stay 0
+    if(pml) bands9(pFLo,pFHi,-1,N,(i0,i1,j0,j1,lx,ly)=>emFaces(F,c,i0,i1,j0,j1,lx,ly));
+    else { emFaces(F,c,0,N-1,0,N-1,false,false);
+      frameRects(0,N-1,-1,N,(i0,i1,j0,j1)=>emFacesEdge(F,c,i0,i1,j0,j1,wrap,refl&&c===1,refl&&c===2)); }
   }
+}
+/* the 3 x 3 rectangles of the square [s,e)^2 cut at lo and hi on each axis, as fn(i0,i1,j0,j1, outside along x, outside along y) */
+function bands9(lo,hi,s,e,fn){ const B=[[s,lo,true],[lo,hi,false],[hi,e,true]];
+  for(const [j0,j1,oy] of B) if(j1>j0) for(const [i0,i1,ox] of B) if(i1>i0) fn(i0,i1,j0,j1,ox,oy); }
+/* the four strips of the square [s,e)^2 around the inner square [lo,hi)^2, as fn(i0,i1,j0,j1) */
+function frameRects(lo,hi,s,e,fn){ fn(s,e,s,lo); fn(s,e,hi,e); fn(s,lo,lo,hi); fn(hi,e,lo,hi); }
+/* update p = da/dt and a on the cells of one rectangle; lx / ly: the rectangle lies in the layer along x / y */
+function emCells(F,c,i0,i1,j0,j1,lx,ly,df,m2){
+  const a=F.a[c], p=F.p[c], qx=F.qx[c], qy=F.qy[c], Px=F.Px[c], Py=F.Py[c], S=F.S[c], A0=F.ac[0][c], A1=F.ac[1][c], dec=F.dec, idx=1/dx;
+  for(let j=j0;j<j1;j++){ let k=K(i0,j); const by=pbC[j], cy=pcC[j];
+    for(let i=i0;i<i1;i++,k++){
+      if(!open[k]){   // a grounded conductor: the total potential is 0 there
+        if(dec){ a[k]=-A0[k]; p[k]=-(A0[k]-A1[k])/dt; } else { a[k]=0; p[k]=0; } continue; }
+      let gx=(qx[k]-qx[k-1])*idx, gy=(qy[k]-qy[k-G])*idx;
+      if(lx){ Px[k]=pbC[i]*Px[k]+pcC[i]*gx; gx+=Px[k]; }
+      if(ly){ Py[k]=by*Py[k]+cy*gy; gy+=Py[k]; }
+      p[k]=df*(p[k]+dt*(gx+gy-m2*a[k]+S[k])); a[k]+=dt*p[k]; } }
+}
+/* update q = grad a on the faces of one rectangle (x-faces need j >= 0, y-faces i >= 0) */
+function emFaces(F,c,i0,i1,j0,j1,lx,ly){
+  const a=F.a[c], p=F.p[c], qx=F.qx[c], qy=F.qy[c], Qx=F.Qx[c], Qy=F.Qy[c], idx=1/dx;
+  for(let j=j0;j<j1;j++){ let k=K(i0,j); const by=pbF[j+1], cy=pcF[j+1];
+    for(let i=i0;i<i1;i++,k++){
+      if(j>=0){
+        if(lx){ let g=(p[k+1]-p[k])*idx; Qx[k]=pbF[i+1]*Qx[k]+pcF[i+1]*g; g+=Qx[k]; qx[k]+=dt*g; }   // in the layer
+        else qx[k]=(a[k+1]-a[k])*idx; }                                                                // elsewhere: exactly grad a
+      if(i>=0){
+        if(ly){ let g=(p[k+G]-p[k])*idx; Qy[k]=by*Qy[k]+cy*g; g+=Qy[k]; qy[k]+=dt*g; }
+        else qy[k]=(a[k+G]-a[k])*idx; } } }
+}
+/* Reflect / Wrap: the outermost faces. Wrap takes them from the far side (ghost copies); on metal walls the part of A
+   pointing into the wall has zero slope, so those faces are left alone */
+function emFacesEdge(F,c,i0,i1,j0,j1,wrap,nX,nY){
+  const a=F.a[c], qx=F.qx[c], qy=F.qy[c], idx=1/dx;
+  for(let j=j0;j<j1;j++){ let k=K(i0,j);
+    for(let i=i0;i<i1;i++,k++){
+      if(j>=0&&!(wrap&&i===-1)&&!(nX&&(i===-1||i===N-1))) qx[k]=(a[k+1]-a[k])*idx;
+      if(i>=0&&!(wrap&&j===-1)&&!(nY&&(j===-1||j===N-1))) qy[k]=(a[k+G]-a[k])*idx; } }
 }
 /* E = -grad phi - dA/dt and B_z = dA_y/dx - dA_x/dy at cell k: the grid part (faces averaged to the cell centre) plus the formula part */
 const emE=[0,0,0];
@@ -622,9 +653,16 @@ function stepEM(frac){
   t+=dt;
   pushCharges();
 }
-function computeEB(){
+function computeEB(){   // emAt over the whole grid, written out so it runs fast
+  const F=EMF, qx0=F.qx[0], qy0=F.qy[0], qx2=F.qx[2], qy1=F.qy[1], p1=F.p[1], p2=F.p[2], fm=F.dec&&F.acInit, h=1/(2*dx);
+  const [A0,A1,A2]=F.ac[0], [,B1,B2]=F.ac[1];
   for(let j=0;j<N;j++){ let k=K(0,j); for(let i=0;i<N;i++,k++){
-    if(!open[k]){ Ex[k]=Ey[k]=Bz[k]=0; continue; } emAt(EMF,k); Ex[k]=emE[0]; Ey[k]=emE[1]; Bz[k]=emE[2]; } }
+    if(!open[k]){ Ex[k]=Ey[k]=Bz[k]=0; continue; }
+    let ex=-0.5*(qx0[k-1]+qx0[k])-p1[k], ey=-0.5*(qy0[k-G]+qy0[k])-p2[k];
+    let bz=0.5*(qx2[k-1]+qx2[k])-0.5*(qy1[k-G]+qy1[k]);
+    if(fm){ ex+=-(A0[k+1]-A0[k-1])*h-(A1[k]-B1[k])/dt; ey+=-(A0[k+G]-A0[k-G])*h-(A2[k]-B2[k])/dt;
+      bz+=(A2[k+1]-A2[k-1])*h-(A1[k+G]-A1[k-G])*h; }
+    Ex[k]=ex; Ey[k]=ey; Bz[k]=bz; } }
 }
 
 function energy(){
@@ -666,6 +704,7 @@ function poke(cx,cy,amp){             // complex field: turns the phase by up to
   if(isEm()){   // a flash: a little swirl of E (divergence-free, so no charge), which spreads as a ring of light
     forDisc(cx,cy,3*s,(k,r)=>{ if(!open[k]) return; const X=((k%G)-1-cx)*dx, Y=(((k/G)|0)-1-cy)*dx, g=amp*Math.exp(-r*r/(2*s*s))/s;
       EMF.p[1][k]+=-Y*g; EMF.p[2][k]+=X*g; });
+    EMF.live[1]=EMF.live[2]=true;
     dirty=true; return; }
   forDisc(cx,cy,3*s,(k,r)=>{ if(!open[k]) return; const a=amp*Math.exp(-r*r/(2*s*s));
     if(!c){ phi[k]+=a; return; }
@@ -750,6 +789,7 @@ const staticEr=r=>r<1e-9?0:(1-Math.exp(-r*r/(2*SIG*SIG)))/(2*Math.PI*r);
 function addStatic(q,cx,cy,F){
   const T=F||EMF, a0=T.a[0], qx=T.qx[0], qy=T.qy[0];
   if(T.dec) return;   // absorb: the formula field already includes it
+  T.live[0]=true;
   for(let j=0;j<N;j++)for(let i=0;i<N;i++){ const k=K(i,j); if(open[k]) a0[k]+=q*staticPhi(Math.hypot((i-cx)*dx,(j-cy)*dx)); }
   // grad phi on every face, from the exact field E_r of the Gaussian charge
   for(let j=-1;j<N;j++)for(let i=-1;i<N;i++){ const k=K(i,j);
@@ -1353,10 +1393,11 @@ if(/[?&]record\b/.test(location.search)) recordMode(); else requestAnimationFram
 function recordMode(){
   const W=1080, H=1920, PY=490, BG='#0b0d14', FADEF=8;
   const TAKES=[
-    {th:'cx', preset:'Vortex + antivortex', sec:9, steps:()=>3},
-    {th:'cx', preset:'Two alike', sec:7, steps:()=>2},
-    {th:'cx', preset:'Strings and walls', sec:9, steps:()=>3},
-    {th:'cx', preset:'Kibble quench', sec:23, steps:f=>f<30?2:0.35+2.4*Math.pow((f-30)/660,1.6)}   // through the dark start in 1 s, then slowly while the tangle is thick
+    {th:'cx', preset:'Vortex + antivortex', sec:6.5, steps:f=>f<90?5.5:2.5},   // they meet after ~600 steps, at 4.4 s
+    {th:'cx', preset:'Kibble quench', sec:17, steps:f=>f<30?2:0.45+2.6*Math.pow((f-30)/480,1.5)},   // through the dark start in 1 s, then slowly while the tangle is thick
+    // a 6x6 checkerboard of vortices and antivortices, nudged a little: it holds still, then unravels from the edges in (gone by ~600 steps)
+    {sec:11, steps:f=>f<30?6:1.5, init(){ setup({th:'cx',m:1,fric:0.05}); const r=rng(12345);
+      for(let a=0;a<6;a++)for(let b=0;b<6;b++) twistAt(U2C((a-2.5)*16+1.5*r()),U2C((b-2.5)*16+1.5*r()),(a+b)%2?1:-1); }}
   ];
   const start=[]; let n=0; for(const tk of TAKES){ start.push(n); n+=tk.sec*30; }
   const rc=document.createElement('canvas'), rctx=rc.getContext('2d');
@@ -1371,20 +1412,18 @@ function recordMode(){
     name:'field-vortices', seconds:n/30, captionY:260,
     music:{ file:'chopin-prelude13.mp3', start:0.5, fade:4.5 },
     captions:[
-      {from:0, to:5.6, text:'A vortex and\nan antivortex'},
-      {from:6.0, to:8.6, text:'They cancel out'},
-      {from:9.4, to:15.6, text:'Two the same way\npush apart'},
-      {from:16.4, to:19.2, text:'Add a tilt and\na wall joins them'},
-      {from:19.6, to:24.6, text:'It pulls them in'},
-      {from:25.4, to:27.4, text:'Cool the field quickly'},
-      {from:27.8, to:43.6, text:'Hundreds of vortices,\npairing off'},
-      {from:44.0, to:n/30+1, text:'Try it yourself,\nlink in description'}
+      {from:0, to:4.0, text:'A vortex and\nan antivortex'},
+      {from:4.3, to:6.3, text:'They cancel out'},
+      {from:6.8, to:8.8, text:'Cool the field quickly'},
+      {from:9.2, to:23.0, text:'Hundreds of vortices,\npairing off'},
+      {from:23.8, to:31.6, text:'Now a grid of them'},
+      {from:32.0, to:n/30+1, text:'Try it yourself,\nlink in description'}
     ],
     reset(){ take=-1; },
     tick(fi){
       cur=fi;
       for(let k=TAKES.length-1;k>=0;k--) if(fi>=start[k]){
-        if(take!==k){ take=k; acc=0; PRESETS[TAKES[k].th].find(q=>q[0]===TAKES[k].preset)[1](); }
+        if(take!==k){ take=k; acc=0; const tk=TAKES[k]; if(tk.init) tk.init(); else PRESETS[tk.th].find(q=>q[0]===tk.preset)[1](); }
         break; }
       acc+=TAKES[take].steps(fi-start[take]); const S=Math.floor(acc); acc-=S;
       if(S>0) advance(S);
