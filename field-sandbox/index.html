@@ -1344,8 +1344,70 @@ function frame(){
 
 setTheory('kg'); setTool('poke'); syncSrcPanel();
 setup({th:'kg',m:0}); poke(N/2-0.5,N/2-0.5,1); afterChange();   // open on a single ripple
-requestAnimationFrame(frame);
-addEventListener('resize',()=>{ sizeCanvas(); if(!P.running) render(); });
+if(/[?&]record\b/.test(location.search)) recordMode(); else requestAnimationFrame(frame);
+
+/* ---------- ?record: a YouTube Short of vortices (see ../shorts-rec.js) ---------- */
+/* 1080×1920: a caption band on top, the page's own phase picture (drawn 1080 wide, without the vortex rings) below it.
+   One take per preset, with a quick fade between takes. steps(f) = simulation steps per video frame (f = frame within
+   the take); the quench passes the dark start quickly, then slows so the tangle can be seen. */
+function recordMode(){
+  const W=1080, H=1920, PY=490, BG='#0b0d14', FADEF=8;
+  const TAKES=[
+    {th:'cx', preset:'Vortex + antivortex', sec:9, steps:()=>3},
+    {th:'cx', preset:'Two alike', sec:7, steps:()=>2},
+    {th:'cx', preset:'Strings and walls', sec:9, steps:()=>3},
+    {th:'cx', preset:'Kibble quench', sec:23, steps:f=>f<30?2:0.35+2.4*Math.pow((f-30)/660,1.6)}   // through the dark start in 1 s, then slowly while the tangle is thick
+  ];
+  const start=[]; let n=0; for(const tk of TAKES){ start.push(n); n+=tk.sec*30; }
+  const rc=document.createElement('canvas'), rctx=rc.getContext('2d');
+  rc.width=W; rc.height=H;
+  for(const el of document.body.children) el.style.display='none';
+  document.body.style.background=BG;
+  rc.style.cssText='display:block;margin:0 auto;width:min(100vw,56.25vh);height:min(100vh,177.78vw)';
+  document.body.append(rc);
+  cv.width=cv.height=W; cssW=W;
+  let take=-1, cur=0, acc=0;
+  const short={
+    name:'field-vortices', seconds:n/30, captionY:260,
+    music:{ file:'chopin-prelude13.mp3', start:0.5, fade:4.5 },
+    captions:[
+      {from:0, to:5.6, text:'A vortex and\nan antivortex'},
+      {from:6.0, to:8.6, text:'They cancel out'},
+      {from:9.4, to:15.6, text:'Two the same way\npush apart'},
+      {from:16.4, to:19.2, text:'Add a tilt and\na wall joins them'},
+      {from:19.6, to:24.6, text:'It pulls them in'},
+      {from:25.4, to:27.4, text:'Cool the field quickly'},
+      {from:27.8, to:43.6, text:'Hundreds of vortices,\npairing off'},
+      {from:44.0, to:n/30+1, text:'Try it yourself,\nlink in description'}
+    ],
+    reset(){ take=-1; },
+    tick(fi){
+      cur=fi;
+      for(let k=TAKES.length-1;k>=0;k--) if(fi>=start[k]){
+        if(take!==k){ take=k; acc=0; PRESETS[TAKES[k].th].find(q=>q[0]===TAKES[k].preset)[1](); }
+        break; }
+      acc+=TAKES[take].steps(fi-start[take]); const S=Math.floor(acc); acc-=S;
+      if(S>0) advance(S);
+    },
+    render(){
+      vortices=[]; render();
+      rctx.setTransform(1,0,0,1,0,0); rctx.fillStyle=BG; rctx.fillRect(0,0,W,H);
+      rctx.drawImage(cv,0,PY,W,W);
+      let f=0; for(let k=1;k<TAKES.length;k++) f=Math.max(f,1-Math.abs(cur-start[k]+0.5)/FADEF);
+      if(f>0){ rctx.globalAlpha=f; rctx.fillStyle=BG; rctx.fillRect(0,0,W,H); rctx.globalAlpha=1; }
+    }
+  };
+  window.__short=short;
+  const fl=document.createElement('link');   // the caption font, which this page doesn't otherwise load
+  fl.rel='stylesheet'; fl.href='https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&display=swap';
+  fl.onload=fl.onerror=()=>{   // shorts-rec.js waits for the font, so load it once the font is declared
+    const sc=document.createElement('script'); sc.src='../shorts-rec.js';
+    sc.onload=()=>{ short.canvas=rc; ShortsRec(short); };
+    document.head.append(sc);
+  };
+  document.head.append(fl);
+}
+addEventListener('resize',()=>{ if(window.__short) return; sizeCanvas(); if(!P.running) render(); });
 
 /* ---------- debug hook ---------- */
 if(/[?&]debug/.test(location.search)){
