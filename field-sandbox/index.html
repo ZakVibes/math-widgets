@@ -1388,7 +1388,7 @@ if(/[?&]record\b/.test(location.search)) recordMode(); else requestAnimationFram
 
 /* ---------- ?record: YouTube Shorts (see ../shorts-rec.js) ---------- */
 /* 1080×1920: a caption band on top, the page's own picture (drawn 1080 wide, without the vortex rings) below it.
-   ?record (or ?record=vortices) records the vortex Short, ?record=slits the light-through-slits one.
+   ?record (or ?record=vortices) records the vortex Short, ?record=slits the light-through-slits one, ?record=atom the classical atom.
    One take per preset or init, with a quick fade between takes. steps(f) = simulation steps per video frame (f = frame
    within the take); the quench passes the dark start quickly, then slows so the tangle can be seen. */
 function slitScene(gaps){            // a wall at x = -5 with openings 3 wide at the heights in gaps, light from the left
@@ -1396,6 +1396,15 @@ function slitScene(gaps){            // a wall at x = -5 with openings 3 wide at
   const xw=Math.round(U2C(-5));
   for(let j=0;j<N;j++){ const y=(j-N/2+0.5)*dx; if(gaps.some(g=>Math.abs(y-g)<1.5)) continue; for(let i=xw-1;i<=xw+1;i++) open[K(i,j)]=0; }
   updateDamp(); resetField(); addCharge({x:U2C(-30),y:U2C(0),kind:'wiggle',w:1.2,A:0.5,vert:true});
+}
+function atomScene(){               // the Classical atom preset at radius 10 (it falls in by t ~ 220; at 15 it swings in and out first)
+  setup({th:'em'}); addCharge({x:U2C(0),y:U2C(0)});
+  const M=1, c0=1/(2*Math.PI*M), v=Math.sqrt((-c0*c0+Math.sqrt(c0**4+4*c0*c0))/2), g=1/Math.sqrt(1-v*v);
+  addCharge({x:U2C(10),y:U2C(0),sign:-1,kind:'free',M,mx:0,my:-M*g*v});
+}
+function dipoleScene(){             // the fallen-in pair at rest, and a flash to its left: the charge swings ±2 up and down (±0.4 across, period ~30)
+  setup({th:'em'}); addCharge({x:U2C(0),y:U2C(0)}); addCharge({x:U2C(0),y:U2C(0),sign:-1,kind:'free',M:1,mx:0,my:0});
+  const b=P.brush; P.brush=6; poke(U2C(-30),U2C(0),1.2); P.brush=b;   // a wide soft flash: a narrow one leaves grid ripples, a stronger one knocks the charge out
 }
 function recordMode(){
   const W=1080, H=1920, PY=490, BG='#0b0d14', FADEF=8;
@@ -1426,6 +1435,21 @@ function recordMode(){
         {from:0, to:10.5, text:'Light through one slit'},
         {from:11.3, to:T-3.5, text:'Now two slits'},
         {from:T-3, to:T+1, text:'Try it yourself,\nlink in description'}
+      ]},
+    // a charge circling an opposite one radiates and falls in (t ~ 220, then rests); then the fallen-in pair, shaken by a flash, radiates as a dipole
+    atom:{ name:'field-atom', music:{ file:'chopin-waltz64no1.mp3', start:0.9, fade:4.5 }, fscale:0.008, zoom:1.6,   // |B| in the middle: ~0.007 (95%), 0.015 (99.5%)
+      takes:[
+        {sec:15, steps:f=>f<360?6.5:3, init: atomScene},
+        // |B| ~0.1 in the flash, ~0.005 in the light the pair sends out: the colour scale starts high and eases down once the flash has passed
+        {sec:11, steps:f=>6.5, init: dipoleScene, fscale:f=>0.006+0.12*Math.exp(-Math.max(0,f-60)/25)}
+      ],
+      captions:T=>[
+        {from:0, to:5.6, text:'A classical atom:\na charge orbiting\nan opposite charge'},
+        {from:6.0, to:10.2, text:'It gives off light\nand falls in'},
+        {from:10.6, to:14.5, text:'That\'s why a classical\natom isn\'t stable'},
+        {from:15.3, to:19.2, text:'Now hit the fallen-in\natom with light'},
+        {from:19.6, to:T-3.5, text:'It shakes and radiates\nlike a dipole'},
+        {from:T-3, to:T+1, text:'Try it yourself,\nlink in description'}
       ]}
   };
   const which=(location.search.match(/[?&]record=(\w+)/)||[])[1]||'vortices', SH=SHORTS[which], TAKES=SH.takes;
@@ -1436,7 +1460,8 @@ function recordMode(){
   document.body.style.background=BG;
   rc.style.cssText='display:block;margin:0 auto;width:min(100vw,56.25vh);height:min(100vh,177.78vw)';
   document.body.append(rc);
-  cv.width=cv.height=W; cssW=W;
+  const CW=Math.round(W*(SH.zoom||1)), C0=(CW-W)/2;   // zoom: draw the page's picture bigger and show its middle (dots and lines grow with it)
+  cv.width=cv.height=CW; cssW=W;
   let take=-1, cur=0, acc=0;
   const short={
     name:SH.name, seconds:n/30, captionY:260, music:SH.music||undefined, captions:SH.captions(n/30),
@@ -1450,9 +1475,9 @@ function recordMode(){
       if(S>0) advance(S);
     },
     render(){
-      vortices=[]; if(SH.fscale) fscale=SH.fscale; render();
+      vortices=[]; const tf=TAKES[take].fscale; if(tf) fscale=tf(cur-start[take]); else if(SH.fscale) fscale=SH.fscale; render();
       rctx.setTransform(1,0,0,1,0,0); rctx.fillStyle=BG; rctx.fillRect(0,0,W,H);
-      rctx.drawImage(cv,0,PY,W,W);
+      rctx.drawImage(cv,C0,C0,W,W,0,PY,W,W);
       let f=0; for(let k=1;k<TAKES.length;k++) f=Math.max(f,1-Math.abs(cur-start[k]+0.5)/FADEF);
       if(f>0){ rctx.globalAlpha=f; rctx.fillStyle=BG; rctx.fillRect(0,0,W,H); rctx.globalAlpha=1; }
     }
@@ -1473,7 +1498,7 @@ addEventListener('resize',()=>{ if(window.__short) return; sizeCanvas(); if(!P.r
 if(/[?&]debug/.test(location.search)){
   window.__fs={emPrepare,computeAC,emSetDec,setPML(w,sig,al,flat){PML=w;PSIG=sig;PALPHA=al;PAFLAT=flat;buildPML();},EMF,emStepF,emAt,emE,stepEM,makeEMF,setSponge(w,g,pw){SPONGE=w;SPMAX=g;SPPOW=pw;buildSponge();updateDamp();},N,G,dx,dt,L,K,P,releaseFree,lx,ly,lvx,lvy,plq,computePlaq,fluxQuanta,energyAH,forceAH,stepAH,syncU,phi,vel,phi2,vel2,phi3,vel3,Ex,Ey,Bz,computeEB,srcState,addStatic,addCharge,twistAt,findVortices,get vortices(){return vortices},open,TH,PRESETS,energy,advance,force,fillField,resetField,addSource,setTheory,setEdge,updateDamp,updateVmin,vacPhi4,Vraw,poke,paint,U2C,
     get t(){return t}, set t(v){t=v}, get sources(){return sources}, set sources(v){sources=v}, frame, render,
-    preset(th,name){ const p=PRESETS[th].find(q=>q[0]===name); p[1](); afterChange(); },
+    preset(th,name){ const p=PRESETS[th].find(q=>q[0]===name); p[1](); afterChange(); }, scene(f){ f(setup); afterChange(); },
     setFric(f){P.fric=f; updateDamp();}, setMass(m){P.m[P.th]=m; updateVmin(); dirty=true;}, markDirty(){dirty=true;}};
 }
 })();
