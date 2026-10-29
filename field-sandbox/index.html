@@ -1386,19 +1386,49 @@ setTheory('kg'); setTool('poke'); syncSrcPanel();
 setup({th:'kg',m:0}); poke(N/2-0.5,N/2-0.5,1); afterChange();   // open on a single ripple
 if(/[?&]record\b/.test(location.search)) recordMode(); else requestAnimationFrame(frame);
 
-/* ---------- ?record: a YouTube Short of vortices (see ../shorts-rec.js) ---------- */
-/* 1080×1920: a caption band on top, the page's own phase picture (drawn 1080 wide, without the vortex rings) below it.
-   One take per preset, with a quick fade between takes. steps(f) = simulation steps per video frame (f = frame within
-   the take); the quench passes the dark start quickly, then slows so the tangle can be seen. */
+/* ---------- ?record: YouTube Shorts (see ../shorts-rec.js) ---------- */
+/* 1080×1920: a caption band on top, the page's own picture (drawn 1080 wide, without the vortex rings) below it.
+   ?record (or ?record=vortices) records the vortex Short, ?record=slits the light-through-slits one.
+   One take per preset or init, with a quick fade between takes. steps(f) = simulation steps per video frame (f = frame
+   within the take); the quench passes the dark start quickly, then slows so the tangle can be seen. */
+function slitScene(gaps){            // a wall at x = -5 with openings 3 wide at the heights in gaps, light from the left
+  setup({th:'em'});
+  const xw=Math.round(U2C(-5));
+  for(let j=0;j<N;j++){ const y=(j-N/2+0.5)*dx; if(gaps.some(g=>Math.abs(y-g)<1.5)) continue; for(let i=xw-1;i<=xw+1;i++) open[K(i,j)]=0; }
+  updateDamp(); resetField(); addCharge({x:U2C(-30),y:U2C(0),kind:'wiggle',w:1.2,A:0.5,vert:true});
+}
 function recordMode(){
   const W=1080, H=1920, PY=490, BG='#0b0d14', FADEF=8;
-  const TAKES=[
-    {th:'cx', preset:'Vortex + antivortex', sec:6.5, steps:f=>f<90?5.5:2.5},   // they meet after ~600 steps, at 4.4 s
-    {th:'cx', preset:'Kibble quench', sec:17, steps:f=>f<30?2:0.45+2.6*Math.pow((f-30)/480,1.5)},   // through the dark start in 1 s, then slowly while the tangle is thick
-    // a 6x6 checkerboard of vortices and antivortices, nudged a little: it holds still, then unravels from the edges in (gone by ~600 steps)
-    {sec:11, steps:f=>f<30?6:1.5, init(){ setup({th:'cx',m:1,fric:0.05}); const r=rng(12345);
-      for(let a=0;a<6;a++)for(let b=0;b<6;b++) twistAt(U2C((a-2.5)*16+1.5*r()),U2C((b-2.5)*16+1.5*r()),(a+b)%2?1:-1); }}
-  ];
+  const SHORTS={
+    vortices:{ name:'field-vortices', music:{ file:'chopin-prelude13.mp3', start:0.5, fade:4.5 },
+      takes:[
+        {th:'cx', preset:'Vortex + antivortex', sec:6.5, steps:f=>f<90?5.5:2.5},   // they meet after ~600 steps, at 4.4 s
+        {th:'cx', preset:'Kibble quench', sec:17, steps:f=>f<30?2:0.45+2.6*Math.pow((f-30)/480,1.5)},   // through the dark start in 1 s, then slowly while the tangle is thick
+        // a 6x6 checkerboard of vortices and antivortices, nudged a little: it holds still, then unravels from the edges in (gone by ~600 steps)
+        {sec:11, steps:f=>f<30?6:1.5, init(){ setup({th:'cx',m:1,fric:0.05}); const r=rng(12345);
+          for(let a=0;a<6;a++)for(let b=0;b<6;b++) twistAt(U2C((a-2.5)*16+1.5*r()),U2C((b-2.5)*16+1.5*r()),(a+b)%2?1:-1); }}
+      ],
+      captions:T=>[
+        {from:0, to:4.0, text:'A vortex and\nan antivortex'},
+        {from:4.3, to:6.3, text:'They cancel out'},
+        {from:6.8, to:8.8, text:'Cool the field quickly'},
+        {from:9.2, to:23.0, text:'Hundreds of vortices,\npairing off'},
+        {from:23.8, to:31.6, text:'Now a grid of them'},
+        {from:32.0, to:T+1, text:'Try it yourself,\nlink in description'}
+      ]},
+    // the same light (wavelength 2 pi / 1.2 = 5.2) through one opening, then two 14 apart: stripes at sin(angle) = 5.2 k / 14
+    slits:{ name:'field-slits', music:{ file:'chopin-prelude23.mp3', start:0.5, fade:4.5 }, fscale:0.008,   // a fixed colour scale, set by the light past the wall (the page's own follows the brighter left side)
+      takes:[
+        {sec:11, steps:f=>f<20?12:4, init(){ slitScene([0]); }},
+        {sec:14, steps:f=>f<20?12:4, init(){ slitScene([-7,7]); }}
+      ],
+      captions:T=>[
+        {from:0, to:10.5, text:'Light through one slit'},
+        {from:11.3, to:T-3.5, text:'Now two slits'},
+        {from:T-3, to:T+1, text:'Try it yourself,\nlink in description'}
+      ]}
+  };
+  const which=(location.search.match(/[?&]record=(\w+)/)||[])[1]||'vortices', SH=SHORTS[which], TAKES=SH.takes;
   const start=[]; let n=0; for(const tk of TAKES){ start.push(n); n+=tk.sec*30; }
   const rc=document.createElement('canvas'), rctx=rc.getContext('2d');
   rc.width=W; rc.height=H;
@@ -1409,16 +1439,7 @@ function recordMode(){
   cv.width=cv.height=W; cssW=W;
   let take=-1, cur=0, acc=0;
   const short={
-    name:'field-vortices', seconds:n/30, captionY:260,
-    music:{ file:'chopin-prelude13.mp3', start:0.5, fade:4.5 },
-    captions:[
-      {from:0, to:4.0, text:'A vortex and\nan antivortex'},
-      {from:4.3, to:6.3, text:'They cancel out'},
-      {from:6.8, to:8.8, text:'Cool the field quickly'},
-      {from:9.2, to:23.0, text:'Hundreds of vortices,\npairing off'},
-      {from:23.8, to:31.6, text:'Now a grid of them'},
-      {from:32.0, to:n/30+1, text:'Try it yourself,\nlink in description'}
-    ],
+    name:SH.name, seconds:n/30, captionY:260, music:SH.music||undefined, captions:SH.captions(n/30),
     reset(){ take=-1; },
     tick(fi){
       cur=fi;
@@ -1429,7 +1450,7 @@ function recordMode(){
       if(S>0) advance(S);
     },
     render(){
-      vortices=[]; render();
+      vortices=[]; if(SH.fscale) fscale=SH.fscale; render();
       rctx.setTransform(1,0,0,1,0,0); rctx.fillStyle=BG; rctx.fillRect(0,0,W,H);
       rctx.drawImage(cv,0,PY,W,W);
       let f=0; for(let k=1;k<TAKES.length;k++) f=Math.max(f,1-Math.abs(cur-start[k]+0.5)/FADEF);
