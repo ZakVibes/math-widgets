@@ -5,7 +5,8 @@
      reset()  start the scene from the beginning (same seed every time)
      tick(i)  advance the scene by one video frame (i = frame number)
      render() draw the scene
-     captions [{ from, to, text, size? }] in seconds, "\n" breaks lines; captionY in pixels
+     captions [{ from, to, text, size?, y?, color? }] in seconds, "\n" breaks lines; captionY in pixels
+              (a caption's own y, up to ~850, overrides captionY; color defaults to white)
      music    optional { file, start, fade }: a recording in shorts/music/, played from <start> s into the
               file and fading out over the last <fade> s of the video
    This file plays a looping preview with the captions, and on "Record" (or the R key) steps through every
@@ -34,8 +35,9 @@ window.ShortsRec = function (o) {
     g.font = `700 ${size}px "Bricolage Grotesque", sans-serif`;
     const widest = Math.max(...lines.map(l => g.measureText(l).width));
     if (widest > 960) { size = Math.floor(size * 960 / widest); g.font = `700 ${size}px "Bricolage Grotesque", sans-serif`; }
-    g.globalAlpha = a; g.fillStyle = '#ffffff';
-    lines.forEach((l, k) => g.fillText(l, 540, captionY + rise + k * size * 1.18));
+    g.globalAlpha = a; g.fillStyle = c.color || '#ffffff';
+    const y0 = c.y || captionY;
+    lines.forEach((l, k) => g.fillText(l, 540, y0 + rise + k * size * 1.18));
     g.restore();
   }
   function overlay(t) {   // the preview and stills draw the captions live, the same way the video shows them
