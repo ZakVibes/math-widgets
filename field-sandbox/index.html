@@ -312,7 +312,9 @@ function srcState(s,time,frac){
   if(isEm()){ const w=s.w, ph=w*(time-s.t0);
     if(s.kind==='wiggle'){ const A=effAmp(s), d=A/dx*Math.sin(ph), v=A*w*Math.cos(ph); if(s.vert){ y+=d; vy+=v; } else { x+=d; vx+=v; } }   // vert: wiggles up and down
     else if(s.kind==='orbit'){ const A=effAmp(s); x+=A/dx*Math.cos(ph); y-=A/dx*Math.sin(ph); vx-=A*w*Math.sin(ph); vy-=A*w*Math.cos(ph); }
-    else if(s.kind==='jump'){ const u=Math.min(1,Math.max(0,(time-s.t0)/s.T)); x+=s.L/dx*u*u*(3-2*u); vx+=s.L*6*u*(1-u)/s.T; } }
+    else if(s.kind==='jump'){   // slides L along x in time T from t0; legs = several such slides [{t0, T, Lx, Ly}]
+      for(const g of s.legs||[{t0:s.t0,T:s.T,Lx:s.L,Ly:0}]){ const u=Math.min(1,Math.max(0,(time-g.t0)/g.T)), sm=u*u*(3-2*u), dv=6*u*(1-u)/g.T;
+        x+=g.Lx/dx*sm; y+=g.Ly/dx*sm; vx+=g.Lx*dv; vy+=g.Ly*dv; } } }
   return {x,y,vx,vy};
 }
 function eachSourceCell(s,time,frac,fn){ const st=srcState(s,time,frac); eachCellAt(st.x,st.y,fn); }
@@ -504,6 +506,16 @@ function buildPML(){
 }
 buildPML();
 const R0=60;   // the formula field is measured from r = R0 (any constant works; this keeps it near 0 at the edges)
+/* The moving part of the formula field (A = v q Phi) fades to 0 before the layer, so the grid carries it there. Without this,
+   a sudden change of speed sends a faint wave in from the edges (~1/10 of the ring in the jump Short), because the grid's
+   edge can't cancel A where it is not 0. Inside |x|, |y| < 40 nothing changes (PLAN, 2026-10-28). */
+let AWIN=null;
+function fadeMovingAC(){
+  AWIN=new Float64Array(NN); const w1=(N/2-PML-12)*dx, w0=w1-12;   // 1 inside |x|, |y| < w0, 0 beyond w1 (units from the centre)
+  const f=u=>{ const s=Math.min(1,Math.max(0,(w1-Math.abs(u))/(w1-w0))); return s*s*(3-2*s); };
+  for(let j=-1;j<=N;j++) for(let i=-1;i<=N;i++) AWIN[K(i,j)]=f((i-N/2+0.5)*dx)*f((j-N/2+0.5)*dx);
+}
+fadeMovingAC();
 function makeEMF(){
   const F={dec:P.edge==='absorb', acInit:false, key:'', live:[false,false,false]};   // live[c]: component c may be nonzero
   for(const key of ['a','p','qx','qy','Px','Py','Qx','Qy','S']) F[key]=[0,1,2].map(()=>new Float64Array(NN));
@@ -521,7 +533,7 @@ function computeAC(out,list,time,frac){
   for(const s of list){ const st=srcState(s,time,frac), q=s.sign*s.q, vx=st.vx, vy=st.vy;
     for(let j=-1;j<=N;j++){ const Y=(j-st.y)*dx; let k=K(-1,j);
       for(let i=-1;i<=N;i++,k++){ const X=(i-st.x)*dx, ph=q*(staticPhi(Math.sqrt(X*X+Y*Y))-P0);
-        o0[k]+=ph; if(vx) o1[k]+=vx*ph; if(vy) o2[k]+=vy*ph; } } }
+        const w=AWIN?AWIN[k]*ph:ph; o0[k]+=ph; if(vx) o1[k]+=vx*w; if(vy) o2[k]+=vy*w; } } }
 }
 function emPrepare(F,list,time,frac){
   const [S0,S1,S2]=F.S;
@@ -530,17 +542,17 @@ function emPrepare(F,list,time,frac){
     S0.fill(0); S1.fill(0); S2.fill(0);
     for(const s of list){ const st=srcState(s,time,frac), q=s.sign*s.q; eachCellAt(st.x,st.y,(k,g)=>{ S0[k]+=q*g; S1[k]+=q*st.vx*g; S2[k]+=q*st.vy*g; }); }
     return; }
-  // nothing moved since last step: the formula field and the grid source are unchanged
+  // nothing moved for the last 3 steps: the formula field and the grid source are unchanged. (After a stop, the source's
+  // d^2/dt^2 term still holds the braking for two more steps; skipping it left the field growing after a charge stopped.)
   let key=''; for(const s of list){ const st=srcState(s,time,frac); key+=`${st.x},${st.y},${st.vx},${st.vy},${s.sign*s.q};`; }
-  if(F.acInit&&key===F.key&&F.still) return;
+  const same=key===F.key?(F.same||0)+1:0; F.same=same; F.key=key;
+  if(F.acInit&&same>=3) return;
   const lv=F.ac; const tmp=lv[2]; lv[2]=lv[1]; lv[1]=lv[0]; lv[0]=tmp;
   computeAC(lv[0],list,time,frac);
   if(!F.acInit){   // start as the field of charges at rest: the grid cancels the moving part (A) of the formula field
     for(let c=0;c<3;c++){ lv[1][c].set(lv[0][c]); lv[2][c].set(lv[0][c]); }
     for(let c=1;c<3;c++){ const a=F.a[c], A=lv[0][c]; for(let k=0;k<NN;k++) a[k]-=A[k]; zeroRing(a); }
     F.acInit=true; F.relax=true; }
-  F.still=key===F.key; F.key=key;
-  if(F.still) for(let c=0;c<3;c++){ lv[1][c].set(lv[0][c]); lv[2][c].set(lv[0][c]); }
   const inv=1/(dx*dx), it2=1/(dt*dt), m2=mass()*mass();
   for(let c=0;c<3;c++){ if(!F.live[c]) continue; const A=lv[0][c], B=lv[1][c], C=lv[2][c], Sc=F.S[c];
     for(let j=1;j<=N;j++){ let k=j*G+1; for(let i=0;i<N;i++,k++)
@@ -1388,7 +1400,7 @@ if(/[?&]record\b/.test(location.search)) recordMode(); else requestAnimationFram
 
 /* ---------- ?record: YouTube Shorts (see ../shorts-rec.js) ---------- */
 /* 1080×1920: a caption band on top, the page's own picture (drawn 1080 wide, without the vortex rings) below it.
-   ?record (or ?record=vortices) records the vortex Short, ?record=slits the light-through-slits one, ?record=atom the classical atom.
+   ?record (or ?record=vortices) records the vortex Short, ?record=slits the light-through-slits one, ?record=atom the classical atom, ?record=jump the jumping charge.
    One take per preset or init, with a quick fade between takes. steps(f) = simulation steps per video frame (f = frame
    within the take); the quench passes the dark start quickly, then slows so the tangle can be seen. */
 function slitScene(gaps){            // a wall at x = -5 with openings 3 wide at the heights in gaps, light from the left
@@ -1405,6 +1417,19 @@ function atomScene(){               // the Classical atom preset at radius 10 (i
 function dipoleScene(){             // the fallen-in pair at rest, and a flash to its left: the charge swings ±2 up and down (±0.4 across, period ~30)
   setup({th:'em'}); addCharge({x:U2C(0),y:U2C(0)}); addCharge({x:U2C(0),y:U2C(0),sign:-1,kind:'free',M:1,mx:0,my:0});
   const b=P.brush; P.brush=6; poke(U2C(-30),U2C(0),1.2); P.brush=b;   // a wide soft flash: a narrow one leaves grid ripples, a stronger one knocks the charge out
+}
+/* A charge (q, at x0, y0) slides along legs [{t0, T, Lx, Ly}]; witnesses [x, y, caged?] are bound pairs (a still + and a free −
+   of mass M), the − placed where the jumping charge's still field balances its pull, so it stays put until the light arrives.
+   cage [x, y, R]: a metal ring. */
+function jumpScene({q=2,x0=0,y0=0,legs,M=0.1,W=[],cage}){
+  setup({th:'em'});
+  if(cage){ for(let j=0;j<N;j++)for(let i=0;i<N;i++){ const r=Math.hypot(i-U2C(cage[0]),j-U2C(cage[1]))*dx; if(Math.abs(r-cage[2])<0.8) open[K(i,j)]=0; }
+    updateDamp(); resetField(); }
+  addCharge({x:U2C(x0),y:U2C(y0),kind:'jump',q,legs});
+  const pull=r=>(1-Math.exp(-r*r/4))/(2*Math.PI*r);   // field of a Gaussian charge felt by another (both sigma 1)
+  for(const [x,y,caged] of W){ const ux=x-x0, uy=y-y0, r=Math.hypot(ux,uy), E0=caged?0:q*pull(r); let lo=0, hi=E0?1.9:0;
+    for(let k=0;k<50;k++){ const d=(lo+hi)/2; if(pull(d)<E0) lo=d; else hi=d; }
+    addCharge({x:U2C(x),y:U2C(y)}); addCharge({x:U2C(x-lo*ux/r),y:U2C(y-lo*uy/r),sign:-1,kind:'free',M,mx:0,my:0}); }
 }
 function recordMode(){
   const W=1080, H=1920, PY=490, BG='#0b0d14', FADEF=8;
@@ -1449,6 +1474,25 @@ function recordMode(){
         {from:10.6, to:14.5, text:'That\'s why a classical\natom isn\'t stable'},
         {from:15.3, to:19.2, text:'Now hit the fallen-in\natom with light'},
         {from:19.6, to:T-3.5, text:'It shakes and radiates\nlike a dipole'},
+        {from:T-3, to:T+1, text:'Try it yourself,\nlink in description'}
+      ]},
+    // a charge jumps and a ring of light spreads out: test charges further out stay still until it reaches them (A), a four-jump
+    // zigzag with one ring per jump (B), a charge in a metal ring left alone while the one outside is kicked (C)
+    jump:{ name:'field-jump', music:{ file:'chopin-prelude3.mp3', start:0.5, fade:4.5 }, fscale:0.02, zoom:1.3,
+      takes:[
+        {sec:10, steps:f=>3, init(){ jumpScene({x0:-3,legs:[{t0:0.5,T:10,Lx:6,Ly:0}],W:[[-2,14],[-22,-20],[30,28],[-30,40]]}); }},
+        {sec:9.5, steps:f=>4, fscale:f=>0.03, init(){ jumpScene({x0:-3,y0:3,legs:[{t0:2,T:10,Lx:6,Ly:0},{t0:22,T:10,Lx:0,Ly:-6},{t0:42,T:10,Lx:-6,Ly:0},{t0:62,T:10,Lx:0,Ly:6}]}); }},
+        {sec:9, steps:f=>4.5, init(){ jumpScene({x0:-25,y0:3,legs:[{t0:1,T:10,Lx:0,Ly:-6}],cage:[18,12,9],W:[[18,12,true],[18,-14]]}); }}
+      ],
+      captions:T=>[
+        {from:0, to:2.2, text:'A charge jumps'},
+        {from:2.4, to:4.4, text:'A ring of light\nspreads out'},
+        {from:4.6, to:7.2, text:'Charges farther out\ndon\'t move until\nit reaches them'},
+        {from:7.4, to:9.8, text:'Then they shake and\nsend out their own light'},
+        {from:10.3, to:13.2, text:'Now it jumps four times'},
+        {from:13.4, to:19.1, text:'Each jump sends out\nits own ring'},
+        {from:19.6, to:22.8, text:'Now one charge sits\ninside a metal ring'},
+        {from:23.0, to:T-3.3, text:'The light can\'t get in,\nso it stays still'},
         {from:T-3, to:T+1, text:'Try it yourself,\nlink in description'}
       ]}
   };
@@ -1496,7 +1540,7 @@ addEventListener('resize',()=>{ if(window.__short) return; sizeCanvas(); if(!P.r
 
 /* ---------- debug hook ---------- */
 if(/[?&]debug/.test(location.search)){
-  window.__fs={emPrepare,computeAC,emSetDec,setPML(w,sig,al,flat){PML=w;PSIG=sig;PALPHA=al;PAFLAT=flat;buildPML();},EMF,emStepF,emAt,emE,stepEM,makeEMF,setSponge(w,g,pw){SPONGE=w;SPMAX=g;SPPOW=pw;buildSponge();updateDamp();},N,G,dx,dt,L,K,P,releaseFree,lx,ly,lvx,lvy,plq,computePlaq,fluxQuanta,energyAH,forceAH,stepAH,syncU,phi,vel,phi2,vel2,phi3,vel3,Ex,Ey,Bz,computeEB,srcState,addStatic,addCharge,twistAt,findVortices,get vortices(){return vortices},open,TH,PRESETS,energy,advance,force,fillField,resetField,addSource,setTheory,setEdge,updateDamp,updateVmin,vacPhi4,Vraw,poke,paint,U2C,
+  window.__fs={jumpScene,fadeMovingAC,noFade(){AWIN=null;},emPrepare,computeAC,emSetDec,setPML(w,sig,al,flat){PML=w;PSIG=sig;PALPHA=al;PAFLAT=flat;buildPML();},EMF,emStepF,emAt,emE,stepEM,makeEMF,setSponge(w,g,pw){SPONGE=w;SPMAX=g;SPPOW=pw;buildSponge();updateDamp();},N,G,dx,dt,L,K,P,releaseFree,lx,ly,lvx,lvy,plq,computePlaq,fluxQuanta,energyAH,forceAH,stepAH,syncU,phi,vel,phi2,vel2,phi3,vel3,Ex,Ey,Bz,computeEB,srcState,addStatic,addCharge,twistAt,findVortices,get vortices(){return vortices},open,TH,PRESETS,energy,advance,force,fillField,resetField,addSource,setTheory,setEdge,updateDamp,updateVmin,vacPhi4,Vraw,poke,paint,U2C,
     get t(){return t}, set t(v){t=v}, get sources(){return sources}, set sources(v){sources=v}, frame, render,
     preset(th,name){ const p=PRESETS[th].find(q=>q[0]===name); p[1](); afterChange(); }, scene(f){ f(setup); afterChange(); },
     setFric(f){P.fric=f; updateDamp();}, setMass(m){P.m[P.th]=m; updateVmin(); dirty=true;}, markDirty(){dirty=true;}};
