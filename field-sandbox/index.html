@@ -1475,7 +1475,7 @@ function recordMode(){
       if(S>0) advance(S);
     },
     render(){
-      vortices=[]; const tf=TAKES[take].fscale; if(tf) fscale=tf(cur-start[take]); else if(SH.fscale) fscale=SH.fscale; render();
+      vortices=[]; const tf=take>=0&&TAKES[take].fscale; if(tf) fscale=tf(cur-start[take]); else if(SH.fscale) fscale=SH.fscale; render();
       rctx.setTransform(1,0,0,1,0,0); rctx.fillStyle=BG; rctx.fillRect(0,0,W,H);
       rctx.drawImage(cv,C0,C0,W,W,0,PY,W,W);
       let f=0; for(let k=1;k<TAKES.length;k++) f=Math.max(f,1-Math.abs(cur-start[k]+0.5)/FADEF);
