@@ -1000,7 +1000,8 @@ $('segSpace').querySelectorAll('button').forEach(b=>b.onclick=()=>setSpace(b.dat
 if(cpu&&S.mode!=='flip') S.mode='flip';
 syncInputs();syncSlice();restart();loadPendulum();
 document.addEventListener('visibilitychange',()=>{lastTs=0;});
-if(/[?&]record\b/.test(location.search)) recordMode(); else requestAnimationFrame(frame);
+if(/[?&]record=islands\b/.test(location.search)) islandsMode();
+else if(/[?&]record\b/.test(location.search)) recordMode(); else requestAnimationFrame(frame);
 
 /* ---------- ?record: a YouTube Short (see ../shorts-rec.js) ---------- */
 /* 1080×1920. Scene 1: two big pendulums 0.001 rad apart. Scene 2: the flip-time map at 1080², filling in as the
@@ -1081,6 +1082,129 @@ function recordMode(){
   const fl=document.createElement('link');   // the caption font, which this page doesn't otherwise load
   fl.rel='stylesheet'; fl.href='https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&display=swap';
   fl.onload=fl.onerror=()=>{
+    const sc=document.createElement('script'); sc.src='../shorts-rec.js';
+    sc.onload=()=>{ short.canvas=cv; ShortsRec(short); };
+    document.head.append(sc);
+  };
+  document.head.append(fl);
+}
+
+/* ?record=islands: the chaos map of momentum space (angles 0, hanging straight down). The camera zooms into two
+   stable islands in the chaotic ring; each one's pendulum then draws its shape: a heart, then a butterfly.
+   The three maps (full view and the two zooms) are computed once on the GPU before the preview starts. */
+function islandsMode(){
+  const W=1080, H=1920, BG='#0b0d14', MY=480, SEC=25, FADEF=8;
+  const PX_=540, PY_=1010, LEN=235, UPS=2.4, NS=Math.round(UPS/30/0.002), hs=UPS/30/NS;   // pivot, arm length, time units per second
+  // Starting kicks (p1, p2) and the camera's span there. The heart is the biggest island inside the chaotic ring;
+  // the butterfly is a smaller island on the ring's right edge.
+  const HEART=[1.931,-1.125,0.7], FLY=[4.736,-0.495,0.7];
+  const VIEWS=[[0,0,10],[HEART[0],HEART[1],2.6],[HEART[0],HEART[1],0.9],[FLY[0],FLY[1],2.6],[FLY[0],FLY[1],0.9]];   // (cx, cy, span) of the maps
+  const T1=4.0, T2=6.6, R1=6.0, X1=7.3, B1=13.0, T3=16.0, R2=16.0, X2=17.3;   // camera keys, rings, cuts to and from the pendulums (s)
+  const cv=document.createElement('canvas'), ctx=cv.getContext('2d');
+  cv.width=W; cv.height=H;
+  for(const el of document.body.children) el.style.display='none';
+  document.body.style.background=BG;
+  cv.style.cssText='display:block;margin:0 auto;width:min(100vw,56.25vh);height:min(100vh,177.78vw)';
+  document.body.append(cv);
+  Object.assign(S,{res:1080,tmax:100,dt:0.01,mv:0,lv:0,mode:'lyap',pal:'ember',space:'mom',fix:{ang:[0,0],mom:[0,0]}});
+  palCache=null;
+  const maps=[];
+  async function chaosMap(cx,cy,span){
+    Object.assign(S,{cx,cy,span}); restart();
+    let n=Math.round(S.tmax/S.dt);
+    while(n>0){
+      for(let k=0;k<8&&n>0;k++){ const m=Math.min(12,n); gpu.step(m,sim.t); sim.t+=m*S.dt; n-=m; }
+      gpu.gl.finish(); await new Promise(r=>setTimeout(r,0));
+    }
+    gpu.draw(null);
+    const c=document.createElement('canvas'); c.width=c.height=W;
+    c.getContext('2d').drawImage(simCanvas,0,0,W,W); return c;
+  }
+  const step=makeStepper(1,1);
+  let P,trail=[],cur=0;
+  const scene=fi=>fi<X1*30?0:fi<B1*30?1:fi<X2*30?2:3;   // map, heart, map, butterfly
+  function reset(){ cur=0; P=null; trail=[]; }
+  function tick(fi){
+    cur=fi; const sc=scene(fi);
+    if(sc===1||sc===3){
+      if(!P){ const k=sc===1?HEART:FLY; P=new Float64Array(toState(0,0,k[0],k[1],1,1)); trail=[]; }
+      for(let i=0;i<NS;i++){ step(P,hs); if(i%4===3){ const a=arms(P,LEN,PX_,PY_); trail.push([a[2],a[3]]); } }
+      if(sc===1&&trail.length>10.5/(4*hs)) trail.splice(0,trail.length-Math.round(10.5/(4*hs)));   // one heart's worth
+    } else P=null;
+  }
+  const ease=u=>u<=0?0:u>=1?1:u*u*(3-2*u);
+  // Camera (cx, cy, span) at s seconds: a slow push, the dive into the heart island, then out and across to the butterfly.
+  const glide=(a,b,u,out)=>[a[0]+(b[0]-a[0])*u,a[1]+(b[1]-a[1])*u,
+    Math.exp(Math.log(a[2])+(Math.log(b[2])-Math.log(a[2]))*u+Math.log(out)*Math.sin(PI*u))];   // log zoom, out× wider midway
+  function camera(s){
+    const a=[0.3,-0.2,8.8];
+    if(s<T1){ const u=s/T1; return [a[0]*u,a[1]*u,10-1.2*u]; }
+    if(s<B1) return glide(a,HEART,ease((s-T1)/(T2-T1)),1);
+    return glide(HEART,FLY,ease((s-B1)/(T3-B1)),2.5);
+  }
+  function drawMaps(cam){
+    ctx.fillStyle=BG; ctx.fillRect(0,0,W,H);
+    ctx.save(); ctx.beginPath(); ctx.rect(0,MY,W,W); ctx.clip(); ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
+    maps.forEach((m,i)=>{
+      const [vx,vy,vs]=VIEWS[i];
+      // A zoom map shows fully only while it covers the whole view, and fades out as the view runs past its edge.
+      const over=Math.max(Math.abs(cam[0]-vx),Math.abs(cam[1]-vy))+cam[2]/2-vs/2;
+      const al=i===0?1:Math.min(1,Math.max(0,1-over/(0.35*vs)));
+      if(al<=0) return;
+      ctx.globalAlpha=al;
+      ctx.drawImage(m,(vx-vs/2-(cam[0]-cam[2]/2))/cam[2]*W,MY+((cam[1]+cam[2]/2)-(vy+vs/2))/cam[2]*W,vs/cam[2]*W,vs/cam[2]*W);
+    });
+    ctx.restore(); ctx.globalAlpha=1;
+  }
+  function ring(cam,p,s){   // white ring on the island's point, s seconds after it appears
+    const a=Math.min(1,s/0.3); if(a<=0) return;
+    const x=(p[0]-cam[0])/cam[2]*W+W/2, y=MY+W/2-(p[1]-cam[1])/cam[2]*W;
+    ctx.globalAlpha=a; ctx.lineWidth=6; ctx.strokeStyle='#ffffff'; ctx.shadowColor='rgba(0,0,0,.8)'; ctx.shadowBlur=10;
+    ctx.beginPath(); ctx.arc(x,y,30+6*Math.sin(s*7),0,TAU); ctx.stroke(); ctx.shadowBlur=0; ctx.globalAlpha=1;
+  }
+  function pendulum(col,fade){
+    ctx.fillStyle=BG; ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle='#c8cddc'; ctx.globalAlpha=.18; ctx.lineWidth=3; ctx.setLineDash([10,16]);
+    ctx.beginPath(); ctx.arc(PX_,PY_,2*LEN,0,TAU); ctx.stroke(); ctx.setLineDash([]);
+    ctx.lineCap='round'; ctx.lineJoin='round'; ctx.strokeStyle=col; ctx.lineWidth=7;
+    const n=trail.length, G=24;
+    for(let g=0;g<G;g++){ const i0=Math.floor(g*n/G), i1=Math.min(n-1,Math.floor((g+1)*n/G)); if(i1<=i0) continue;
+      ctx.globalAlpha=fade?0.15+0.85*Math.pow((g+1)/G,1.2):0.9;
+      ctx.beginPath(); ctx.moveTo(trail[i0][0],trail[i0][1]); for(let i=i0+1;i<=i1;i++) ctx.lineTo(trail[i][0],trail[i][1]); ctx.stroke(); }
+    ctx.globalAlpha=1;
+    if(!P) return;
+    const a=arms(P,LEN,PX_,PY_);
+    ctx.strokeStyle='#c8cddc'; ctx.lineWidth=9; ctx.beginPath(); ctx.moveTo(PX_,PY_); ctx.lineTo(a[0],a[1]); ctx.lineTo(a[2],a[3]); ctx.stroke();
+    for(const [x,y,c,r] of [[a[0],a[1],'#e2a64b',24],[a[2],a[3],col,28]]){ ctx.fillStyle=c; ctx.beginPath(); ctx.arc(x,y,r,0,TAU); ctx.fill(); }
+    ctx.fillStyle='#c8cddc'; ctx.beginPath(); ctx.arc(PX_,PY_,10,0,TAU); ctx.fill();
+  }
+  function render(){
+    ctx.setTransform(1,0,0,1,0,0);
+    const s=cur/30, sc=scene(cur);
+    if(!maps.length){ ctx.fillStyle=BG; ctx.fillRect(0,0,W,H); return; }
+    if(sc===0||sc===2){ const cam=camera(s); drawMaps(cam);
+      if(sc===0&&s>=R1) ring(cam,HEART,s-R1);
+      if(sc===2&&s>=R2) ring(cam,FLY,s-R2); }
+    else pendulum(sc===1?'#ff5c8a':'#7cc4ff',sc===1);
+    let f=0; for(const x of [X1,B1,X2]) f=Math.max(f,1-Math.abs(cur-x*30+0.5)/FADEF);
+    if(f>0){ ctx.globalAlpha=f; ctx.fillStyle=BG; ctx.fillRect(0,0,W,H); ctx.globalAlpha=1; }
+  }
+  const short={
+    name:'pendulum-islands', seconds:SEC, captionY:270,
+    music:{ file:'chopin-fantaisie-impromptu.mp3', start:0.96, fade:4.5 },   // first chord on frame one
+    captions:[
+      {from:0, to:4.8, text:'In this sea of chaos,\nthere are islands of stability'},
+      {from:5.2, to:12.8, text:'Like here,\nthe love pendulums'},
+      {from:13.4, to:19.6, text:'Or here,\nin the butterfly island'},
+      {from:20.2, to:SEC+1, text:'Try it yourself,\nlink in description'}
+    ],
+    reset, tick, render, maps
+  };
+  window.__short=short;
+  const fl=document.createElement('link');
+  fl.rel='stylesheet'; fl.href='https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&display=swap';
+  fl.onload=fl.onerror=async()=>{
+    for(const v of VIEWS) maps.push(await chaosMap(...v));
     const sc=document.createElement('script'); sc.src='../shorts-rec.js';
     sc.onload=()=>{ short.canvas=cv; ShortsRec(short); };
     document.head.append(sc);
