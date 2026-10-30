@@ -1000,7 +1000,93 @@ $('segSpace').querySelectorAll('button').forEach(b=>b.onclick=()=>setSpace(b.dat
 if(cpu&&S.mode!=='flip') S.mode='flip';
 syncInputs();syncSlice();restart();loadPendulum();
 document.addEventListener('visibilitychange',()=>{lastTs=0;});
-requestAnimationFrame(frame);
+if(/[?&]record\b/.test(location.search)) recordMode(); else requestAnimationFrame(frame);
+
+/* ---------- ?record: a YouTube Short (see ../shorts-rec.js) ---------- */
+/* 1080×1920. Scene 1: two big pendulums 0.001 rad apart. Scene 2: the flip-time map at 1080², filling in as the
+   simulated time runs. The page's own loop is off; each video frame steps the GPU engine by hand. */
+function recordMode(){
+  const W=1080, H=1920, BG='#0b0d14', FADEF=8, S2=270, MY=480, SEC=25.5;
+  const PX_=540, PY_=900, LEN=255, SPEED=0.7, PRE=1.0, TR=36;   // pivot, arm length, playback speed (× real time at g = 9.81), trail frames
+  const START=[-134*PI/180,154*PI/180];                 // after a 1.0 pre-roll the gap passes 0.7 rad at about 3.2 s; this one flips 8 times in 22 time units, the twin 3
+  const cv=document.createElement('canvas'), ctx=cv.getContext('2d');
+  cv.width=W; cv.height=H;
+  for(const el of document.body.children) el.style.display='none';
+  document.body.style.background=BG;
+  cv.style.cssText='display:block;margin:0 auto;width:min(100vw,56.25vh);height:min(100vh,177.78vw)';
+  document.body.append(cv);
+  Object.assign(S,{res:1080,tmax:100,dt:0.01,mv:0,lv:0,mode:'flip',pal:'ember',space:'ang',fix:{ang:[0,0],mom:[0,0]},cx:0,cy:0,span:TAU});
+  palCache=null;
+  const step=makeStepper(1,1), upf=Math.sqrt(9.81)*SPEED/30, NS=Math.round(upf/0.002), hs=upf/NS;
+  let P,Q,trP,trQ,cur=0;
+  function reset(){
+    P=new Float64Array([START[0],START[1],0,0]); Q=new Float64Array(P); Q[0]+=1e-3; trP=[]; trQ=[]; cur=0;
+    for(let i=0,n=Math.round(PRE/0.002);i<n;i++){ step(P,0.002); step(Q,0.002); }
+    if(gpu) restart();
+  }
+  const rate=s=>S.tmax*Math.pow(Math.min(1,s/(SEC-S2/30)),2);   // simulated time at s seconds into the map
+  function tick(fi){
+    cur=fi;
+    for(let i=0;i<NS;i++){ step(P,hs); step(Q,hs); }
+    const a=arms(P,LEN,PX_,PY_), b=arms(Q,LEN,PX_,PY_);
+    trP.push([a[2],a[3]]); trQ.push([b[2],b[3]]); if(trP.length>TR){ trP.shift(); trQ.shift(); }
+    if(fi>=S2&&gpu){
+      let left=Math.round((rate((fi-S2)/30)-sim.t)/S.dt);
+      while(left>0){ const n=Math.min(12,left); gpu.step(n,sim.t); sim.t+=n*S.dt; left-=n; }
+    }
+  }
+  function trail(tr,col){
+    ctx.lineCap='round'; ctx.strokeStyle=col; ctx.lineWidth=9;
+    for(let i=1;i<tr.length;i++){ ctx.globalAlpha=Math.pow(i/tr.length,1.5)*0.7; ctx.beginPath(); ctx.moveTo(tr[i-1][0],tr[i-1][1]); ctx.lineTo(tr[i][0],tr[i][1]); ctx.stroke(); }
+    ctx.globalAlpha=1;
+  }
+  function pend(s,al,arm,c1,c2,w,r){
+    const a=arms(s,LEN,PX_,PY_); ctx.globalAlpha=al;
+    ctx.strokeStyle=arm; ctx.lineWidth=w; ctx.lineJoin='round'; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(PX_,PY_); ctx.lineTo(a[0],a[1]); ctx.lineTo(a[2],a[3]); ctx.stroke();
+    for(const [x,y,c] of [[a[0],a[1],c1],[a[2],a[3],c2]]){ ctx.fillStyle=c; ctx.beginPath(); ctx.arc(x,y,r,0,TAU); ctx.fill(); }
+    ctx.globalAlpha=1;
+  }
+  function render(){
+    ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle=BG; ctx.fillRect(0,0,W,H);
+    if(cur<S2){
+      trail(trQ,'#6eb0ff'); trail(trP,'#f07b5c');
+      pend(Q,0.85,'#6eb0ff','#6eb0ff','#6eb0ff',6,22);
+      pend(P,1,'#c8cddc','#e2a64b','#f07b5c',9,26);
+      ctx.fillStyle='#c8cddc'; ctx.beginPath(); ctx.arc(PX_,PY_,10,0,TAU); ctx.fill();
+    } else if(gpu){
+      gpu.draw(null);
+      ctx.imageSmoothingEnabled=true; ctx.drawImage(simCanvas,0,MY,W,W);
+      const s=(cur-S2)/30;   // ring on scene 1's start point
+      if(s<2.6){ const x=(START[0]/TAU+.5)*W, y=MY+(.5-START[1]/TAU)*W, a=Math.min(1,s/0.3,(2.6-s)/0.5);
+        ctx.globalAlpha=a; ctx.lineWidth=5; ctx.strokeStyle='#ffffff'; ctx.shadowColor='rgba(0,0,0,.8)'; ctx.shadowBlur=8;
+        ctx.beginPath(); ctx.arc(x,y,24+6*Math.sin(s*7),0,TAU); ctx.stroke(); ctx.shadowBlur=0; ctx.globalAlpha=1; }
+    }
+    const f=Math.max(0,1-Math.abs(cur-S2+0.5)/FADEF);
+    if(f>0){ ctx.globalAlpha=f; ctx.fillStyle=BG; ctx.fillRect(0,0,W,H); ctx.globalAlpha=1; }
+  }
+  const short={
+    name:'pendulum-flips', seconds:SEC, captionY:270,
+    music:{ file:'chopin-prelude21.mp3', start:22.5, fade:4.5 },
+    captions:[
+      {from:0, to:3.8, text:'Two double pendulums,\nstarted almost the same'},
+      {from:3.8, to:8.6, text:'Then they split'},
+      {from:9.4, to:14.6, text:'Every pixel is a pendulum'},
+      {from:15.2, to:21.4, text:'Colour shows when it first\nflips over the top'},
+      {from:22, to:SEC+1, text:'Try it yourself,\nlink in description'}
+    ],
+    reset, tick, render
+  };
+  window.__short=short;
+  const fl=document.createElement('link');   // the caption font, which this page doesn't otherwise load
+  fl.rel='stylesheet'; fl.href='https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&display=swap';
+  fl.onload=fl.onerror=()=>{
+    const sc=document.createElement('script'); sc.src='../shorts-rec.js';
+    sc.onload=()=>{ short.canvas=cv; ShortsRec(short); };
+    document.head.append(sc);
+  };
+  document.head.append(fl);
+}
 })();
 </script>
 

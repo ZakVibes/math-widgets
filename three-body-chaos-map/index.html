@@ -1892,19 +1892,177 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-createEngine();
-createTimeLapse();
-updateRamp();
-new ResizeObserver(() => resize()).observe(mapCv);
-new ResizeObserver(() => sizeOrbit()).observe(orbCv);
-resize();
-fitView(DEFAULT_VIEW.cx, DEFAULT_VIEW.cy, DEFAULT_VIEW.span);
-applyParams();
-setViewMode(tl ? "tl" : "map");
-computeReplay();
-setPlaying(clock.playing);
-syncClockUI();
-requestAnimationFrame(frame);
+function startPage() {
+  createEngine();
+  createTimeLapse();
+  updateRamp();
+  new ResizeObserver(() => resize()).observe(mapCv);
+  new ResizeObserver(() => sizeOrbit()).observe(orbCv);
+  resize();
+  fitView(DEFAULT_VIEW.cx, DEFAULT_VIEW.cy, DEFAULT_VIEW.span);
+  applyParams();
+  setViewMode(tl ? "tl" : "map");
+  computeReplay();
+  setPlaying(clock.playing);
+  syncClockUI();
+  requestAnimationFrame(frame);
+}
+if (/[?&]record\b/.test(location.search)) recordMode(); else startPage();
+
+/* ---------- ?record: a YouTube Short of the chaos map (see ../shorts-rec.js) ---------- */
+/* 1080×1920: captions on top. Scene 1: the "Who's alone" time-lapse, edge to edge, from just after t = 0.
+   Scene 2: a tap on one pixel (a ring), then a zoom into it. Scene 3: the orbit of that one start, drawn big;
+   the body thrown out is the colour the pixel had on the map. Then back to the map under the end caption. */
+function recordMode() {
+  const W = 1080, H = 1920, FPS = 30, FADEF = 10;
+  const T2 = 360, T3 = 420, T4 = 690;     // frames: the tap begins, the orbit begins, the map returns
+  const MAPY = 450, MAPS = 1080;          // map picture: top edge and side (px)
+  const PIX = { x: 0.8, y: 1.2656 };      // the chosen start (C ends up thrown out: pink)
+  const RATE = 1.7, SLOW = 1.0;           // orbit time per second in scene 3, and while the body is thrown out
+  const BGC = "#090d19", CY = 990, CLIPY = 440, CLIPH = 1100;
+  const cv = document.createElement("canvas"), ctx = cv.getContext("2d");
+  cv.width = W; cv.height = H;
+  for (const el of document.body.children) el.style.display = "none";
+  document.body.style.background = BGC;
+  cv.style.cssText = "display:block;margin:0 auto;width:min(100vw,56.25vh);height:min(100vh,177.78vw)";
+  document.body.append(cv);
+  const tlCan = document.createElement("canvas");
+  const lap = new TimeLapse(tlCan);
+  const SIM = 540, SPAN = 3.2, VC = DEFAULT_VIEW;
+  let run = null, scale = 300, mapOn = false, cur = 0;
+
+  function interp(sys, t, b) {            // body position at time t, between the stored steps
+    const n = sys.T.length;
+    if (t >= sys.T[n - 1]) return [sys.P[(n - 1) * 6 + b * 2], sys.P[(n - 1) * 6 + b * 2 + 1]];
+    const i = bsearch(sys.T, t), f = (t - sys.T[i]) / (sys.T[i + 1] - sys.T[i]);
+    return [sys.P[i * 6 + b * 2] * (1 - f) + sys.P[(i + 1) * 6 + b * 2] * f, sys.P[i * 6 + b * 2 + 1] * (1 - f) + sys.P[(i + 1) * 6 + b * 2 + 1] * f];
+  }
+  function setStart(x, y) {               // runs the orbit and fits the picture to where the bodies go before the escape
+    if (x !== undefined) { PIX.x = x; PIX.y = y; }
+    run = runOrbit(PIX.x, PIX.y);
+    run.gx = PIX.x / 3; run.gy = PIX.y / 3;
+    const tCut = run.res.status <= 3 ? run.res.t : run.T[run.T.length - 1], d = [];
+    for (let i = 0; i < run.T.length && run.T[i] <= tCut; i += 3) for (let b = 0; b < 3; b++) d.push(Math.hypot(run.P[i * 6 + b * 2] - run.gx, run.P[i * 6 + b * 2 + 1] - run.gy));
+    d.sort((a, b) => a - b);
+    scale = 500 / Math.max(0.8, d[Math.floor(d.length * 0.97)]);
+  }
+  const orbEnd = () => run.T[run.T.length - 1];
+  function orbitTime(f) {                 // slow down around the escape so the throw is easy to follow
+    const u = (f - T3) / FPS, a = run.res.t - 1.2, b = run.res.t + 1.8, u1 = a / RATE, u2 = u1 + (b - a) / SLOW;
+    if (u <= u1) return RATE * u;
+    if (u <= u2) return a + SLOW * (u - u1);
+    return b + RATE * (u - u2);
+  }
+  const ease = (u) => { u = Math.min(1, Math.max(0, u)); return u * u * (3 - 2 * u); };
+  function camera(tc) {                  // the centre of mass; once a body is thrown out, it moves over to the remaining pair
+    const e = run.res.status - 1, a = (e + 1) % 3, b = (e + 2) % 3;
+    const w = e < 0 ? 0 : ease((tc - (run.res.t - 2)) / 3);
+    const [ax, ay] = interp(run, tc, a), [bx, by] = interp(run, tc, b);
+    return [run.gx + w * ((ax + bx) / 2 - run.gx), run.gy + w * ((ay + by) / 2 - run.gy)];
+  }
+  function tail(b, tc, len, rgb, width, cam) {
+    const n = 40, pts = [];
+    for (let k = 0; k <= n; k++) { const [px, py] = interp(run, Math.max(0, tc - len * (n - k) / n), b); pts.push([540 + (px - cam[0]) * scale, CY - (py - cam[1]) * scale]); }
+    ctx.lineWidth = width; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    for (let k = 0; k < 8; k++) {
+      const a = Math.floor(k * n / 8), z = Math.floor((k + 1) * n / 8);
+      ctx.strokeStyle = `rgba(${rgb},${0.85 * (k + 1) / 8})`;
+      ctx.beginPath(); ctx.moveTo(pts[a][0], pts[a][1]);
+      for (let j = a + 1; j <= z; j++) ctx.lineTo(pts[j][0], pts[j][1]);
+      ctx.stroke();
+    }
+  }
+  function orbit(f) {
+    const tc = Math.min(orbEnd(), orbitTime(f));
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0, CLIPY, W, CLIPH); ctx.clip();
+    const cam = camera(tc);
+    for (let b = 0; b < 3; b++) tail(b, tc, 2.2, COLORS[b + 1], 11, cam);
+    for (let b = 0; b < 3; b++) {
+      const [px, py] = interp(run, tc, b), x = 540 + (px - cam[0]) * scale, y = CY - (py - cam[1]) * scale, rgb = COLORS[b + 1];
+      ctx.fillStyle = `rgba(${rgb},0.22)`; ctx.beginPath(); ctx.arc(x, y, 66, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = `rgb(${rgb})`; ctx.strokeStyle = "rgba(9,13,25,0.85)"; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(x, y, 30, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  const pxY = () => MAPY + MAPS / 2 - (PIX.y - VC.cy) / SPAN * MAPS;
+  function mapPic(f) {                    // the map, zoomed about the chosen pixel during scene 2
+    const k = 1 + 4 * ease((f - (T2 + 26)) / 30);
+    const px = 540 + (PIX.x - VC.cx) / SPAN * MAPS, py = pxY();
+    const e = ease((f - (T2 + 26)) / 30), cx = px + (540 - px) * e, cy = py + (MAPY + MAPS / 2 - py) * e;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0, MAPY, MAPS, MAPS); ctx.clip();
+    ctx.imageSmoothingEnabled = true;
+    ctx.translate(cx, cy); ctx.scale(k, k); ctx.translate(-px, -py);
+    ctx.drawImage(tlCan, 0, MAPY, MAPS, MAPS);
+    ctx.restore();
+    return { k, cx, cy };
+  }
+  function ring(f, k, cx, cy) {           // a tap: the ring comes in, closes, flashes, opens again
+    const u = f - T2;
+    const a = Math.min(1, (u + 1) / 8) * (1 - ease((u - 50) / 10));
+    if (a <= 0) return;
+    const r = (u < 10 ? 40 - 14 * ease(u / 10) : u < 16 ? 26 - 6 * ease((u - 10) / 6) : 20 + 8 * ease((u - 16) / 8)) * k;
+    ctx.strokeStyle = `rgba(255,255,255,${0.95 * a})`; ctx.lineWidth = 4 * Math.min(k, 2);
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+    const fl = Math.max(0, 1 - Math.abs(u - 14) / 8);
+    if (fl > 0) { ctx.fillStyle = `rgba(255,255,255,${0.45 * fl * a})`; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill(); }
+  }
+  // map time: just into the folding at frame 0, then a gentle speed-up to the final picture at T2
+  const mapTarget = (f) => { const s = Math.min(f, T2) / FPS; return 1 + 0.5 * s + 0.025 * s * s; };
+
+  const short = {
+    name: "three-body", seconds: 26.5, captionY: 260,
+    music: { file: "chopin-op48no1.mp3", start: 4.4, fade: 4.5 },
+    captions: [
+      { from: 0, to: 5, text: "Every pixel is a whole\nthree-body system" },
+      { from: 5.6, to: 11.6, text: "Colour shows which body\ngets thrown out alone" },
+      { from: 12.2, to: 17.6, text: "Here's one pixel" },
+      { from: 18.2, to: 22.4, text: "Pink gets thrown out" },
+      { from: 23.0, to: 27.5, text: "Try it yourself,\nlink in description" }
+    ],
+    setStart, PIX,
+    reset() { mapOn = false; cur = 0; },
+    tick(f) {
+      cur = f;
+      if (f === 0) {
+        lap.reset({ cx: VC.cx, cy: VC.cy, wpp: SPAN / SIM }, 1, SIM, SIM, false, 0, 0);
+        mapOn = true; lap.steps = 2048;
+        for (let k = 0; k < 4; k++) lap.advance(mapTarget(0), settings.h);
+      } else if (f <= T2) {
+        lap.steps = 2048;
+        lap.advance(mapTarget(f), settings.h); lap.advance(mapTarget(f), settings.h);
+      }
+    },
+    render() {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.fillStyle = BGC; ctx.fillRect(0, 0, W, H);
+      if (cur < T3 || cur >= T4) {
+        lap.render(0, 0);
+        const m = mapPic(cur < T3 ? cur : 0);
+        if (cur < T3) { if (cur >= T2) ring(cur, m.k, m.cx, m.cy); }
+        else {                            // the end: the map again, ring on the same pixel
+          ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineWidth = 4;
+          ctx.beginPath(); ctx.arc(540 + (PIX.x - VC.cx) / SPAN * MAPS, pxY(), 26, 0, Math.PI * 2); ctx.stroke();
+        }
+      } else orbit(cur);
+      let g = 0;
+      for (const c of [T3, T4]) g = Math.max(g, 1 - Math.abs(cur - c + 0.5) / FADEF);
+      if (g > 0) { ctx.globalAlpha = g; ctx.fillStyle = BGC; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+    }
+  };
+  setStart();
+  window.__short = short; window.__lap = lap;
+  const fl = document.createElement("link");   // the caption font, which this page doesn't otherwise load
+  fl.rel = "stylesheet"; fl.href = "https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&display=swap";
+  fl.onload = fl.onerror = () => {   // shorts-rec.js waits for the font, so load it once the font is declared
+    const sc = document.createElement("script"); sc.src = "../shorts-rec.js";
+    sc.onload = () => { short.canvas = cv; ShortsRec(short); };
+    document.head.append(sc);
+  };
+  document.head.append(fl);
+}
 </script>
 </body>
 </html>
