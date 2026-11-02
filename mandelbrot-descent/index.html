@@ -949,7 +949,9 @@ function resize() {
 
 // ---------- offline rendering (used by GIF export) ----------
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-async function gpuWait() { const f = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0); gl.flush(); for (;;) { const st = gl.clientWaitSync(f, 0, 0); if (st === gl.ALREADY_SIGNALED || st === gl.CONDITION_SATISFIED) break; await sleep(1); } gl.deleteSync(f); }
+// a hidden page throttles timers to once a second or slower, so there yield through a message port instead
+const yieldNow = (() => { const ch = new MessageChannel(), q = []; ch.port1.onmessage = () => q.shift()(); return () => new Promise(r => { q.push(r); ch.port2.postMessage(0); }); })();
+async function gpuWait() { const f = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0); gl.flush(); for (;;) { const st = gl.clientWaitSync(f, 0, 0); if (st === gl.ALREADY_SIGNALED || st === gl.CONDITION_SATISFIED) break; await (document.hidden ? yieldNow() : sleep(1)); } gl.deleteSync(f); }
 async function ensureProbes(J) { while (!J.target) await sleep(5); while (!probesDone(J)) { pumpProbes(J, 3e7); await gpuWait(); } }
 
 const offBla = new BlaSet();
@@ -1265,18 +1267,119 @@ addEventListener('keydown', (e) => {
 });
 let idleT = 0;
 function poke() { document.body.classList.remove('idle'); clearTimeout(idleT); idleT = setTimeout(() => { if ($('panel').hidden && !$('bar').matches(':hover')) document.body.classList.add('idle'); else poke(); }, 2600); }
+// ---------- record mode for YouTube Shorts (?record=<location id>, a–f; see guides/shorts.md) ----------
+// One dive at 1080×1920 from the whole set down to the location's minibrot, with a zoom counter drawn in.
+// Each frame is rendered exactly with renderFrame (the GIF export's offline renderer), so takes are identical.
+function recordMode() {
+  const W = 1080, H = 1920, SS = 2, FPS = 30, SEC = 27, TZ = 23.5;   // zoom for TZ s, then hold on the minibrot
+  const loc = LOCATIONS.find(l => l.id === DQ.get('record')) || LOCATIONS[0];
+  const CAPS = {
+    a: [
+      { from: 0, to: 8.6, text: 'Zooming into\nthe Mandelbrot set' },
+      { from: 3.4, to: 8.6, y: 470, size: 40, color: '#c9cfe0', text: 'Every point follows one rule: z → z² + c' },
+      { from: 20.4, to: 23.6, text: 'A tiny copy\nof the whole set' },
+      { from: 23.6, to: SEC + 1, text: 'Try it yourself,\nlink in description' }],
+    b: [
+      { from: 0, to: 8.6, text: 'How far down does\nthe Mandelbrot set go?' },
+      { from: 3.4, to: 8.6, y: 470, size: 40, color: '#c9cfe0', text: 'Every point follows one rule: z → z² + c' },
+      { from: 20.4, to: 23.6, text: 'A tiny copy,\n10³⁵ times smaller' },
+      { from: 23.6, to: SEC + 1, text: 'Try it yourself,\nlink in description' }],
+    c: [
+      { from: 0, to: 8.6, text: 'Spirals inside spirals' },
+      { from: 3.4, to: 8.6, y: 418, size: 40, color: '#c9cfe0', text: 'Every point follows one rule: z → z² + c' },
+      { from: 20.4, to: 23.6, text: 'And in the middle,\na tiny copy' },
+      { from: 23.6, to: SEC + 1, text: 'Try it yourself,\nlink in description' }],
+    d: [
+      { from: 0, to: 8.6, text: 'Zooming into one thin hair\nof the Mandelbrot set' },
+      { from: 3.4, to: 8.6, y: 470, size: 40, color: '#c9cfe0', text: 'Every point follows one rule: z → z² + c' },
+      { from: 20.4, to: 23.6, text: 'Even the hairs\nhold tiny copies' },
+      { from: 23.6, to: SEC + 1, text: 'Try it yourself,\nlink in description' }],
+    e: [
+      { from: 0, to: 8.6, text: "Zooming into the Mandelbrot\nset's long spike" },
+      { from: 3.4, to: 8.6, y: 470, size: 40, color: '#c9cfe0', text: 'Every point follows one rule: z → z² + c' },
+      { from: 20.4, to: 23.6, text: 'A tiny copy,\nhiding on the spike' },
+      { from: 23.6, to: SEC + 1, text: 'Try it yourself,\nlink in description' }],
+  };
+  const MUSIC = {   // Zak picks each by ear from two samples
+    a: { file: 'chopin-waltz64no2.mp3', start: 0.2, fade: 4.5 },
+    b: { file: 'chopin-op9no2-higuchi.mp3', start: 0.4, fade: 4.5 },
+  };
+  for (const el of document.body.children) if (el.tagName !== 'SCRIPT') el.style.display = 'none';
+  const cv = document.createElement('canvas'), ctx = cv.getContext('2d');
+  cv.width = W; cv.height = H;
+  cv.style.cssText = 'display:block;margin:0 auto;width:min(100vw,56.25vh);height:min(100vh,177.78vw)';
+  document.body.appendChild(cv);
+  const J = new Journey(loc, W / H);
+  // depth u per video frame: start with the whole set across the width, full speed at once, slow into the minibrot
+  const N = Math.round(SEC * FPS), NZ = Math.round(TZ * FPS);
+  const u0 = Math.log2(J.r0 * Math.min(1, W / H) / 1.25), U = new Float64Array(N);
+  const vel = (s) => smoothstep(0, 0.015, s) * (1 - 0.92 * smoothstep(0.78, 1, s));
+  let acc = 0; const cum = [0]; for (let i = 0; i < NZ; i++) { acc += vel((i + 0.5) / NZ); cum.push(acc); }
+  for (let i = 0; i < N; i++) U[i] = i < NZ ? u0 + (J.Uend - u0) * cum[i] / acc : J.Uend;
+  let fi = 0, img = null, imgU = u0, busy = null, again = null;
+  const mag = (u) => Math.log10(1.25 / (J.r(u) * Math.min(1, W / H)));
+  function counter(u) {   // "Zoom ×12,345", then "Zoom ×10ⁿ"
+    const m = Math.max(0, mag(u)), y = 1470;
+    ctx.save(); ctx.textBaseline = 'alphabetic'; ctx.fillStyle = '#fff';
+    ctx.shadowColor = 'rgba(0,0,0,0.85)'; ctx.shadowBlur = 20;
+    const big = '700 62px "Bricolage Grotesque", sans-serif', sup = '700 40px "Bricolage Grotesque", sans-serif';
+    let a, e = '';
+    if (m < 6) a = 'Zoom ×' + Math.round(10 ** m).toLocaleString('en-US');
+    else { a = 'Zoom ×10'; e = String(Math.floor(m)); }
+    ctx.font = big; const wa = ctx.measureText(a).width; ctx.font = sup; const we = e ? ctx.measureText(e).width + 4 : 0;
+    const x = 540 - (wa + we) / 2;
+    ctx.textAlign = 'left'; ctx.font = big; ctx.fillText(a, x, y);
+    if (e) { ctx.font = sup; ctx.fillText(e, x + wa + 4, y - 30); }
+    ctx.restore();
+  }
+  function paint() {
+    if (img) ctx.putImageData(img, 0, 0); else { ctx.fillStyle = '#05070c'; ctx.fillRect(0, 0, W, H); }
+    counter(imgU);
+  }
+  async function go() {
+    const u = U[Math.min(fi, N - 1)];
+    if (img && u === imgU) return paint();
+    const px = await renderFrame(J, u, W, H, SS);
+    img = new ImageData(new Uint8ClampedArray(px.buffer), W, H); imgU = u; paint();
+  }
+  // the preview calls render() every screen frame: draw the last finished picture now, and keep one render going
+  function render() {
+    paint();
+    if (!busy) return busy = go().finally(() => { busy = null; });
+    return again || (again = busy.then(() => { again = null; return render(); }));
+  }
+  const short = {
+    name: 'mandel-' + loc.id, seconds: SEC, fps: FPS,
+    captions: CAPS[loc.id] || [{ from: 0, to: SEC + 1, text: loc.name }],
+    music: MUSIC[loc.id],
+    reset() { fi = 0; }, tick(i) { fi = i + 1; }, render, U, J
+  };
+  window.__short = short;
+  const fl = document.createElement('link');   // the caption font, which this page doesn't otherwise load
+  fl.rel = 'stylesheet'; fl.href = 'https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&display=swap';
+  fl.onload = fl.onerror = async () => {
+    await ensureProbes(J);   // depth probes (iteration budgets and the colour map) before the first frame
+    const sc = document.createElement('script'); sc.src = '../shorts-rec.js';
+    sc.onload = () => { short.canvas = cv; ShortsRec(short); };
+    document.head.appendChild(sc);
+  };
+  document.head.appendChild(fl);
+}
+
 ['pointermove', 'pointerdown', 'touchstart', 'wheel'].forEach(ev => addEventListener(ev, poke, { passive: true }));
 canvas.addEventListener('dblclick', () => { try { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => {}); } catch (_) {} });
 try { navigator.wakeLock && navigator.wakeLock.request('screen').catch(() => {}); } catch (_) {}
 
 resize(); DEBUG && dinfo2();
+const REC = DQ.has('record');
+if (REC) recordMode();
 let resume = null;
 try { resume = JSON.parse(sessionStorage.getItem('md-resume') || 'null'); sessionStorage.removeItem('md-resume'); } catch (_) {}
 if (resume && Date.now() - resume.t < 600000) { const i = LOCATIONS.findIndex(l => l.id === resume.id); if (i >= 0) { order.splice(order.indexOf(i), 1); order.unshift(i); orderPos = 0; } else resume = null; } else resume = null;
-S.cur = new Journey(nextLoc(), S.aspect);
-if (resume) { S.resumeU = Math.max(0, Math.min(resume.u, S.cur.Uend - 1)); S.quality = Math.min(S.quality, 0.55); }
+if (!REC) S.cur = new Journey(nextLoc(), S.aspect);
+if (resume && !REC) { S.resumeU = Math.max(0, Math.min(resume.u, S.cur.Uend - 1)); S.quality = Math.min(S.quality, 0.55); }
 setSpeed(matchMedia('(prefers-reduced-motion: reduce)').matches ? 1 : 3); poke();
-if (!window.NO_TICK) requestAnimationFrame(frame);
+if (!window.NO_TICK && !REC) requestAnimationFrame(frame);
 
 </script>
 

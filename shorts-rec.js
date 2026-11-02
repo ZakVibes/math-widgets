@@ -4,7 +4,7 @@
      seconds  video length; fps (default 30)
      reset()  start the scene from the beginning (same seed every time)
      tick(i)  advance the scene by one video frame (i = frame number)
-     render() draw the scene
+     render() draw the scene (may return a promise; recording and stills wait for it)
      captions [{ from, to, text, size?, y?, color? }] in seconds, "\n" breaks lines; captionY in pixels
               (a caption's own y, up to ~850, overrides captionY; color defaults to white)
      music    optional { file, start, fade }: a recording in shorts/music/, played from <start> s into the
@@ -81,7 +81,7 @@ window.ShortsRec = function (o) {
       await ready;
       o.reset();
       for (let i = 0; i < N; i++) {
-        o.tick(i); o.render();
+        o.tick(i); await o.render();   // render() may return a promise (a slow frame), so wait for it
         const blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', 0.93));
         const r = await post(`/__rec/frame?name=${o.name}&i=${i}`, blob);
         if (r.error) throw new Error(r.error);
@@ -136,7 +136,7 @@ window.ShortsRec = function (o) {
     for (const t of times) {
       const m = Math.round(t * fps);
       while (i < m) o.tick(i++);
-      o.render(); overlay(i / fps);
+      await o.render(); overlay(i / fps);
       const blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', 0.85));
       await post(`/__rec/frame?name=${o.name}-stills&i=${k++}`, blob);
     }
