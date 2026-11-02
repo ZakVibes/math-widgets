@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Classical Field Sandbox</title>
-<link rel="manifest" href="../manifest.json"><link rel="icon" href="../icons/icon-192.png"><link rel="apple-touch-icon" href="../icons/icon-180.png"><meta name="apple-mobile-web-app-title" content="Math Widgets"><script>if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("../sw.js"));</script><script>if (location.hostname === "zakvibes.github.io") { const s = document.createElement("script"); s.defer = true; s.src = "https://static.cloudflareinsights.com/beacon.min.js"; s.dataset.cfBeacon = JSON.stringify({ token: "82a3b23479314bcbbeaf2af3881066d0", spa: false }); document.head.append(s); }</script>
+<link rel="manifest" href="../manifest.json"><link rel="icon" href="../icons/icon-192.png"><link rel="apple-touch-icon" href="../icons/icon-180.png"><meta name="apple-mobile-web-app-title" content="Math Widgets"><script>if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("../sw.js"));</script><script>if (location.hostname === "zakvibes.github.io") { const s = document.createElement("script"); s.defer = true; s.src = "https://static.cloudflareinsights.com/beacon.min.js"; s.dataset.cfBeacon = JSON.stringify({ token: "82a3b23479314bcbbeaf2af3881066d0" }); document.head.append(s); }</script>
 <link rel="stylesheet" href="../site.css">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -99,6 +99,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
       <button type="button" data-th="cx" aria-pressed="false">Complex φ (vortices)</button>
       <button type="button" data-th="em" aria-pressed="false">Electromagnetism</button>
       <button type="button" data-th="ah" aria-pressed="false">Superconductor</button>
+      <button type="button" data-th="ym" aria-pressed="false">Yang–Mills (gluons)</button>
     </div>
     <p class="eq" id="eq"></p>
 
@@ -110,6 +111,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
             <button type="button" data-tool="twist" aria-pressed="false" id="twistBtn" hidden>Twist</button>
             <button type="button" data-tool="source" aria-pressed="false" id="srcToolBtn">Source</button>
             <button type="button" data-tool="paint" aria-pressed="false" id="paintBtn">Paint</button>
+            <button type="button" data-tool="gauge" aria-pressed="false" id="gaugeBtn" hidden>Gauge</button>
             <button type="button" data-tool="wall" aria-pressed="false">Barrier</button>
           </div>
           <div class="row">
@@ -146,6 +148,15 @@ input[type=range]{width:100%;accent-color:var(--accent)}
             <button type="button" data-s="1" aria-pressed="true" id="pokeUp">Push up</button>
             <button type="button" data-s="-1" aria-pressed="false" id="pokeDown">Push down</button>
           </div>
+          <div class="seg sm" id="pokeCol" role="group" aria-label="Flash colour" hidden>
+            <button type="button" data-c="0" aria-pressed="true">Red</button>
+            <button type="button" data-c="1" aria-pressed="false">Green</button>
+            <button type="button" data-c="2" aria-pressed="false">Blue</button>
+          </div>
+          <div class="seg sm" id="pokeAmp" role="group" aria-label="Flash strength" hidden>
+            <button type="button" data-a="0" aria-pressed="true">Gentle</button>
+            <button type="button" data-a="1" aria-pressed="false">Strong</button>
+          </div>
           <span class="lab">size</span><div class="seg sm brushSeg" role="group" aria-label="Brush size"></div>
         </div>
         <div class="toolopts" id="opts-paint" hidden>
@@ -158,6 +169,13 @@ input[type=range]{width:100%;accent-color:var(--accent)}
             <button type="button" data-s="1" aria-pressed="true">+1 (phase turns anticlockwise)</button>
             <button type="button" data-s="-1" aria-pressed="false">−1 (clockwise)</button>
           </div>
+        </div>
+        <div class="toolopts" id="opts-gauge" hidden>
+          <div class="seg sm" id="gaugeSign" role="group" aria-label="Gauge turn">
+            <button type="button" data-s="1" aria-pressed="true">red → green → blue</button>
+            <button type="button" data-s="-1" aria-pressed="false">blue → green → red</button>
+          </div>
+          <span class="lab">size</span><div class="seg sm brushSeg" role="group" aria-label="Brush size"></div>
         </div>
         <div class="toolopts" id="opts-wall" hidden>
           <div class="seg sm" id="wallMode" role="group" aria-label="Barrier mode">
@@ -178,7 +196,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
           <div class="presets" id="presets"></div>
         </div>
         <div class="blk">
-          <div class="sl"><span id="mLab">mass m</span><input type="range" id="mass" min="0" max="1.5" step="0.05" value="0"><output id="massO">0.00</output></div>
+          <div class="sl" id="mWrap"><span id="mLab">mass m</span><input type="range" id="mass" min="0" max="1.5" step="0.05" value="0"><output id="massO">0.00</output></div>
           <div class="sl" id="eWrap" hidden><span>charge e</span><input type="range" id="echg" min="0.3" max="1.5" step="0.05" value="0.8"><output id="echgO">0.80</output></div>
           <div class="sl" id="epsWrap" hidden><span>tilt ε</span><input type="range" id="eps" min="0" max="0.15" step="0.005" value="0"><output id="epsO">0.000</output></div>
           <div class="sl"><span>friction</span><input type="range" id="fric" min="0" max="0.5" step="0.01" value="0"><output id="fricO">0.00</output></div>
@@ -200,7 +218,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
             </div></div>
         </div>
         <div class="blk" id="plotBlk">
-          <h3>Potential V(φ) <span class="note" style="font-weight:400">and where the field sits</span></h3>
+          <h3 id="plotTitle">Potential V(φ) <span class="note" style="font-weight:400">and where the field sits</span></h3>
           <canvas id="plot" width="600" height="240"></canvas>
           <p class="note" id="plotNote"></p>
         </div>
@@ -244,10 +262,11 @@ const TH={
       targets:[[0,'phase 0'],[Math.PI/2,'π/2'],[Math.PI,'π'],[-Math.PI/2,'−π/2'],[null,'0 (hilltop)']], vac:()=>vacPhi4(1), plot:[-1.9,1.9]},
   em:{name:'Electromagnetism', mMin:0, mMax:1, mDef:0, poke:1, scale:null, targets:[[0,'0']], vac:()=>0, plot:[-2,2]},
   ah:{name:'Superconductor', mMin:0.4, mMax:2, mDef:1.2, poke:Math.PI/2, scale:1,
-      targets:[[0,'phase 0'],[Math.PI/2,'π/2'],[Math.PI,'π'],[-Math.PI/2,'−π/2'],[null,'0 (normal)']], vac:()=>1, plot:[-1.9,1.9]}
+      targets:[[0,'phase 0'],[Math.PI/2,'π/2'],[Math.PI,'π'],[-Math.PI/2,'−π/2'],[null,'0 (normal)']], vac:()=>1, plot:[-1.9,1.9]},
+  ym:{name:'Yang–Mills', mMin:0, mMax:0, mDef:0, poke:1, scale:null, targets:[[0,'0']], vac:()=>0, plot:[-2,2]}
 };
-const P={th:'kg', m:{kg:0,phi4:1,sg:1,cx:1,em:0,ah:1.2}, e:0.8, eps:0, fric:0, speed:2, edge:'absorb', view:'field',
-  tool:'poke', brush:3, shade:1.2, pokeSign:1, twistSign:1, paintIdx:0, wallMode:'draw', running:true,
+const P={th:'kg', m:{kg:0,phi4:1,sg:1,cx:1,em:0,ah:1.2,ym:0}, e:0.8, eps:0, fric:0, speed:2, edge:'absorb', view:'field',
+  tool:'poke', brush:3, shade:1.2, pokeSign:1, twistSign:1, paintIdx:0, wallMode:'draw', running:true, pokeCol:0, pokeStrong:false, gaugeSign:1,
   newSrc:{kind:'osc', sign:1, q:1, w:1}, newCharge:{kind:'still', sign:1, q:1, w:0.3, A:3, M:1}};
 let t=0, dirty=true, sources=[], sel=null, nextId=1, vortices=[];
 const isCx=()=>P.th==='cx', isEm=()=>P.th==='em', isAh=()=>P.th==='ah', isPh=()=>P.th==='cx'||P.th==='ah';
@@ -279,7 +298,7 @@ function updateDamp(){
 /* Absorbing edge for the scalar tabs: besides the damping rim, the ghost cells follow Mur's one-way wave condition,
    g(t+dt) = e(t) + k (e(t+dt) - g(t)), k = (dt - dx)/(dt + dx), so waves reaching the outer edge leave instead of bouncing. */
 const MURK=(dt-dx)/(dt+dx), murOld=[new Float64Array(NN),new Float64Array(NN),new Float64Array(NN)];
-const useMur=()=>P.edge==='absorb'&&!isEm()&&!isAh();
+const useMur=()=>P.edge==='absorb'&&!isEm()&&!isAh()&&!isYm();
 function murEach(fn){   // fn(ghost cell, edge cell next to it)
   for(let i=1;i<=N;i++){ fn(i,G+i); fn((N+1)*G+i,N*G+i); }
   for(let j=1;j<=N;j++){ fn(j*G,j*G+1); fn(j*G+N+1,j*G+N); }
@@ -353,6 +372,7 @@ function force(time,frac){
 /* velocity Verlet (kick-drift-kick); damping folded into the half kicks; walls have dampH=0 */
 function stepOnce(frac,fracPrev){
   if(isAh()){ stepAH(); return; }
+  if(isYm()){ stepYM(); return; }
   if(isEm()){ stepEM(frac); dirty=false; return; }
   if(dirty){ force(t,fracPrev); dirty=false; }
   const h=dt/2, nc=ncomp();
@@ -406,6 +426,7 @@ const wrapA=d=>d-2*Math.PI*Math.round(d/(2*Math.PI));
 function updateLinkMasks(){   // which links exist: with closed edges, none leads out of the grid
   const wrap=P.edge==='wrap'; lmX.fill(0); lmY.fill(0);
   for(let j=0;j<N;j++)for(let i=0;i<N;i++){ const k=K(i,j); if(wrap||i<N-1) lmX[k]=1; if(wrap||j<N-1) lmY[k]=1; }
+  ymMasks(); if(isYm()) ymFreeze();
 }
 function linkGhost(a){        // wrap: periodic copies; otherwise links and plaquettes outside the grid are 0
   if(P.edge==='wrap'){ ghostsOf(a,0); return; }
@@ -479,6 +500,200 @@ function energyAH(){
 }
 /* magnetic flux through the whole grid, in flux quanta 2 pi/e (anticlockwise-positive, like the vortex winding) */
 function fluxQuanta(){ computePlaq(); let s=0; for(let j=1;j<=N;j++){ let k=j*G+1; for(let i=0;i<N;i++,k++) s+=wrapA(plq[k]); } return -s/(2*Math.PI); }
+
+/* ---------- Yang–Mills: an SU(2) gauge field on the links (lattice gauge theory, temporal gauge) ----------
+   Each link carries U = u0 + i(u1 σ1 + u2 σ2 + u3 σ3), a unit quaternion, and a colour electric field w (three colours, the
+   rate the link turns): U' = i (w·σ/2) U. A link's w is in the colours of the site it leaves. The plaquette
+   P(s) = U_x(s) U_y(s+x) U_x(s+y)† U_y(s)† is in the colours of its corner s. Coupling g = 1 (classically only g·A matters).
+   H = Σ_links |w|²/2 + Σ_plaq 4(1 − P0)/dx². For small fields w = dx E and P ≈ 1 + i dx² B·σ/2, so H ≈ Σ ½(E² + B²) dx².
+   The update is symplectic and respects Gauss's law exactly: Σ w out − Σ (w in, carried over its link) = 0 at every site. */
+const ux0=new Float64Array(NN), ux1=new Float64Array(NN), ux2=new Float64Array(NN), ux3=new Float64Array(NN);
+const uy0=new Float64Array(NN), uy1=new Float64Array(NN), uy2=new Float64Array(NN), uy3=new Float64Array(NN);
+const wx1=new Float64Array(NN), wx2=new Float64Array(NN), wx3=new Float64Array(NN), wy1=new Float64Array(NN), wy2=new Float64Array(NN), wy3=new Float64Array(NN);
+const fx1=new Float64Array(NN), fx2=new Float64Array(NN), fx3=new Float64Array(NN), fy1=new Float64Array(NN), fy2=new Float64Array(NN), fy3=new Float64Array(NN);
+const pq0=new Float64Array(NN), pq1=new Float64Array(NN), pq2=new Float64Array(NN), pq3=new Float64Array(NN);
+const ymX=new Uint8Array(NN), ymY=new Uint8Array(NN);   // links that move: inside the grid and not touching a barrier
+const YMU=[ux0,ux1,ux2,ux3,uy0,uy1,uy2,uy3], YMW=[wx1,wx2,wx3,wy1,wy2,wy3];
+const isYm=()=>P.th==='ym';
+function ymMasks(){ for(let k=0;k<NN;k++){ ymX[k]=lmX[k]&&open[k]&&open[k+1]?1:0; ymY[k]=lmY[k]&&open[k]&&open[k+G]?1:0; } }
+function ymFreeze(){             // links touching a barrier (or leaving the grid) stay at U = 1, w = 0
+  for(let k=0;k<NN;k++){
+    if(!ymX[k]){ ux0[k]=1; ux1[k]=ux2[k]=ux3[k]=0; wx1[k]=wx2[k]=wx3[k]=0; }
+    if(!ymY[k]){ uy0[k]=1; uy1[k]=uy2[k]=uy3[k]=0; wy1[k]=wy2[k]=wy3[k]=0; } }
+}
+function ymClear(){ ux0.fill(1); uy0.fill(1); for(const a of [ux1,ux2,ux3,uy1,uy2,uy3,...YMW]) a.fill(0); dirty=true; }
+function ymGhosts(){            // wrap: periodic copies; otherwise the ghost links are U = 1, w = 0
+  const wrap=P.edge==='wrap';
+  for(const a of YMU) if(wrap) wrapGhost(a); else zeroRing(a);
+  for(const a of YMW) if(wrap) wrapGhost(a); else zeroRing(a);
+  if(!wrap){ for(let i=0;i<G;i++){ ux0[i]=ux0[(N+1)*G+i]=uy0[i]=uy0[(N+1)*G+i]=1; } for(let j=0;j<G;j++){ ux0[j*G]=ux0[j*G+N+1]=uy0[j*G]=uy0[j*G+N+1]=1; } }
+}
+function ymNormalize(){ for(let k=0;k<NN;k++){
+  let r=1/Math.sqrt(ux0[k]*ux0[k]+ux1[k]*ux1[k]+ux2[k]*ux2[k]+ux3[k]*ux3[k]); ux0[k]*=r; ux1[k]*=r; ux2[k]*=r; ux3[k]*=r;
+  r=1/Math.sqrt(uy0[k]*uy0[k]+uy1[k]*uy1[k]+uy2[k]*uy2[k]+uy3[k]*uy3[k]); uy0[k]*=r; uy1[k]*=r; uy2[k]*=r; uy3[k]*=r; } }
+/* plaquettes (quaternion products: (a0,a)(b0,b) = (a0 b0 − a·b, a0 b + b0 a − a×b)); with closed edges the squares
+   sticking out of the grid are left out (P = 1) */
+function ymPlaq(){
+  ymGhosts(); const wrap=P.edge==='wrap';
+  for(let j=1;j<=N;j++){ let k=j*G+1; for(let i=0;i<N;i++,k++){
+    if(!wrap&&(i===N-1||j===N)){ pq0[k]=1; pq1[k]=pq2[k]=pq3[k]=0; continue; }
+    // A = U_x(s) U_y(s+x)
+    const a0=ux0[k], a1=ux1[k], a2=ux2[k], a3=ux3[k], b0=uy0[k+1], b1=uy1[k+1], b2=uy2[k+1], b3=uy3[k+1];
+    const A0=a0*b0-a1*b1-a2*b2-a3*b3, A1=a0*b1+b0*a1-(a2*b3-a3*b2), A2=a0*b2+b0*a2-(a3*b1-a1*b3), A3=a0*b3+b0*a3-(a1*b2-a2*b1);
+    // B = U_y(s) U_x(s+y), then P = A B†
+    const c0=uy0[k], c1=uy1[k], c2=uy2[k], c3=uy3[k], d0=ux0[k+G], d1=ux1[k+G], d2=ux2[k+G], d3=ux3[k+G];
+    const B0=c0*d0-c1*d1-c2*d2-c3*d3, B1=c0*d1+d0*c1-(c2*d3-c3*d2), B2=c0*d2+d0*c2-(c3*d1-c1*d3), B3=c0*d3+d0*c3-(c1*d2-c2*d1);
+    pq0[k]=A0*B0+A1*B1+A2*B2+A3*B3;
+    pq1[k]=-A0*B1+B0*A1+(A2*B3-A3*B2); pq2[k]=-A0*B2+B0*A2+(A3*B1-A1*B3); pq3[k]=-A0*B3+B0*A3+(A1*B2-A2*B1); } }
+  if(wrap){ wrapGhost(pq0); wrapGhost(pq1); wrapGhost(pq2); wrapGhost(pq3); }
+  else { zeroRing(pq1); zeroRing(pq2); zeroRing(pq3); for(let i=0;i<G;i++){ pq0[i]=pq0[(N+1)*G+i]=1; } for(let j=0;j<G;j++){ pq0[j*G]=pq0[j*G+N+1]=1; } }
+}
+/* force on each link: −(2/dx²) × the colour part of the two plaquettes through it, the one not cornered at s carried over to s.
+   Carrying v back along a link V: V† v V = (a0² − |a|²) v + 2 (a·v) a + 2 a0 (a×v). */
+function forceYM(){
+  ymPlaq(); const c=-2/(dx*dx);
+  for(let j=1;j<=N;j++){ let k=j*G+1; for(let i=0;i<N;i++,k++){
+    const b1=pq1[k], b2=pq2[k], b3=pq3[k];
+    if(ymX[k]){ const q=k-G, a0=uy0[q], a1=uy1[q], a2=uy2[q], a3=uy3[q], v1=pq1[q], v2=pq2[q], v3=pq3[q];
+      const s=a0*a0-a1*a1-a2*a2-a3*a3, d=2*(a1*v1+a2*v2+a3*v3), e=2*a0;
+      fx1[k]=c*(b1-(s*v1+d*a1+e*(a2*v3-a3*v2))); fx2[k]=c*(b2-(s*v2+d*a2+e*(a3*v1-a1*v3))); fx3[k]=c*(b3-(s*v3+d*a3+e*(a1*v2-a2*v1))); }
+    else { fx1[k]=fx2[k]=fx3[k]=0; }
+    if(ymY[k]){ const q=k-1, a0=ux0[q], a1=ux1[q], a2=ux2[q], a3=ux3[q], v1=pq1[q], v2=pq2[q], v3=pq3[q];
+      const s=a0*a0-a1*a1-a2*a2-a3*a3, d=2*(a1*v1+a2*v2+a3*v3), e=2*a0;
+      fy1[k]=c*((s*v1+d*a1+e*(a2*v3-a3*v2))-b1); fy2[k]=c*((s*v2+d*a2+e*(a3*v1-a1*v3))-b2); fy3[k]=c*((s*v3+d*a3+e*(a1*v2-a2*v1))-b3); }
+    else { fy1[k]=fy2[k]=fy3[k]=0; } } }
+}
+/* U ← exp(i dt w·σ/2) U each step; the half angle dt|w|/2 is small, so a Taylor series does (Math for big turns) */
+let ymSteps=0;
+function stepYM(){
+  if(dirty||++ymSteps%64===0){ ymNormalize(); forceYM(); dirty=false; }
+  const h=dt/2, q2=0.25*dt*dt;
+  for(let j=1;j<=N;j++){ let k=j*G+1; for(let i=0;i<N;i++,k++){ const d=dampL[k];
+    // kick, then turn the link (ymTurn written out here: the call cost more than the maths)
+    if(ymX[k]){ const w1=wx1[k]=d*(wx1[k]+h*fx1[k]), w2=wx2[k]=d*(wx2[k]+h*fx2[k]), w3=wx3[k]=d*(wx3[k]+h*fx3[k]);
+      const h2=q2*(w1*w1+w2*w2+w3*w3);
+      if(h2!==0){ let co, sw;
+        if(h2<0.04){ co=1-h2*(0.5-h2*(1/24-h2/720)); sw=h*(1-h2*(1/6-h2*(1/120-h2/5040))); } else { const hh=Math.sqrt(h2); co=Math.cos(hh); sw=h*Math.sin(hh)/hh; }
+        const e1=sw*w1, e2=sw*w2, e3=sw*w3, a0=ux0[k], a1=ux1[k], a2=ux2[k], a3=ux3[k];
+        ux0[k]=co*a0-e1*a1-e2*a2-e3*a3; ux1[k]=co*a1+a0*e1-(e2*a3-e3*a2); ux2[k]=co*a2+a0*e2-(e3*a1-e1*a3); ux3[k]=co*a3+a0*e3-(e1*a2-e2*a1); } }
+    if(ymY[k]){ const w1=wy1[k]=d*(wy1[k]+h*fy1[k]), w2=wy2[k]=d*(wy2[k]+h*fy2[k]), w3=wy3[k]=d*(wy3[k]+h*fy3[k]);
+      const h2=q2*(w1*w1+w2*w2+w3*w3);
+      if(h2!==0){ let co, sw;
+        if(h2<0.04){ co=1-h2*(0.5-h2*(1/24-h2/720)); sw=h*(1-h2*(1/6-h2*(1/120-h2/5040))); } else { const hh=Math.sqrt(h2); co=Math.cos(hh); sw=h*Math.sin(hh)/hh; }
+        const e1=sw*w1, e2=sw*w2, e3=sw*w3, a0=uy0[k], a1=uy1[k], a2=uy2[k], a3=uy3[k];
+        uy0[k]=co*a0-e1*a1-e2*a2-e3*a3; uy1[k]=co*a1+a0*e1-(e2*a3-e3*a2); uy2[k]=co*a2+a0*e2-(e3*a1-e1*a3); uy3[k]=co*a3+a0*e3-(e1*a2-e2*a1); } } } }
+  t+=dt;
+  forceYM();
+  for(let j=1;j<=N;j++){ let k=j*G+1; for(let i=0;i<N;i++,k++){ const d=dampL[k];
+    if(ymX[k]){ wx1[k]=d*(wx1[k]+h*fx1[k]); wx2[k]=d*(wx2[k]+h*fx2[k]); wx3[k]=d*(wx3[k]+h*fx3[k]); }
+    if(ymY[k]){ wy1[k]=d*(wy1[k]+h*fy1[k]); wy2[k]=d*(wy2[k]+h*fy2[k]); wy3[k]=d*(wy3[k]+h*fy3[k]); } } }
+}
+function ymReady(){ if(dirty){ ymNormalize(); forceYM(); dirty=false; } }
+function energyYM(){
+  ymReady(); let Ek=0, Eb=0;
+  for(let j=1;j<=N;j++){ let k=j*G+1; for(let i=0;i<N;i++,k++){
+    Ek+=0.5*(wx1[k]*wx1[k]+wx2[k]*wx2[k]+wx3[k]*wx3[k]+wy1[k]*wy1[k]+wy2[k]*wy2[k]+wy3[k]*wy3[k]); Eb+=4*(1-pq0[k]); } }
+  Eb/=dx*dx;
+  return {field:Ek+Eb, electric:Ek, magnetic:Eb};
+}
+/* colour weights at site s: electric energy on the two links leaving s plus the magnetic energy of the square cornered at s,
+   split by colour (all three in the colours of s); per unit area */
+const ymC=new Float64Array(3);
+function ymColourAt(k){
+  const ie=0.5/(dx*dx), ib=2/(dx*dx*dx*dx);
+  ymC[0]=ie*(wx1[k]*wx1[k]+wy1[k]*wy1[k])+ib*pq1[k]*pq1[k];
+  ymC[1]=ie*(wx2[k]*wx2[k]+wy2[k]*wy2[k])+ib*pq2[k]*pq2[k];
+  ymC[2]=ie*(wx3[k]*wx3[k]+wy3[k]*wy3[k])+ib*pq3[k]*pq3[k];
+}
+function ymShares(){ ymReady(); let r=0,g=0,b=0;
+  for(let j=1;j<=N;j++){ let k=j*G+1; for(let i=0;i<N;i++,k++){ ymColourAt(k); r+=ymC[0]; g+=ymC[1]; b+=ymC[2]; } }
+  const s=r+g+b||1; return [r/s,g/s,b/s];
+}
+/* Gauss's law, largest error over the sites not next to a barrier (barriers are colour conductors and carry induced charge)
+   and outside the absorbing rim (its uneven damping makes a little charge there while waves are being soaked up) */
+function gaussYM(){
+  ymReady(); ymGhosts(); let mx=0; const rim=P.edge==='absorb';
+  for(let j=1;j<=N;j++){ let k=j*G+1; for(let i=0;i<N;i++,k++){
+    if(!open[k]||!open[k-1]||!open[k+1]||!open[k-G]||!open[k+G]||(rim&&(sponge[k]>0||sponge[k-1]>0||sponge[k-G]>0))) continue;
+    let g1=wx1[k]+wy1[k], g2=wx2[k]+wy2[k], g3=wx3[k]+wy3[k];
+    let q=k-1, a0=ux0[q], a1=ux1[q], a2=ux2[q], a3=ux3[q], v1=wx1[q], v2=wx2[q], v3=wx3[q];   // the x link arriving from the left
+    let s=a0*a0-a1*a1-a2*a2-a3*a3, d=2*(a1*v1+a2*v2+a3*v3), e=2*a0;
+    g1-=s*v1+d*a1+e*(a2*v3-a3*v2); g2-=s*v2+d*a2+e*(a3*v1-a1*v3); g3-=s*v3+d*a3+e*(a1*v2-a2*v1);
+    q=k-G; a0=uy0[q]; a1=uy1[q]; a2=uy2[q]; a3=uy3[q]; v1=wy1[q]; v2=wy2[q]; v3=wy3[q];       // the y link arriving from below
+    s=a0*a0-a1*a1-a2*a2-a3*a3; d=2*(a1*v1+a2*v2+a3*v3); e=2*a0;
+    g1-=s*v1+d*a1+e*(a2*v3-a3*v2); g2-=s*v2+d*a2+e*(a3*v1-a1*v3); g3-=s*v3+d*a3+e*(a1*v2-a2*v1);
+    const g=Math.hypot(g1,g2,g3); if(g>mx) mx=g; } }
+  return mx;
+}
+/* starting fields from potentials on the squares: theta = curl Phi on the links (one colour per wave packet, so the links of a
+   packet commute and Gauss's law holds exactly), and w = curl Psi. Plaquette centres sit at ((i + 1 − N/2) dx, (j + 1 − N/2) dx). */
+const ymT=[...Array(6)].map(()=>new Float64Array(NN));
+function ymFromPotentials(fn){      // fn(x, y) -> [Phi1, Phi2, Phi3, Psi1, Psi2, Psi3] at a square's centre (or null)
+  for(const a of ymT) a.fill(0);
+  // the outer squares stay 0, so no curl is lost on the edge links (that would break Gauss's law there)
+  for(let j=1;j<N-2;j++)for(let i=1;i<N-2;i++){ const r=fn((i+1-N/2)*dx,(j+1-N/2)*dx); if(!r) continue; const k=K(i,j); for(let c=0;c<6;c++) ymT[c][k]=r[c]; }
+  ymClear();
+  for(let j=0;j<N;j++)for(let i=0;i<N;i++){ const k=K(i,j);
+    const tx=[0,1,2].map(c=>ymT[c][k]-ymT[c][k-G]), ty=[0,1,2].map(c=>-(ymT[c][k]-ymT[c][k-1]));
+    ymSetLink(ux0,ux1,ux2,ux3,k,tx); ymSetLink(uy0,uy1,uy2,uy3,k,ty);
+    wx1[k]=ymT[3][k]-ymT[3][k-G]; wx2[k]=ymT[4][k]-ymT[4][k-G]; wx3[k]=ymT[5][k]-ymT[5][k-G];
+    wy1[k]=-(ymT[3][k]-ymT[3][k-1]); wy2[k]=-(ymT[4][k]-ymT[4][k-1]); wy3[k]=-(ymT[5][k]-ymT[5][k-1]); }
+  ymFreeze(); dirty=true;
+}
+function ymSetLink(U0,U1,U2,U3,k,th){   // U = exp(i th·σ/2)
+  const n=Math.hypot(th[0],th[1],th[2]), s=n>1e-12?Math.sin(n/2)/n:0.5;
+  U0[k]=Math.cos(n/2); U1[k]=s*th[0]; U2[k]=s*th[1]; U3[k]=s*th[2];
+}
+/* a wave packet of one colour n moving along (ux, uy) at speed 1: Phi = amp e^(−u²/2su² − v²/2sv²) cos(k u), Psi = −dPhi/du */
+function ymPacket(x0,y0,ux,uy,n,amp,su=4,sv=12,kw=1){
+  return (x,y)=>{ const u=(x-x0)*ux+(y-y0)*uy, v=-(x-x0)*uy+(y-y0)*ux, ex=Math.exp(-u*u/(2*su*su)-v*v/(2*sv*sv));
+    if(ex<1e-14) return null;
+    const ph=amp*ex*Math.cos(kw*u), ps=amp*ex*(u/(su*su)*Math.cos(kw*u)+kw*Math.sin(kw*u));
+    return [ph*n[0],ph*n[1],ph*n[2],ps*n[0],ps*n[1],ps*n[2]]; };
+}
+function ymSum(...fs){ return (x,y)=>{ let out=null; for(const f of fs){ const r=f(x,y); if(!r) continue; if(!out) out=r.slice(); else for(let c=0;c<6;c++) out[c]+=r[c]; } return out; }; }
+/* a flash of colour n: E = curl of a bump f on the squares, the neighbouring square's bump carried over its link (as in the force) */
+const YMCOL=[[1,0,0],[0,1,0],[0,0,1]];
+let YM_GENTLE=0.25, YM_STRONG=3;   // flash bump heights: a red and a green flash 8 apart end up ~1% and ~11% blue
+function ymPoke(cx,cy,amp){
+  ymReady();
+  const s=P.brush/2, n=YMCOL[P.pokeCol], Rc=3*s/dx+3, cut=Math.exp(-4.5);
+  const i0=Math.max(0,Math.floor(cx-Rc)), i1=Math.min(N-1,Math.ceil(cx+Rc)), j0=Math.max(0,Math.floor(cy-Rc)), j1=Math.min(N-1,Math.ceil(cy+Rc));
+  // the bump is exactly 0 beyond 3 s, inside the box, so no curl is lost at the box's edge
+  const f=(i,j)=>{ const X=(i+0.5-cx)*dx, Y=(j+0.5-cy)*dx, e=Math.exp(-(X*X+Y*Y)/(2*s*s)); return e>cut?amp*(e-cut)/(1-cut):0; };
+  const carry=(U0,U1,U2,U3,q,c)=>{ const a0=U0[q], a1=U1[q], a2=U2[q], a3=U3[q], v1=c*n[0], v2=c*n[1], v3=c*n[2];
+    const sc=a0*a0-a1*a1-a2*a2-a3*a3, d=2*(a1*v1+a2*v2+a3*v3), e=2*a0;
+    return [sc*v1+d*a1+e*(a2*v3-a3*v2), sc*v2+d*a2+e*(a3*v1-a1*v3), sc*v3+d*a3+e*(a1*v2-a2*v1)]; };
+  for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){ const k=K(i,j), fk=f(i,j);
+    if(ymX[k]){ const b=carry(uy0,uy1,uy2,uy3,k-G,f(i,j-1)); wx1[k]+=fk*n[0]-b[0]; wx2[k]+=fk*n[1]-b[1]; wx3[k]+=fk*n[2]-b[2]; }
+    if(ymY[k]){ const b=carry(ux0,ux1,ux2,ux3,k-1,f(i-1,j)); wy1[k]+=b[0]-fk*n[0]; wy2[k]+=b[1]-fk*n[1]; wy3[k]+=b[2]-fk*n[2]; } }
+  dirty=true;
+}
+/* gauge brush: g(s) = exp(i α(s) m·σ/2) with m = (1,1,1)/√3, so the colours turn red → green → blue as α grows.
+   U(s→s') ← g(s) U g(s')†, w ← g(s) w g(s)†. Nothing physical changes: energy, Gauss's law and the motion stay the same. */
+const yg0=new Float64Array(NN).fill(1), yg1=new Float64Array(NN), yg2=new Float64Array(NN), yg3=new Float64Array(NN);
+function ymGauge(cx,cy,ang){
+  ymReady();
+  const R=P.brush, Rc=R/dx+2, m=1/Math.sqrt(3);
+  const i0=Math.max(0,Math.floor(cx-Rc)), i1=Math.min(N-1,Math.ceil(cx+Rc)), j0=Math.max(0,Math.floor(cy-Rc)), j1=Math.min(N-1,Math.ceil(cy+Rc));
+  for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){ const k=K(i,j), r=Math.hypot(i-cx,j-cy)*dx;
+    let w=Math.min(1,Math.max(0,(R-r)/(0.6*R))); w=w*w*(3-2*w); const a=ang*w/2;
+    yg0[k]=Math.cos(a); yg1[k]=yg2[k]=yg3[k]=m*Math.sin(a); }
+  const mulG=(U0,U1,U2,U3,k,k2)=>{   // U ← g(k) U g(k2)†
+    let a0=yg0[k], a1=yg1[k], a2=yg2[k], a3=yg3[k], b0=U0[k], b1=U1[k], b2=U2[k], b3=U3[k];
+    const c0=a0*b0-a1*b1-a2*b2-a3*b3, c1=a0*b1+b0*a1-(a2*b3-a3*b2), c2=a0*b2+b0*a2-(a3*b1-a1*b3), c3=a0*b3+b0*a3-(a1*b2-a2*b1);
+    b0=yg0[k2]; b1=-yg1[k2]; b2=-yg2[k2]; b3=-yg3[k2];
+    U0[k]=c0*b0-c1*b1-c2*b2-c3*b3; U1[k]=c0*b1+b0*c1-(c2*b3-c3*b2); U2[k]=c0*b2+b0*c2-(c3*b1-c1*b3); U3[k]=c0*b3+b0*c3-(c1*b2-c2*b1); };
+  const turnW=(W1,W2,W3,k)=>{   // g v g† = (a0² − |a|²) v + 2 (a·v) a − 2 a0 (a×v)
+    const a0=yg0[k], a1=yg1[k], a2=yg2[k], a3=yg3[k], v1=W1[k], v2=W2[k], v3=W3[k];
+    const s=a0*a0-a1*a1-a2*a2-a3*a3, d=2*(a1*v1+a2*v2+a3*v3), e=-2*a0;
+    W1[k]=s*v1+d*a1+e*(a2*v3-a3*v2); W2[k]=s*v2+d*a2+e*(a3*v1-a1*v3); W3[k]=s*v3+d*a3+e*(a1*v2-a2*v1); };
+  for(let j=Math.max(0,j0-1);j<=j1;j++)for(let i=Math.max(0,i0-1);i<=i1;i++){ const k=K(i,j);
+    if(ymX[k]){ mulG(ux0,ux1,ux2,ux3,k,k+1); turnW(wx1,wx2,wx3,k); }
+    if(ymY[k]){ mulG(uy0,uy1,uy2,uy3,k,k+G); turnW(wy1,wy2,wy3,k); } }
+  for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){ const k=K(i,j); yg0[k]=1; yg1[k]=yg2[k]=yg3[k]=0; }
+  dirty=true;
+}
 
 /* ---------- EM solver ----------
    Each potential a (phi, A_x, A_y; Lorenz gauge) obeys  a'' = lap a - m^2 a + source.  Stored as p = da/dt on the cells and
@@ -679,6 +894,7 @@ function computeEB(){   // emAt over the whole grid, written out so it runs fast
 
 function energy(){
   if(isAh()) return energyAH();
+  if(isYm()) return energyYM();
   if(isEm()){ computeEB(); let e=0;
     for(let j=1;j<=N;j++){ let k=j*G+1; for(let i=0;i<N;i++,k++) e+=0.5*(Ex[k]*Ex[k]+Ey[k]*Ey[k]+Bz[k]*Bz[k]); }
     return {field:e*dx*dx}; }
@@ -777,6 +993,7 @@ function resetField(){
   const v0=TH[P.th].vac();
   for(let k=0;k<NN;k++){ phi[k]=open[k]?v0:0; vel[k]=0; phi2[k]=0; vel2[k]=0; phi3[k]=0; vel3[k]=0; lx[k]=ly[k]=lvx[k]=lvy[k]=0; }
   emClear(EMF); for(const s of sources) if(s.own) emClear(s.own);
+  ymClear(); ymFreeze(); ymHist.length=0;
   murInit(); dirty=true;
 }
 function fillField(fn){              // fn(x,y) with x,y in units from the centre -> [phi, phidot, (imaginary part, its rate)]
@@ -864,8 +1081,8 @@ function autoScales(){
     const a=samp.subarray(0,n).sort(); const target=Math.max(isEm()?0.03:0.04,a[Math.floor(n*0.985)]);
     fscale=easeHold(fscale,target);
   }
-  if(P.view==='energy'){
-    ghosts();
+  if(P.view==='energy'||isYm()){
+    ghosts(); if(isYm()) ymReady();
     for(let q=0;q<N*N;q+=7){ const i=q%N, j=(q/N)|0; samp[n++]=edens(K(i,j)); }
     const a=samp.subarray(0,n).sort(); const target=Math.max(0.002,a[Math.floor(n*0.995)]);
     escale=easeHold(escale,target);
@@ -884,6 +1101,7 @@ function easeHold(cur,target){
 function edens(k){
   if(!open[k]) return 0;
   if(isEm()) return 0.5*(Ex[k]*Ex[k]+Ey[k]*Ey[k]+Bz[k]*Bz[k]);
+  if(isYm()){ ymColourAt(k); return ymC[0]+ymC[1]+ymC[2]; }
   if(isAh()){ const p=phi[k], q=phi2[k], e2=ech()*ech(), A=dx*dx;
     const c=cX[k], sn=sX[k], a=c*phi[k+1]+sn*phi2[k+1]-p, b=c*phi2[k+1]-sn*phi[k+1]-q;
     const c2=cY[k], s2=sY[k], a2=c2*phi[k+G]+s2*phi2[k+G]-p, b2=c2*phi2[k+G]-s2*phi[k+G]-q;
@@ -904,7 +1122,16 @@ function sizeCanvas(){
 function render(){
   if(isEm()) computeEB();
   if(isAh()) computePlaq();
-  if(P.view==='field'&&isEm()){
+  if(isYm()) ymReady();
+  if(P.view==='field'&&isYm()){
+    // colour view: the energy at each spot split into the three colours, shown as red, green and blue light
+    const inv=1/escale, f=255*0.92;
+    for(let j=0;j<N;j++){ let k=K(0,j), o=j*N; for(let i=0;i<N;i++,k++,o++){
+      if(!open[k]){pix[o]=WALL;continue;}
+      ymColourAt(k);
+      let r=Math.sqrt(ymC[0]*inv)*f, g=Math.sqrt(ymC[1]*inv)*f, b=Math.sqrt(ymC[2]*inv)*f;
+      pix[o]=(255<<24)|((b>255?255:b)<<16)|((g>255?255:g)<<8)|(r>255?255:r); } }
+  } else if(P.view==='field'&&isEm()){
     // colour = magnetic field B_z (orange out of the screen, blue into it), plus a soft glow where the electric field is strong
     const inv=1/fscale, sc=(LN-1)/(2*UMAX);
     for(let j=0;j<N;j++){ let k=K(0,j), o=j*N; for(let i=0;i<N;i++,k++,o++){
@@ -990,7 +1217,11 @@ function render(){
 }
 function drawLegend(){
   const lg=document.getElementById('leg'), c=lg.getContext('2d'), id=c.createImageData(256,1), p32=new Uint32Array(id.data.buffer);
-  if(P.view==='bfield'){
+  if(P.view==='field'&&isYm()){
+    for(let q=0;q<256;q++){ const u=q/255*3, a=Math.max(0,1-Math.abs(u-0.5)), b=Math.max(0,1-Math.abs(u-1.5)), c=Math.max(0,1-Math.abs(u-2.5));
+      p32[q]=pack(Math.round(235*Math.sqrt(a)),Math.round(235*Math.sqrt(b)),Math.round(235*Math.sqrt(c))); }
+    document.getElementById('legLo').textContent='colour 1 (red)'; document.getElementById('legHi').textContent='3 (blue)';
+  } else if(P.view==='bfield'){
     for(let q=0;q<256;q++){ const u=-1.6+3.2*q/255; p32[q]=lutF[Math.round((u+UMAX)/(2*UMAX)*(LN-1))]; }
     document.getElementById('legLo').textContent='B −'+(fscale*2).toPrecision(2); document.getElementById('legHi').textContent='+'+(fscale*2).toPrecision(2);
   } else if(P.view==='field'&&isPh()){
@@ -1011,11 +1242,24 @@ function fmtPi(v){ const r=v/Math.PI; return (r>=0?'+':'−')+Math.abs(r).toFixe
 /* potential plot with a histogram of the field values */
 const pl=document.getElementById('plot'), pctx=pl.getContext('2d');
 const HB=80, hist=new Float64Array(HB);
+const ymHist=[];                    // [t, red, green, blue] shares of the energy, for the colour-mix plot
 function drawPlot(){
   if(isEm()) return;
   const W=pl.width, H=pl.height, cs=getComputedStyle(document.documentElement);
   const fg=cs.getPropertyValue('--fg').trim()||'#222', mu=cs.getPropertyValue('--muted').trim()||'#888', ac=cs.getPropertyValue('--accent').trim()||'#f80';
   pctx.clearRect(0,0,W,H);
+  if(isYm()){
+    if(ymHist.length&&t<ymHist[ymHist.length-1][0]) ymHist.length=0;
+    if(!ymHist.length||t>ymHist[ymHist.length-1][0]){ const s=ymShares(); ymHist.push([t,s[0],s[1],s[2]]); if(ymHist.length>400) ymHist.shift(); }
+    const pad=14, T0=ymHist[0][0], T1=Math.max(T0+1,ymHist[ymHist.length-1][0]), X=v=>pad+(v-T0)/(T1-T0)*(W-2*pad), Y=v=>H-8-v*(H-22);
+    pctx.strokeStyle=mu; pctx.lineWidth=1; pctx.beginPath(); for(const v of [0,0.5,1]){ pctx.moveTo(pad,Y(v)); pctx.lineTo(W-pad,Y(v)); } pctx.stroke();
+    ['#e5484d','#30a46c','#3e7bfa'].forEach((col,c)=>{ pctx.strokeStyle=col; pctx.lineWidth=3; pctx.beginPath();
+      ymHist.forEach((h,q)=>{ const x=X(h[0]), y=Y(h[c+1]); q?pctx.lineTo(x,y):pctx.moveTo(x,y); }); pctx.stroke(); });
+    pctx.fillStyle=mu; pctx.font='22px JetBrains Mono, monospace'; pctx.textBaseline='top'; pctx.textAlign='left';
+    pctx.fillText('100%',pad+4,Y(1)+4); pctx.textAlign='right'; pctx.fillText('t = '+T1.toFixed(0),W-pad,Y(0.5)+4);
+    $('plotNote').textContent='How the energy splits between the three colours over time. The split depends on the gauge (try the Gauge brush); the total energy doesn’t.';
+    return;
+  }
   let [a,b]=TH[P.th].plot; if(P.th==='kg'){ a*=fscale; b*=fscale; }
   hist.fill(0); let hmax=0;
   const cx=isPh();
@@ -1056,6 +1300,11 @@ function readout(){
     extra+=`<br>moving charges' kinetic energy <b>${ke.toPrecision(4)}</b><br>field + kinetic <b>${(E.field+ke).toPrecision(5)}</b>`;
     if(sel&&sel.kind==='free'&&!sel.held) extra+=`<br>selected charge's speed <b>${(Math.hypot(sel.mx,sel.my)/Math.hypot(sel.M,sel.mx,sel.my)).toFixed(2)}</b> c`; }
   if(isEm()&&sel&&(sel.kind==='wiggle'||sel.kind==='orbit')) extra+=`<br>selected charge's top speed <b>${(effAmp(sel)*sel.w).toFixed(2)}</b> c`;
+  if(isYm()){ const s=ymShares(), g=gaussYM();
+    extra+=`<br>electric <b>${E.electric.toPrecision(4)}</b>, magnetic <b>${E.magnetic.toPrecision(4)}</b>`+
+      `<br>colour split <b style="color:#e5484d">${(100*s[0]).toFixed(1)}%</b> · <b style="color:#30a46c">${(100*s[1]).toFixed(1)}%</b> · <b style="color:#3e7bfa">${(100*s[2]).toFixed(1)}%</b>`+
+      (g<1e-6?`<br>Gauss's law (no colour charge) holds to <b>${g<1e-12?'10⁻¹²':g.toExponential(0)}</b>`
+             :`<br>colour charge left by flashes into a strong field, largest <b>${g.toPrecision(2)}</b>`); }
   if(isAh()) extra+=`<br>magnetic flux <b>${fluxQuanta().toFixed(2)}</b> flux quanta (each 2π/e = ${(2*Math.PI/ech()).toFixed(2)})`;
   if(isPh()){ let np=0,nm=0; for(const v of vortices){ if(v.w>0) np+=v.w; else nm-=v.w; }
     extra+=`<br>vortices <b>${np}</b> with +1 (solid ring), <b>${nm}</b> with −1 (dashed)`;
@@ -1068,7 +1317,8 @@ const EQ={
   sg:'∂²φ/∂t² = ∇²φ − m² sin φ + ρ',
   cx:'∂²φ/∂t² = ∇²φ − λ(|φ|² − 1)φ + ε + ρ,   φ complex,   λ = m²/2',
   em:'(∂²/∂t² − ∇² + m²)(φ, A) = (ρ, J),   E = −∇φ − ∂A/∂t,   B = ∂ₓA_y − ∂_yA_x',
-  ah:'∂²ψ/∂t² = D·Dψ − λ(|ψ|² − 1)ψ,   ∂²A/∂t² = −∇×∇×A + e Im(ψ* Dψ),   D = ∇ − ieA,   λ = m²/2'
+  ah:'∂²ψ/∂t² = D·Dψ − λ(|ψ|² − 1)ψ,   ∂²A/∂t² = −∇×∇×A + e Im(ψ* Dψ),   D = ∇ − ieA,   λ = m²/2',
+  ym:'∂E/∂t = D×B,   B = ∂ₓA_y − ∂_yA_x + g A_x×A_y,   D·E = 0,   D = ∇ + g A×   (A, E, B each have three colours: SU(2))'
 };
 const ABOUT={
   kg:`<h2>Waves and the Klein–Gordon field</h2>
@@ -1114,7 +1364,17 @@ const ABOUT={
 <li><b>Type I</b> (m smaller than e): flux tubes attract and merge into one fat tube with two flux quanta.</li>
 <li><b>Balanced</b> (m = e, the BPS point): flux tubes feel no force at all and stay wherever you put them.</li>
 <li><b>Flux in a hole:</b> barriers here are normal (non-superconducting) metal. Flux threading a hole in a superconductor is trapped, and it comes in whole quanta.</li>
-<li><b>Gauged quench:</b> cool the field from the hilltop. Vortices form, now carrying flux, and pair off.</li></ul>`
+<li><b>Gauged quench:</b> cool the field from the hilltop. Vortices form, now carrying flux, and pair off.</li></ul>`,
+  ym:`<h2>Yang–Mills: light that carries charge</h2>
+<p>Electromagnetism has one kind of light, and light carries no charge, so two beams pass straight through each other. In Yang–Mills theory the light comes in colours (here three, drawn as red, green and blue), and every colour carries colour charge itself. So the waves pull on each other, scatter, and turn one colour into another. In the equations this is the cross product g A×A: two colours combine into the third, the way red × green points along blue. With a single colour the cross product is zero and the theory is plain electromagnetism, however strong the wave. The strong force works this way, and its light is the gluons. Real gluons come in eight colours (the group SU(3)). This tab uses the smaller group SU(2), whose three colours fit red, green and blue.</p>
+<p>Brightness shows energy and the hue shows which colour it's in. But the colours are partly a choice of description, called a gauge: you may turn the colour labels differently at every point without changing anything physical. The <b>Gauge</b> brush does just that. The hues change while the energy view, the motion and every number except the colour split stay put. Gauss's law (no colour charge anywhere) holds to rounding error; the readout checks it.</p>
+<ul class="try"><li><b>Gentle: they pass through:</b> a weak red wave meets a weak green one. Weak waves barely feel the cross product, so they cross like light.</li>
+<li><b>Strong: they scatter:</b> the same two waves, much stronger. They come out tinted with blue, made from red × green.</li>
+<li><b>Crossing beams:</b> two strong beams cross at right angles.</li>
+<li><b>Unstable magnetic field:</b> a smooth blue colour-magnetic field fills the box. In electromagnetism it would sit still forever. Here red and green ripples grow out of almost nothing, at the rate √(gB) theory predicts, and tear it into a sheet full of holes, which then churns into turbulence. This is the Nielsen–Olesen instability, one sign that the vacuum of the strong force is not simple.</li>
+<li><b>Turbulence:</b> a random field. Energy flows from big swirls into ever smaller ripples, until it reaches the smallest ones the grid allows: classical Yang–Mills is chaotic and never settles. It's the same ultraviolet catastrophe as in black-body radiation, the one quantum mechanics cured.</li>
+<li>Make <b>Strong</b> flashes of two colours close together and watch the third colour appear where the rings cross.</li></ul>
+<p class="note">What a classical field can't show: quarks being confined, and gluons acting as if they had mass. Both come from quantum mechanics. Barriers here are colour-conducting metal; colour charge gathers on them, so Gauss's law is checked away from them. A flash of one fixed colour fits exactly only where the field is quiet: inside a strong field the field would have to be turning its colour as it goes in. Flash there and a little fixed colour charge is left behind where you tapped (like a very heavy quark), and the readout reports it.</p>`
 };
 const HINT={
   source:'Tap an empty spot to add a source. Drag a source to move it; tap one to select it and change it.',
@@ -1126,7 +1386,10 @@ const HINT={
   fluxtube:'Tap to put a flux tube there: a vortex in the Higgs field carrying one quantum of magnetic flux.',
   ahPoke:'Tap or drag to turn the phase. In a superconductor the photon has eaten the phase ripple, so it becomes a massive light wave (the Higgs mechanism).',
   ahWall:'Draw normal (non-superconducting) regions. Magnetic flux can sit inside them, but around a closed loop only whole flux quanta fit.',
-  twist:'Tap to put a vortex there. With Wrap edges, add them in +1/−1 pairs: a wrapped world must have zero total winding.'
+  twist:'Tap to put a vortex there. With Wrap edges, add them in +1/−1 pairs: a wrapped world must have zero total winding.',
+  ymPoke:'Tap or drag to make a flash of the chosen colour. Strong flashes of different colours scatter off each other where they cross.',
+  gauge:'Brush over the field to relabel its colours (red → green → blue). It’s a gauge change: the energy and the motion stay exactly the same.',
+  ymWall:'Draw colour-conducting metal. Waves bounce off it.'
 };
 
 /* ---------- presets ---------- */
@@ -1146,6 +1409,27 @@ function kinkPair(v,x0){             // phi^4 kink at -x0 moving +v, antikink at
 function rng(seed){                 // mulberry32, values in [-0.5, 0.5)
   let s=seed|0;
   return ()=>{ s=(s+0x6D2B79F5)|0; let z=Math.imul(s^(s>>>15),1|s); z=(z+Math.imul(z^(z>>>7),61|z))^z; return ((z^(z>>>14))>>>0)/4294967296-0.5; };
+}
+/* Yang–Mills starts with w = 0, so Gauss's law holds whatever the links are.
+   ymUniform: a blue magnetic field plus small random red and green links, in the wrapped box (with closed edges the walls
+   would send waves in). Landau gauge, theta3_x = −phi j, and the y links of the top row close the loop with phi N i, which fits
+   the wrap only if phi N² is a multiple of 4π (SU(2) turns repeat after 4π), so phi is rounded to the nearest such value.
+   ymRandom: random smooth links, a sum of plane waves that fit the wrapped box, with random colours. */
+function ymUniform(phi,noise,seed){
+  const r=rng(seed); ymClear(); phi=4*Math.PI*Math.round(phi*N*N/(4*Math.PI))/(N*N);
+  for(let j=0;j<N;j++)for(let i=0;i<N;i++){ const k=K(i,j);
+    ymSetLink(ux0,ux1,ux2,ux3,k,[noise*r(),noise*r(),-phi*j]); ymSetLink(uy0,uy1,uy2,uy3,k,[noise*r(),noise*r(),j===N-1?phi*N*i:0]); }
+  ymFreeze(); dirty=true;
+}
+function ymRandom(amp,seed){
+  const r=rng(seed), modes=[];
+  for(let q=0;q<48;q++){ const nx=Math.round(12*r()), ny=Math.round(12*r()); if(Math.hypot(nx,ny)<2) { q--; continue; }
+    modes.push({kx:2*Math.PI*nx/N, ky:2*Math.PI*ny/N, ph:2*Math.PI*r(), c:[0,1,2,3,4,5].map(()=>r())}); }
+  const nrm=amp/Math.sqrt(modes.length/8); ymClear();
+  for(let j=0;j<N;j++)for(let i=0;i<N;i++){ const k=K(i,j), th=[0,0,0,0,0,0];
+    for(const m of modes){ const s=Math.sin(m.kx*i+m.ky*j+m.ph); for(let c=0;c<6;c++) th[c]+=nrm*m.c[c]*s; }
+    ymSetLink(ux0,ux1,ux2,ux3,k,th.slice(0,3)); ymSetLink(uy0,uy1,uy2,uy3,k,th.slice(3)); }
+  ymFreeze(); dirty=true;
 }
 const PRESETS={
   kg:[
@@ -1201,6 +1485,14 @@ const PRESETS={
       updateDamp(); resetField(); twistAt(U2C(0),U2C(0),1); }],
     ['Gauged quench',()=>{ setup({th:'ah',m:1.2,e:0.8,fric:0.1,edge:'wrap'}); const r=rng(31337); fillField(()=>[0.2*r(),0,0.2*r(),0]); }]
   ],
+  ym:[
+    // packet strength a is the size of g A / k, the cross-product term against the plain wave term: 0.15 is nearly light, 2 scatters
+    ['Gentle: they pass through',()=>{ setup({th:'ym'}); ymFromPotentials(ymSum(ymPacket(-26,0,1,0,YMCOL[0],0.15,6,14,0.6),ymPacket(26,0,-1,0,YMCOL[1],0.15,6,14,0.6))); }],
+    ['Strong: they scatter',()=>{ setup({th:'ym'}); ymFromPotentials(ymSum(ymPacket(-26,0,1,0,YMCOL[0],2,6,14,0.6),ymPacket(26,0,-1,0,YMCOL[1],2,6,14,0.6))); }],
+    ['Crossing beams',()=>{ setup({th:'ym'}); ymFromPotentials(ymSum(ymPacket(-36,0,1,0,YMCOL[0],2,6,8,0.6),ymPacket(0,36,0,-1,YMCOL[1],2,6,8,0.6))); }],
+    ['Unstable magnetic field',()=>{ setup({th:'ym',edge:'wrap'}); ymUniform(0.02,1e-3,4242); }],
+    ['Turbulence',()=>{ setup({th:'ym',edge:'wrap'}); ymRandom(0.15,99); }]
+  ],
   em:[
     // the charge sits still until t = 6, then slides 10 units in 20 time units (top speed 0.75 c)
     ['Kink',()=>{ setup({th:'em'}); addCharge({x:U2C(-12),y:U2C(0),kind:'jump',L:10,T:20,t0:6}); }],
@@ -1229,7 +1521,7 @@ function buildPresets(){
 /* ---------- controls ---------- */
 function pressSeg(seg,attr,val){ for(const b of seg.querySelectorAll('button')) b.setAttribute('aria-pressed',String(b.dataset[attr]===String(val))); }
 function setTheory(th,keepField){
-  if((P.th==='em')!==(th==='em')){ sources=[]; sel=null; }   // scalar sources and charges are different things
+  if((P.th==='em')!==(th==='em')||th==='ym'){ sources=[]; sel=null; }   // scalar sources and charges are different things; Yang–Mills has none yet
   P.th=th; pressSeg($('theorySeg'),'th',th);
   const em=th==='em';
   $('plotBlk').hidden=em; $('paintBtn').hidden=em; $('srcToolBtn').textContent=em?'Charge':'Source';
@@ -1244,8 +1536,13 @@ function setTheory(th,keepField){
   $('pokeUp').textContent=ph?'Turn phase +':em?'Flash ↺':'Push up'; $('pokeDown').textContent=ph?'Turn phase −':em?'Flash ↻':'Push down';
   $('viewField').textContent=ph?'Phase':em?'B and E':'Field φ';
   $('mLab').textContent=em?'photon mass':ah?'Higgs mass m':'mass m';
+  const ym=th==='ym';
+  $('paintBtn').hidden=em||ym; $('srcToolBtn').hidden=ah||ym; $('gaugeBtn').hidden=!ym; $('mWrap').hidden=ym;
+  $('pokeSign').hidden=ym; $('pokeCol').hidden=!ym; $('pokeAmp').hidden=!ym;
+  if(ym){ $('viewField').textContent='Colour'; $('pokeUp').textContent='Flash'; }
+  $('plotTitle').innerHTML=ym?'Colour mix <span class="note" style="font-weight:400">over time</span>':'Potential V(φ) <span class="note" style="font-weight:400">and where the field sits</span>';
   vortices=[];
-  let tl=P.tool; if(tl==='twist'&&!ph) tl='poke'; if(tl==='paint'&&em) tl='poke'; if(tl==='source'&&ah) tl='poke';
+  let tl=P.tool; if(tl==='twist'&&!ph) tl='poke'; if(tl==='paint'&&(em||ym)) tl='poke'; if(tl==='source'&&(ah||ym)) tl='poke'; if(tl==='gauge'&&!ym) tl='poke';
   setTool(tl);
   const ms=$('mass'); ms.min=TH[th].mMin; ms.max=TH[th].mMax;
   P.paintIdx=0; buildPaint(); buildPresets(); syncSliders(); updateVmin();
@@ -1271,6 +1568,7 @@ function paramNote(){
   else if(isEm()) s=mass()>0?`Light has mass m = ${mass().toFixed(2)}: still charges' fields die off within 1/m = ${(1/mass()).toFixed(1)}, and wiggles slower than ω = m don't radiate.`:'Light travels at speed 1. Charges can be moved at up to 0.9 of that.';
   else if(isAh()){ const m=mass(), e=ech();
     s=`Higgs mass m = ${m.toFixed(2)}, photon mass e = ${e.toFixed(2)}: ${m>e*1.02?'type II, flux tubes repel':m<e*0.98?'type I, flux tubes attract and merge':'balanced (BPS), flux tubes feel no force'}. Magnetic fields die off within 1/e = ${(1/e).toFixed(1)}.`; }
+  else if(isYm()) s='Gluon waves travel at speed 1. Coupling g = 1: a classical field’s strength and g only appear together, so “strong” means a big field.';
   else if(isCx()) s=`Size ripples have mass m = ${mass().toFixed(2)}; phase ripples are massless${P.eps>0?`, or have mass √ε = ${Math.sqrt(P.eps).toFixed(2)} with the tilt`:''}. Vortex cores are about ${(2/mass()).toFixed(1)} across.`;
   else s=`Domain walls are about ${(2/mass()*2).toFixed(1)} wide (a few times 1/m). Friction drains energy, which helps the field settle.`;
   $('paramNote').textContent=s;
@@ -1278,12 +1576,14 @@ function paramNote(){
 function setEdge(e){ P.edge=e; pressSeg($('edgeSeg'),'e',e); updateDamp(); murInit(); emSetDec(EMF,sources,e==='absorb'); for(const s of sources) if(s.own) emSetDec(s.own,[s],e==='absorb'); dirty=true; }
 function setTool(tl){
   P.tool=tl; pressSeg($('toolSeg'),'tool',tl);
-  for(const n of ['source','poke','paint','wall','twist']) $('opts-'+n).hidden=n!==tl;
-  $('hint').textContent=isAh()&&tl==='poke'?HINT.ahPoke:isAh()&&tl==='twist'?HINT.fluxtube:isAh()&&tl==='wall'?HINT.ahWall:isCx()&&tl==='poke'?'Tap or drag to turn the phase. The turn spreads out as massless Goldstone waves.':isEm()&&tl==='poke'?HINT.flash:isEm()&&tl==='source'?HINT.charge:HINT[tl];
+  for(const n of ['source','poke','paint','wall','twist','gauge']) $('opts-'+n).hidden=n!==tl;
+  $('hint').textContent=isYm()&&tl==='poke'?HINT.ymPoke:isYm()&&tl==='wall'?HINT.ymWall:isAh()&&tl==='poke'?HINT.ahPoke:isAh()&&tl==='twist'?HINT.fluxtube:isAh()&&tl==='wall'?HINT.ahWall:isCx()&&tl==='poke'?'Tap or drag to turn the phase. The turn spreads out as massless Goldstone waves.':isEm()&&tl==='poke'?HINT.flash:isEm()&&tl==='source'?HINT.charge:HINT[tl];
 }
 function afterChange(){ scaleReset=true; vortices=findVortices(); syncSliders(); syncSrcPanel(); drawLegend(); drawPlot(); readout(); if(!P.running) render(); }
 
-$('theorySeg').onclick=e=>{ const b=e.target.closest('button'); if(!b||b.dataset.th===P.th) return; setTheory(b.dataset.th); afterChange(); };
+$('theorySeg').onclick=e=>{ const b=e.target.closest('button'); if(!b||b.dataset.th===P.th) return; setTheory(b.dataset.th);
+  if(b.dataset.th==='ym') PRESETS.ym[1][1]();   // an empty Yang–Mills field is just black: open on the strong collision
+  afterChange(); };
 $('toolSeg').onclick=e=>{ const b=e.target.closest('button'); if(b) setTool(b.dataset.tool); };
 $('edgeSeg').onclick=e=>{ const b=e.target.closest('button'); if(b){ setEdge(b.dataset.e); } };
 $('viewSeg').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; P.view=b.dataset.v; pressSeg($('viewSeg'),'v',P.view); scaleReset=true; autoScales(); drawLegend(); if(!P.running) render(); };
@@ -1296,6 +1596,9 @@ $('playBtn').onclick=()=>{ P.running=!P.running; $('playBtn').textContent=P.runn
 $('resetBtn').onclick=()=>{ resetField(); t=0; afterChange(); };
 $('clearBtn').onclick=()=>{ sources=[]; sel=null; clearWalls(); resetField(); t=0; afterChange(); };
 $('pokeSign').onclick=e=>{ const b=e.target.closest('button'); if(b){ P.pokeSign=+b.dataset.s; pressSeg($('pokeSign'),'s',b.dataset.s); } };
+$('pokeCol').onclick=e=>{ const b=e.target.closest('button'); if(b){ P.pokeCol=+b.dataset.c; pressSeg($('pokeCol'),'c',b.dataset.c); } };
+$('pokeAmp').onclick=e=>{ const b=e.target.closest('button'); if(b){ P.pokeStrong=b.dataset.a==='1'; pressSeg($('pokeAmp'),'a',b.dataset.a); } };
+$('gaugeSign').onclick=e=>{ const b=e.target.closest('button'); if(b){ P.gaugeSign=+b.dataset.s; pressSeg($('gaugeSign'),'s',b.dataset.s); } };
 $('twistSign').onclick=e=>{ const b=e.target.closest('button'); if(b){ P.twistSign=+b.dataset.s; pressSeg($('twistSign'),'s',b.dataset.s); } };
 $('wallMode').onclick=e=>{ const b=e.target.closest('button'); if(b){ P.wallMode=b.dataset.w; pressSeg($('wallMode'),'w',P.wallMode); } };
 for(const seg of document.querySelectorAll('.brushSeg')){
@@ -1339,7 +1642,11 @@ function hitSource(c){
   return best;
 }
 function applyBrush(a,b){
-  if(P.tool==='poke'){ const amp=P.pokeSign*TH[P.th].poke*(P.th==='kg'?Math.max(0.3,fscale*1.5):1);
+  if(isYm()&&P.tool==='poke'){ const amp=P.pokeStrong?YM_STRONG:YM_GENTLE;
+    if(!a) ymPoke(b.x,b.y,amp); else walkSeg(a,b,P.brush/dx/2,(x,y)=>ymPoke(x,y,amp*0.25)); }
+  else if(P.tool==='gauge'){ const ang=-P.gaugeSign*2*Math.PI/3;   // a negative turn about (1,1,1) takes red toward green
+    if(!a) ymGauge(b.x,b.y,ang); else walkSeg(a,b,P.brush/dx/4,(x,y)=>ymGauge(x,y,ang*0.08)); }
+  else if(P.tool==='poke'){ const amp=P.pokeSign*TH[P.th].poke*(P.th==='kg'?Math.max(0.3,fscale*1.5):1);
     if(!a){ poke(b.x,b.y,amp); return; }
     walkSeg(a,b,P.brush/dx/2,(x,y)=>poke(x,y,amp*0.25)); }
   else if(P.tool==='paint'){ const v=TH[P.th].targets[P.paintIdx][0]; let tv=v, tv2=0;
@@ -1384,7 +1691,7 @@ cv.addEventListener('pointerup',endDrag); cv.addEventListener('pointercancel',en
 /* ---------- main loop ---------- */
 let frameNo=0;
 function frame(){
-  if(P.running){ advance(2*P.speed); }
+  if(P.running){ advance(isYm()?P.speed:2*P.speed); }   // a Yang–Mills step costs ~2 superconductor steps, so it takes half as many
   sizeCanvas();
   if(frameNo%3===0){ autoScales(); vortices=findVortices(); }
   render();
@@ -1543,7 +1850,10 @@ if(/[?&]debug/.test(location.search)){
   window.__fs={jumpScene,fadeMovingAC,noFade(){AWIN=null;},emPrepare,computeAC,emSetDec,setPML(w,sig,al,flat){PML=w;PSIG=sig;PALPHA=al;PAFLAT=flat;buildPML();},EMF,emStepF,emAt,emE,stepEM,makeEMF,setSponge(w,g,pw){SPONGE=w;SPMAX=g;SPPOW=pw;buildSponge();updateDamp();},N,G,dx,dt,L,K,P,releaseFree,lx,ly,lvx,lvy,plq,computePlaq,fluxQuanta,energyAH,forceAH,stepAH,syncU,phi,vel,phi2,vel2,phi3,vel3,Ex,Ey,Bz,computeEB,srcState,addStatic,addCharge,twistAt,findVortices,get vortices(){return vortices},open,TH,PRESETS,energy,advance,force,fillField,resetField,addSource,setTheory,setEdge,updateDamp,updateVmin,vacPhi4,Vraw,poke,paint,U2C,
     get t(){return t}, set t(v){t=v}, get sources(){return sources}, set sources(v){sources=v}, frame, render,
     preset(th,name){ const p=PRESETS[th].find(q=>q[0]===name); p[1](); afterChange(); }, scene(f){ f(setup); afterChange(); },
-    setFric(f){P.fric=f; updateDamp();}, setMass(m){P.m[P.th]=m; updateVmin(); dirty=true;}, markDirty(){dirty=true;}};
+    setFric(f){P.fric=f; updateDamp();}, setMass(m){P.m[P.th]=m; updateVmin(); dirty=true;}, markDirty(){dirty=true;},
+    ym:{U:YMU,W:YMW,pq:[pq0,pq1,pq2,pq3],energy:energyYM,gauss:gaussYM,shares:ymShares,poke:ymPoke,gauge:ymGauge,packet:ymPacket,sum:ymSum,
+      fromPot:ymFromPotentials,uniform:ymUniform,random:ymRandom,step:stepYM,ready:ymReady,COL:YMCOL,
+      setAmp(g,s){YM_GENTLE=g;YM_STRONG=s;}}};
 }
 })();
 </script>
