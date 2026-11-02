@@ -730,6 +730,7 @@ function setMode(m){
 document.querySelectorAll('.modes button').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
 
 /* ---------- boot ---------- */
+if(/[?&]record\b/.test(location.search)){recordMode();return;}   // ?record: a YouTube Short, see recordMode() below
 readTheme();fitCanvas();
 nRange.value=mToV(D.M);
 loadShape('heart');
@@ -737,6 +738,201 @@ setTones([{m:60},{m:64},{m:67}]);syncSegs();soundChanged();
 setMode(location.hash==='#sound'?'sound':'draw');
 if(matchMedia('(prefers-reduced-motion: reduce)').matches){D.playing=false;$('play').textContent='Play';}
 requestAnimationFrame(frame);
+
+/* =====================================================================
+   ?record: a YouTube Short, "fourier-mandel" (see ../shorts-rec.js). Record mode only; the normal page never runs this.
+   32768 points around the Mandelbrot set (mandelbrot-outline.bin) are Fourier-transformed (its own N = 32768) into
+   20,000 circles. Scene 1: all of them draw the outline. Scene 2: they are added one by one (log schedule) with a
+   counter. Scene 3: zoom in on the pen at the top bulb, then back out.
+   ===================================================================== */
+function recordMode(){
+  const W=1080,H=1920,FPS=30,NR=32768,MAXR=20000;
+  const BG='#0b0d14',YC=960;                     // screen y of the picture's centre
+  const F_HOOKEND=204,F_FO=210,F_BUILD=219,F_ZIN=585,F_ZHOLD=660,F_ZOUT=720,F_ZEND=780,F_LAST=825;
+  const ZOOM=6;
+  for(const el of document.body.children)el.style.display='none';
+  document.body.style.background=BG;document.body.style.margin='0';
+  const rc=document.createElement('canvas'),g=rc.getContext('2d');rc.width=W;rc.height=H;
+  rc.style.cssText='display:block;margin:0 auto;width:min(100vw,56.25vh);height:min(100vh,177.78vw)';
+  document.body.append(rc);
+
+  let kk,cr,ci,am,anchor=[0,0],C20=null,iB=0,penT=null,cur=0,ready=false;
+  const jx=new Float64Array(MAXR+2),jy=new Float64Array(MAXR+2);   // joints of the circle chain
+  const sm=u=>{u=Math.min(1,Math.max(0,u));return u*u*(3-2*u);};
+  const S0=920/2.469,CX0=-0.7645;                 // full view: set about 1000 px wide
+
+  async function load(){
+    const buf=await (await fetch('mandelbrot-outline.bin')).arrayBuffer(),pts=new Float32Array(buf);
+    const re=new Float64Array(NR),im=new Float64Array(NR);
+    for(let s=0;s<NR;s++){re[s]=pts[2*s];im[s]=pts[2*s+1];}
+    fft(re,im);
+    const terms=[];
+    for(let j=0;j<NR;j++){const k=j<NR/2?j:j-NR,x=re[j]/NR,y=im[j]/NR;if(k===0){anchor=[x,y];continue;}terms.push({k,j,x,y,a:Math.hypot(x,y)});}
+    terms.sort((p,q)=>q.a-p.a||Math.abs(p.k)-Math.abs(q.k));
+    kk=new Float64Array(MAXR);cr=new Float64Array(MAXR);ci=new Float64Array(MAXR);am=new Float64Array(MAXR);
+    for(let m=0;m<MAXR;m++){const q=terms[m];kk[m]=q.k;cr[m]=q.x;ci[m]=q.y;am[m]=q.a;q.m=m;}
+    termJ=new Int32Array(MAXR);for(let m=0;m<MAXR;m++)termJ[m]=terms[m].j;
+    C20=curveFor(MAXR);
+    // the top bulb of the main cardioid: the sample nearest to c = -0.12+0.75i
+    let best=1e9;for(let s=0;s<NR;s++){const d=Math.hypot(pts[2*s]+0.12,pts[2*s+1]-0.75);if(d<best){best=d;iB=s;}}
+    // pen time (in loops) for every frame from F_BUILD on: 1 loop per 3 s, slowing to a crawl before the zoom,
+    // and passing the top bulb in the middle of the zoom (frame 690)
+    penT=new Float64Array(F_LAST+1);
+    const s1=1/90,s2=(560/NR)/240;let acc=0;
+    for(let f=F_BUILD;f<=F_LAST;f++){penT[f]=acc;acc+=s2+(s1-s2)*(1-sm((f-500)/80));}
+    const off=iB/NR-penT[690];for(let f=F_BUILD;f<=F_LAST;f++)penT[f]+=off;
+    ready=true;
+  }
+  let termJ=null,cacheKey=-1,cacheCurve=null;
+  // the curve traced by the largest M circles (M may be fractional: the last circle has weight M-floor(M)); inverse FFT of the kept coefficients
+  function curveFor(Mf){
+    const re=new Float64Array(NR),im=new Float64Array(NR);
+    re[0]=anchor[0];im[0]=-anchor[1];
+    const m0=Math.floor(Mf),w=Mf-m0;
+    for(let m=0;m<m0&&m<MAXR;m++){const j=termJ[m];re[j]=cr[m];im[j]=-ci[m];}
+    if(m0<MAXR&&w>0){const j=termJ[m0];re[j]=cr[m0]*w;im[j]=-ci[m0]*w;}
+    fft(re,im);
+    const a=new Float32Array(2*NR);for(let s=0;s<NR;s++){a[2*s]=re[s];a[2*s+1]=-im[s];}
+    return a;
+  }
+  function curveAt(Mf){if(Mf>=MAXR)return C20;const key=Math.round(Mf*1000);if(key!==cacheKey){cacheKey=key;cacheCurve=curveFor(Mf);}return cacheCurve;}
+
+  // joints of the chain for pen time t (loops), with M circles (last one weighted); returns count of joints
+  function chain(t,Mf){
+    const m0=Math.min(MAXR,Math.floor(Mf)),w=m0<MAXR?Mf-m0:0;
+    let x=anchor[0],y=anchor[1];jx[0]=x;jy[0]=y;let n=1;
+    for(let m=0;m<m0;m++){const th=TAU*kk[m]*t,c=Math.cos(th),s=Math.sin(th);x+=cr[m]*c-ci[m]*s;y+=cr[m]*s+ci[m]*c;jx[n]=x;jy[n]=y;n++;}
+    if(w>0){const th=TAU*kk[m0]*t,c=Math.cos(th),s=Math.sin(th);x+=w*(cr[m0]*c-ci[m0]*s);y+=w*(cr[m0]*s+ci[m0]*c);jx[n]=x;jy[n]=y;n++;}
+    return {n,m0,w};
+  }
+
+  // view: world centre (cx,cy), px per unit s.  Screen: X=540+(x-cx)s, Y=YC-(y-cy)s
+  function drawChain(v,ch,t){
+    const {n,m0,w}=ch,s=v.s,X=i=>540+(jx[i]-v.cx)*s,Y=i=>YC-(jy[i]-v.cy)*s;
+    g.lineWidth=1;g.lineCap='round';g.lineJoin='round';
+    // circles: circle m is centred on joint m with radius |c_m|; skip anything under half a pixel or off screen
+    const ez=v.e||0;
+    for(let pass=0;pass<2;pass++){   // small circles, then the big ones (dimmed while zoomed in so the tiny ones stand out)
+      g.strokeStyle=pass?`rgba(165,175,215,${0.27*(1-0.7*ez)})`:'rgba(165,175,215,0.27)';g.beginPath();
+      for(let m=0;m<n-1;m++){
+        const r=am[m]*s*(m<m0?1:w);if(r<0.5||(r>150)!==(pass===1))continue;
+        const x=X(m),y=Y(m),d=Math.hypot(x-540,y-YC);if(Math.abs(d-r)>1250&&d>r)continue;if(r-d>1250)continue;
+        g.moveTo(x+r,y);g.arc(x,y,r,0,TAU);
+      }
+      g.stroke();
+    }
+    // the first few circles a little brighter
+    g.strokeStyle='rgba(190,200,235,0.45)';g.beginPath();
+    for(let m=0;m<Math.min(3,n-1);m++){const r=am[m]*s*(m<m0?1:w),x=X(m),y=Y(m);if(r<0.5)continue;g.moveTo(x+r,y);g.arc(x,y,r,0,TAU);}
+    g.stroke();
+    // the chain of radius lines (joints less than 0.35 px apart are merged)
+    g.strokeStyle='rgba(225,230,248,0.6)';g.lineWidth=1.2;g.beginPath();
+    let lx=X(0),ly=Y(0);g.moveTo(lx,ly);
+    for(let i=1;i<n-1;i++){const x=X(i),y=Y(i);if(Math.abs(x-lx)+Math.abs(y-ly)<0.4)continue;g.lineTo(x,y);lx=x;ly=y;}
+    g.lineTo(X(n-1),Y(n-1));g.stroke();
+    g.fillStyle='rgba(235,238,250,0.9)';g.beginPath();g.arc(X(0),Y(0),3,0,TAU);g.fill();
+  }
+  // a polyline through samples a..b (indices into pts, wrapping), skipping what is far off screen; tip = optional exact pen position
+  function strokeRange(pts,a,b,v,tip,extra){
+    const s=v.s;let started=false,prevIn=false,px=0,py=0,first=true;
+    g.beginPath();
+    for(let i=Math.ceil(a);i<=Math.floor(b)+(extra?1:0);i++){
+      const k=((i%NR)+NR)%NR,x=540+(pts[2*k]-v.cx)*s,y=YC-(pts[2*k+1]-v.cy)*s;
+      const inn=x>-120&&x<1200&&y>-120&&y<2040;
+      if(inn||prevIn){if(!started){g.moveTo(first||!prevIn&&!inn?x:px,first||!prevIn&&!inn?y:py);started=true;}g.lineTo(x,y);}else started=false;
+      px=x;py=y;prevIn=inn;first=false;
+    }
+    if(tip){const x=540+(tip[0]-v.cx)*s,y=YC-(tip[1]-v.cy)*s;if(!started)g.moveTo(x,y);g.lineTo(x,y);}
+    g.stroke();
+  }
+  // gold trail ending at index idx: faint behind, brightest just behind the pen
+  function tailStroke(pts,idx,len,v,tip,aMin,wid){
+    const CH=24;g.lineWidth=wid;g.lineCap='round';g.lineJoin='round';
+    for(let ch=CH-1;ch>=0;ch--){
+      const u=Math.pow(1-ch/CH,1.5),al=aMin+(1-aMin)*u;
+      const R=255,G=Math.round(194+50*u*u),B=Math.round(71+110*u*u*u);
+      g.strokeStyle=`rgba(${R},${G},${B},${al})`;
+      strokeRange(pts,idx-(ch+1)*len/CH,idx-ch*len/CH,v,ch===0?tip:null,ch>0);
+    }
+  }
+  function penDot(x,y,r){
+    g.fillStyle='rgba(240,122,168,0.22)';g.beginPath();g.arc(x,y,r*2.6,0,TAU);g.fill();
+    g.fillStyle='#f07aa8';g.beginPath();g.arc(x,y,r,0,TAU);g.fill();
+    g.strokeStyle='rgba(255,255,255,0.9)';g.lineWidth=1.2;g.beginPath();g.arc(x,y,r,0,TAU);g.stroke();
+  }
+  function counter(a){
+    if(a<=0)return;
+    const n=Math.max(1,Math.round(cMf));
+    g.save();g.globalAlpha=a;g.fillStyle='#fff';g.textAlign='center';g.textBaseline='alphabetic';
+    g.font='700 64px "Bricolage Grotesque", Figtree, sans-serif';
+    g.shadowColor='rgba(0,0,0,0.8)';g.shadowBlur=14;
+    g.fillText(n===1?'1 circle':n.toLocaleString('en-US')+' circles',540,1470);
+    g.restore();
+  }
+  let cMf=1;
+
+  function render(){
+    g.setTransform(1,0,0,1,0,0);g.fillStyle=BG;g.fillRect(0,0,W,H);
+    if(!ready)return;
+    const f=cur,full={cx:CX0,cy:0,s:S0};
+    let fade=0;
+    if(f<F_BUILD){
+      // scene 1: all 20,000 circles; the pen starts 60% round with the first 60% already drawn
+      const p=0.6+0.4*Math.min(f,F_HOOKEND)/F_HOOKEND,t=p%1,ch=chain(t,MAXR),tip=[jx[ch.n-1],jy[ch.n-1]];
+      drawChain(full,ch,t);
+      const idx=p*NR,len=0.3*NR;
+      g.strokeStyle='rgba(255,194,71,0.55)';g.lineWidth=1.7;g.lineCap='round';g.lineJoin='round';
+      if(idx>len)strokeRange(C20,0,idx-len,full,null,true);
+      tailStroke(C20,Math.min(idx,NR),Math.min(len,idx),full,tip,0.55,1.7);
+      penDot(540+(tip[0]-CX0)*S0,YC-tip[1]*S0,5);
+      if(f>=F_FO)fade=Math.min(1,(f-F_FO)/8);
+    }else{
+      const t=penT[f]%1;let Mf,e=0,v=full;
+      if(f<F_ZIN){
+        const u=Math.min(1,(f-F_BUILD)/(F_ZIN-F_BUILD)),s=0.5*u+0.5*sm(u);Mf=Math.exp(s*Math.log(MAXR));
+      }else Mf=MAXR;
+      cMf=Mf;
+      const ch=chain(t,Mf),tip=[jx[ch.n-1],jy[ch.n-1]],pts=curveAt(Mf);
+      if(f>=F_ZIN){   // camera: the pen's screen position glides from where it is in the full view to the middle
+        e=f<F_ZHOLD?sm((f-F_ZIN)/(F_ZHOLD-F_ZIN)):f<F_ZOUT?1:1-sm((f-F_ZOUT)/(F_ZEND-F_ZOUT));
+        const s=S0*Math.pow(ZOOM,e),p0x=540+(tip[0]-CX0)*S0,p0y=YC-tip[1]*S0;
+        const px=p0x*(1-e)+540*e,py=p0y*(1-e)+1120*e;
+        v={s,e,cx:tip[0]-(px-540)/s,cy:tip[1]+(py-YC)/s};
+      }
+      drawChain(v,ch,t);
+      const wid=1.5+e*1.0,idx=t*NR;
+      g.strokeStyle=`rgba(255,194,71,${f<F_ZIN?0.85:0.55+0.45*(1-e)})`;g.lineWidth=wid;g.lineCap='round';g.lineJoin='round';
+      strokeRange(pts,0,NR,v,null,true);
+      tailStroke(pts,idx,(f<F_ZIN?0.12:0.03)*NR,v,tip,0.0,wid+0.3);
+      penDot(540+(tip[0]-v.cx)*v.s,YC-(tip[1]-v.cy)*v.s,5+e*1.5);
+      counter(f<F_ZIN?1:Math.max(0,1-(f-F_ZIN)/30));
+      if(f<F_BUILD+8)fade=1-(f-F_BUILD)/8;
+    }
+    if(fade>0){g.globalAlpha=Math.min(1,fade);g.fillStyle=BG;g.fillRect(0,0,W,H);g.globalAlpha=1;}
+  }
+
+  const short={
+    name:'fourier-mandel',seconds:F_LAST/FPS,captionY:300,music:{file:'chopin-op9no1.mp3',start:0.68,fade:4.5},
+    captions:[
+      {from:0,to:3.6,text:'Can circles draw\nthe Mandelbrot set?'},
+      {from:3.6,to:6.9,text:'20,000 circles, each\nspinning at its own speed'},
+      {from:7.4,to:12.5,text:'Start with one circle'},
+      {from:12.6,to:19.3,text:'Add more, and the\ndetail fills in'},
+      {from:19.6,to:24.8,text:'Up close, tiny circles\ndraw the finest bits'},
+      {from:25.0,to:27.5,text:'Try it yourself,\nlink in description'}
+    ],
+    reset(){cur=0;},
+    tick(f){cur=f;},
+    render
+  };
+  window.__short=short;
+  const fl=document.createElement('link');   // the caption and counter font, which this page doesn't otherwise load
+  fl.rel='stylesheet';fl.href='https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&display=swap';
+  const start=()=>{const sc=document.createElement('script');sc.src='../shorts-rec.js';sc.onload=()=>{short.canvas=rc;ShortsRec(short);};document.head.append(sc);};
+  const go=()=>load().then(start);
+  fl.onload=fl.onerror=go;
+  document.head.append(fl);
+}
 })();
 </script>
 </body>

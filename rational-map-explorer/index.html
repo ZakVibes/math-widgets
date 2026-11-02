@@ -701,6 +701,109 @@ $('sl').addEventListener('click',function(){exportPng(P0)});
 $('sr').addEventListener('click',function(){exportPng(P1)});
 try{if(window.claude&&window.claude.use)window.claude.use('downloads').then(function(d){if(d)DL=d},function(){})}catch(err){}
 
-initPool();setBases();setSize();all(true);
+/* ---------- ?record: a YouTube Short, "twin zoom" (see ../shorts-rec.js) ----------
+   Tan Lei: near a Misiurewicz point c0 the parameter plane looks like the Julia set of c0, up to a fixed complex
+   factor lam:  (M - c0) ~ lam (J - c0). Both panels zoom into c0 together; the Julia view is eased into the
+   matched frame (centre c0, half-width hM/|lam|, turned by arg(|lam|/lam)) so the two turn into twins.
+   Two takes: z^2 + c, then z^3 + c. Pictures are drawn by a worker pool using this file's own kernel (pix, col). */
+function recordMode(){
+ var W=1080,H=1920,FPS=30,PH=610,PY=[450,1070],BGC='#0b0f12',T1=17.3,CUT=17.45,T2S=17.6,T2L=7.9;
+ var TAKES=[
+  {n:2,it:4000,c0:[-0.7746749922024402,0.13665361294907125],lam:[0.06625681300755801,0.2191365111851702],mc:[-0.5,0],mh:2.1,jh:1.6,he:2e-5,T:T1},
+  {n:3,it:3000,c0:[0.5388259897522255,0.45299038940862374],lam:[0.12137013701985794,0.4297633172005966],mc:[0,0],mh:3.0,jh:2.0,he:2e-4,T:T2L}
+ ];
+ for(var i=0;i<document.body.children.length;i++)document.body.children[i].style.display='none';
+ document.body.style.background=BGC;document.body.style.padding='0';
+ var cv=document.createElement('canvas');cv.width=W;cv.height=H;
+ cv.style.cssText='display:block;margin:0 auto;width:min(100vw,56.25vh);height:min(100vh,177.78vw)';
+ document.body.appendChild(cv);
+ var ctx=cv.getContext('2d'),buf=document.createElement('canvas');buf.width=W;buf.height=H;var bx=buf.getContext('2d');
+ // ----- worker pool -----
+ var WS='var S={},N,M,KM,MAXIT,LN,PALI,CD,C=[0,0,0],PALS='+JSON.stringify(PALS)+';\n'+[smooth,iter,pix,col,prep].map(function(f){return f.toString()}).join('\n')+
+ '\nonmessage=function(e){var d=e.data;S.n=d.n;S.m=0;S.it=d.it;S.pal=0;S.cd=0.02;prep();'+
+ 'var W=1080,ss=d.ss,out=new Uint8ClampedArray((d.r1-d.r0)*W*4),p=0,x,y,a,b,ux,uy,re,im,r,g,bl,k=ss*ss,ca=Math.cos(d.ph),sa=Math.sin(d.ph);'+
+ 'for(y=d.r0;y<d.r1;y++)for(x=0;x<W;x++){r=g=bl=0;'+
+ 'for(a=0;a<ss;a++)for(b=0;b<ss;b++){ux=(x+(a+.5)/ss-540)/540;uy=(d.H/2-(y+(b+.5)/ss))/540;'+
+ 're=d.cx+d.h*(ca*ux-sa*uy);im=d.cy+d.h*(sa*ux+ca*uy);col(pix(d.kind,re,im,d.lr,d.li));r+=C[0];g+=C[1];bl+=C[2]}'+
+ 'out[p++]=r/k;out[p++]=g/k;out[p++]=bl/k;out[p++]=255}'+
+ 'postMessage({id:d.id,r0:d.r0,out:out},[out.buffer])};';
+ var pool=[],queue=[],pending={},jid=0;
+ (function(){var url=URL.createObjectURL(new Blob([WS],{type:'text/javascript'})),nw=Math.min(14,Math.max(2,(navigator.hardwareConcurrency||4)-1));
+  for(var i=0;i<nw;i++){var w=new Worker(url);w.idle=true;w.onmessage=function(e){var d=e.data,pd=pending[d.id];delete pending[d.id];this.idle=true;pd(d);pump()};pool.push(w)}})();
+ function pump(){for(var i=0;i<pool.length&&queue.length;i++){var w=pool[i];if(!w.idle)continue;var j=queue.shift();w.idle=false;pending[j.msg.id]=j.res;w.postMessage(j.msg)}}
+ function drawPanel(kind,P,take){   // P: {cx,cy,h,ph,lr,li}; returns a canvas PH tall
+  var c=document.createElement('canvas');c.width=W;c.height=PH;var g=c.getContext('2d'),proms=[],CH=6;
+  for(var r0=0;r0<PH;r0+=CH){(function(r0){
+   proms.push(new Promise(function(res){
+    queue.push({res:res,msg:{id:++jid,kind:kind,n:take.n,it:take.it,ss:2,H:PH,r0:r0,r1:Math.min(PH,r0+CH),cx:P.cx,cy:P.cy,h:P.h,ph:P.ph,lr:P.lr,li:P.li}});pump();
+   }).then(function(d){g.putImageData(new ImageData(d.out,W,d.out.length/4/W),0,d.r0)}));
+  })(r0)}
+  return Promise.all(proms).then(function(){return c});
+ }
+ // ----- timeline -----
+ var ease=function(u){u=Math.min(1,Math.max(0,u));return u*u*(3-2*u)};
+ function zoomG(tau){var a=0.12;tau=Math.min(1,Math.max(0,tau));return (tau>=a?tau-a/2:tau*tau/(2*a))/(1-a/2)}
+ function state(f){
+  var t=f/FPS,k=t<CUT?0:1,tt=k===0?Math.min(t,T1):Math.min(Math.max(t-T2S,0),T2L),tk=TAKES[k];
+  var l0=Math.log(tk.mh),l1=Math.log(tk.he),lh=l0+(l1-l0)*zoomG(tt/tk.T),h=Math.exp(lh);
+  var e=ease(tt/2),cx=tk.mc[0]+(tk.c0[0]-tk.mc[0])*e,cy=tk.mc[1]+(tk.c0[1]-tk.mc[1])*e;
+  var s=ease((l0-lh)/(l0-Math.log(0.02))),lam=tk.lam,al=Math.hypot(lam[0],lam[1]);
+  var phE=-Math.atan2(lam[1],lam[0]),jl=Math.log(tk.jh)+(Math.log(h/al)-Math.log(tk.jh))*s;
+  var J={cx:tk.c0[0]*s,cy:tk.c0[1]*s,h:Math.exp(jl),ph:phE*s,lr:tk.c0[0],li:tk.c0[1]};
+  var Mp={cx:cx,cy:cy,h:h,ph:0,lr:0,li:0};
+  var ring=lh>Math.log(0.12)?1:1-ease((Math.log(0.12)-lh)/(Math.log(0.12)-Math.log(0.04)));   // 1 early, 0 once hM < 0.04
+  var fade=Math.max(0,1-Math.abs(t-0.5*(T1+T2S))/(0.5*(T2S-T1)));fade=Math.min(1,fade*1.15);
+  return{tk:tk,k:k,M:Mp,J:J,ring:ring,fade:fade};
+ }
+ function ringAt(g,x,y,a){if(a<=0.01)return;g.save();g.lineWidth=4.5;g.strokeStyle='rgba(255,255,255,'+a+')';g.shadowColor='rgba(0,0,0,.8)';g.shadowBlur=8;g.beginPath();g.arc(x,y,24,0,6.2832);g.stroke();g.restore()}
+ function label(g,txt,y){g.save();g.font='600 34px "Bricolage Grotesque",sans-serif';g.textAlign='left';g.textBaseline='alphabetic';g.fillStyle='rgba(255,255,255,.78)';g.shadowColor='rgba(0,0,0,.9)';g.shadowBlur=10;g.fillText(txt,26,y+52);g.restore()}
+ var cur=0,latest=null,want=0,running=null;
+ function build(f){
+  var st=state(f),tk=st.tk;
+  return Promise.all([drawPanel(0,st.M,tk),drawPanel(1,st.J,tk)]).then(function(cs){
+   bx.fillStyle=BGC;bx.fillRect(0,0,W,H);
+   for(var i=0;i<2;i++){bx.drawImage(cs[i],0,PY[i])}
+   label(bx,'Mandelbrot set',PY[0]);label(bx,'Julia set for c',PY[1]);
+   var c0=tk.c0;
+   // ring on c0 in the parameter plane: u = (c0 - centre)/h ; in the dynamical plane: u = (c0 - centreJ)/(hJ e^{i ph})
+   var ux=(c0[0]-st.M.cx)/st.M.h,uy=(c0[1]-st.M.cy)/st.M.h;
+   bx.save();bx.beginPath();bx.rect(0,PY[0],W,PH);bx.clip();ringAt(bx,540+ux*540,PY[0]+PH/2-uy*540,st.ring);bx.restore();
+   var dx=c0[0]-st.J.cx,dy=c0[1]-st.J.cy,cp=Math.cos(-st.J.ph),sp=Math.sin(-st.J.ph);
+   var vx=(dx*cp-dy*sp)/st.J.h,vy=(dx*sp+dy*cp)/st.J.h;
+   bx.save();bx.beginPath();bx.rect(0,PY[1],W,PH);bx.clip();ringAt(bx,540+vx*540,PY[1]+PH/2-vy*540,st.ring);bx.restore();
+   if(st.fade>0){bx.globalAlpha=st.fade;bx.fillStyle='#000';bx.fillRect(0,0,W,H);bx.globalAlpha=1}
+  });
+ }
+ function compose(){ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle=BGC;ctx.fillRect(0,0,W,H);if(latest)ctx.drawImage(buf,0,0)}
+ function render(){
+  if(latest&&latest.f===cur){compose();return Promise.resolve()}
+  if(latest)compose();
+  want=cur;
+  if(!running)running=(async function(){
+   while(!latest||latest.f!==want){var f=want;await build(f);latest={f:f}}
+   running=null;compose();
+  })();
+  return running;
+ }
+ var short={
+  name:'twin-zoom',seconds:28,captionY:300,music:{file:'chopin-op15no1.mp3',start:3.15,fade:4.5},
+  captions:[
+   {from:0,to:3.8,text:'Two different fractals,\nzooming into one point'},
+   {from:3.9,to:9.0,text:'Top: the Mandelbrot set\nBottom: its Julia set',size:64},
+   {from:9.1,to:17.2,text:'Watch them turn\ninto twins'},
+   {from:17.8,to:25.3,text:'Same thing for z³ + c'},
+   {from:25.5,to:28.5,text:'Try it yourself,\nlink in description'}
+  ],
+  reset(){cur=0;latest=null},
+  tick(f){cur=f},
+  render:render
+ };
+ window.__short=short;
+ var fl=document.createElement('link');fl.rel='stylesheet';fl.href='https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&display=swap';
+ fl.onload=fl.onerror=function(){var sc=document.createElement('script');sc.src='../shorts-rec.js';sc.onload=function(){short.canvas=cv;ShortsRec(short)};document.head.appendChild(sc)};
+ document.head.appendChild(fl);
+}
+if(/[?&]record\b/.test(location.search))recordMode();else{
+initPool();setBases();setSize();all(true);}
 })();
 </script></body></html>
