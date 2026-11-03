@@ -153,6 +153,10 @@ input[type=range]{width:100%;accent-color:var(--accent)}
             <button type="button" data-s="1" aria-pressed="true" id="pokeUp">Push up</button>
             <button type="button" data-s="-1" aria-pressed="false" id="pokeDown">Push down</button>
           </div>
+          <div class="seg sm" id="pokeWhat" role="group" aria-label="What to poke" hidden>
+            <button type="button" data-p="0" aria-pressed="true">Gluon flash</button>
+            <button type="button" data-p="1" aria-pressed="false">Higgs bump</button>
+          </div>
           <div class="seg sm" id="pokeCol" role="group" aria-label="Flash colour" hidden>
             <button type="button" data-c="0" aria-pressed="true">Red</button>
             <button type="button" data-c="1" aria-pressed="false">Green</button>
@@ -219,8 +223,16 @@ input[type=range]{width:100%;accent-color:var(--accent)}
             <div class="seg sm" id="viewSeg" role="group" aria-label="View">
               <button type="button" data-v="field" aria-pressed="true" id="viewField">Field φ</button>
               <button type="button" data-v="bfield" aria-pressed="false" id="viewB" hidden>Magnetic field</button>
+              <button type="button" data-v="higgs" aria-pressed="false" id="viewH" hidden>Higgs field</button>
               <button type="button" data-v="energy" aria-pressed="false">Energy density</button>
             </div></div>
+          <div class="row" id="higgsRow" style="margin-top:8px" hidden><span class="note" style="margin:0;min-width:44px">Higgs</span>
+            <div class="seg sm" id="higgsSeg" role="group" aria-label="Higgs field">
+              <button type="button" data-h="0" aria-pressed="true">Off</button>
+              <button type="button" data-h="1" aria-pressed="false">On</button>
+            </div>
+            <label class="sl inl" id="higgsStr" hidden>strength <input type="range" id="higgsV" min="0.1" max="1" step="0.05" value="0.5"><output id="higgsVo">0.50</output></label></div>
+          <p class="note" id="higgsNote" hidden></p>
         </div>
         <div class="blk" id="plotBlk">
           <h3 id="plotTitle">Potential V(φ) <span class="note" style="font-weight:400">and where the field sits</span></h3>
@@ -268,10 +280,10 @@ const TH={
   em:{name:'Electromagnetism', mMin:0, mMax:1, mDef:0, poke:1, scale:null, targets:[[0,'0']], vac:()=>0, plot:[-2,2]},
   ah:{name:'Superconductor', mMin:0.4, mMax:2, mDef:1.2, poke:Math.PI/2, scale:1,
       targets:[[0,'phase 0'],[Math.PI/2,'π/2'],[Math.PI,'π'],[-Math.PI/2,'−π/2'],[null,'0 (normal)']], vac:()=>1, plot:[-1.9,1.9]},
-  ym:{name:'Yang–Mills', mMin:0, mMax:0, mDef:0, poke:1, scale:null, targets:[[0,'0']], vac:()=>0, plot:[-2,2]}
+  ym:{name:'Yang–Mills', mMin:0, mMax:1, mDef:0, poke:1, scale:null, targets:[[0,'0']], vac:()=>0, plot:[-2,2]}
 };
 const P={th:'kg', m:{kg:0,phi4:1,sg:1,cx:1,em:0,ah:1.2,ym:0}, e:0.8, eps:0, fric:0, speed:2, edge:'absorb', view:'field',
-  tool:'poke', brush:3, shade:1.2, pokeSign:1, twistSign:1, paintIdx:0, wallMode:'draw', running:true, pokeCol:0, pokeStrong:false, gaugeSign:1,
+  tool:'poke', brush:3, shade:1.2, pokeSign:1, twistSign:1, paintIdx:0, wallMode:'draw', running:true, pokeCol:0, pokeStrong:false, gaugeSign:1, ymW:0.5, pokeHiggs:false,
   newSrc:{kind:'osc', sign:1, q:1, w:1}, newCharge:{kind:'still', sign:1, q:1, w:0.3, A:3, M:1}, newYm:{kind:'still', sign:1, q:1, M:1, col:0, w:1}};
 let t=0, dirty=true, sources=[], sel=null, nextId=1, vortices=[];
 const isCx=()=>P.th==='cx', isEm=()=>P.th==='em', isAh=()=>P.th==='ah', isPh=()=>P.th==='cx'||P.th==='ah';
@@ -528,7 +540,62 @@ function ymFreeze(){             // links touching a barrier (or leaving the gri
     if(!ymX[k]){ ux0[k]=1; ux1[k]=ux2[k]=ux3[k]=0; wx1[k]=wx2[k]=wx3[k]=0; }
     if(!ymY[k]){ uy0[k]=1; uy1[k]=uy2[k]=uy3[k]=0; wy1[k]=wy2[k]=wy3[k]=0; } }
 }
-function ymClear(){ ux0.fill(1); uy0.fill(1); for(const a of [ux1,ux2,ux3,uy1,uy2,uy3,...YMW]) a.fill(0); dirty=true; }
+function ymClear(){ ux0.fill(1); uy0.fill(1); for(const a of [ux1,ux2,ux3,uy1,uy2,uy3,...YMW]) a.fill(0); ymHiggsReset(); dirty=true; }
+/* ---------- the Higgs field: an SU(2) doublet on the sites ----------
+   Φ = h0 + i(h1 σ1 + h2 σ2 + h3 σ3), kept as a quaternion (four real numbers), |Φ|² = h0² + h1² + h2² + h3². A gauge turn g at
+   a site acts as Φ ← g Φ, and a link carries Φ over as U Φ(s+μ). The vacuum is |Φ| = v; we start at Φ = v (h0 = v).
+   H gains Σ_sites dx² (½|π|² + λ/4 (|Φ|² − v²)²) + Σ_links ½|U Φ(s+μ) − Φ(s)|², with π = dΦ/dt. The gluons get the mass
+   m_W = g v/2 (g = 1, so v = 2 m_W), the Higgs ripples m_H = √(2λ) v. Forces: dπ/dt = Σ_links (U Φ(s+μ) − Φ(s))/dx² (U† Φ(s−μ)
+   over the links arriving) − λ(|Φ|² − v²)Φ, and each link gets dw/dt += ½ (X0 Φv − Φ0 Xv + Φv × Xv) with X = U Φ(s+μ),
+   Φ = Φ(s): minus the change of ½|UΦ' − Φ|² as the link turns, U ← (1, ε/2) U.
+   The Higgs carries colour charge, so Gauss's law becomes D·E = ρ + ρ_H, ρ_H = −(dx²/2)⟨π, e_a Φ⟩ = −(dx²/2)(Φ0 πv − π0 Φv − Φv×πv)
+   (e_a: the unit quaternions). The update keeps it exactly: the kicks are the forces of a gauge-invariant H, and the drifts
+   leave it alone (⟨π, e_a π⟩ = 0). With m_W = 0 none of this runs and the tab is plain Yang–Mills. */
+const hg0=new Float64Array(NN), hg1=new Float64Array(NN), hg2=new Float64Array(NN), hg3=new Float64Array(NN);
+const hp0=new Float64Array(NN), hp1=new Float64Array(NN), hp2=new Float64Array(NN), hp3=new Float64Array(NN);
+const hf0=new Float64Array(NN), hf1=new Float64Array(NN), hf2=new Float64Array(NN), hf3=new Float64Array(NN);
+// m_H = 1.56 m_W as in nature (125 against 80 GeV), so λ = m_H²/(2v²) = 1.56²/8 whatever the strength
+const YM_HW=1.56, ymHiggs=()=>P.m.ym>0, ymV=()=>2*P.m.ym, ymLam=()=>YM_HW*YM_HW/8, ymMH=()=>YM_HW*P.m.ym;
+function ymHiggsReset(){ hg0.fill(ymV()); for(const a of [hg1,hg2,hg3,hp0,hp1,hp2,hp3]) a.fill(0); }
+const ymNext=(k,i,j,dir)=>P.edge!=='wrap'?(dir?k+G:k+1):dir?(j===N-1?k-(N-1)*G:k+G):(i===N-1?k-N+1:k+1);   // the site a link leads to (j from 0)
+function forceHiggs(){
+  const id2=1/(dx*dx), lam=ymLam(), v2=ymV()*ymV();
+  for(let j=1;j<=N;j++){ let k=j*G+1; for(let i=0;i<N;i++,k++){ const a=hg0[k], b=hg1[k], c=hg2[k], d=hg3[k], u=-lam*(a*a+b*b+c*c+d*d-v2);
+    hf0[k]=u*a; hf1[k]=u*b; hf2[k]=u*c; hf3[k]=u*d; } }
+  // each link k → n: X = U Φ(n) and Y = U† Φ(k) (quaternion products (a0, a)(b0, b) = (a0 b0 − a·b, a0 b + b0 a − a×b)) pull on
+  // the Higgs at both ends, and the Higgs pulls on the link. Written out for x and y links: the shared function ran slower.
+  const wrap=P.edge==='wrap';
+  for(let j=0;j<N;j++){ let k=K(0,j); for(let i=0;i<N;i++,k++){ const f0=hg0[k], f1=hg1[k], f2=hg2[k], f3=hg3[k];
+    let g0=0, g1=0, g2=0, g3=0;
+    if(ymX[k]){ const n=wrap&&i===N-1?k-N+1:k+1, a0=ux0[k], a1=ux1[k], a2=ux2[k], a3=ux3[k], p0=hg0[n], p1=hg1[n], p2=hg2[n], p3=hg3[n];
+      const X0=a0*p0-a1*p1-a2*p2-a3*p3, X1=a0*p1+p0*a1-(a2*p3-a3*p2), X2=a0*p2+p0*a2-(a3*p1-a1*p3), X3=a0*p3+p0*a3-(a1*p2-a2*p1);
+      g0+=X0-f0; g1+=X1-f1; g2+=X2-f2; g3+=X3-f3;
+      hf0[n]+=(a0*f0+a1*f1+a2*f2+a3*f3-p0)*id2; hf1[n]+=(a0*f1-f0*a1+(a2*f3-a3*f2)-p1)*id2; hf2[n]+=(a0*f2-f0*a2+(a3*f1-a1*f3)-p2)*id2; hf3[n]+=(a0*f3-f0*a3+(a1*f2-a2*f1)-p3)*id2;
+      fx1[k]+=0.5*(X0*f1-f0*X1+(f2*X3-f3*X2)); fx2[k]+=0.5*(X0*f2-f0*X2+(f3*X1-f1*X3)); fx3[k]+=0.5*(X0*f3-f0*X3+(f1*X2-f2*X1)); }
+    if(ymY[k]){ const n=wrap&&j===N-1?k-(N-1)*G:k+G, a0=uy0[k], a1=uy1[k], a2=uy2[k], a3=uy3[k], p0=hg0[n], p1=hg1[n], p2=hg2[n], p3=hg3[n];
+      const X0=a0*p0-a1*p1-a2*p2-a3*p3, X1=a0*p1+p0*a1-(a2*p3-a3*p2), X2=a0*p2+p0*a2-(a3*p1-a1*p3), X3=a0*p3+p0*a3-(a1*p2-a2*p1);
+      g0+=X0-f0; g1+=X1-f1; g2+=X2-f2; g3+=X3-f3;
+      hf0[n]+=(a0*f0+a1*f1+a2*f2+a3*f3-p0)*id2; hf1[n]+=(a0*f1-f0*a1+(a2*f3-a3*f2)-p1)*id2; hf2[n]+=(a0*f2-f0*a2+(a3*f1-a1*f3)-p2)*id2; hf3[n]+=(a0*f3-f0*a3+(a1*f2-a2*f1)-p3)*id2;
+      fy1[k]+=0.5*(X0*f1-f0*X1+(f2*X3-f3*X2)); fy2[k]+=0.5*(X0*f2-f0*X2+(f3*X1-f1*X3)); fy3[k]+=0.5*(X0*f3-f0*X3+(f1*X2-f2*X1)); }
+    hf0[k]+=g0*id2; hf1[k]+=g1*id2; hf2[k]+=g2*id2; hf3[k]+=g3*id2; } }
+}
+const yhR=new Float64Array(3);
+function ymRhoH(k){   // the Higgs's colour charge at site k, into yhR
+  const f0=hg0[k], f1=hg1[k], f2=hg2[k], f3=hg3[k], q0=hp0[k], q1=hp1[k], q2=hp2[k], q3=hp3[k], c=-0.5*dx*dx;
+  yhR[0]=c*(f0*q1-q0*f1-(f2*q3-f3*q2)); yhR[1]=c*(f0*q2-q0*f2-(f3*q1-f1*q3)); yhR[2]=c*(f0*q3-q0*f3-(f1*q2-f2*q1));
+}
+function energyHiggs(){   // kinetic and potential (× dx²) on the sites, hopping on the links
+  const lam=ymLam(), v2=ymV()*ymV(); let Ek=0, Ev=0, Eh=0;
+  for(let j=0;j<N;j++){ let k=K(0,j); for(let i=0;i<N;i++,k++){ const f0=hg0[k], f1=hg1[k], f2=hg2[k], f3=hg3[k], r=f0*f0+f1*f1+f2*f2+f3*f3-v2;
+    Ek+=0.5*(hp0[k]*hp0[k]+hp1[k]*hp1[k]+hp2[k]*hp2[k]+hp3[k]*hp3[k]); Ev+=0.25*lam*r*r;
+    for(let dir=0;dir<2;dir++){ if(!(dir?ymY[k]:ymX[k])) continue;
+      const n=ymNext(k,i,j,dir), U0=dir?uy0:ux0, U1=dir?uy1:ux1, U2=dir?uy2:ux2, U3=dir?uy3:ux3, a0=U0[k], a1=U1[k], a2=U2[k], a3=U3[k], p0=hg0[n], p1=hg1[n], p2=hg2[n], p3=hg3[n];
+      const d0=a0*p0-a1*p1-a2*p2-a3*p3-f0, d1=a0*p1+p0*a1-(a2*p3-a3*p2)-f1, d2=a0*p2+p0*a2-(a3*p1-a1*p3)-f2, d3=a0*p3+p0*a3-(a1*p2-a2*p1)-f3;
+      Eh+=0.5*(d0*d0+d1*d1+d2*d2+d3*d3); } } }
+  return (Ek+Ev)*dx*dx+Eh;
+}
+function higgsDens(k){ const f0=hg0[k], f1=hg1[k], f2=hg2[k], f3=hg3[k], r=f0*f0+f1*f1+f2*f2+f3*f3-ymV()*ymV();   // per unit area, without the hopping
+  return 0.5*(hp0[k]*hp0[k]+hp1[k]*hp1[k]+hp2[k]*hp2[k]+hp3[k]*hp3[k])+0.25*ymLam()*r*r; }
 function ymGhosts(){            // wrap: periodic copies; otherwise the ghost links are U = 1, w = 0
   const wrap=P.edge==='wrap';
   for(const a of YMU) if(wrap) wrapGhost(a); else zeroRing(a);
@@ -569,6 +636,7 @@ function forceYM(){
       const s=a0*a0-a1*a1-a2*a2-a3*a3, d=2*(a1*v1+a2*v2+a3*v3), e=2*a0;
       fy1[k]=c*((s*v1+d*a1+e*(a2*v3-a3*v2))-b1); fy2[k]=c*((s*v2+d*a2+e*(a3*v1-a1*v3))-b2); fy3[k]=c*((s*v3+d*a3+e*(a1*v2-a2*v1))-b3); }
     else { fy1[k]=fy2[k]=fy3[k]=0; } } }
+  if(ymHiggs()) forceHiggs();
 }
 /* U ← exp(i dt w·σ/2) U each step; the half angle dt|w|/2 is small, so a Taylor series does (Math for big turns) */
 let ymSteps=0;
@@ -589,12 +657,17 @@ function stepYM(frac=1){
         if(h2<0.04){ co=1-h2*(0.5-h2*(1/24-h2/720)); sw=h*(1-h2*(1/6-h2*(1/120-h2/5040))); } else { const hh=Math.sqrt(h2); co=Math.cos(hh); sw=h*Math.sin(hh)/hh; }
         const e1=sw*w1, e2=sw*w2, e3=sw*w3, a0=uy0[k], a1=uy1[k], a2=uy2[k], a3=uy3[k];
         uy0[k]=co*a0-e1*a1-e2*a2-e3*a3; uy1[k]=co*a1+a0*e1-(e2*a3-e3*a2); uy2[k]=co*a2+a0*e2-(e3*a1-e1*a3); uy3[k]=co*a3+a0*e3-(e1*a2-e2*a1); } } } }
+  const hig=ymHiggs();
+  if(hig) for(let j=1;j<=N;j++){ let k=j*G+1; for(let i=0;i<N;i++,k++){ const d=dampL[k];   // Higgs: kick, then drift
+    hg0[k]+=dt*(hp0[k]=d*(hp0[k]+h*hf0[k])); hg1[k]+=dt*(hp1[k]=d*(hp1[k]+h*hf1[k])); hg2[k]+=dt*(hp2[k]=d*(hp2[k]+h*hf2[k])); hg3[k]+=dt*(hp3[k]=d*(hp3[k]+h*hf3[k])); } }
   if(sources.length) ymMoveCharges(frac);
   t+=dt;
   forceYM();
   for(let j=1;j<=N;j++){ let k=j*G+1; for(let i=0;i<N;i++,k++){ const d=dampL[k];
     if(ymX[k]){ wx1[k]=d*(wx1[k]+h*fx1[k]); wx2[k]=d*(wx2[k]+h*fx2[k]); wx3[k]=d*(wx3[k]+h*fx3[k]); }
     if(ymY[k]){ wy1[k]=d*(wy1[k]+h*fy1[k]); wy2[k]=d*(wy2[k]+h*fy2[k]); wy3[k]=d*(wy3[k]+h*fy3[k]); } } }
+  if(hig) for(let j=1;j<=N;j++){ let k=j*G+1; for(let i=0;i<N;i++,k++){ const d=dampL[k];
+    hp0[k]=d*(hp0[k]+h*hf0[k]); hp1[k]=d*(hp1[k]+h*hf1[k]); hp2[k]=d*(hp2[k]+h*hf2[k]); hp3[k]=d*(hp3[k]+h*hf3[k]); } }
 }
 function ymReady(){ if(dirty){ ymNormalize(); forceYM(); dirty=false; } }
 function energyYM(){
@@ -602,7 +675,8 @@ function energyYM(){
   for(let j=1;j<=N;j++){ let k=j*G+1; for(let i=0;i<N;i++,k++){
     Ek+=0.5*(wx1[k]*wx1[k]+wx2[k]*wx2[k]+wx3[k]*wx3[k]+wy1[k]*wy1[k]+wy2[k]*wy2[k]+wy3[k]*wy3[k]); Eb+=4*(1-pq0[k]); } }
   Eb/=dx*dx;
-  return {field:Ek+Eb, electric:Ek, magnetic:Eb};
+  const Eh=ymHiggs()?energyHiggs():0;
+  return {field:Ek+Eb+Eh, electric:Ek, magnetic:Eb, higgs:Eh};
 }
 /* colour weights at site s: electric energy on the two links leaving s plus the magnetic energy of the square cornered at s,
    split by colour (all three in the colours of s); per unit area */
@@ -620,13 +694,14 @@ function ymShares(){ ymReady(); let r=0,g=0,b=0;
 /* Gauss's law, largest error over the sites not next to a barrier (barriers are colour conductors and carry induced charge)
    and outside the absorbing rim (its uneven damping makes a little charge there while waves are being soaked up) */
 function gaussYM(){
-  ymReady(); ymGhosts(); let mx=0; const rim=P.edge==='absorb', qs=sources.some(s=>s.Q), edge=qs&&P.edge==='reflect';
+  ymReady(); ymGhosts(); let mx=0; const rim=P.edge==='absorb', qs=sources.some(s=>s.Q), edge=qs&&P.edge==='reflect', hig=ymHiggs();
   if(qs) ymDepositAll();   // with charges: D·E = their density; with Reflect the grid's edge holds their opposite charge
   for(let j=1;j<=N;j++){ let k=j*G+1; for(let i=0;i<N;i++,k++){
     if(!open[k]||!open[k-1]||!open[k+1]||!open[k-G]||!open[k+G]||(rim&&(sponge[k]>0||sponge[k-1]>0||sponge[k-G]>0))) continue;
     if(edge&&(i===0||j===1||i===N-1||j===N)) continue;   // (j counts rows from 1 here)
     let g1=wx1[k]+wy1[k], g2=wx2[k]+wy2[k], g3=wx3[k]+wy3[k];
     if(qs){ g1-=yr1[k]; g2-=yr2[k]; g3-=yr3[k]; }
+    if(hig){ ymRhoH(k); g1-=yhR[0]; g2-=yhR[1]; g3-=yhR[2]; }
     let q=k-1, a0=ux0[q], a1=ux1[q], a2=ux2[q], a3=ux3[q], v1=wx1[q], v2=wx2[q], v3=wx3[q];   // the x link arriving from the left
     let s=a0*a0-a1*a1-a2*a2-a3*a3, d=2*(a1*v1+a2*v2+a3*v3), e=2*a0;
     g1-=s*v1+d*a1+e*(a2*v3-a3*v2); g2-=s*v2+d*a2+e*(a3*v1-a1*v3); g3-=s*v3+d*a3+e*(a1*v2-a2*v1);
@@ -685,6 +760,13 @@ function ymPoke(cx,cy,amp,fixIt=true){
   if(fix) fix();
   dirty=true;
 }
+/* a Higgs bump: the Higgs field's size grows by amp e^(−r²/2s²) near (cx, cy) (a negative amp shrinks it). Φ is scaled and π
+   scaled back by the same factor, so its colour charge (made of π and Φ together) and Gauss's law don't change. */
+function ymHiggsBump(cx,cy,amp){
+  const s=P.brush/2; forDisc(cx,cy,3*s,(k,r)=>{ const f=1+amp*Math.exp(-r*r/(2*s*s)), g=1/f;
+    hg0[k]*=f; hg1[k]*=f; hg2[k]*=f; hg3[k]*=f; hp0[k]*=g; hp1[k]*=g; hp2[k]*=g; hp3[k]*=g; });
+  dirty=true;
+}
 /* a drag: the flashes along a segment, then one charge fix over the box around all of them */
 function ymPokeSeg(a,b,amp){
   const p=ymPokeBox(a.x,a.y), q=ymPokeBox(b.x,b.y);
@@ -705,7 +787,8 @@ let ymFixIts=0, YM_FIXTOL=1e-16, YM_SSOR=1.8;   // solver steps of the last fix 
 function ymGaussBox(i0,i1,j0,j1,ground=false){
   const wrap=P.edge==='wrap', bi1=wrap?i1+1:Math.min(N-1,i1+1), bj1=wrap?j1+1:Math.min(N-1,j1+1), nx=bi1-i0+1, M=nx*(bj1-j0+1);
   const kk=new Int32Array(M); for(let b=0;b<M;b++) kk[b]=ymK(i0+b%nx,j0+(b/nx|0));
-  const gauss=out=>{ ymGhosts();   // Gauss's law at every box site, as in gaussYM
+  const hig=ymHiggs();   // with the Higgs, the fix also turns π (δπ = −½ (λ·e) Φ), which adds dx²|Φ|²/4 to the diagonal
+  const gauss=out=>{ ymGhosts();   // Gauss's law at every box site, as in gaussYM (minus the Higgs's charge)
     for(let b=0;b<M;b++){ const k=kk[b];
       let g1=wx1[k]+wy1[k], g2=wx2[k]+wy2[k], g3=wx3[k]+wy3[k];
       let q=k-1, a0=ux0[q], a1=ux1[q], a2=ux2[q], a3=ux3[q], v1=wx1[q], v2=wx2[q], v3=wx3[q];
@@ -714,6 +797,7 @@ function ymGaussBox(i0,i1,j0,j1,ground=false){
       q=k-G; a0=uy0[q]; a1=uy1[q]; a2=uy2[q]; a3=uy3[q]; v1=wy1[q]; v2=wy2[q]; v3=wy3[q];
       s=a0*a0-a1*a1-a2*a2-a3*a3; d=2*(a1*v1+a2*v2+a3*v3); e=2*a0;
       g1-=s*v1+d*a1+e*(a2*v3-a3*v2); g2-=s*v2+d*a2+e*(a3*v1-a1*v3); g3-=s*v3+d*a3+e*(a1*v2-a2*v1);
+      if(hig){ ymRhoH(k); g1-=yhR[0]; g2-=yhR[1]; g3-=yhR[2]; }
       out[3*b]=g1; out[3*b+1]=g2; out[3*b+2]=g3; } };
   const before=new Float64Array(3*M); gauss(before);
   const fix=extra=>{
@@ -736,7 +820,8 @@ function ymGaussBox(i0,i1,j0,j1,ground=false){
     const GT=l=>{ for(let m=0;m<nL;m++){ const b=3*Li[2*m], nb=3*Li[2*m+1], x=9*m;   // Gᵀ l
       const u1=b>=0?l[b]:0, u2=b>=0?l[b+1]:0, u3=b>=0?l[b+2]:0, v1=nb>=0?l[nb]:0, v2=nb>=0?l[nb+1]:0, v3=nb>=0?l[nb+2]:0;
       t[3*m]=u1-(Rm[x]*v1+Rm[x+3]*v2+Rm[x+6]*v3); t[3*m+1]=u2-(Rm[x+1]*v1+Rm[x+4]*v2+Rm[x+7]*v3); t[3*m+2]=u3-(Rm[x+2]*v1+Rm[x+5]*v2+Rm[x+8]*v3); } };
-    const A=(l,out)=>{ GT(l); out.fill(0);   // G (Gᵀ l)
+    const cH=new Float64Array(M); if(hig) for(let b=0;b<M;b++){ const k=kk[b]; cH[b]=0.25*dx*dx*(hg0[k]*hg0[k]+hg1[k]*hg1[k]+hg2[k]*hg2[k]+hg3[k]*hg3[k]); }
+    const A=(l,out)=>{ GT(l); for(let b=0;b<M;b++){ const c=cH[b]; out[3*b]=c*l[3*b]; out[3*b+1]=c*l[3*b+1]; out[3*b+2]=c*l[3*b+2]; }   // (G Gᵀ + cH) l
       for(let m=0;m<nL;m++){ const b=3*Li[2*m], nb=3*Li[2*m+1], x=9*m, v1=t[3*m], v2=t[3*m+1], v3=t[3*m+2];
         if(b>=0){ out[b]+=v1; out[b+1]+=v2; out[b+2]+=v3; }
         if(nb>=0){ out[nb]-=Rm[x]*v1+Rm[x+1]*v2+Rm[x+2]*v3; out[nb+1]-=Rm[x+3]*v1+Rm[x+4]*v2+Rm[x+5]*v3; out[nb+2]-=Rm[x+6]*v1+Rm[x+7]*v2+Rm[x+8]*v3; } } };
@@ -752,10 +837,10 @@ function ymGaussBox(i0,i1,j0,j1,ground=false){
     const pre=(r,z)=>{
       for(let b=0;b<M;b++){ const B=3*b; acc[0]=r[B]; acc[1]=r[B+1]; acc[2]=r[B+2];
         if(inL[2*b]>=0) fw(inL[2*b],z); if(inL[2*b+1]>=0) fw(inL[2*b+1],z);
-        const q=deg[b]?om/deg[b]:0; z[B]=q*acc[0]; z[B+1]=q*acc[1]; z[B+2]=q*acc[2]; }
-      for(let b=M-1;b>=0;b--){ if(!deg[b]) continue; const B=3*b; acc[0]=acc[1]=acc[2]=0;
+        const D=deg[b]+cH[b], q=D?om/D:0; z[B]=q*acc[0]; z[B+1]=q*acc[1]; z[B+2]=q*acc[2]; }
+      for(let b=M-1;b>=0;b--){ const D=deg[b]+cH[b]; if(!D) continue; const B=3*b; acc[0]=acc[1]=acc[2]=0;
         if(xl[b]>=0) bw(xl[b],z); if(yl[b]>=0) bw(yl[b],z);
-        const q=om/deg[b]; z[B]+=q*acc[0]; z[B+1]+=q*acc[1]; z[B+2]+=q*acc[2]; } };
+        const q=om/D; z[B]+=q*acc[0]; z[B+1]+=q*acc[1]; z[B+2]+=q*acc[2]; } };
     const dot=(a,b)=>{ let s=0; for(let c=0;c<3*M;c++) s+=a[c]*b[c]; return s; };
     const lam=new Float64Array(3*M), z=new Float64Array(3*M), Ap=new Float64Array(3*M);
     pre(r,z); const p=z.slice();
@@ -766,6 +851,8 @@ function ymGaussBox(i0,i1,j0,j1,ground=false){
     ymFixIts=it; GT(lam);
     for(let m=0;m<nL;m++){ const k=LK[m];
       if(LD[m]){ wy1[k]-=t[3*m]; wy2[k]-=t[3*m+1]; wy3[k]-=t[3*m+2]; } else { wx1[k]-=t[3*m]; wx2[k]-=t[3*m+1]; wx3[k]-=t[3*m+2]; } }
+    if(hig) for(let b=0;b<M;b++){ const k=kk[b], l1=0.5*lam[3*b], l2=0.5*lam[3*b+1], l3=0.5*lam[3*b+2], f0=hg0[k], f1=hg1[k], f2=hg2[k], f3=hg3[k];
+      hp0[k]+=l1*f1+l2*f2+l3*f3; hp1[k]-=f0*l1-(l2*f3-l3*f2); hp2[k]-=f0*l2-(l3*f1-l1*f3); hp3[k]-=f0*l3-(l1*f2-l2*f1); }   // π −= ½ (λ·e) Φ
   };
   fix.i0=i0; fix.j0=j0; fix.nx=nx; fix.ny=M/nx; fix.M=M;
   return fix;
@@ -792,6 +879,7 @@ function ymGauge(cx,cy,ang){
   for(let j=Math.max(0,j0-1);j<=j1;j++)for(let i=Math.max(0,i0-1);i<=i1;i++){ const k=K(i,j);
     if(ymX[k]){ mulG(ux0,ux1,ux2,ux3,k,k+1); turnW(wx1,wx2,wx3,k); }
     if(ymY[k]){ mulG(uy0,uy1,uy2,uy3,k,k+G); turnW(wy1,wy2,wy3,k); } }
+  if(ymHiggs()) for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){ const k=K(i,j); ymTurnHiggs(k,yg0[k],yg1[k],yg2[k],yg3[k]); }
   for(const s of sources) if(s.Q){   // the charges' colour charge turns with the sites it sits on
     for(let j=Math.max(0,j0-1);j<=j1;j++)for(let i=Math.max(0,i0-1);i<=i1;i++) turnW(s.r[0],s.r[1],s.r[2],K(i,j)); yqBaseColour(s); }
   for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){ const k=K(i,j); yg0[k]=1; yg1[k]=yg2[k]=yg3[k]=0; }
@@ -848,7 +936,9 @@ function yqAddRho(s,fix,out,sg){   // out (a box's sites, as in ymGaussBox) += s
   for(let b=0;b<YQ_NP;b++)for(let a=0;a<YQ_NP;a++){ const i=s.bi+YQ_P0+a-fix.i0, j=s.bj+YQ_P0+b-fix.j0; if(i<0||j<0||i>=fix.nx||j>=fix.ny) continue;
     const k=yqK(s,a,b), B=3*(j*fix.nx+i); out[B]+=sg*r1[k]; out[B+1]+=sg*r2[k]; out[B+2]+=sg*r3[k]; }
 }
-function ymBigBox(){ ymReady(); const a=P.edge==='absorb'?SPONGE:1, b=P.edge==='absorb'?N-2-SPONGE:N-3; return ymGaussBox(a,b,a,b,true); }
+// out to the grid's edge ring, with Absorb too: the field then fills the rim like the waves do, and the rim's damping thins
+// it out gradually there (grounding at the rim's inner edge cut it off sharply, a visible square)
+function ymBigBox(){ ymReady(); return ymGaussBox(1,N-3,1,N-3,true); }
 /* add (sg = 1) or take away (−1) the charges in list and their settled fields: one solve over the whole box */
 function ymPlace(list,sg){ if(!list.length) return; const fix=ymBigBox(), ex=new Float64Array(3*fix.M); for(const s of list) yqAddRho(s,fix,ex,sg); fix(ex); }
 function ymNewCharge(o,place=true){   // o: x, y (cells), col 0–2, sign, q, kind ('still' or 'free'), M, mx, my; place: false when several go in one solve
@@ -876,11 +966,15 @@ function ymReplaceAll(){ const qs=sources.filter(s=>s.Q); if(!qs.length) return;
 /* In temporal gauge a still charge's E keeps winding the links up, and the colours drawn around it turn into rings that
    multiply with time. With charges about, one sweep a frame relaxes toward Coulomb gauge: each site turned to bring its four
    links as close to 1 as it can (over-relaxed). It's a gauge change like the brush: energy, Gauss's law and the motion stay
-   the same. The sites under still charges are held, so a still charge keeps its colour and the field's colours are measured
+   the same. The base site of each still charge is held, so a still charge keeps its colour and the field's colours are measured
    from it; free charges' colours turn about the others' (in full Coulomb gauge still charges would turn too). How much of one
    charge's colour lies along another's, carried between them over the links, is the same with or without it (checked).
    Sites touching a frozen link (barriers, the grid's edge) are left alone. */
 let YM_RELAX=1.7, YM_RELAXMIN=1e-3;
+function ymTurnHiggs(k,g0,g1,g2,g3){   // Φ ← g Φ and π ← g π at site k
+  for(const [A0,A1,A2,A3] of [[hg0,hg1,hg2,hg3],[hp0,hp1,hp2,hp3]]){ const b0=A0[k], b1=A1[k], b2=A2[k], b3=A3[k];
+    A0[k]=g0*b0-g1*b1-g2*b2-g3*b3; A1[k]=g0*b1+b0*g1-(g2*b3-g3*b2); A2[k]=g0*b2+b0*g2-(g3*b1-g1*b3); A3[k]=g0*b3+b0*g3-(g1*b2-g2*b1); }
+}
 function ymRelaxGauge(){
   const turn=(W1,W2,W3,k,g0,g1,g2,g3)=>{ const v1=W1[k], v2=W2[k], v3=W3[k], sc=g0*g0-g1*g1-g2*g2-g3*g3, d=2*(g1*v1+g2*v2+g3*v3), e=-2*g0;   // g v g†
     W1[k]=sc*v1+d*g1+e*(g2*v3-g3*v2); W2[k]=sc*v2+d*g2+e*(g3*v1-g1*v3); W3[k]=sc*v3+d*g3+e*(g1*v2-g2*v1); };
@@ -888,17 +982,17 @@ function ymRelaxGauge(){
     U0[q]=g0*a0-g1*a1-g2*a2-g3*a3; U1[q]=g0*a1+a0*g1-(g2*a3-g3*a2); U2[q]=g0*a2+a0*g2-(g3*a1-g1*a3); U3[q]=g0*a3+a0*g3-(g1*a2-g2*a1); };
   const right=(U0,U1,U2,U3,q,g0,b1,b2,b3)=>{ const a0=U0[q], a1=U1[q], a2=U2[q], a3=U3[q];   // U ← U g†, with (g0, b) = g†
     U0[q]=a0*g0-a1*b1-a2*b2-a3*b3; U1[q]=a0*b1+g0*a1-(a2*b3-a3*b2); U2[q]=a0*b2+g0*a2-(a3*b1-a1*b3); U3[q]=a0*b3+g0*a3-(a1*b2-a2*b1); };
-  const qs=sources.filter(s=>s.Q), R=-YQ_P0+2, held=qs.filter(s=>s.kind!=='free');
+  const qs=sources.filter(s=>s.Q), R=-YQ_P0+2, held=qs.filter(s=>s.kind!=='free'), hig=ymHiggs();
   for(let j=0;j<N;j++)for(let i=0;i<N;i++){ const k=K(i,j), kl=k-1, kd=k-G;
     if(!(ymX[k]&&ymY[k]&&ymX[kl]&&ymY[kd])) continue;
-    let pin=false; for(const s of held) if(Math.abs(i-s.cx)<=6&&Math.abs(j-s.cy)<=6){ pin=true; break; } if(pin) continue;
+    let pin=false; for(const s of held) if(i===s.bi&&j===s.bj){ pin=true; break; } if(pin) continue;   // (holding a whole square around it left a visible edge)
     // maximise the real parts of g U_out and U_in g†: g ∝ (H0, −H), H0 = Σ u0, H = Σ u_out − Σ u_in
     const H0=ux0[k]+uy0[k]+ux0[kl]+uy0[kd], H1=ux1[k]+uy1[k]-ux1[kl]-uy1[kd], H2=ux2[k]+uy2[k]-ux2[kl]-uy2[kd], H3=ux3[k]+uy3[k]-ux3[kl]-uy3[kd];
     const hv=Math.hypot(H1,H2,H3); if(hv<YM_RELAXMIN*H0) continue;   // too small a turn to bother with (it is caught once it has grown)
     const th=YM_RELAX*Math.atan2(hv,H0), sn=-Math.sin(th)/hv, g0=Math.cos(th), g1=sn*H1, g2=sn*H2, g3=sn*H3;
     left(ux0,ux1,ux2,ux3,k,g0,g1,g2,g3); left(uy0,uy1,uy2,uy3,k,g0,g1,g2,g3);
     right(ux0,ux1,ux2,ux3,kl,g0,-g1,-g2,-g3); right(uy0,uy1,uy2,uy3,kd,g0,-g1,-g2,-g3);
-    turn(wx1,wx2,wx3,k,g0,g1,g2,g3); turn(wy1,wy2,wy3,k,g0,g1,g2,g3);
+    turn(wx1,wx2,wx3,k,g0,g1,g2,g3); turn(wy1,wy2,wy3,k,g0,g1,g2,g3); if(hig) ymTurnHiggs(k,g0,g1,g2,g3);
     for(const s of qs) if(Math.abs(i-s.bi)<=R+1&&Math.abs(j-s.bj)<=R+1) turn(s.r[0],s.r[1],s.r[2],k,g0,g1,g2,g3); }
   for(const s of qs) yqBaseColour(s);
   dirty=true;
@@ -1335,6 +1429,10 @@ function autoScales(){
     for(let q=0;q<N*N;q+=7){ const i=q%N, j=(q/N)|0; samp[n++]=Math.abs(wrapA(plq[K(i,j)]))*ib; }
     const a=samp.subarray(0,n).sort(); fscale=easeHold(fscale,Math.max(0.01,a[Math.floor(n*0.995)]));
   }
+  if(P.view==='higgs'&&isYm()){
+    const v=ymV(); for(let q=0;q<N*N;q+=7){ const k=K(q%N,(q/N)|0); samp[n++]=Math.abs(Math.sqrt(hg0[k]*hg0[k]+hg1[k]*hg1[k]+hg2[k]*hg2[k]+hg3[k]*hg3[k])-v); }
+    const a=samp.subarray(0,n).sort(); fscale=easeHold(fscale,Math.max(0.01*v,a[Math.floor(n*0.995)]));
+  }
   if(P.view==='field'&&(P.th==='kg'||isEm())){
     const src=isEm()?Bz:phi;
     for(let q=0;q<N*N;q+=7){ const i=q%N, j=(q/N)|0; samp[n++]=Math.abs(src[K(i,j)]); }
@@ -1361,7 +1459,7 @@ function easeHold(cur,target){
 function edens(k){
   if(!open[k]) return 0;
   if(isEm()) return 0.5*(Ex[k]*Ex[k]+Ey[k]*Ey[k]+Bz[k]*Bz[k]);
-  if(isYm()){ ymColourAt(k); return ymC[0]+ymC[1]+ymC[2]; }
+  if(isYm()){ ymColourAt(k); return ymC[0]+ymC[1]+ymC[2]+(ymHiggs()?higgsDens(k):0); }
   if(isAh()){ const p=phi[k], q=phi2[k], e2=ech()*ech(), A=dx*dx;
     const c=cX[k], sn=sX[k], a=c*phi[k+1]+sn*phi2[k+1]-p, b=c*phi2[k+1]-sn*phi[k+1]-q;
     const c2=cY[k], s2=sY[k], a2=c2*phi[k+G]+s2*phi2[k+G]-p, b2=c2*phi2[k+G]-s2*phi[k+G]-q;
@@ -1391,6 +1489,13 @@ function render(){
       ymColourAt(k);
       let r=Math.sqrt(ymC[0]*inv)*f, g=Math.sqrt(ymC[1]*inv)*f, b=Math.sqrt(ymC[2]*inv)*f;
       pix[o]=(255<<24)|((b>255?255:b)<<16)|((g>255?255:g)<<8)|(r>255?255:r); } }
+  } else if(P.view==='higgs'&&isYm()){
+    // Higgs view: the size |Φ| against its vacuum v (dark), orange where bigger, blue where smaller
+    const v=ymV(), inv=1/(fscale||1), sc=(LN-1)/(2*UMAX);
+    for(let j=0;j<N;j++){ let k=K(0,j), o=j*N; for(let i=0;i<N;i++,k++,o++){
+      if(!open[k]){pix[o]=WALL;continue;}
+      const a=Math.sqrt(hg0[k]*hg0[k]+hg1[k]*hg1[k]+hg2[k]*hg2[k]+hg3[k]*hg3[k])-v;
+      let q=((a*inv*0.8+UMAX)*sc)|0; q=q<0?0:q>LN-1?LN-1:q; pix[o]=lutF[q]; } }
   } else if(P.view==='field'&&isEm()){
     // colour = magnetic field B_z (orange out of the screen, blue into it), plus a soft glow where the electric field is strong
     const inv=1/fscale, sc=(LN-1)/(2*UMAX);
@@ -1494,6 +1599,9 @@ function drawLegend(){
     for(let q=0;q<256;q++){ const u=q/255*3, a=Math.max(0,1-Math.abs(u-0.5)), b=Math.max(0,1-Math.abs(u-1.5)), c=Math.max(0,1-Math.abs(u-2.5));
       p32[q]=pack(Math.round(235*Math.sqrt(a)),Math.round(235*Math.sqrt(b)),Math.round(235*Math.sqrt(c))); }
     document.getElementById('legLo').textContent='colour 1 (red)'; document.getElementById('legHi').textContent='3 (blue)';
+  } else if(P.view==='higgs'){
+    for(let q=0;q<256;q++){ const u=-1.6+3.2*q/255; p32[q]=lutF[Math.round((u+UMAX)/(2*UMAX)*(LN-1))]; }
+    document.getElementById('legLo').textContent='Higgs smaller (blue)'; document.getElementById('legHi').textContent='bigger (orange)';   // dark: its normal size
   } else if(P.view==='bfield'){
     for(let q=0;q<256;q++){ const u=-1.6+3.2*q/255; p32[q]=lutF[Math.round((u+UMAX)/(2*UMAX)*(LN-1))]; }
     document.getElementById('legLo').textContent='B −'+(fscale*2).toPrecision(2); document.getElementById('legHi').textContent='+'+(fscale*2).toPrecision(2);
@@ -1577,7 +1685,7 @@ function readout(){
     if(qs.some(c=>c.kind==='free')){ const ke=ymKinetic(); extra+=`<br>moving charges' kinetic energy <b>${ke.toPrecision(4)}</b><br>field + kinetic <b>${(E.field+ke).toPrecision(5)}</b>`;
       if(sel&&sel.Q&&sel.kind==='free'&&!sel.held) extra+=`<br>selected charge's speed <b>${(Math.hypot(sel.mx,sel.my)/Math.hypot(sel.M,sel.mx,sel.my)).toFixed(2)}</b> c`; }
     if(sel&&sel.Q) extra+=`<br>selected charge's colour <b style="color:#e5484d">${sel.Q[0].toFixed(2)}</b> · <b style="color:#30a46c">${sel.Q[1].toFixed(2)}</b> · <b style="color:#3e7bfa">${sel.Q[2].toFixed(2)}</b>`;
-    extra+=`<br>electric <b>${E.electric.toPrecision(4)}</b>, magnetic <b>${E.magnetic.toPrecision(4)}</b>`+
+    extra+=`<br>electric <b>${E.electric.toPrecision(4)}</b>, magnetic <b>${E.magnetic.toPrecision(4)}</b>`+(E.higgs?`, Higgs <b>${E.higgs.toPrecision(4)}</b>`:'')+
       `<br>colour split <b style="color:#e5484d">${(100*s[0]).toFixed(1)}%</b> · <b style="color:#30a46c">${(100*s[1]).toFixed(1)}%</b> · <b style="color:#3e7bfa">${(100*s[2]).toFixed(1)}%</b>`+
       (g<1e-6?`<br>Gauss's law (${qs.length?'D·E = the charges':'no colour charge'}) holds to <b>${g<1e-12?'10⁻¹²':g.toExponential(0)}</b>`
              :`<br>${qs.length?'stray ':''}colour charge (Gauss's law broken), largest <b>${g.toPrecision(2)}</b>`); }
@@ -1594,7 +1702,7 @@ const EQ={
   cx:'∂²φ/∂t² = ∇²φ − λ(|φ|² − 1)φ + ε + ρ,   φ complex,   λ = m²/2',
   em:'(∂²/∂t² − ∇² + m²)(φ, A) = (ρ, J),   E = −∇φ − ∂A/∂t,   B = ∂ₓA_y − ∂_yA_x',
   ah:'∂²ψ/∂t² = D·Dψ − λ(|ψ|² − 1)ψ,   ∂²A/∂t² = −∇×∇×A + e Im(ψ* Dψ),   D = ∇ − ieA,   λ = m²/2',
-  ym:'∂E/∂t = D×B − J,   B = ∂ₓA_y − ∂_yA_x + g A_x×A_y,   D·E = ρ,   D = ∇ + g A×   (A, E, B each have three colours: SU(2));   a charge: dp/dt = g Q·(E + v×B),   dQ/dt = −g (v·A)×Q'
+  ym:'∂E/∂t = D×B − J,   B = ∂ₓA_y − ∂_yA_x + g A_x×A_y,   D·E = ρ,   D = ∇ + g A×   (A, E, B each have three colours: SU(2));   a charge: dp/dt = g Q·(E + v×B),   dQ/dt = −g (v·A)×Q;   Higgs: ∂²Φ/∂t² = D·DΦ − λ(|Φ|² − v²)Φ,   m_W = g v/2'
 };
 const ABOUT={
   kg:`<h2>Waves and the Klein–Gordon field</h2>
@@ -1655,7 +1763,12 @@ const ABOUT={
 <li><b>Fly-by: the colour turns:</b> a green charge is thrown past a strong red one. Green and red neither attract nor repel, but on the way the field turns the green charge's colour, it ends up partly anti-red, and then it's pulled in.</li>
 <li><b>Red meets green:</b> two free charges at rest. At first there's no pull between them, but the field between them turns their colours, and they start to attract.</li>
 <li><b>A gluon wave hits a charge:</b> a strong blue wave washes over a red charge, scatters into all three colours and carries the charge off, its colour changed.</li></ul>
-<p class="note">What a classical field can't show: quarks being confined (here opposite colours pull like charges in 2D electromagnetism, not with a string of fixed tension), and gluons acting as if they had mass. Both come from quantum mechanics. Colour charges are soft blobs about one unit across. Placing one works out its field over the whole box, with the absorbing rim (or with Reflect, the edge) holding the opposite charge like a grounded metal wall, so they need Absorb or Reflect edges. Barriers here are colour-conducting metal; colour charge gathers on them, so Gauss's law is checked away from them. A flash of one colour fits exactly only where the field is quiet. Inside a strong field it has to change colour as it goes in, so near where you tap it picks up a little of the other colours. Otherwise it would leave colour charge behind.</p>`
+<p><b>The Higgs field.</b> Turn <b>Higgs</b> on (next to edges and show) and a second field fills the box: a Higgs field, a pair of complex numbers on every site that feels the colour field, sitting at a fixed size v in a Mexican-hat potential (like the Superconductor tab, but with SU(2) colours). Its <b>strength</b> is that size. Moving through it costs the gluon field energy, so the gluons gain the mass m_W = g v/2, the same for all three colours. This is how the W and Z bosons of the weak force get their masses. A flash now fades instead of spreading across the box: waves slower than ω = m_W can't travel, and the rest travel slower than light. A colour charge's field is screened. The Higgs field gathers an opposite colour charge around it (the Higgs carries colour too, and Gauss's law counts it), so the field dies off within about 1/m_W, and charges further apart than that hardly feel each other. That is why the weak force is short-ranged. Ripples in the Higgs field's size are Higgs bosons. Their mass is set here to 1.56 m_W, the real ratio of the Higgs to the W (125 and 80 GeV). The <b>Higgs field</b> view shows the field's size: dark where it sits at v, orange where it's bigger, blue where smaller. With the Higgs on, <b>Poke</b> can make either a <b>Gluon flash</b> (a burst of colour-electric field, as before) or a <b>Higgs bump</b> (a push on the Higgs field's size).</p>
+<ul class="try"><li><b>Massive gluons: a flash:</b> a single flash. Compare it with the same flash with the Higgs off: here the ring fades and a glow keeps throbbing where it started.</li>
+<li><b>Short-range force:</b> two red and anti-red pairs. The close pair pulls together; the far pair, 12 apart, barely notices.</li>
+<li><b>Higgs ripples:</b> a Higgs bump rings outward as Higgs waves, slower than light (shown in the Higgs field view).</li>
+<li><b>Strong collision, now massive:</b> the strong scattering preset with heavy gluons. The waves are slower and leave a throbbing trail.</li></ul>
+<p class="note">What a classical field can't show: quarks being confined (here opposite colours pull like charges in 2D electromagnetism, not with a string of fixed tension), and gluons acting as if they had mass. Both come from quantum mechanics. Colour charges are soft blobs about one unit across. Placing one works out its field over the whole box, with the absorbing rim (or with Reflect, the edge) holding the opposite charge like a grounded metal wall, so they need Absorb or Reflect edges. Switching the Higgs on or off starts the field afresh. Barriers here are colour-conducting metal; colour charge gathers on them, so Gauss's law is checked away from them. A flash of one colour fits exactly only where the field is quiet. Inside a strong field it has to change colour as it goes in, so near where you tap it picks up a little of the other colours. Otherwise it would leave colour charge behind.</p>`
 };
 const HINT={
   source:'Tap an empty spot to add a source. Drag a source to move it; tap one to select it and change it.',
@@ -1672,6 +1785,7 @@ const HINT={
   gauge:'Brush over the field to relabel its colours (red → green → blue). It’s a gauge change: the energy and the motion stay exactly the same.',
   ymWall:'Draw colour-conducting metal. Waves bounce off it.',
   ymCharge:'Tap to add a colour charge (placing one takes a moment while its field is worked out). Drag a charge to move it; tap one to select it and change it. Free charges are pushed by the field, and you can throw one as you let go.',
+  ymBump:'Tap or drag to push the Higgs field\'s size up for a moment. It springs back and rings outward as Higgs ripples, slower than light; the Higgs field view shows them. A Higgs bump has no colour, so on its own it barely stirs the gluons.',
   ymWrap:'Colour charges need Absorb or Reflect edges: in a wrapped world their field lines would have nowhere to end.'
 };
 
@@ -1679,7 +1793,7 @@ const HINT={
 function setup(o){
   sources=[]; sel=null; clearWalls(); t=0;
   setTheory(o.th,true);
-  P.m[o.th]=o.m!=null?o.m:TH[o.th].mDef; P.eps=o.eps||0; P.fric=o.fric||0; if(o.e) P.e=o.e;
+  P.m[o.th]=o.m!=null?o.m:TH[o.th].mDef; P.eps=o.eps||0; P.fric=o.fric||0; if(o.e) P.e=o.e; if(o.th==='ym'){ if(P.m.ym>0) P.ymW=P.m.ym; ymHiggsUi(); }
   setEdge(o.edge||'absorb'); syncSliders(); updateVmin(); updateDamp();
   resetField();
 }
@@ -1780,7 +1894,15 @@ const PRESETS={
     ['Fly-by: the colour turns',()=>{ setup({th:'ym'}); const a=ymNewCharge({x:U2C(0),y:U2C(0),col:0,q:2},false);
       sel=ymNewCharge({x:U2C(-19),y:U2C(-5),col:1,kind:'free',mx:0.3,my:0},false); ymPlace([a,sel],1); }],
     ['Red meets green',()=>{ setup({th:'ym'}); ymPlace([ymNewCharge({x:U2C(-8),y:U2C(0),col:0,kind:'free'},false),ymNewCharge({x:U2C(8),y:U2C(0),col:1,kind:'free'},false)],1); }],
-    ['A gluon wave hits a charge',()=>{ setup({th:'ym'}); ymFromPotentials(ymPacket(-30,0,1,0,YMCOL[2],2,6,14,0.6)); sel=ymNewCharge({x:U2C(0),y:U2C(0),col:0,kind:'free'}); }]
+    ['A gluon wave hits a charge',()=>{ setup({th:'ym'}); ymFromPotentials(ymPacket(-30,0,1,0,YMCOL[2],2,6,14,0.6)); sel=ymNewCharge({x:U2C(0),y:U2C(0),col:0,kind:'free'}); }],
+    // the Higgs (stage 3): gluon mass m_W = v/2
+    ['Massive gluons: a flash',()=>{ setup({th:'ym',m:0.5}); const c=P.pokeCol, b=P.brush; P.pokeCol=0; P.brush=3; ymPoke(U2C(0),U2C(0),1); P.pokeCol=c; P.brush=b; }],
+    ['Short-range force',()=>{ setup({th:'ym',m:0.4});   // range 1/m_W = 2.5: the pair 3 apart pulls together, the pair 12 apart hardly feels a thing
+      ymPlace([[-1.5,12],[1.5,12],[-6,-12],[6,-12]].map(([x,y],n)=>ymNewCharge({x:U2C(x),y:U2C(y),col:0,sign:n%2?-1:1,kind:'free'},false)),1); }],
+    ['Higgs ripples',()=>{ setup({th:'ym',m:0.5}); const v=ymV();   // a bump in the Higgs field's size, at rest (no colour charge, so Gauss's law still holds)
+      for(let j=0;j<N;j++)for(let i=0;i<N;i++){ const X=(i-N/2+0.5)*dx, Y=(j-N/2+0.5)*dx; hg0[K(i,j)]=v*(1+0.6*Math.exp(-(X*X+Y*Y)/2)); }
+      dirty=true; P.view='higgs'; pressSeg($('viewSeg'),'v','higgs'); }],
+    ['Strong collision, now massive',()=>{ setup({th:'ym',m:0.3}); ymFromPotentials(ymSum(ymPacket(-26,0,1,0,YMCOL[0],2,6,14,0.6),ymPacket(26,0,-1,0,YMCOL[1],2,6,14,0.6))); }]
   ],
   em:[
     // the charge sits still until t = 6, then slides 10 units in 20 time units (top speed 0.75 c)
@@ -1827,7 +1949,7 @@ function setTheory(th,keepField){
   $('pokeUp').textContent=ph?'Turn phase +':em?'Flash ↺':'Push up'; $('pokeDown').textContent=ph?'Turn phase −':em?'Flash ↻':'Push down';
   $('viewField').textContent=ph?'Phase':em?'B and E':'Field φ';
   $('mLab').textContent=em?'photon mass':ah?'Higgs mass m':'mass m';
-  $('paintBtn').hidden=em||ym; $('srcToolBtn').hidden=ah; $('gaugeBtn').hidden=!ym; $('mWrap').hidden=ym;
+  $('paintBtn').hidden=em||ym; $('srcToolBtn').hidden=ah; $('gaugeBtn').hidden=!ym; $('mWrap').hidden=ym; ymHiggsUi();
   $('pokeSign').hidden=ym; $('pokeCol').hidden=!ym; $('pokeAmp').hidden=!ym;
   if(ym){ $('viewField').textContent='Colour'; $('pokeUp').textContent='Flash'; }
   $('plotTitle').innerHTML=ym?'Colour mix <span class="note" style="font-weight:400">over time</span>':'Potential V(φ) <span class="note" style="font-weight:400">and where the field sits</span>';
@@ -1838,6 +1960,17 @@ function setTheory(th,keepField){
   P.paintIdx=0; buildPaint(); buildPresets(); syncSliders(); updateVmin();
   if(!keepField) resetField();
   dirty=true;
+}
+function ymHiggsUi(){   // the Higgs row shows in Yang–Mills; its strength, the Higgs view and the Higgs bump only while it's on
+  const ym=isYm(), on=ym&&ymHiggs();
+  $('higgsRow').hidden=!ym; $('higgsStr').hidden=!on; $('viewH').hidden=!on; $('higgsNote').hidden=!ym; $('pokeWhat').hidden=!on;
+  pressSeg($('higgsSeg'),'h',on?1:0); $('higgsV').value=P.ymW; $('higgsVo').textContent=P.ymW.toFixed(2);
+  if(!on&&P.view==='higgs'){ P.view='field'; pressSeg($('viewSeg'),'v','field'); }
+  if(!on) P.pokeHiggs=false; pressSeg($('pokeWhat'),'p',P.pokeHiggs?1:0); $('pokeCol').hidden=!ym||P.pokeHiggs;
+  const m=P.m.ym;
+  $('higgsNote').textContent=on?`The Higgs is a second field that fills all of space with a fixed size. Gluons moving through it act as if they had mass m_W = ${m.toFixed(2)}, so their waves fade and a colour charge's pull reaches only about 1/m_W = ${(1/m).toFixed(1)}. Ripples in the Higgs field's own size are Higgs bosons, mass ${ymMH().toFixed(2)}.`
+    :'Turn the Higgs on to give the gluons a mass (the way the W and Z bosons get theirs).';
+  if(P.tool==='poke') setTool('poke');
 }
 function buildPaint(){
   const seg=$('paintSeg'); seg.innerHTML='';
@@ -1858,7 +1991,8 @@ function paramNote(){
   else if(isEm()) s=mass()>0?`Light has mass m = ${mass().toFixed(2)}: still charges' fields die off within 1/m = ${(1/mass()).toFixed(1)}, and wiggles slower than ω = m don't radiate.`:'Light travels at speed 1. Charges can be moved at up to 0.9 of that.';
   else if(isAh()){ const m=mass(), e=ech();
     s=`Higgs mass m = ${m.toFixed(2)}, photon mass e = ${e.toFixed(2)}: ${m>e*1.02?'type II, flux tubes repel':m<e*0.98?'type I, flux tubes attract and merge':'balanced (BPS), flux tubes feel no force'}. Magnetic fields die off within 1/e = ${(1/e).toFixed(1)}.`; }
-  else if(isYm()) s='Gluon waves travel at speed 1. Coupling g = 1: a classical field’s strength and g only appear together, so “strong” means a big field.';
+  else if(isYm()) s=ymHiggs()?'With the Higgs on, gluon waves travel slower than light, and waves slower than ω = m_W don’t travel at all.'
+      :'Gluon waves travel at speed 1. Coupling g = 1: a classical field’s strength and g only appear together, so “strong” means a big field.';
   else if(isCx()) s=`Size ripples have mass m = ${mass().toFixed(2)}; phase ripples are massless${P.eps>0?`, or have mass √ε = ${Math.sqrt(P.eps).toFixed(2)} with the tilt`:''}. Vortex cores are about ${(2/mass()).toFixed(1)} across.`;
   else s=`Domain walls are about ${(2/mass()*2).toFixed(1)} wide (a few times 1/m). Friction drains energy, which helps the field settle.`;
   $('paramNote').textContent=s;
@@ -1869,7 +2003,7 @@ function setEdge(e){ P.edge=e; pressSeg($('edgeSeg'),'e',e); updateDamp(); murIn
 function setTool(tl){
   P.tool=tl; pressSeg($('toolSeg'),'tool',tl);
   for(const n of ['source','poke','paint','wall','twist','gauge']) $('opts-'+n).hidden=n!==tl;
-  $('hint').textContent=isYm()&&tl==='poke'?HINT.ymPoke:isYm()&&tl==='wall'?HINT.ymWall:isYm()&&tl==='source'?(P.edge==='wrap'?HINT.ymWrap:HINT.ymCharge):isAh()&&tl==='poke'?HINT.ahPoke:isAh()&&tl==='twist'?HINT.fluxtube:isAh()&&tl==='wall'?HINT.ahWall:isCx()&&tl==='poke'?'Tap or drag to turn the phase. The turn spreads out as massless Goldstone waves.':isEm()&&tl==='poke'?HINT.flash:isEm()&&tl==='source'?HINT.charge:HINT[tl];
+  $('hint').textContent=isYm()&&tl==='poke'?(P.pokeHiggs&&ymHiggs()?HINT.ymBump:ymHiggs()?HINT.ymPoke+' With the Higgs on they fade instead of crossing the box.':HINT.ymPoke):isYm()&&tl==='wall'?HINT.ymWall:isYm()&&tl==='source'?(P.edge==='wrap'?HINT.ymWrap:HINT.ymCharge):isAh()&&tl==='poke'?HINT.ahPoke:isAh()&&tl==='twist'?HINT.fluxtube:isAh()&&tl==='wall'?HINT.ahWall:isCx()&&tl==='poke'?'Tap or drag to turn the phase. The turn spreads out as massless Goldstone waves.':isEm()&&tl==='poke'?HINT.flash:isEm()&&tl==='source'?HINT.charge:HINT[tl];
 }
 function afterChange(){ scaleReset=true; vortices=findVortices(); syncSliders(); syncSrcPanel(); drawLegend(); drawPlot(); readout(); if(!P.running) render(); }
 
@@ -1880,6 +2014,13 @@ $('toolSeg').onclick=e=>{ const b=e.target.closest('button'); if(b) setTool(b.da
 $('edgeSeg').onclick=e=>{ const b=e.target.closest('button'); if(b){ setEdge(b.dataset.e); } };
 $('viewSeg').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; P.view=b.dataset.v; pressSeg($('viewSeg'),'v',P.view); scaleReset=true; autoScales(); drawLegend(); if(!P.running) render(); };
 $('mass').oninput=e=>{ P.m[P.th]=+e.target.value; $('massO').textContent=mass().toFixed(2); updateVmin(); paramNote(); dirty=true; };
+$('higgsSeg').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; const on=b.dataset.h==='1'; if(on===ymHiggs()) return;
+  P.m.ym=on?P.ymW:0; resetField(); t=0; ymHiggsUi(); paramNote(); afterChange(); };   // switching the Higgs on or off starts the field afresh (charges get their new fields)
+$('higgsV').oninput=e=>{ const old=P.m.ym; P.ymW=+e.target.value;
+  if(ymHiggs()){ P.m.ym=P.ymW; const f=P.m.ym/old, g=1/f;   // live: the Higgs is scaled to its new size (π back, so Gauss's law doesn't change)
+    for(const a of [hg0,hg1,hg2,hg3]) for(let k=0;k<NN;k++) a[k]*=f; for(const a of [hp0,hp1,hp2,hp3]) for(let k=0;k<NN;k++) a[k]*=g; }
+  ymHiggsUi(); dirty=true; };
+$('pokeWhat').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; P.pokeHiggs=b.dataset.p==='1'; ymHiggsUi(); };
 $('echg').oninput=e=>{ P.e=+e.target.value; $('echgO').textContent=P.e.toFixed(2); paramNote(); dirty=true; };
 $('eps').oninput=e=>{ P.eps=+e.target.value; $('epsO').textContent=P.eps.toFixed(3); updateVmin(); paramNote(); dirty=true; };
 $('fric').oninput=e=>{ P.fric=+e.target.value; $('fricO').textContent=P.fric.toFixed(2); updateDamp(); };
@@ -1936,7 +2077,9 @@ function hitSource(c){
   return best;
 }
 function applyBrush(a,b){
-  if(isYm()&&P.tool==='poke'){ const amp=P.pokeStrong?YM_STRONG:YM_GENTLE;
+  if(isYm()&&P.tool==='poke'&&P.pokeHiggs&&ymHiggs()){ const amp=P.pokeStrong?0.8:0.3;   // a Higgs bump
+    if(!a) ymHiggsBump(b.x,b.y,amp); else walkSeg(a,b,P.brush/dx/2,(x,y)=>ymHiggsBump(x,y,amp*0.25)); }
+  else if(isYm()&&P.tool==='poke'){ const amp=P.pokeStrong?YM_STRONG:YM_GENTLE;
     if(!a) ymPoke(b.x,b.y,amp); else ymPokeSeg(a,b,amp*0.25); }
   else if(P.tool==='gauge'){ const ang=-P.gaugeSign*2*Math.PI/3;   // a negative turn about (1,1,1) takes red toward green
     if(!a) ymGauge(b.x,b.y,ang); else walkSeg(a,b,P.brush/dx/4,(x,y)=>ymGauge(x,y,ang*0.08)); }
@@ -2198,7 +2341,8 @@ if(/[?&]debug/.test(location.search)){
     ym:{U:YMU,W:YMW,pq:[pq0,pq1,pq2,pq3],energy:energyYM,gauss:gaussYM,shares:ymShares,poke:ymPoke,pokeSeg:ymPokeSeg,gauge:ymGauge,packet:ymPacket,sum:ymSum,
       fromPot:ymFromPotentials,get fixIts(){return ymFixIts},set fixTol(v){YM_FIXTOL=v},set ssor(v){YM_SSOR=v},uniform:ymUniform,random:ymRandom,step:stepYM,ready:ymReady,COL:YMCOL,
       setAmp(g,s){YM_GENTLE=g;YM_STRONG=s;},
-      charge:ymNewCharge,place:ymPlace,relax:ymRelaxGauge,set relaxW(v){YM_RELAX=v},set relaxMin(v){YM_RELAXMIN=v},recolour:ymRecolour,kinetic:ymKinetic,deposit:ymDepositAll,rho:[yr1,yr2,yr3]}};
+      charge:ymNewCharge,place:ymPlace,relax:ymRelaxGauge,set relaxW(v){YM_RELAX=v},set relaxMin(v){YM_RELAXMIN=v},recolour:ymRecolour,kinetic:ymKinetic,deposit:ymDepositAll,rho:[yr1,yr2,yr3],
+      H:[hg0,hg1,hg2,hg3],HP:[hp0,hp1,hp2,hp3],v:ymV,higgsE:energyHiggs}};
 }
 })();
 </script>
