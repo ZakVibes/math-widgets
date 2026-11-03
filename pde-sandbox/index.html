@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>PDE Sandbox</title>
-<link rel="manifest" href="../manifest.json"><link rel="icon" href="../icons/icon-192.png"><link rel="apple-touch-icon" href="../icons/icon-180.png"><meta name="apple-mobile-web-app-title" content="Math Widgets"><script>if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("../sw.js"));</script><script>if (location.hostname === "zakvibes.github.io") { const s = document.createElement("script"); s.defer = true; s.src = "https://static.cloudflareinsights.com/beacon.min.js"; s.dataset.cfBeacon = JSON.stringify({ token: "82a3b23479314bcbbeaf2af3881066d0", spa: false }); document.head.append(s); }</script>
+<link rel="manifest" href="../manifest.json"><link rel="icon" href="../icons/icon-192.png"><link rel="apple-touch-icon" href="../icons/icon-180.png"><meta name="apple-mobile-web-app-title" content="Math Widgets"><script>if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("../sw.js"));</script><script>if (location.hostname === "zakvibes.github.io") { const s = document.createElement("script"); s.defer = true; s.src = "https://static.cloudflareinsights.com/beacon.min.js"; s.dataset.cfBeacon = JSON.stringify({ token: "82a3b23479314bcbbeaf2af3881066d0" }); document.head.append(s); }</script>
 <link rel="stylesheet" href="../site.css">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -1401,7 +1401,7 @@ custom:`<h2>Your own equation</h2>
 
 setHint();
 setEq('burg');
-if(/[?&]record\b/.test(location.search)) recordMode(); else requestAnimationFrame(frame);
+if(/[?&]record=pluck\b/.test(location.search)) recordPluck(); else if(/[?&]record\b/.test(location.search)) recordMode(); else requestAnimationFrame(frame);
 
 /* ---------- ?record: a YouTube Short of spiral waves (see ../shorts-rec.js) ---------- */
 /* 1080×1920: a caption band on top, the plate edge to edge below it on a background the colour of the plate's
@@ -1454,6 +1454,85 @@ function recordMode(){
   const fl=document.createElement('link');   // the caption font, which this page doesn't otherwise load
   fl.rel='stylesheet'; fl.href='https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&display=swap';
   fl.onload=fl.onerror=()=>{   // shorts-rec.js waits for the font, so load it once the font is declared
+    const sc=document.createElement('script'); sc.src='../shorts-rec.js';
+    sc.onload=()=>{ short.canvas=cv; ShortsRec(short); };
+    document.head.append(sc);
+  };
+  document.head.append(fl);
+}
+
+/* ---------- ?record=pluck: a YouTube Short of a plucked string ---------- */
+/* The Wave preset on a finer grid (1000 points), drawn as a string between two pegs. A dashed blue "what you'd
+   expect" string swings as one smooth arch, b₁ sin(πx) cos(πt): the string's own first mode (its note), where
+   b₁ = 2 sin(πa) / (π² a(1−a)) for a pluck of height 1 at x = a. The corners are the higher modes on top.
+   Take 1 plucks near one end (the page's preset), take 2 in the middle. */
+function recordPluck(){
+  const W=1080, H=1920, BG='#080a14', FADEF=8, XL=90, XR=990, Y0=890, AMP=330;
+  const TAKES=[{a:0.3, sec:9}, {a:0.5, sec:9}];
+  for(const tk of TAKES){ tk.init=`min(x/${tk.a}, (1-x)/${1-tk.a})`; tk.b1=2*Math.sin(Math.PI*tk.a)/(Math.PI*Math.PI*tk.a*(1-tk.a)); }
+  const RATE=0.25;   // sim time per video second: one full swing (t = 2) takes 8 s
+  const start=[]; let n=0; for(const tk of TAKES){ start.push(n); n+=tk.sec*30; }
+  const cv=document.createElement('canvas'), ctx=cv.getContext('2d');
+  cv.width=W; cv.height=H;
+  for(const el of document.body.children) el.style.display='none';
+  document.body.style.background=BG;
+  cv.style.cssText='display:block;margin:0 auto;width:min(100vw,56.25vh);height:min(100vh,177.78vw)';
+  document.body.append(cv);
+  EQS.wave.N=1000; setEq('wave');
+  let take=-1, cur=0;
+  const X=x=>XL+x*(XR-XL), Y=q=>Y0-AMP*q, FONT='700 34px "Bricolage Grotesque", sans-serif';
+  const short={
+    name:'pde-pluck', seconds:n/30, captionY:260,
+    music:{ file:'chopin-op32no1.mp3', start:134.3, fade:3 },   // a cadence lands home (B major, 149 s) at ~14.7 s, then the opening melody returns
+    captions:[
+      {from:0, to:3.3, text:'What happens when\nyou pluck a string?'},
+      {from:3.5, to:5.8, text:'It\'s not what you expect'},
+      {from:6.0, to:8.6, text:'Two corners run along it'},
+      {from:9.2, to:14.6, text:'Pluck it in the middle'},
+      {from:14.9, to:n/30+1, text:'Try it yourself,\nlink in description'},
+      {from:4.5, to:8.6, text:'It repeats every swing,\nso you still hear one note', y:1400, size:46},
+      {from:9.4, to:14.6, text:'The dashed arch is the note.\nThe corners are higher notes on top.', y:1400, size:46},
+      {from:0, to:n/30+1, text:'∂²u/∂t² = c² ∂²u/∂x²', y:418, size:32, color:'#c9cfe0'}
+    ],
+    reset(){ take=0; cur=0; P.initStr=TAKES[0].init; restart(); },
+    tick(fi){
+      cur=fi;
+      for(let k=TAKES.length-1;k>=0;k--) if(fi>=start[k]){ if(take!==k){ take=k; P.initStr=TAKES[k].init; restart(); } break; }
+      if(fi>start[take]) advanceBy(RATE/30);
+    },
+    render(){
+      ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle=BG; ctx.fillRect(0,0,W,H);
+      ctx.lineCap='round'; ctx.lineJoin='round';
+      ctx.strokeStyle='rgba(255,255,255,.12)'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(XL,Y0); ctx.lineTo(XR,Y0); ctx.stroke();
+      // what you'd expect: one smooth arch swinging with the same period (the string's first mode)
+      const g=TAKES[take].b1*Math.cos(Math.PI*t);
+      ctx.strokeStyle='rgba(108,180,255,.8)'; ctx.lineWidth=5; ctx.setLineDash([18,14]); ctx.beginPath();
+      for(let k=0;k<=200;k++){ const x=k/200, yy=Y(Math.sin(Math.PI*x)*g); k?ctx.lineTo(X(x),yy):ctx.moveTo(X(x),yy); }
+      ctx.stroke(); ctx.setLineDash([]);
+      // the real string
+      ctx.save(); ctx.shadowColor='rgba(255,255,255,.45)'; ctx.shadowBlur=18;
+      ctx.strokeStyle='#f4f6fb'; ctx.lineWidth=7; ctx.beginPath(); ctx.moveTo(X(0),Y0);
+      for(let i=0;i<N;i++) ctx.lineTo(X(xs[i]),Y(u[i+O]));
+      ctx.lineTo(X(1),Y0); ctx.stroke(); ctx.restore();
+      ctx.fillStyle='#9aa6b6'; for(const px of [XL,XR]){ ctx.beginPath(); ctx.arc(px,Y0,13,0,2*Math.PI); ctx.fill(); }
+      // key
+      ctx.font=FONT; ctx.textBaseline='middle'; ctx.textAlign='left';
+      const ky=1300, items=[{lab:'what you\'d expect', col:'#6cb4ff', dash:true}, {lab:'the real string', col:'#f4f6fb'}];
+      let tw=0; const ws=items.map(it=>ctx.measureText(it.lab).width); tw=ws[0]+ws[1]+2*(70+16)+60;
+      let x0=(W-tw)/2;
+      items.forEach((it,k)=>{
+        ctx.strokeStyle=it.col; ctx.lineWidth=it.dash?5:7; ctx.setLineDash(it.dash?[18,14]:[]);
+        ctx.beginPath(); ctx.moveTo(x0,ky); ctx.lineTo(x0+70,ky); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle=it.col; ctx.fillText(it.lab,x0+86,ky); x0+=86+ws[k]+60;
+      });
+      let f=0; for(let k=1;k<TAKES.length;k++) f=Math.max(f,1-Math.abs(cur-start[k]+0.5)/FADEF);
+      if(f>0){ ctx.globalAlpha=f; ctx.fillStyle=BG; ctx.fillRect(0,0,W,H); ctx.globalAlpha=1; }
+    }
+  };
+  window.__short=short;
+  const fl=document.createElement('link');   // the caption font, which this page doesn't otherwise load
+  fl.rel='stylesheet'; fl.href='https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&display=swap';
+  fl.onload=fl.onerror=()=>{
     const sc=document.createElement('script'); sc.src='../shorts-rec.js';
     sc.onload=()=>{ short.canvas=cv; ShortsRec(short); };
     document.head.append(sc);
