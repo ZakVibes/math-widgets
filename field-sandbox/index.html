@@ -1707,7 +1707,8 @@ if(/[?&]record\b/.test(location.search)) recordMode(); else requestAnimationFram
 
 /* ---------- ?record: YouTube Shorts (see ../shorts-rec.js) ---------- */
 /* 1080×1920: a caption band on top, the page's own picture (drawn 1080 wide, without the vortex rings) below it.
-   ?record (or ?record=vortices) records the vortex Short, ?record=slits the light-through-slits one, ?record=atom the classical atom, ?record=jump the jumping charge.
+   ?record (or ?record=vortices) records the vortex Short, ?record=slits the light-through-slits one, ?record=atom the classical atom, ?record=jump the jumping charge,
+   ?record=ymcollide the Yang–Mills wave collision, ?record=ymtear the unstable colour-magnetic field.
    One take per preset or init, with a quick fade between takes. steps(f) = simulation steps per video frame (f = frame
    within the take); the quench passes the dark start quickly, then slows so the tangle can be seen. */
 function slitScene(gaps){            // a wall at x = -5 with openings 3 wide at the heights in gaps, light from the left
@@ -1801,6 +1802,34 @@ function recordMode(){
         {from:19.6, to:22.8, text:'Now one charge sits\ninside a metal ring'},
         {from:23.0, to:T-3.3, text:'The light can\'t get in,\nso it stays still'},
         {from:T-3, to:T+1, text:'Try it yourself,\nlink in description'}
+      ]},
+    // Yang–Mills: weak red + green waves cross untouched, strong ones scatter and make blue. Each take opens with the waves
+    // already moving; auto: the page's own energy colour scale, set fresh every frame, times auto (0.5: brighter)
+    ymcollide:{ name:'ym-collide', music:{ file:'chopin-nocturne-csharp-minor-b49.mp3', start:52, fade:3.5 }, auto:0.5, zoom:1.3,
+      takes:[
+        {sec:5.5, steps:f=>2.4, init(){ PRESETS.ym.find(q=>q[0]==='Gentle: they pass through')[1](); advance(40); }},
+        {sec:8.5, steps:f=>2.2, init(){ PRESETS.ym.find(q=>q[0]==='Strong: they scatter')[1](); advance(140); }}   // they meet ~1 s in
+      ],
+      captions:T=>[
+        {from:0, to:2.6, text:'What happens when\ngluon waves collide?'},
+        {from:2.9, to:5.2, text:'Weak ones pass\nright through'},
+        {from:5.7, to:8.4, text:'Strong ones scatter'},
+        {from:8.7, to:T-2.8, text:'and make a\nnew colour'},
+        {from:T-2.6, to:T+1, text:'Try it yourself,\nlink in description'},
+        {from:0, to:T+1, text:'Classical Yang–Mills theory', y:418, size:32, color:'#c9cfe0'}
+      ]},
+    // Yang–Mills: the Unstable magnetic field preset (uniform blue, tiny red + green noise) tears into holes, then turbulence
+    ymtear:{ name:'ym-tear', music:{ file:'chopin-waltz64no2.mp3', start:0.2, fade:3.5 }, auto:1, zoom:1.3,
+      takes:[
+        // holes open at t ~ 28 and it is churning by ~42: start at t = 22, slow down through the tearing, speed up at the end
+        {sec:14, steps:f=>f<30?1.3:f<330?0.5:1.2, init(){ PRESETS.ym.find(q=>q[0]==='Unstable magnetic field')[1](); advance(220); }}
+      ],
+      captions:T=>[
+        {from:0, to:2.4, text:'Will this magnetic\nfield stay still?'},
+        {from:2.6, to:6.0, text:'It tears itself apart'},
+        {from:6.3, to:T-2.8, text:'Ordinary magnetism\ncan\'t do this'},
+        {from:T-2.6, to:T+1, text:'Try it yourself,\nlink in description'},
+        {from:0, to:T+1, text:'Classical Yang–Mills theory', y:418, size:32, color:'#c9cfe0'}
       ]}
   };
   const which=(location.search.match(/[?&]record=(\w+)/)||[])[1]||'vortices', SH=SHORTS[which], TAKES=SH.takes;
@@ -1820,13 +1849,14 @@ function recordMode(){
     tick(fi){
       cur=fi;
       for(let k=TAKES.length-1;k>=0;k--) if(fi>=start[k]){
-        if(take!==k){ take=k; acc=0; const tk=TAKES[k]; if(tk.init) tk.init(); else PRESETS[tk.th].find(q=>q[0]===tk.preset)[1](); }
+        if(take!==k){ take=k; acc=0; scaleReset=true; const tk=TAKES[k]; if(tk.init) tk.init(); else PRESETS[tk.th].find(q=>q[0]===tk.preset)[1](); }
         break; }
       acc+=TAKES[take].steps(fi-start[take]); const S=Math.floor(acc); acc-=S;
       if(S>0) advance(S);
     },
     render(){
-      vortices=[]; const tf=take>=0&&TAKES[take].fscale; if(tf) fscale=tf(cur-start[take]); else if(SH.fscale) fscale=SH.fscale; render();
+      vortices=[]; if(SH.auto){ scaleReset=true; autoScales(); escale*=SH.auto; }   // follow the field at once, so a sudden bright spot doesn't burn out
+      const tf=take>=0&&TAKES[take].fscale; if(tf) fscale=tf(cur-start[take]); else if(SH.fscale) fscale=SH.fscale; render();
       rctx.setTransform(1,0,0,1,0,0); rctx.fillStyle=BG; rctx.fillRect(0,0,W,H);
       rctx.drawImage(cv,C0,C0,W,W,0,PY,W,W);
       let f=0; for(let k=1;k<TAKES.length;k++) f=Math.max(f,1-Math.abs(cur-start[k]+0.5)/FADEF);
