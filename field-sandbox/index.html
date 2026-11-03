@@ -655,19 +655,99 @@ function ymSum(...fs){ return (x,y)=>{ let out=null; for(const f of fs){ const r
 /* a flash of colour n: E = curl of a bump f on the squares, the neighbouring square's bump carried over its link (as in the force) */
 const YMCOL=[[1,0,0],[0,1,0],[0,0,1]];
 let YM_GENTLE=0.25, YM_STRONG=3;   // flash bump heights: a red and a green flash 8 apart end up ~1% and ~11% blue
-function ymPoke(cx,cy,amp){
+function ymPokeBox(cx,cy){ const Rc=3*P.brush/2/dx+3, i0=Math.floor(cx-Rc), i1=Math.ceil(cx+Rc), j0=Math.floor(cy-Rc), j1=Math.ceil(cy+Rc);   // the cells a flash at (cx, cy) touches
+  return P.edge==='wrap'?[i0,i1,j0,j1]:[Math.max(0,i0),Math.min(N-1,i1),Math.max(0,j0),Math.min(N-1,j1)]; }
+const ymK=(i,j)=>P.edge==='wrap'?K((i%N+N)%N,(j%N+N)%N):K(i,j);   // with Wrap, a flash or its box may reach round the edge
+function ymPoke(cx,cy,amp,fixIt=true){
   ymReady();
-  const s=P.brush/2, n=YMCOL[P.pokeCol], Rc=3*s/dx+3, cut=Math.exp(-4.5);
-  const i0=Math.max(0,Math.floor(cx-Rc)), i1=Math.min(N-1,Math.ceil(cx+Rc)), j0=Math.max(0,Math.floor(cy-Rc)), j1=Math.min(N-1,Math.ceil(cy+Rc));
+  const s=P.brush/2, n=YMCOL[P.pokeCol], cut=Math.exp(-4.5), [i0,i1,j0,j1]=ymPokeBox(cx,cy);
   // the bump is exactly 0 beyond 3 s, inside the box, so no curl is lost at the box's edge
   const f=(i,j)=>{ const X=(i+0.5-cx)*dx, Y=(j+0.5-cy)*dx, e=Math.exp(-(X*X+Y*Y)/(2*s*s)); return e>cut?amp*(e-cut)/(1-cut):0; };
   const carry=(U0,U1,U2,U3,q,c)=>{ const a0=U0[q], a1=U1[q], a2=U2[q], a3=U3[q], v1=c*n[0], v2=c*n[1], v3=c*n[2];
     const sc=a0*a0-a1*a1-a2*a2-a3*a3, d=2*(a1*v1+a2*v2+a3*v3), e=2*a0;
     return [sc*v1+d*a1+e*(a2*v3-a3*v2), sc*v2+d*a2+e*(a3*v1-a1*v3), sc*v3+d*a3+e*(a1*v2-a2*v1)]; };
-  for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){ const k=K(i,j), fk=f(i,j);
-    if(ymX[k]){ const b=carry(uy0,uy1,uy2,uy3,k-G,f(i,j-1)); wx1[k]+=fk*n[0]-b[0]; wx2[k]+=fk*n[1]-b[1]; wx3[k]+=fk*n[2]-b[2]; }
-    if(ymY[k]){ const b=carry(ux0,ux1,ux2,ux3,k-1,f(i-1,j)); wy1[k]+=b[0]-fk*n[0]; wy2[k]+=b[1]-fk*n[1]; wy3[k]+=b[2]-fk*n[2]; } }
+  const fix=fixIt?ymGaussBox(i0,i1,j0,j1):null;
+  if(P.edge==='wrap') ymGhosts();
+  for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){ const k=ymK(i,j), fk=f(i,j);
+    if(ymX[k]){ const b=carry(uy0,uy1,uy2,uy3,ymK(i,j-1),f(i,j-1)); wx1[k]+=fk*n[0]-b[0]; wx2[k]+=fk*n[1]-b[1]; wx3[k]+=fk*n[2]-b[2]; }
+    if(ymY[k]){ const b=carry(ux0,ux1,ux2,ux3,ymK(i-1,j),f(i-1,j)); wy1[k]+=b[0]-fk*n[0]; wy2[k]+=b[1]-fk*n[1]; wy3[k]+=b[2]-fk*n[2]; } }
+  if(fix) fix();
   dirty=true;
+}
+/* a drag: the flashes along a segment, then one charge fix over the box around all of them */
+function ymPokeSeg(a,b,amp){
+  const p=ymPokeBox(a.x,a.y), q=ymPokeBox(b.x,b.y);
+  if(Math.max(p[1],q[1])-Math.min(p[0],q[0])>N/2||Math.max(p[3],q[3])-Math.min(p[2],q[2])>N/2){   // a long jump: in halves (a box must not wrap onto itself)
+    const m={x:(a.x+b.x)/2,y:(a.y+b.y)/2}; ymPokeSeg(a,m,amp); ymPokeSeg(m,b,amp); return; }
+  const fix=ymGaussBox(Math.min(p[0],q[0]),Math.max(p[1],q[1]),Math.min(p[2],q[2]),Math.max(p[3],q[3]));
+  walkSeg(a,b,P.brush/dx/2,(x,y)=>ymPoke(x,y,amp,false)); fix();
+}
+/* In a strong field a fixed-colour flash leaves colour charge rho (D·(D×X) = g B×X). Remove it: solve G Gᵀ λ = rho on the box of
+   sites (conjugate gradients) and add w −= Gᵀ λ on the links inside it, where G is the lattice Gauss operator (w out − w in
+   carried over its link) and Gᵀ λ on a link s→s' is λ(s) − U λ(s') U†. Only links inside the box change, so charge only moves
+   between box sites; rho is G of the flash's own links, so it can always be cancelled. The flash touches links leaving cells
+   i0..i1, j0..j1, so the box of sites reaches one further. Call before the flash (it records the box's charge), then call the
+   result after. */
+let ymFixIts=0, YM_FIXTOL=1e-16, YM_SSOR=1.8;   // solver steps of the last fix (for the debug hook); stop once |rho|² is down this much
+function ymGaussBox(i0,i1,j0,j1){
+  const wrap=P.edge==='wrap', bi1=wrap?i1+1:Math.min(N-1,i1+1), bj1=wrap?j1+1:Math.min(N-1,j1+1), nx=bi1-i0+1, M=nx*(bj1-j0+1);
+  const kk=new Int32Array(M); for(let b=0;b<M;b++) kk[b]=ymK(i0+b%nx,j0+(b/nx|0));
+  const gauss=out=>{ ymGhosts();   // Gauss's law at every box site, as in gaussYM
+    for(let b=0;b<M;b++){ const k=kk[b];
+      let g1=wx1[k]+wy1[k], g2=wx2[k]+wy2[k], g3=wx3[k]+wy3[k];
+      let q=k-1, a0=ux0[q], a1=ux1[q], a2=ux2[q], a3=ux3[q], v1=wx1[q], v2=wx2[q], v3=wx3[q];
+      let s=a0*a0-a1*a1-a2*a2-a3*a3, d=2*(a1*v1+a2*v2+a3*v3), e=2*a0;
+      g1-=s*v1+d*a1+e*(a2*v3-a3*v2); g2-=s*v2+d*a2+e*(a3*v1-a1*v3); g3-=s*v3+d*a3+e*(a1*v2-a2*v1);
+      q=k-G; a0=uy0[q]; a1=uy1[q]; a2=uy2[q]; a3=uy3[q]; v1=wy1[q]; v2=wy2[q]; v3=wy3[q];
+      s=a0*a0-a1*a1-a2*a2-a3*a3; d=2*(a1*v1+a2*v2+a3*v3); e=2*a0;
+      g1-=s*v1+d*a1+e*(a2*v3-a3*v2); g2-=s*v2+d*a2+e*(a3*v1-a1*v3); g3-=s*v3+d*a3+e*(a1*v2-a2*v1);
+      out[3*b]=g1; out[3*b+1]=g2; out[3*b+2]=g3; } };
+  const before=new Float64Array(3*M); gauss(before);
+  return ()=>{
+    const r=new Float64Array(3*M); gauss(r); for(let c=0;c<3*M;c++) r[c]-=before[c];
+    // the links inside the box (x: to site b + 1, y: to b + nx), each with R = the 3×3 rotation v → U† v U (Rᵀ: v → U v U†)
+    const L=[], R=[], xl=new Int32Array(M).fill(-1), yl=new Int32Array(M).fill(-1), deg=new Float64Array(M);   // each site's x and y link out, its link count
+    for(let b=0;b<M;b++){ const k=kk[b];
+      for(const [on,nb,U0,U1,U2,U3] of [[b%nx<nx-1&&ymX[k],b+1,ux0,ux1,ux2,ux3],[b<M-nx&&ymY[k],b+nx,uy0,uy1,uy2,uy3]]){ if(!on) continue;
+        const a0=U0[k], a1=U1[k], a2=U2[k], a3=U3[k], s=a0*a0-a1*a1-a2*a2-a3*a3;   // R v = s v + 2 (a·v) a + 2 a0 (a×v)
+        (nb===b+1?xl:yl)[b]=L.length/2; deg[b]++; deg[nb]++;
+        L.push(b,nb); R.push(s+2*a1*a1, 2*a1*a2-2*a0*a3, 2*a1*a3+2*a0*a2,
+                            2*a2*a1+2*a0*a3, s+2*a2*a2, 2*a2*a3-2*a0*a1,
+                            2*a3*a1-2*a0*a2, 2*a3*a2+2*a0*a1, s+2*a3*a3); } }
+    const nL=L.length/2, Li=Int32Array.from(L), Rm=Float64Array.from(R), t=new Float64Array(3*nL);
+    const GT=l=>{ for(let m=0;m<nL;m++){ const b=3*Li[2*m], nb=3*Li[2*m+1], x=9*m, v1=l[nb], v2=l[nb+1], v3=l[nb+2];   // Gᵀ l
+      t[3*m]=l[b]-(Rm[x]*v1+Rm[x+3]*v2+Rm[x+6]*v3); t[3*m+1]=l[b+1]-(Rm[x+1]*v1+Rm[x+4]*v2+Rm[x+7]*v3); t[3*m+2]=l[b+2]-(Rm[x+2]*v1+Rm[x+5]*v2+Rm[x+8]*v3); } };
+    const A=(l,out)=>{ GT(l); out.fill(0);   // G (Gᵀ l)
+      for(let m=0;m<nL;m++){ const b=3*Li[2*m], nb=3*Li[2*m+1], x=9*m, v1=t[3*m], v2=t[3*m+1], v3=t[3*m+2];
+        out[b]+=v1; out[b+1]+=v2; out[b+2]+=v3;
+        out[nb]-=Rm[x]*v1+Rm[x+1]*v2+Rm[x+2]*v3; out[nb+1]-=Rm[x+3]*v1+Rm[x+4]*v2+Rm[x+5]*v3; out[nb+2]-=Rm[x+6]*v1+Rm[x+7]*v2+Rm[x+8]*v3; } };
+    // preconditioner: one symmetric SOR sweep. A's diagonal block at b is deg(b)·I; its block to the next site over link m is −Rᵀ,
+    // to the previous one −R. Forward: z_b = ω (r_b + R z_left + R z_below)/deg; backward: z_b += ω (Rᵀ z_right + Rᵀ z_up)/deg
+    const inL=new Int32Array(2*M).fill(-1);   // the links arriving at b from the left and from below
+    for(let b=0;b<M;b++){ if(b%nx) inL[2*b]=xl[b-1]; if(b>=nx) inL[2*b+1]=yl[b-nx]; }
+    const om=YM_SSOR, acc=new Float64Array(3);
+    const fw=(m,z)=>{ const c=3*Li[2*m], x=9*m, v1=z[c], v2=z[c+1], v3=z[c+2];   // acc += R z(start)
+      acc[0]+=Rm[x]*v1+Rm[x+1]*v2+Rm[x+2]*v3; acc[1]+=Rm[x+3]*v1+Rm[x+4]*v2+Rm[x+5]*v3; acc[2]+=Rm[x+6]*v1+Rm[x+7]*v2+Rm[x+8]*v3; };
+    const bw=(m,z)=>{ const c=3*Li[2*m+1], x=9*m, v1=z[c], v2=z[c+1], v3=z[c+2];   // acc += Rᵀ z(end)
+      acc[0]+=Rm[x]*v1+Rm[x+3]*v2+Rm[x+6]*v3; acc[1]+=Rm[x+1]*v1+Rm[x+4]*v2+Rm[x+7]*v3; acc[2]+=Rm[x+2]*v1+Rm[x+5]*v2+Rm[x+8]*v3; };
+    const pre=(r,z)=>{
+      for(let b=0;b<M;b++){ const B=3*b; acc[0]=r[B]; acc[1]=r[B+1]; acc[2]=r[B+2];
+        if(inL[2*b]>=0) fw(inL[2*b],z); if(inL[2*b+1]>=0) fw(inL[2*b+1],z);
+        const q=deg[b]?om/deg[b]:0; z[B]=q*acc[0]; z[B+1]=q*acc[1]; z[B+2]=q*acc[2]; }
+      for(let b=M-1;b>=0;b--){ if(!deg[b]) continue; const B=3*b; acc[0]=acc[1]=acc[2]=0;
+        if(xl[b]>=0) bw(xl[b],z); if(yl[b]>=0) bw(yl[b],z);
+        const q=om/deg[b]; z[B]+=q*acc[0]; z[B+1]+=q*acc[1]; z[B+2]+=q*acc[2]; } };
+    const dot=(a,b)=>{ let s=0; for(let c=0;c<3*M;c++) s+=a[c]*b[c]; return s; };
+    const lam=new Float64Array(3*M), z=new Float64Array(3*M), Ap=new Float64Array(3*M);
+    pre(r,z); const p=z.slice();
+    let rr=dot(r,r), rz=dot(r,z), it=0; const tol=YM_FIXTOL*rr;
+    for(;it<4000&&rr>tol&&rr>1e-30;it++){ A(p,Ap); const pAp=dot(p,Ap); if(!(pAp>0)) break; const al=rz/pAp;
+      for(let c=0;c<3*M;c++){ lam[c]+=al*p[c]; r[c]-=al*Ap[c]; }
+      pre(r,z); const rzn=dot(r,z), be=rzn/rz; rz=rzn; rr=dot(r,r); for(let c=0;c<3*M;c++) p[c]=z[c]+be*p[c]; }
+    ymFixIts=it; GT(lam);
+    for(let m=0;m<nL;m++){ const b=Li[2*m], k=kk[b], W=Li[2*m+1]===b+1?[wx1,wx2,wx3]:[wy1,wy2,wy3];
+      W[0][k]-=t[3*m]; W[1][k]-=t[3*m+1]; W[2][k]-=t[3*m+2]; }
+  };
 }
 /* gauge brush: g(s) = exp(i α(s) m·σ/2) with m = (1,1,1)/√3, so the colours turn red → green → blue as α grows.
    U(s→s') ← g(s) U g(s')†, w ← g(s) w g(s)†. Nothing physical changes: energy, Gauss's law and the motion stay the same. */
@@ -1304,7 +1384,7 @@ function readout(){
     extra+=`<br>electric <b>${E.electric.toPrecision(4)}</b>, magnetic <b>${E.magnetic.toPrecision(4)}</b>`+
       `<br>colour split <b style="color:#e5484d">${(100*s[0]).toFixed(1)}%</b> · <b style="color:#30a46c">${(100*s[1]).toFixed(1)}%</b> · <b style="color:#3e7bfa">${(100*s[2]).toFixed(1)}%</b>`+
       (g<1e-6?`<br>Gauss's law (no colour charge) holds to <b>${g<1e-12?'10⁻¹²':g.toExponential(0)}</b>`
-             :`<br>colour charge left by flashes into a strong field, largest <b>${g.toPrecision(2)}</b>`); }
+             :`<br>colour charge (Gauss's law broken), largest <b>${g.toPrecision(2)}</b>`); }
   if(isAh()) extra+=`<br>magnetic flux <b>${fluxQuanta().toFixed(2)}</b> flux quanta (each 2π/e = ${(2*Math.PI/ech()).toFixed(2)})`;
   if(isPh()){ let np=0,nm=0; for(const v of vortices){ if(v.w>0) np+=v.w; else nm-=v.w; }
     extra+=`<br>vortices <b>${np}</b> with +1 (solid ring), <b>${nm}</b> with −1 (dashed)`;
@@ -1374,7 +1454,7 @@ const ABOUT={
 <li><b>Unstable magnetic field:</b> a smooth blue colour-magnetic field fills the box. In electromagnetism it would sit still forever. Here red and green ripples grow out of almost nothing, at the rate √(gB) theory predicts, and tear it into a sheet full of holes, which then churns into turbulence. This is the Nielsen–Olesen instability, one sign that the vacuum of the strong force is not simple.</li>
 <li><b>Turbulence:</b> a random field. Energy flows from big swirls into ever smaller ripples, until it reaches the smallest ones the grid allows: classical Yang–Mills is chaotic and never settles. It's the same ultraviolet catastrophe as in black-body radiation, the one quantum mechanics cured.</li>
 <li>Make <b>Strong</b> flashes of two colours close together and watch the third colour appear where the rings cross.</li></ul>
-<p class="note">What a classical field can't show: quarks being confined, and gluons acting as if they had mass. Both come from quantum mechanics. Barriers here are colour-conducting metal; colour charge gathers on them, so Gauss's law is checked away from them. A flash of one fixed colour fits exactly only where the field is quiet: inside a strong field the field would have to be turning its colour as it goes in. Flash there and a little fixed colour charge is left behind where you tapped (like a very heavy quark), and the readout reports it.</p>`
+<p class="note">What a classical field can't show: quarks being confined, and gluons acting as if they had mass. Both come from quantum mechanics. Barriers here are colour-conducting metal; colour charge gathers on them, so Gauss's law is checked away from them. A flash of one colour fits exactly only where the field is quiet. Inside a strong field it has to change colour as it goes in, so near where you tap it picks up a little of the other colours. Otherwise it would leave colour charge behind.</p>`
 };
 const HINT={
   source:'Tap an empty spot to add a source. Drag a source to move it; tap one to select it and change it.',
@@ -1643,7 +1723,7 @@ function hitSource(c){
 }
 function applyBrush(a,b){
   if(isYm()&&P.tool==='poke'){ const amp=P.pokeStrong?YM_STRONG:YM_GENTLE;
-    if(!a) ymPoke(b.x,b.y,amp); else walkSeg(a,b,P.brush/dx/2,(x,y)=>ymPoke(x,y,amp*0.25)); }
+    if(!a) ymPoke(b.x,b.y,amp); else ymPokeSeg(a,b,amp*0.25); }
   else if(P.tool==='gauge'){ const ang=-P.gaugeSign*2*Math.PI/3;   // a negative turn about (1,1,1) takes red toward green
     if(!a) ymGauge(b.x,b.y,ang); else walkSeg(a,b,P.brush/dx/4,(x,y)=>ymGauge(x,y,ang*0.08)); }
   else if(P.tool==='poke'){ const amp=P.pokeSign*TH[P.th].poke*(P.th==='kg'?Math.max(0.3,fscale*1.5):1);
@@ -1881,8 +1961,8 @@ if(/[?&]debug/.test(location.search)){
     get t(){return t}, set t(v){t=v}, get sources(){return sources}, set sources(v){sources=v}, frame, render,
     preset(th,name){ const p=PRESETS[th].find(q=>q[0]===name); p[1](); afterChange(); }, scene(f){ f(setup); afterChange(); },
     setFric(f){P.fric=f; updateDamp();}, setMass(m){P.m[P.th]=m; updateVmin(); dirty=true;}, markDirty(){dirty=true;},
-    ym:{U:YMU,W:YMW,pq:[pq0,pq1,pq2,pq3],energy:energyYM,gauss:gaussYM,shares:ymShares,poke:ymPoke,gauge:ymGauge,packet:ymPacket,sum:ymSum,
-      fromPot:ymFromPotentials,uniform:ymUniform,random:ymRandom,step:stepYM,ready:ymReady,COL:YMCOL,
+    ym:{U:YMU,W:YMW,pq:[pq0,pq1,pq2,pq3],energy:energyYM,gauss:gaussYM,shares:ymShares,poke:ymPoke,pokeSeg:ymPokeSeg,gauge:ymGauge,packet:ymPacket,sum:ymSum,
+      fromPot:ymFromPotentials,get fixIts(){return ymFixIts},set fixTol(v){YM_FIXTOL=v},set ssor(v){YM_SSOR=v},uniform:ymUniform,random:ymRandom,step:stepYM,ready:ymReady,COL:YMCOL,
       setAmp(g,s){YM_GENTLE=g;YM_STRONG=s;}}};
 }
 })();
