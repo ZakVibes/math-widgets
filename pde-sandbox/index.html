@@ -1401,7 +1401,7 @@ custom:`<h2>Your own equation</h2>
 
 setHint();
 setEq('burg');
-if(/[?&]record=pluck\b/.test(location.search)) recordPluck(); else if(/[?&]record\b/.test(location.search)) recordMode(); else requestAnimationFrame(frame);
+if(/[?&]record=pluck\b/.test(location.search)) recordPluck(); else if(/[?&]record=spots\b/.test(location.search)) recordSpots(); else if(/[?&]record\b/.test(location.search)) recordMode(); else requestAnimationFrame(frame);
 
 /* ---------- ?record: a YouTube Short of spiral waves (see ../shorts-rec.js) ---------- */
 /* 1080×1920: a caption band on top, the plate edge to edge below it on a background the colour of the plate's
@@ -1525,6 +1525,72 @@ function recordPluck(){
         ctx.beginPath(); ctx.moveTo(x0,ky); ctx.lineTo(x0+70,ky); ctx.stroke(); ctx.setLineDash([]);
         ctx.fillStyle=it.col; ctx.fillText(it.lab,x0+86,ky); x0+=86+ws[k]+60;
       });
+      let f=0; for(let k=1;k<TAKES.length;k++) f=Math.max(f,1-Math.abs(cur-start[k]+0.5)/FADEF);
+      if(f>0){ ctx.globalAlpha=f; ctx.fillStyle=BG; ctx.fillRect(0,0,W,H); ctx.globalAlpha=1; }
+    }
+  };
+  window.__short=short;
+  const fl=document.createElement('link');   // the caption font, which this page doesn't otherwise load
+  fl.rel='stylesheet'; fl.href='https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&display=swap';
+  fl.onload=fl.onerror=()=>{
+    const sc=document.createElement('script'); sc.src='../shorts-rec.js';
+    sc.onload=()=>{ short.canvas=cv; ShortsRec(short); };
+    document.head.append(sc);
+  };
+  document.head.append(fl);
+}
+
+/* ---------- ?record=spots: a YouTube Short of Gray–Scott spots dividing ---------- */
+/* The page's Gray–Scott presets on a finer grid (256² instead of 128², same plate), drawn like the spirals Short.
+   The camera starts close on the single spot as it splits and backs out as the colony grows, following the
+   pattern's real size (the farthest bright cell from the middle), smoothed. Take 1 Dividing spots, take 2 Coral.
+   Sim time per video second ramps from slow (the first split) to fast (the plate filling). */
+function recordSpots(){
+  const W=1080, H=1920, PY=490, BG='#080a14', FADEF=8;
+  const TAKES=[{preset:'Dividing spots', sec:10, t0:1500, rate:s=>Math.min(2200,400+600*Math.max(0,s-2))},
+               {preset:'Coral', sec:8.5, t0:2100, rate:s=>Math.min(1800,500+500*s)}];
+  const start=[]; let n=0; for(const tk of TAKES){ start.push(n); n+=tk.sec*30; }
+  const cv=document.createElement('canvas'), ctx=cv.getContext('2d');
+  cv.width=W; cv.height=H;
+  for(const el of document.body.children) el.style.display='none';
+  document.body.style.background=BG;
+  cv.style.cssText='display:block;margin:0 auto;width:min(100vw,56.25vh);height:min(100vh,177.78vw)';
+  document.body.append(cv);
+  D2.gs.N=256; P.eq2='gs'; setDim(2); P.running=false;
+  const off=document.createElement('canvas'), octx=off.getContext('2d');
+  let img=null, take=-1, cur=0, hw=0;   // hw: half the width of the view, as a fraction of the plate
+  const extent=()=>{ let m=0; const c=(N2-1)/2;
+    for(let j=0;j<N2;j+=2) for(let i=0;i<N2;i+=2) if(v2[(j+1)*G2+i+1]>0.1){ const r=Math.max(Math.abs(i-c),Math.abs(j-c)); if(r>m) m=r; }
+    return (m+1)/N2; };
+  const fit=()=>Math.min(0.5,Math.max(0.09,1.5*extent()));
+  const load=k=>{ take=k; loadPreset2(TAKES[k].preset); P.running=false; for(let T=0;T<TAKES[k].t0;T+=50) advance2(50); hw=fit(); };   // in chunks: advance2 caps its steps per call
+  const short={
+    name:'pde-spots', seconds:n/30, captionY:260,
+    music:{ file:'chopin-op55no1.mp3', start:138.5, fade:2.2 },   // Zak's pick: starts on a note just before the phrase lands home on F minor (150.9 s, ~12.4 s in)
+    captions:[
+      {from:0, to:3.0, text:'Why does this spot\nsplit in two?'},
+      {from:3.2, to:6.0, text:'Its middle runs out of fuel,\nso it pinches in two'},
+      {from:6.2, to:9.6, text:'Then every copy\nsplits again'},
+      {from:10.2, to:14.0, text:'More fuel: coral'},
+      {from:14.2, to:n/30+1, text:'Try it yourself,\nlink in description'},
+      {from:0, to:n/30+1, text:'Gray–Scott reaction–diffusion', y:418, size:32, color:'#c9cfe0'}
+    ],
+    reset(){ cur=0; load(0); },
+    tick(fi){
+      cur=fi;
+      for(let k=TAKES.length-1;k>=0;k--) if(fi>=start[k]){ if(take!==k) load(k); break; }
+      if(fi>start[take]) advance2(TAKES[take].rate((fi-start[take])/30)/30);
+      hw+=(fit()-hw)*0.06;
+    },
+    render(){
+      if(off.width!==N2||!img){ off.width=off.height=N2; img=octx.createImageData(N2,N2); }
+      const pix=new Uint32Array(img.data.buffer);
+      for(let j=0;j<N2;j++){ const o=(N2-1-j)*N2, b=(j+1)*G2+1;
+        for(let i=0;i<N2;i++){ let x=v2[b+i]/0.4; x=x<0?0:x>1?1:x; pix[o+i]=lutQ[(x*(LN-1))|0]; } }
+      octx.putImageData(img,0,0);
+      ctx.setTransform(1,0,0,1,0,0); ctx.fillStyle=BG; ctx.fillRect(0,0,W,H);
+      const s=2*hw*N2, s0=(N2-s)/2;
+      ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high'; ctx.drawImage(off,s0,s0,s,s,0,PY,W,W);
       let f=0; for(let k=1;k<TAKES.length;k++) f=Math.max(f,1-Math.abs(cur-start[k]+0.5)/FADEF);
       if(f>0){ ctx.globalAlpha=f; ctx.fillStyle=BG; ctx.fillRect(0,0,W,H); ctx.globalAlpha=1; }
     }
