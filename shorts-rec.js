@@ -6,7 +6,7 @@
      tick(i)  advance the scene by one video frame (i = frame number)
      render() draw the scene (may return a promise; recording and stills wait for it)
      captions [{ from, to, text, size?, y?, color? }] in seconds, "\n" breaks lines; captionY in pixels
-              (a caption's own y, up to ~850, overrides captionY; color defaults to white)
+              (a caption's own y, anywhere up to ~1880, overrides captionY; color defaults to white)
      music    optional { file, start, fade }: a recording in shorts/music/, played from <start> s into the
               file and fading out over the last <fade> s of the video
    This file plays a looping preview with the captions, and on "Record" (or the R key) steps through every
@@ -17,7 +17,7 @@
    caption's words or timing needs no re-recording. __rec.music() only redoes the music.
    No site address in the video (Zak's choice): the link goes in the YouTube description. */
 (() => {
-const FADE = 0.35, RISE = 18, BAND = 900;   // caption fade (s), slide-up (px), height of the caption pictures (px)
+const FADE = 0.35, RISE = 18, BAND = 1920;   // caption fade (s), slide-up (px), height of the caption pictures (px): the whole frame, so a caption can sit at the bottom
 
 window.ShortsRec = function (o) {
   const fps = o.fps || 30, N = Math.round(o.seconds * fps);

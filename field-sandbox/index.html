@@ -1898,6 +1898,19 @@ function recordMode(){
         {from:T-2.6, to:T+1, text:'Try it yourself,\nlink in description'},
         {from:0, to:T+1, text:'Classical Yang–Mills theory', y:418, size:32, color:'#c9cfe0'}
       ]},
+    // Yang–Mills: the Turbulence preset (random smooth colour field at rest) churning, before it breaks into fine grain
+    ymturb:{ name:'ym-turb', music:{ file:'chopin-op72no1.mp3', start:0.5, fade:3 }, auto:1, zoom:2,
+      takes:[
+        // it starts at rest (dark) and needs to simmer: open at t = 26 (?t0= to try others; Zak picked 26 over 2, 10 and 18), fine threads still swirling
+        {sec:10, steps:f=>0.45, init(){ PRESETS.ym.find(q=>q[0]==='Turbulence')[1](); advance(Math.round(10*(+new URLSearchParams(location.search).get('t0')||26))); }}
+      ],
+      captions:T=>[
+        {from:0, to:T-2.8, text:'Gluon turbulence'},
+        {from:T-2.6, to:T+1, text:'Try it yourself,\nlink in description'},
+        {from:0, to:T+1, text:'Classical Yang–Mills theory', y:418, size:32, color:'#c9cfe0'},
+        // under the field (it ends at y = 1569)
+        {from:0, to:T+1, text:'The gluon field pulls on itself,\nso big swirls break into smaller ones', y:1610, size:34, color:'#c9cfe0'}
+      ]},
     // Yang–Mills: the Unstable magnetic field preset (uniform blue, tiny red + green noise) tears into holes, then turbulence
     ymtear:{ name:'ym-tear', music:{ file:'chopin-waltz64no2.mp3', start:0.2, fade:3.5 }, auto:1, zoom:1.3,
       takes:[
