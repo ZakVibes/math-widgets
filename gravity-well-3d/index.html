@@ -954,6 +954,30 @@ else {
       if (fade > 0) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = fade; ctx.fillStyle = C.void; ctx.fillRect(0, 0, cv.width, cv.height); ctx.globalAlpha = 1; }
     }
   };
+  // ?record=eight: holds only the captions and music of the figure-eight Short. Its pictures come from Python
+  // (the widget's softening and steps could send out a different star), so don't press Record here:
+  // shorts/_clean/gravity-eight.mp4 is the finished picture, and __rec.captions() lays these over it.
+  if (/[?&]record=eight\b/.test(location.search)) {
+    const SEC8 = 40.53;
+    Object.assign(short, {
+      name: 'gravity-eight', seconds: SEC8, captionY: 260,
+      music: { file: 'chopin-op55no1.mp3', start: 2.4, fade: 4.5 },   // Chopin, Nocturne Op. 55 No. 1 (Musopen recording, public domain)
+      captions: [
+        { from: 0, to: 2.3, text: 'Can three stars chase\neach other forever?' },
+        { from: 2.5, to: 4.4, text: 'This orbit is stable' },
+        { from: 4.5, to: 6.2, text: 'Move one star' },
+        { from: 8.2, to: 13.6, text: 'Now one gets thrown out' },
+        { from: 14.2, to: 19.4, text: 'Every pixel is\na different nudge' },
+        { from: 19.8, to: 24.8, text: 'Colour shows how fast\na star leaves' },
+        { from: 25.2, to: 30.8, text: 'Zoom in and it keeps going' },
+        { from: 33.6, to: 37, text: 'The black looks calm, but\nmost of it is slow chaos' },
+        { from: 37.2, to: SEC8 + 1, text: 'Tiny nudges should stay forever.\nAll of them? Nobody knows' }
+      ],
+      reset() { recSeed = 7; frameN = 0; scene('eight'); cur = 0; },
+      tick(i) { cur = i; simFrame(); frameN++; },
+      render() { draw(); }
+    });
+  }
   window.__short = short;
   const s = document.createElement('script');
   s.src = '../shorts-rec.js';
