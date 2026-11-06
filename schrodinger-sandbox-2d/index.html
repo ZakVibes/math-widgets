@@ -837,7 +837,169 @@ install(packet(...P0.pk), false);
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", readTokens);
 new MutationObserver(readTokens).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 if (matchMedia("(prefers-reduced-motion: reduce)").matches) togglePlay();
-requestAnimationFrame(loop);
+if (/[?&]record\b/.test(location.search)) recordMode(); else requestAnimationFrame(loop);
+
+// ---------- ?record: a YouTube Short of one particle at two slits (see ../shorts-rec.js) ----------
+// The page's Double slit scene with a faster packet (k = 6, five clear stripes), turned so the particle travels up the phone.
+// Both runs (two slits, one slit) are computed once with the page's own step() and kept as a film. The dots are drawn at
+// random from the flux that really crosses the screen line at x = 6.5, so the stripes are the simulation's, not painted.
+// light-slits.jpg (loaded only here) is the last frame of our Short of light through two slits, turned the same way.
+function recordMode() {
+  const W = 1080, H = 1920, BG = "#0D121D", BAND = "#161D2D", SC = 72, BY = 514, BH = 90, FT = 604, FB = 1500, WY = FT + 6.5 * SC;
+  const SP = 3, HW = 0.45, XS = 6.5, EVERY = 3, STEPS = 690, ND = 5000, DOT = "#FFECAA";
+  const T_END = 37, T_CLOSE = 26, T_SHUT = 26.8;
+  const cv = document.createElement("canvas"), ctx = cv.getContext("2d"); cv.width = W; cv.height = H;
+  document.documentElement.dataset.theme = "dark"; readTokens();
+  for (const el of document.body.children) el.style.display = "none";
+  document.body.style.background = BG;
+  cv.style.cssText = "display:block;margin:0 auto;width:min(100vw,56.25vh);height:min(100vh,177.78vw)";
+  document.body.append(cv);
+  S.pot = "dslit"; S.params.dslit = SP; S.edges = "absorb"; S.bumps = [];
+  const yPx = y => (7.5 - y) * SC;
+  const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+  const ramp = (t, a, b) => clamp((t - a) / (b - a));
+  function setWalls(one) {
+    S.walls.fill(0);
+    if (one) for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) if (Math.abs(XC[i]) < 0.3 && Math.abs(XC[j] + SP / 2) <= HW) S.walls[j * n + i] = 1;
+    buildPotential(true);
+  }
+  function film(one) {
+    setWalls(one);
+    const st = packet(-5.5, 0, 6, 0, 1.6); pr.set(st[0]); pi.set(st[1]);
+    const frames = [], flux = new Float64Array(n), avg = new Float64Array(N2), ci = XC.findIndex(x => x >= XS);
+    for (let s = 0; s < STEPS; s++) {
+      if (s % EVERY === 0) { frames.push([Float32Array.from(pr), Float32Array.from(pi)]); for (let q = 0; q < N2; q++) avg[q] += pr[q] * pr[q] + pi[q] * pi[q]; }
+      step();
+      for (let j = 0; j < n; j++) { const q = j * n + ci; flux[j] += (pr[q] * (pi[q + 1] - pi[q - 1]) - pi[q] * (pr[q + 1] - pr[q - 1])) / (2 * DX) * DT; }
+    }
+    const fan = document.createElement("canvas"); fan.width = fan.height = n;
+    const g = fan.getContext("2d"), im = g.createImageData(n, n); let top = 0;
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) if (XC[i] > 2) top = Math.max(top, avg[j * n + i]);
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) if (XC[i] > 0.3) {
+      const o = ((n - 1 - j) * n + i) * 4; im.data[o] = C.rAcc[0]; im.data[o + 1] = C.rAcc[1]; im.data[o + 2] = C.rAcc[2];
+      im.data[o + 3] = 255 * Math.min(1, Math.pow(avg[j * n + i] / top, 0.55));
+    }
+    g.putImageData(im, 0, 0);
+    return { frames, flux, fan };
+  }
+  let F2 = null, F1 = null, A = [], B = [];
+  function sample(rnd, flux) {
+    const cells = []; let tot = 0;
+    for (let j = 0; j < n; j++) if (Math.abs(XC[j]) < 7.5 && flux[j] > 0) { tot += flux[j]; cells.push([XC[j], tot]); }
+    const out = [];
+    for (let k = 0; k < ND; k++) {
+      const u = rnd() * tot; let a = 0, b = cells.length - 1;
+      while (a < b) { const m = (a + b) >> 1; if (cells[m][1] < u) a = m + 1; else b = m; }
+      out.push([yPx(cells[a][0] + (rnd() - 0.5) * DX), 8 + rnd() * (BH - 16)]);
+    }
+    return out;
+  }
+  const seeded = s => () => { s = s + 0x6D2B79F5 | 0; let x = Math.imul(s ^ s >>> 15, 1 | s); x = x + Math.imul(x ^ x >>> 7, 61 | x) ^ x; return ((x ^ x >>> 14) >>> 0) / 4294967296; };
+  const L0 = 12, L1 = 133;   // film frames: t = 0.29 (just before the wall) and t = 3.2 (the wave is on the screen)
+  const RUNS = [[0, 6.3], [8.7, 11], [11.3, 11.9], [11.95, 12.55], [12.6, 13.2], [13.25, 13.85]], NRUN = RUNS.length;
+  const RUNB = [T_SHUT + 0.1, 28.4];
+  const countA = t => { let c = 0; for (const r of RUNS) if (t >= r[1]) c++; return t <= 14 ? c : Math.round(NRUN + (ND - NRUN) * ramp(t, 14, 21) ** 3); };
+  const countB = t => t < RUNB[1] ? 0 : Math.round(1 + (ND - 1) * ramp(t, RUNB[1], 31) ** 2);
+  const bandA = document.createElement("canvas"), bandB = document.createElement("canvas");
+  bandA.width = bandB.width = W; bandA.height = bandB.height = BH;
+  const gA = bandA.getContext("2d"), gB = bandB.getContext("2d");
+  let nA = 0, nB = 0, cur = 0, one = false;
+  const dot = (g, d, r) => { g.fillStyle = DOT; g.beginPath(); g.arc(d[0], d[1], r, 0, 7); g.fill(); };
+  const light = new Image(), lightReady = new Promise(r => { light.onload = light.onerror = r; }); light.src = "light-slits.jpg";
+  const toField = () => ctx.setTransform(0, -SC * DX, SC * DX, 0, -2.5 * SC, WY + 10 * SC);
+  function wave(fm, p, alpha) {
+    const f = fm.frames[Math.round(L0 + (L1 - L0) * p)]; paintField(f[0], f[1], "phase", true);
+    toField(); ctx.globalAlpha = alpha; ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high"; ctx.drawImage(off, 0, 0);
+  }
+  function ring(d, y, k) {
+    ctx.strokeStyle = DOT; ctx.globalAlpha = 1 - k; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(d[0], y + d[1], 8 + 46 * k, 0, 7); ctx.stroke(); ctx.globalAlpha = 1;
+  }
+
+  const short = {
+    name: "quantum-slits", seconds: T_END, captionY: 250, seed: 9,
+    music: { file: "chopin-op27no2-levy.mp3", start: 0.6, fade: 4.5 },   // Zak's pick over Prelude No. 13
+    captions: [
+      { from: 0, to: 3.4, text: "What happens when one\nparticle goes through two slits?", size: 68 },
+      { from: 3.6, to: 6.2, text: "Its wave goes through both" },
+      { from: 6.6, to: 8.6, text: "But it lands in\njust one spot" },
+      { from: 8.9, to: 11.2, text: "Run it again:\na different spot" },
+      { from: 14.3, to: 18.2, text: "Thousands of runs:\nstripes" },
+      { from: 18.6, to: 22, text: "The same stripes we saw with\nlight through two slits", size: 68 },
+      { from: 22.3, to: 26, text: "Amazingly, one particle\nbehaves exactly like a wave!", size: 68 },
+      { from: 26.3, to: 30.4, text: "Close one slit:\nno stripes" },
+      { from: 30.7, to: 34.4, text: "Closing a slit put\nmore particles here" },
+      { from: 34.6, to: T_END + 1, text: "Try it yourself,\nlink in description" },
+      { from: 0, to: T_END + 1, text: "Schrödinger equation in 2D", y: 1535, size: 32, color: "#c9cfe0" },
+    ],
+    reset() {
+      if (!F2) { F1 = film(true); F2 = film(false); one = false; }
+      const rnd = seeded(short.seed);
+      A = sample(rnd, F2.flux); B = sample(rnd, F1.flux);
+      gA.clearRect(0, 0, W, BH); gB.clearRect(0, 0, W, BH); nA = nB = 0; cur = 0;
+      if (one) { one = false; setWalls(false); }
+    },
+    tick(i) {
+      cur = (i + 1) / 30;
+      const a = countA(cur), b = countB(cur);
+      for (; nA < a; nA++) dot(gA, A[nA], nA < NRUN ? 6 : 2);
+      for (; nB < b; nB++) dot(gB, B[nB], nB < 1 ? 6 : 2);
+      if (!one && cur >= T_SHUT) { one = true; setWalls(true); }
+    },
+    render() {
+      const t = cur; ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.fillStyle = BG; ctx.fillRect(0, 0, W, H);
+      // the field
+      ctx.save(); ctx.beginPath(); ctx.rect(0, FT, W, FB - FT); ctx.clip();
+      const run = RUNS.find(r => t >= r[0] && t < r[1] + 0.25);
+      if (run) wave(F2, ramp(t, run[0], run[1]), 1 - ramp(t, run[1], run[1] + 0.25));
+      if (t >= RUNB[0] && t < RUNB[1] + 0.25) wave(F1, ramp(t, RUNB[0], RUNB[1]), 1 - ramp(t, RUNB[1], RUNB[1] + 0.25));
+      const li = ramp(t, 18.5, 19.3) * (1 - ramp(t, 22, 22.8));
+      const fan2 = ramp(t, 14, 15.5) * (1 - ramp(t, T_CLOSE - 0.3, T_CLOSE + 0.3)) * (1 - li), fan1 = ramp(t, 28.6, 30);
+      toField();
+      if (fan2 > 0) { ctx.globalAlpha = fan2; ctx.drawImage(F2.fan, 0, 0); }
+      if (fan1 > 0) { ctx.globalAlpha = fan1; ctx.drawImage(F1.fan, 0, 0); }
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      if (li > 0 && light.naturalWidth) { ctx.globalAlpha = li; ctx.drawImage(light, 0, WY - light.naturalHeight); }
+      ctx.globalAlpha = 1;
+      // the wall, with the slit closing from the side
+      ctx.fillStyle = C.wall; const wy = WY - 0.3 * SC, wh = 0.6 * SC, s1 = yPx(SP / 2 + HW), s2 = yPx(SP / 2 - HW), s3 = yPx(-SP / 2 + HW), s4 = yPx(-SP / 2 - HW);
+      ctx.fillRect(0, wy, s1, wh); ctx.fillRect(s2, wy, s3 - s2, wh); ctx.fillRect(s4, wy, W - s4, wh);
+      const shut = ramp(t, T_CLOSE, T_SHUT); if (shut > 0) ctx.fillRect(s4 - (s4 - s3) * shut, wy, (s4 - s3) * shut, wh);
+      ctx.restore();
+      // the screen: the two-slit dots slide up to make room when the slit closes
+      const up = (BH + 4) * (1 - (1 - ramp(t, T_CLOSE, T_SHUT)) ** 2), yA = BY - up;
+      ctx.fillStyle = BAND; ctx.fillRect(0, BY, W, BH); if (up > 0) ctx.fillRect(0, yA, W, BH);
+      ctx.drawImage(bandA, 0, yA); ctx.drawImage(bandB, 0, BY);
+      ctx.fillStyle = "#8995B0"; ctx.fillRect(0, BY + BH, W, 3);
+      RUNS.forEach((r, q) => { const k = (t - r[1]) / 0.6; if (k >= 0 && k < 1) ring(A[q], yA, k); });
+      const kb = (t - RUNB[1]) / 0.6; if (kb >= 0 && kb < 1) ring(B[0], BY, kb);
+      ctx.font = '700 30px "Bricolage Grotesque", sans-serif'; ctx.textBaseline = "alphabetic";
+      if (nA > 0 && t < T_CLOSE) { ctx.textAlign = "right"; ctx.fillStyle = "#c9cfe0"; ctx.fillText(`${nA.toLocaleString("en-US")} particle${nA > 1 ? "s" : ""}`, W - 24, BY - 14); }
+      const lab = ramp(t, T_SHUT, T_SHUT + 0.4);
+      if (lab > 0) {
+        ctx.globalAlpha = lab; ctx.textAlign = "left";
+        for (const [txt, y] of [["Two slits", yA], ["One slit", BY]]) { ctx.fillStyle = BG; ctx.fillRect(8, y + 6, ctx.measureText(txt).width + 16, 38); ctx.fillStyle = "#fff"; ctx.fillText(txt, 16, y + 35); }
+        ctx.globalAlpha = 1;
+      }
+      // the band that was dark
+      const mk = ramp(t, 30.7, 31.1);
+      if (mk > 0) {
+        const x = yPx(1.33), bw = 56; ctx.globalAlpha = mk; ctx.strokeStyle = "#fff"; ctx.lineWidth = 4; ctx.strokeRect(x - bw / 2, yA - 4, bw, 2 * BH + 12);
+        ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.moveTo(x, yA - 12); ctx.lineTo(x - 18, yA - 40); ctx.lineTo(x + 18, yA - 40); ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1;
+      }
+    },
+  };
+  window.__short = short;
+  const fl = document.createElement("link");   // the caption font, which this page doesn't otherwise load
+  fl.rel = "stylesheet"; fl.href = "https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&display=swap";
+  fl.onload = fl.onerror = async () => {
+    await lightReady;
+    const sc = document.createElement("script"); sc.src = "../shorts-rec.js";
+    sc.onload = () => { short.canvas = cv; ShortsRec(short); };
+    document.head.append(sc);
+  };
+  document.head.append(fl);
+}
 })();
 </script>
 
