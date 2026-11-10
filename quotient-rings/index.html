@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Quotient Rings</title>
-<link rel="manifest" href="../manifest.json"><link rel="icon" href="../icons/icon-192.png"><link rel="apple-touch-icon" href="../icons/icon-180.png"><meta name="apple-mobile-web-app-title" content="Math Widgets"><script>if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("../sw.js"));</script><script>if (location.hostname === "zakvibes.github.io") { const s = document.createElement("script"); s.defer = true; s.src = "https://static.cloudflareinsights.com/beacon.min.js"; s.dataset.cfBeacon = JSON.stringify({ token: "82a3b23479314bcbbeaf2af3881066d0", spa: false }); document.head.append(s); }</script>
+<link rel="manifest" href="../manifest.json"><link rel="icon" href="../icons/icon-192.png"><link rel="apple-touch-icon" href="../icons/icon-180.png"><meta name="apple-mobile-web-app-title" content="Math Widgets"><script>if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("../sw.js"));</script><script>if (location.hostname === "zakvibes.github.io") { const s = document.createElement("script"); s.defer = true; s.src = "https://static.cloudflareinsights.com/beacon.min.js"; s.dataset.cfBeacon = JSON.stringify({ token: "82a3b23479314bcbbeaf2af3881066d0" }); document.head.append(s); }</script>
 <link rel="stylesheet" href="../site.css">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -308,10 +308,10 @@ function parseExact(src, ring){
     for(;;){
       const t=peek();
       if(!t) break;
-      if(t.t==='*'){ next(); if(!peek()) fail("Something is missing after '*'."); v=chk(PC.mul(v,power())); }
+      if(t.t==='*'){ next(); if(!peek()) fail("Something is missing after '*'."); v=chk(PC.mul(v,signedPower())); }
       else if(t.t==='/'){
         next(); if(!peek()) fail("Something is missing after '/'.");
-        const d=power();
+        const d=signedPower();
         if(!isConst(d)) fail('You can only divide by a number, not by a polynomial in x.');
         if(!d.length) fail('Division by zero.');
         v=PC.scale(v,FC.inv(d[0]));
@@ -323,6 +323,12 @@ function parseExact(src, ring){
       else break;
     }
     return sign<0?PC.scale(v,FC.neg(FC.one)):v;
+  }
+  function signedPower(){ // after '*' or '/': allow x*-1, x/-2
+    let sg=1;
+    while(peek()&&(peek().t==='+'||peek().t==='-')){ if(next().t==='-') sg=-sg; }
+    if(!peek()) fail('The expression ends too early: something is missing after the last operator.');
+    const v=power(); return sg<0?PC.scale(v,FC.neg(FC.one)):v;
   }
   function exponent(){
     let t=peek(); if(!t) fail("Something is missing after '^'.");
@@ -545,39 +551,55 @@ function decomposeChar0(f,isReal){
   const P=PC; f=P.trim(f); const m=P.deg(f);
   const lead=f[m]; const fm=P.monic(f);
   const sq=yun(P,fm); const pieces=[];
-  for(const [a,e] of sq){
-    const roots=aberth(a.map(z=>[qfloat(z.r),qfloat(z.i)]));
+  const cf2=z=>[qfloat(z.r),qfloat(z.i)];
+  for(const [a0,e] of sq){
+    // Shift x = y + c (c = minus the mean of the roots, exact) so the floating-point root finder
+    // works on small numbers: huge offsets like (x-10^8)^2+1 then keep their +1.
+    const a=P.monic(a0), da=P.deg(a);
+    const c=FC.mul(FC.neg(a[da-1]),FC.inv(FC.fromInt(da)));
+    let b=[]; { let pw=[FC.one]; const yc=[c,FC.one]; for(let k=0;k<=da;k++){ b=P.add(b,P.scale(pw,a[k])); pw=P.mul(pw,yc); } }
+    const cr=qfloat(c.r), ci=qfloat(c.i);
+    const roots=aberth(b.map(cf2));
+    let R=0; for(const z of roots) R=Math.max(R,cabs(z));
+    const tiny=1e-10*(R+Math.hypot(cr,ci))||0;      // below this a float is rounding noise
+    const cl=x=>Math.abs(x)<=tiny?0:x;
     if(!isReal){
       for(const z of roots){
         const qr=snapQ(z[0]), qi=snapQ(z[1]);
-        let re=rnF(z[0]), im=rnF(z[1]);
-        if(qr&&qi&&P.F.isZero(P.ev(a,C(qr,qi)))){ re=rnQ(qr); im=rnQ(qi); }
-        else if(Math.abs(z[1])<1e-11){ im=rnF(0); }
-        pieces.push({kind:'lin',e,d:1,re,im,sortKey:[z[0],z[1]]});
+        let re=rnF(cl(cr+z[0])), im=rnF(cl(ci+z[1]));
+        if(qr&&qi){ const ex=FC.add(c,C(qr,qi)); if(P.F.isZero(P.ev(a,ex))){ re=rnQ(ex.r); im=rnQ(ex.i); } }
+        pieces.push({kind:'lin',e,d:1,re,im,sortKey:[re.f,im.f]});
       }
     } else {
       const N=sturmCount(a);
       const idx=roots.map((_,k)=>k).sort((u,v)=>Math.abs(roots[u][1])-Math.abs(roots[v][1]));
       const realIdx=idx.slice(0,N), rest=idx.slice(N);
       for(const k of realIdx){
-        // real Newton polish on the real polynomial
-        const cf=a.map(z=>qfloat(z.r)); let x=roots[k][0];
-        for(let it=0;it<8;it++){ let p=0,d=0; for(let j=cf.length-1;j>=0;j--){ d=d*x+p; p=p*x+cf[j]; } if(d===0) break; const w=p/d; if(!isFinite(w)) break; x-=w; }
-        const q=snapQ(x);
-        let re=rnF(x);
-        if(q&&P.F.isZero(P.ev(a,C(q,Q0)))) re=rnQ(q);
-        pieces.push({kind:'real',e,d:1,re,im:rnF(0),sortKey:[x,0]});
+        // real Newton polish on the shifted real polynomial
+        const cf=b.map(z=>qfloat(z.r)); let y=roots[k][0];
+        for(let it=0;it<8;it++){ let p=0,d=0; for(let j=cf.length-1;j>=0;j--){ d=d*y+p; p=p*y+cf[j]; } if(d===0) break; const w=p/d; if(!isFinite(w)) break; y-=w; }
+        const q=snapQ(y);
+        let re=rnF(cl(cr+y));
+        if(q){ const ex=qadd(c.r,q); if(P.F.isZero(P.ev(a,C(ex,Q0)))) re=rnQ(ex); }
+        pieces.push({kind:'real',e,d:1,re,im:rnF(0),sortKey:[re.f,0]});
       }
       const reps=rest.slice().sort((u,v)=>roots[v][1]-roots[u][1]).slice(0,Math.floor(rest.length/2));
       for(const k of reps){
         const z=roots[k]; const u=z[0], v=Math.abs(z[1]);
+        // factor y^2 - Sy*y + Ty of b, i.e. x^2 - S x + T of a with S = 2c + Sy, T = c^2 + c*Sy + Ty
+        let S=rnF(cl(2*cr+2*u)), T=rnF(cl(cr*cr+2*cr*u+u*u+v*v)), vv=v;
         const sq_=snapQ(2*u), tq=snapQ(u*u+v*v);
-        let S=rnF(2*u), T=rnF(u*u+v*v);
-        if(sq_&&tq){
+        if(da===2){ // a is this quadratic itself: take S, T exactly from it
+          S=rnQ(qneg(a[1].r)); T=rnQ(a[0].r);
+          vv=Math.sqrt(Math.max(qfloat(qsub(a[0].r,qmul(qmul(a[1].r,a[1].r),Q(1n,4n)))),0));
+        } else if(sq_&&tq){
           const qd=[C(tq,Q0),C(qneg(sq_),Q0),FC.one];
-          if(P.rem(a,qd).length===0){ S=rnQ(sq_); T=rnQ(tq); }
+          if(P.rem(b,qd).length===0){
+            S=rnQ(qadd(qadd(c.r,c.r),sq_)); T=rnQ(qadd(qadd(qmul(c.r,c.r),qmul(c.r,sq_)),tq));
+            vv=Math.sqrt(Math.max(qfloat(qsub(tq,qmul(qmul(sq_,sq_),Q(1n,4n)))),0));
+          }
         }
-        const uu=S.f/2, vv=Math.sqrt(Math.max(T.f-uu*uu,0));
+        const uu=cl(S.f/2);
         pieces.push({kind:'pair',e,d:2,S,T,re:rnF(uu),im:rnF(vv),sortKey:[uu,vv]});
       }
     }
@@ -776,8 +798,9 @@ const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',
 
 /* ---------- number / polynomial display ---------- */
 function fmtNum(x){ if(Math.abs(x)<1e-10) return '0'; return String(Number(x.toPrecision(4))); }
-function rnStr(r){ return r.q?qstr(qabs(r.q)):fmtNum(Math.abs(r.f)); }
-function rnZero(r){ return r.q?qz(r.q):Math.abs(r.f)<1e-10; }
+function fmtSig(x){ return x===0?'0':String(Number(x.toPrecision(4))); } // roots: already cleaned of rounding noise
+function rnStr(r){ return r.q?qstr(qabs(r.q)):fmtSig(Math.abs(r.f)); }
+function rnZero(r){ return r.q?qz(r.q):r.f===0; }
 function rnNegQ(r){ return r.q?r.q.n<0n:r.f<0; }
 function cfRN(r){ if(rnZero(r)) return null; return {neg:rnNegQ(r),mag:rnStr(r),wrap:!!(r.q&&r.q.d!==1n)}; }
 function cfComplex(re,im){
@@ -847,7 +870,7 @@ function analyze(ring,p,text){
     }
     if(poly.length-1>DEG_CAP) return {kind:'error',msg:'Degree '+(poly.length-1)+' is above the cap of '+DEG_CAP+'.'};
     const lead=poly[poly.length-1];
-    if(znInv(n,lead)===null) return {kind:'error',msg:'Modulo '+n+', the leading coefficient of f is '+lead+', which is not invertible in ℤ/'+n+'. With a non-invertible leading coefficient (for example 2x² + 1 over ℤ/4) the quotient no longer has the nice basis 1, x, …, x^(deg−1): the highest power of x cannot be rewritten using the lower ones. So this widget only accepts polynomials whose leading coefficient is invertible (a unit) modulo '+n+'.'};
+    if(znInv(n,lead)===null) return {kind:'error',msg:'Modulo '+n+', the leading coefficient of f is '+lead+', which is not invertible in ℤ/'+n+'. Then f = 0 cannot be solved for the highest power of x, so the quotient loses the nice basis 1, x, …, x^(deg−1) and can behave very differently. For example, over ℤ/4 the polynomial 2x² + 1 is itself invertible, since (1 + 2x²)(1 − 2x²) = 1 − 4x⁴ = 1, so the quotient by it is the zero ring; while the quotient by 2x is infinite. So this widget only accepts polynomials whose leading coefficient is invertible (a unit) modulo '+n+'.'};
     return analyzeZn(n,poly,ex.length>poly.length);
   }
   if(!ex.length) return {kind:'zero',ring,p,note:''};
@@ -1186,10 +1209,10 @@ function rootText(r,raw){
   if(raw&&raw.kind==='lin'&&raw.re.q&&raw.im.q){
     return polyHtml([cfComplex(raw.re,raw.im)]).replace(/^\(|\)$/g,'');
   }
-  if(Math.abs(im)<1e-10) return fmtNum(re).replace('-','−');
-  const imS=fmtNum(Math.abs(im)), imT=(imS==='1'?'':imS)+'i';
-  if(fmtNum(re)==='0') return (im<0?'−':'')+imT;
-  return fmtNum(re).replace('-','−')+(im<0?' − ':' + ')+imT;
+  if(im===0) return fmtSig(re).replace('-','−');
+  const imS=fmtSig(Math.abs(im)), imT=(imS==='1'?'':imS)+'i';
+  if(re===0) return (im<0?'−':'')+imT;
+  return fmtSig(re).replace('-','−')+(im<0?' − ':' + ')+imT;
 }
 function plotSvg(res){
   const roots=[]; res.pieces.forEach((pc,k)=>pc.roots.forEach(r=>roots.push({k,pc,x:r[0],y:r[1]})));
