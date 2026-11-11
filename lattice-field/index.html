@@ -159,7 +159,7 @@ body.poke #field,body.srcmode #field{touch-action:none;cursor:crosshair;-webkit-
       <li><b>Make it complex.</b> Choose Complex φ and the Vortices view. Go from Vortex gas to Quasi-ordered: free vortices pair up and the stiffness Υ jumps past 2/π. That is the BKT transition.</li>
       <li><b>Wrap the ball.</b> Choose Arrows (O(3)) and the Topology view, press Add instanton, then Run: the hand-made blob is not a typical sample, and the next samples no longer show it. Press Randomize, wait for the picture to settle, then Cool: the noise is stripped away and the instantons (red) and anti-instantons (blue) that remain are left standing. Then compare the Strong, Medium and Weak coupling presets: ξ grows exponentially with β.</li>
       <li><b>Watch a collision in real time.</b> Choose Kink collisions and press Two bounces: the kinks meet, bounce, fall back for a second hit and only then fly apart. Compare One bounce and Trapped (bion), then press Scan speeds to map every speed from 0.15 to 0.30 and click any bar to replay that collision.</li>
-      <li><b>Make particles yourself.</b> Choose Poke the field. Tap the picture quickly: only ripples. Now press and hold for about half a second: a kink–antikink pair is born and flies apart. With Gentle strength no pair ever forms, however long you hold, because the push is too weak to lift the field over the hump.</li>
+      <li><b>Make particles yourself.</b> Choose Poke the field. Tap the picture quickly: only ripples. Now press and hold for about half a second: a kink–antikink pair is born and flies apart. With Gentle strength no pair ever forms, however long you hold, because the push is too weak to lift the field over the hump. Gentle pushes in rhythm with the field's wobble can still pump it over.</li>
     </ol>
   </details>
 
@@ -247,6 +247,7 @@ body.poke #field,body.srcmode #field{touch-action:none;cursor:crosshair;-webkit-
           <button class="btn primary" id="runBtn">Pause</button>
           <button class="btn ko" id="fireBtn" style="align-items:center" title="Start a new collision at the current speed">Fire</button>
           <button class="btn po" id="calmBtn" style="align-items:center" title="Set the whole field back to rest in the blue valley">Calm</button>
+          <button class="btn po" id="pumpBtn" style="align-items:center" title="Three gentle pushes in rhythm with the field's wobble: watch them pump it over the hump">Pump it over</button>
           <div class="sizebox ko po" style="margin-left:0"><label for="kspeed">Playback</label>
             <select id="kspeed"><option value="0.5">0.5×</option><option value="1">1×</option><option value="2" selected>2×</option><option value="4">4×</option><option value="8">8×</option></select></div>
           <button class="btn kh ph" id="hotBtn" title="Random values everywhere">Randomize</button>
@@ -372,7 +373,7 @@ body.poke #field,body.srcmode #field{touch-action:none;cursor:crosshair;-webkit-
         <div class="cards">
           <div class="card"><div class="k">time t</div><div class="v" id="pT">–</div><div class="s" id="pTs">&nbsp;</div></div>
           <div class="card"><div class="k">walls in view</div><div class="v" id="pW">–</div><div class="s">kinks and antikinks</div></div>
-          <div class="card"><div class="k">your last push put in</div><div class="v" id="pIn">–</div><div class="s">a pair needs ≥ 2.67</div></div>
+          <div class="card"><div class="k">your pushes put in</div><div class="v" id="pIn">–</div><div class="s">a pair needs ≥ 2.67</div></div>
           <div class="card"><div class="k">energy in the box</div><div class="v" id="pE">–</div><div class="s">ripples carry it off the edges</div></div>
         </div>
         <p class="kstatus" id="pStatus">Press and hold on the picture to push the field.</p>
@@ -699,7 +700,12 @@ function allocLattice(nx, nt){
 function setSize(n){
   if (kink || poke) return;
   if (cplx){ allocU(n); return; }
-  if (o3){ allocO(n); return; }
+  if (o3){
+    var wasCooling = coolLeft > 0;
+    allocO(n);
+    if (wasCooling){ paused = false; $("runBtn").textContent = "Pause"; }
+    return;
+  }
   N = n; sq = null; srcList = []; srcRef = null;
   if (strip){ setGeometry("square"); return; }
   allocLattice(N, N);
@@ -1942,8 +1948,8 @@ var parked = {
 };
 function setMode(m){
   if (m === mode || scan || kscan || !MODES[m]) return;
+  if (o3 && coolLeft > 0){ coolTotal -= coolLeft; finishCool(); }
   parked[mode] = { kappa: kappa, lambda: lambda, view: viewMode, strip: strip, paused: paused };
-  if (o3) coolLeft = 0;
   var sz = parseInt($("sizeSel").value, 10) || N, p = parked[m], cfg = MODES[m];
   mode = m; modeFlags();
   kappa = p.kappa; lambda = p.lambda; viewMode = p.view; strip = m === "real" && p.strip; paused = p.paused;
@@ -2728,7 +2734,7 @@ function showStrip(){
 
 /* ---------- width scan: ln(rate) against L, straight-line fit gives the kink mass ---------- */
 var scan = null;
-var SCAN_CTRL = ["mReal", "mCplx", "mO3", "mKink", "kap", "lam", "lsl", "hotBtn", "coldBtn", "gSquare", "gStrip", "sizeSel", "vField", "vWalls"];
+var SCAN_CTRL = ["mReal", "mCplx", "mO3", "mKink", "mPoke", "kap", "lam", "lsl", "hotBtn", "coldBtn", "gSquare", "gStrip", "sizeSel", "vField", "vWalls"];
 function setScanLocked(b){
   SCAN_CTRL.forEach(function(id){ $(id).disabled = b; });
   Array.prototype.forEach.call(document.querySelectorAll("[data-preset]"), function(e){ e.disabled = b; });
@@ -2768,7 +2774,7 @@ function scanFinish(stopped){
   $("scanFit2").hidden = !scanFit2;
   if (scanFit2) $("scanFit2").textContent = "M comes from the dashed fit, which allows a slowly varying prefactor L^" + scanFit2.b.toFixed(2) + " (about L^−½ is expected for a wall wobbling around the strip). A plain straight line (solid) gives M ≈ " + scanFit.M.toFixed(3) + ", which reads high.";
   var tag = "κ = " + kappaOfScan.toFixed(3) + ", λ = " + lambdaOfScan.toFixed(2);
-  var best = scanFit2 || scanFit;   /* ln L fit reproduced Ising duality (M(0.37)=0.243 vs m(0.31)=0.241; M(0.36)=0.157 vs 0.163); straight line ~30% high */
+  var best = scanFit2;   /* Only the ln L fit is trusted for the mass; the straight line reads high. */
   if (best){
     $("scanCards").hidden = false;
     var dm = best.Merr < 0.01 ? 3 : 2;
@@ -2777,7 +2783,8 @@ function scanFinish(stopped){
     $("scanLine").textContent = (stopped ? "Stopped early, fit uses " + scanFit.n + " widths. " : "Done. ") + tag + ".";
   } else {
     $("scanCards").hidden = true;
-    $("scanLine").textContent = (stopped ? "Stopped early. " : "") + "Not enough widths with tunnelling events to fit a line. " + tag + ". " + (kappaOfScan < 0.35 ? "Try κ ≈ 0.37." : "");
+    $("scanLine").textContent = stopped ? "Stopped early: at least 4 widths are needed for a kink mass. Run the scan again and let it go further."
+      : "Not enough widths with tunnelling events to fit a line. " + tag + ". " + (kappaOfScan < 0.35 ? "Try κ ≈ 0.37." : "");
   }
 }
 var kappaOfScan = 0, lambdaOfScan = 0;
@@ -3271,7 +3278,10 @@ if (window.ResizeObserver) ro.observe(haloCv);
    over ~PRAMP after release. Work done by a push = sum J phi_t dx dt (the energy it put in). Picture rows are a ring buffer: newest at the top. */
 var PL = 60, PSPONGE = 20, PDX = 0.05, PW = 1.5, PRAMP = 0.3, PHALF = 25, PCOLS = 500, PROWS = 500, PROWSTEP = 4, PSPS = 120, PMAXSRC = 4;
 var PKPAIR = 8 / 3;                                            /* rest energy of a kink-antikink pair, 2 x 4/3 */
-var PRESETS_P = { sym: [0.6, 1], crit: [1, 1], brk: [2, 1] };   /* gentle (never crosses the hump: max restoring force 4/(3 sqrt 3) = 0.77), medium, strong */
+var PRESETS_P = { sym: [0.6, 1], crit: [1, 1], brk: [2, 1] };   /* gentle (a steady push cannot cross the hump: max restoring force 4/(3 sqrt 3) = 0.77), medium, strong */
+var pBatch = { W: 0, n: 0 };
+/* Completed work plus the work of every source still easing off or held. No solver changes. */
+function pWork(){ return psrc.reduce(function(w, S){ return w + S.W; }, pBatch.W); }
 var PK = null, psrc = [], pHead = 0, pLast = 0, pReadT = 0, pAcc = 0, pCone = null, pLastW = null, pEval = null, pStatusTxt = "", pKeyX = 0;
 var pimgF = new Float32Array(PCOLS * PROWS), pimgE = new Float32Array(PCOLS * PROWS);
 var pSX = new Float32Array(PROWS * PMAXSRC), pSA = new Float32Array(PROWS * PMAXSRC);
@@ -3332,6 +3342,7 @@ function pokeLocalE(s, x, r){
   return e * dx;
 }
 function pokeReset(){
+  pBatch = { W: 0, n: 0 };
   PK = pokeNew(); psrc = []; pAcc = 0; pCone = null; pLastW = null; pEval = null; pStatusTxt = "";
   pimgF.fill(-1); pimgE.fill(0); pSA.fill(0); pHead = 0;
   dirty = true; pReadT = 0;
@@ -3460,19 +3471,22 @@ function showP(){
   $("pT").textContent = s.t.toFixed(1); $("pTs").textContent = "step " + s.k;
   $("pW").textContent = String(pokeWalls(s, PHALF));
   $("pE").textContent = pokeEnergy(s, PL - PSPONGE).toFixed(2);
-  var w = act ? act.W : pLastW;
+  var w = pBatch.n ? pWork() : null;
   $("pIn").textContent = w === null ? "–" : w.toFixed(2);
-  if (act) $("pStatus").textContent = "Pushing… " + act.W.toFixed(2) + " put in so far" + (act.W >= PKPAIR ? ": enough for a pair." : (kappa < 0.77 ? ". At this strength the field can never get over the hump." : ", a pair needs 2.67."));
+  if (pDemo) $("pStatus").textContent = pDemoText();
+  else if (act) $("pStatus").textContent = "Pushing… " + w.toFixed(2) + (pBatch.n > 1 ? " put in together so far" : " put in so far") + (w >= PKPAIR ? ": enough for a pair." : (kappa < 0.77 ? ". A steady push this weak can't lift the field over the hump." : ", a pair needs 2.67."));
   else if (pStatusTxt) $("pStatus").textContent = pStatusTxt;
 }
 /* judge a finished push 12 time units after it ended: new walls = pairs; energy still sitting near it = an oscillon */
 function pJudge(){
   var e = pEval, s = PK, walls = pokeWalls(s, PL - PSPONGE), dW = walls - e.walls0, lump = pokeLocalE(s, e.x, 4), w = e.W.toFixed(2), msg;
-  if (dW >= 2) msg = "That push put in " + w + " and made " + (dW >= 4 ? Math.floor(dW / 2) + " kink–antikink pairs" : "a kink–antikink pair") + ". Watch them fly apart.";
-  else if (dW <= -2) msg = "That push put in " + w + " and the field between two walls flipped back: a pair annihilated.";
-  else if (lump > 0.6) msg = "That push put in " + w + " and left a wobbling lump (an oscillon). It slowly leaks its energy as ripples.";
-  else if (e.W < PKPAIR) msg = "That push put in " + w + ", less than the 2.67 a pair costs, so it could only make ripples (mesons).";
-  else msg = "That push put in " + w + ", more than the 2.67 a pair costs, but it all left as ripples: no pair this time.";
+  var lead = e.n > 1 ? "Your " + e.n + " pushes put in " + w + " together" : "That push put in " + w;
+  if (dW >= 2 && e.W >= PKPAIR) msg = lead + " and made " + (dW >= 4 ? Math.floor(dW / 2) + " kink–antikink pairs" : "a kink–antikink pair") + ". Watch them fly apart.";
+  else if (dW >= 2) msg = lead + ". New walls came into view, but that is less than the 2.67 a new pair costs, so earlier ripples must have helped.";
+  else if (dW <= -2) msg = lead + " and the field between two walls flipped back: a pair annihilated.";
+  else if (lump > 0.6) msg = lead + " and left a wobbling lump (an oscillon). It slowly leaks its energy as ripples.";
+  else if (e.W < PKPAIR) msg = lead + ", less than the 2.67 a pair costs, so it could only make ripples (mesons).";
+  else msg = lead + ", enough for the 2.67 a pair costs, but it all left as ripples: no pair this time.";
   pStatusTxt = msg; pEval = null;
 }
 function frameP(){
@@ -3490,16 +3504,42 @@ function frameP(){
   if (now - pReadT > 100 || dirty){ pReadT = now; showP(); changed = true; }
   if (changed){ drawFieldP(); drawPX(); dirty = false; }
 }
+/* "Pump it over": three Gentle pushes in rhythm with the field's wobble (2 time units on, 2 off).
+   Events fire on exact solver steps (dt 0.025, so 80 steps = 2 units), never on wall-clock time,
+   so the same pair forms every time at any playback speed or frame rate. */
+var PDEMO_EV = [[0, 1], [80, 0], [160, 1], [240, 0], [320, 1], [400, 0]], pDemo = null;
+function pDemoStart(){
+  setParams(PRESETS_P.sym[0], PRESETS_P.sym[1]);
+  pokeReset(); pKeyX = 0;
+  pDemo = { k0: PK.k, i: 0 };
+  if (paused){ paused = false; $("runBtn").textContent = "Pause"; }
+  pDemoTick();
+}
+function pDemoStop(){ if (pDemo){ pUp("demo"); pDemo = null; } }
+function pDemoTick(){
+  var d = pDemo, ev;
+  while (d && d.i < PDEMO_EV.length && PK.k - d.k0 >= (ev = PDEMO_EV[d.i])[0]){
+    if (ev[1]) pPress("demo", 0); else pUp("demo");
+    d.i++;
+    if (d.i === PDEMO_EV.length) pDemo = null;
+  }
+}
+function pDemoText(){
+  if (!pDemo) return "";
+  var n = Math.min(3, (pDemo.i + 1) >> 1);
+  return (pDemo.i % 2 ? "Push " + n + " of 3…" : "Rest… (the field swings back)") + " " + pWork().toFixed(2) + " put in so far, with Gentle strength 0.6.";
+}
 function pAdvance(ns){
   var s = PK, k, q;
   for (k = 0; k < ns; k++){
+    if (pDemo) pDemoTick();
     pokeStep(s, psrc);
     if (s.k % PROWSTEP === 0) pPushRow();
     for (q = psrc.length - 1; q >= 0; q--){
       var S = psrc[q];
       if (S.tgt === 0 && S.amp < 1e-3){
-        psrc.splice(q, 1); pLastW = S.W;
-        if (!psrc.length) pEval = { t: s.t + 12, W: S.W, x: S.x, walls0: S.walls0 };
+        pBatch.W += S.W; psrc.splice(q, 1); pLastW = pWork();
+        if (!psrc.length) pEval = { t: s.t + 12, W: pBatch.W, n: pBatch.n, x: S.x, walls0: S.walls0 };
         else pEval = null;
       }
     }
@@ -3511,6 +3551,11 @@ function pXat(ev){ var rc = fieldCv.getBoundingClientRect(); return Math.max(-PH
 function pPress(id, x){
   if (!PK || psrc.length >= PMAXSRC) return;
   var s = PK, ic = Math.round(x / s.dx) + s.i0, m = 0, j;
+  /* Quiet uses the existing box-energy and wall readouts: <0.01 energy (under 0.4% of a pair),
+     no walls and no sources. Check only when starting a push, so a pending result stays intact. */
+  if (!psrc.length && pokeEnergy(s, PL - PSPONGE) < 0.01 && pokeWalls(s, PL - PSPONGE) === 0) pBatch = { W: 0, n: 0 };
+  if (!pBatch.n) pBatch.walls0 = pokeWalls(s, PL - PSPONGE);
+  pBatch.n++;
   for (j = -10; j <= 10; j++) m += s.b[ic + j];
   psrc.push({ id: id, x: x, sgn: m > 0 ? -1 : 1, amp: 0, tgt: kappa, W: 0, walls0: pokeWalls(s, PL - PSPONGE) });
   pCone = { x: x, t: s.t }; pEval = null; pStatusTxt = "";
@@ -3522,6 +3567,7 @@ function pUp(id){ for (var q = 0; q < psrc.length; q++) if (psrc[q].id === id) p
 fieldCv.addEventListener("pointerdown", function(ev){
   if (!poke) return;
   ev.preventDefault();
+  pDemoStop();
   try { fieldCv.setPointerCapture(ev.pointerId); } catch (e) {}
   pPress(ev.pointerId, pXat(ev));
 });
@@ -3535,7 +3581,8 @@ fieldCv.addEventListener("keydown", function(ev){
   else if (ev.key === "ArrowLeft" || ev.key === "ArrowRight"){ ev.preventDefault(); pKeyX = Math.max(-PHALF, Math.min(PHALF, pKeyX + (ev.key === "ArrowLeft" ? -1 : 1))); pMove("key", pKeyX); }
 });
 fieldCv.addEventListener("keyup", function(ev){ if (poke && (ev.key === " " || ev.key === "Enter")) pUp("key"); });
-$("calmBtn").addEventListener("click", function(){ pokeReset(); });
+$("calmBtn").addEventListener("click", function(){ pDemo = null; pokeReset(); });
+$("pumpBtn").addEventListener("click", pDemoStart);
 if (window.ResizeObserver) ro.observe(pxCv);
 
 /* ---------- main loop ---------- */
@@ -3626,11 +3673,13 @@ if (/[?&]record\b/.test(location.search)) recordMode(); else requestAnimationFra
 /* ---------- ?record: a YouTube Short of kink collisions (see ../shorts-rec.js) ---------- */
 /* 1080×1920: a caption band on top, below it the space-time film in the dark colours (x from -20 to 20 across,
    real time up, newest row at the top). One take per collision speed, with a quick fade between takes.
-   The approach and the flight apart play at double speed, the crash itself at normal speed. */
+   The approach and the flight apart play at double speed, the crash itself at normal speed.
+   Each take opens on a full film with the crash moments away: the earlier rows are the exact moving-pair profile (the kinks are
+   20+ apart there, so it matches the solver to ~e^-40), then the solver runs off screen until the kinks are 2 apart. */
 function recordMode(){
-  var W = 1080, H = 1920, TOP = 470, PW = 540, PH = (H - TOP) / 2, XH = 20, ROWSTEPS = 5;   /* 540×725 cells drawn 2×; 0.125 time units per row */
-  var BG = "#10141c", FADEF = 8;
-  var TAKES = [{ v: 0.35, sec: 8 }, { v: 0.198, sec: 10 }, { v: 0.16, sec: 12 }];
+  var W = 1080, H = 1920, TOP = 470, PW = 540, PH = (H - TOP) / 2, XH = 20, ROWSTEPS = 5, ROWT = 0.125;   /* 540×725 cells drawn 2×; 0.125 time units per row */
+  var BG = "#10141c", FADEF = 8, PRE_D = 2;
+  var TAKES = [{ v: 0.35, sec: 6 }, { v: 0.198, sec: 8 }, { v: 0.16, sec: 10 }];
   var start = [], n = 0, i;
   for (i = 0; i < TAKES.length; i++){ start.push(n); n += TAKES[i].sec * 30; }
   var SEC = n / 30;
@@ -3652,7 +3701,13 @@ function recordMode(){
   }
   var bgPx = (255 << 24) | (0x1c << 16) | (0x14 << 8) | 0x10;
   var data = new Float32Array(PW * PH), rows = 0, run = null, take = -1, cur = 0;
-  function begin(kk){ take = kk; run = KINK.newRun(TAKES[kk].v, { stop: false }); rows = 0; addRow(); }
+  function begin(kk){
+    take = kk; run = KINK.newRun(TAKES[kk].v, { stop: false });
+    var s = run.s, g = s.g, v = s.v, x0 = s.x0, y, jj, x, t;
+    for (y = 0; y < PH; y++){ t = -y * ROWT; for (jj = 0; jj < PW; jj++){ x = -XH + (jj + 0.5) * 2 * XH / PW; data[y * PW + jj] = Math.tanh(g * (x + x0 - v * t)) - Math.tanh(g * (x - x0 + v * t)) - 1; } }
+    rows = PH;
+    while (s.t < (x0 - PRE_D) / v){ run.advance(ROWSTEPS); addRow(); }
+  }
   function addRow(){   /* newest row goes to the top: shift the film down one row */
     data.copyWithin(PW, 0, (PH - 1) * PW);
     var s = run.s, bb = s.b;
@@ -3663,9 +3718,10 @@ function recordMode(){
     name: "lattice-kinks", seconds: SEC, captionY: 220,
     music: { file: "chopin-op27no2-levy.mp3", start: 0.6, fade: 3 },
     captions: [
-      { from: 0, to: 17.4, text: "Watch two kinks\nin a field collide,\ninteract, and fly apart", size: 72 },
-      { from: 18.4, to: 26, text: "Slower, and\nthey get stuck", size: 72 },
-      { from: 26.6, to: SEC + 1, text: "Try it yourself,\nlink in description", size: 72 }
+      { from: 0, to: 13.4, text: "Two kinks collide\nand fly apart", size: 72 },
+      { from: 0, to: SEC + 1, text: "∂²φ/∂t² = ∂²φ/∂x² + 2φ(1 − φ²)", y: 410, size: 40, color: "#c9cfe0" },
+      { from: 14.4, to: 20.4, text: "Slower, and\nthey get stuck", size: 72 },
+      { from: 21, to: SEC + 1, text: "Try it yourself,\nlink in description", size: 72 }
     ],
     reset: function(){ take = -1; },
     tick: function(fi){

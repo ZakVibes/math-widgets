@@ -54,6 +54,7 @@ button:disabled{opacity:.45;cursor:default}
 button:focus-visible,.chip:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600;min-width:88px}
 .zoombtns button{padding:4px 10px;font-size:12px;background:color-mix(in srgb,var(--raise) 85%,transparent)}
+@media (max-width:480px), (any-pointer:coarse){#diveBtn{min-height:44px}}
 label.tog{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:14px;cursor:pointer}
 label.tog input{accent-color:var(--accent);width:16px;height:16px}
 .step{font-family:var(--font-mono);font-size:13px;color:var(--muted)}
@@ -89,7 +90,7 @@ input[type=text]{font-family:var(--font-mono);font-size:14px}
   <header>
     <a class="back-link" href="../index.html">← All widgets</a>
     <h1>p-adic <i>Warp</i></h1>
-    <p class="lede">Every dot is a p-adic number. Numbers that share their last k digits sit in the same disk, so close in the picture means close p-adically. Pick a function and watch it rebuild the picture one digit at a time, starting from the last digit. See several of these worlds side by side in <a href="../adelic-mirror/index.html" style="color:var(--accent)">The Adelic Mirror</a>.</p>
+    <p class="lede">Every dot is a p-adic number. Numbers that share their last k digits sit in the same disk (a p-adic <i>ball</i>), so close in the picture means close p-adically. Pick a function and watch it rebuild the picture one digit at a time, starting from the last digit. See several of these worlds side by side in <a href="../adelic-mirror/index.html" style="color:var(--accent)">The Adelic Mirror</a>.</p>
   </header>
 
   <div class="grid">
@@ -382,8 +383,8 @@ const ZFNS = [
 ];
 const QFNS = [
   {g:'Julia sets', id:'julia', nm:()=>'x² + c', cd:()=>p===2?'1/4':'(p-1)/p^2',
-   d:()=>p===2 ? 'Points that get too big run off to infinity. For p = 2 and c = 1/4 the survivors fill whole balls rather than dust; try c = 3/16 or 1/16.'
-     : 'Points that get too big run off to infinity. The ones that survive longest sit on the Julia set, a Cantor dust. With c = (p−1)/p² the point 1/p is fixed. Try c = 1/p² too.'},
+   d:()=>p===2 ? 'Points that get too big run off to infinity. For p = 2 and c = 1/4 the survivors fill whole balls rather than dust.'
+     : 'Points that get too big run off to infinity. The ones that survive longest sit on the Julia set, a Cantor dust. With c = (p−1)/p² the point 1/p is fixed.' + (p === 5 ? ' Try c = 1/p² too.' : '')},
   {g:'Julia sets', id:'jcube', nm:()=>'x³ + c', cd:()=>'(p-1)/p^3', d:()=>'The cubic family. Escapes are faster, |x³| = |x|³, so the surviving dust is thinner.'},
   {g:'Powers', id:'sq', nm:()=>'x²', d:()=>'|x²| = |x|². Everything outside ℤ'+SUB(p)+' escapes, everything inside stays: ℤ'+SUB(p)+' is the filled Julia set.'},
   {g:'Powers', id:'xp', nm:()=>'x'+SUP(p), d:()=>'Units contract toward the Teichmüller points, numbers outside ℤ'+SUB(p)+' fly away.'},
@@ -505,7 +506,7 @@ function updateLegend(){
   const never = esc.some(v => v === 0);
   if (!escMax){ legendEl.innerHTML = `<span><span class="sw" style="background:${escColor(0)}"></span>Nothing leaves the window in ${MAXIT} steps. Switch View to Warp to watch it move.</span>`; return; }
   const stops = []; for (let k = 0; k <= 8; k++) stops.push(escColor(1 + Math.round(k/8*(escMax - 1))));
-  legendEl.innerHTML = `<span>Leaves after 1 step</span><span class="bar" style="background:linear-gradient(90deg,${stops.join(',')})"></span><span>${escMax} steps</span>${never ? `<span><span class="sw" style="background:${escColor(0)}"></span>never (in ${MAXIT})</span>` : ''}`;
+  legendEl.innerHTML = `<span>Leaves after 1 step</span><span class="bar" style="background:linear-gradient(90deg,${stops.join(',')})"></span><span>${escMax} step${escMax === 1 ? '' : 's'}</span>${never ? `<span><span class="sw" style="background:${escColor(0)}"></span>never (in ${MAXIT})</span>` : ''}`;
 }
 
 // ---------- layout ----------
@@ -616,6 +617,7 @@ function buildPalette(){
 function resize(){
   const r = box.getBoundingClientRect(); DPR = Math.min(window.devicePixelRatio || 1, 2); CW = r.width; CH = r.height;
   cv.width = Math.round(CW*DPR); cv.height = Math.round(CH*DPR); mapCv.width = cv.width; mapCv.height = cv.height; mapDirty = true; draw();
+  if (!diving) badge.textContent = baseBadge();
 }
 const scaleK = () => Math.min(CW, CH)/2/view.r;
 const toSX = x => (x - view.x)*scaleK() + CW/2;
@@ -817,7 +819,7 @@ function fmtQ(x){
 // Continuity check: for each radius p^-k, how big can the image of one ball of that radius be?
 let contKey = '', contHTML = '';
 function continuityZ(){
-  const key = [p, fn.id, C, polyIn.value].join('|');
+  const key = [p, N, fn.id, C, polyIn.value].join('|');
   if (key === contKey) return contHTML;
   contKey = key;
   let g;
@@ -860,21 +862,22 @@ function continuityZ(){
   return contHTML;
 }
 const baseBadge = () => mode === 'Z' ? `ℤ${SUB(p)} to ${N} digits · ${p}${SUP(N)} = ${n.toLocaleString()} points`
-  : `ℚ${SUB(p)} · window |x| ≤ ${p}${SUP(m)} · ${n.toLocaleString()} points`;
+  : `ℚ${SUB(p)} · ${matchMedia('(max-width:480px)').matches ? '' : 'window '}|x| ≤ ${p}${SUP(m)} · ${n.toLocaleString()} points`;
 function updateStats(){
   let txt;
   if (mode === 'Z'){
     const hit = new Uint32Array(Mod); let live = 0, img = 0, maxF = 0, und = 0;
     for (let i = 0; i < n; i++){ if (curZ[i] < 0) continue; live++; const v = nxtZ[i]; if (v < 0){ und++; continue; } if (!hit[v]) img++; hit[v]++; if (hit[v] > maxF) maxF = hit[v]; }
     const pct = x => (100*x/Mod).toFixed(x === Mod ? 0 : 1) + '%';
-    txt = `<p><span class="lab">Image of f</span></p><p>Hits <b class="mono">${img.toLocaleString()}</b> of ${Mod.toLocaleString()} points (${pct(img)})${maxF > 1 ? `, up to <b class="mono">${maxF}</b>-to-1` : ', one-to-one'}.${und ? ` <span class="muted">${und.toLocaleString()} points have no image.</span>` : ''}${live < n ? ` <span class="muted">${(n - live).toLocaleString()} points dropped out in earlier steps.</span>` : ''}</p>` + continuityZ();
+    const randomTopDigit = ['shift', 'collatz', 'unit'].includes(fn.id);
+    txt = `<p><span class="lab">Image of f</span></p><p>Hits <b class="mono">${img.toLocaleString()}</b> of ${Mod.toLocaleString()} points (${pct(img)})${randomTopDigit ? '' : maxF > 1 ? `, up to <b class="mono">${maxF}</b>-to-1` : ', one-to-one'}.${und ? ` <span class="muted">${und.toLocaleString()} points have no image.</span>` : ''}${live < n ? ` <span class="muted">${(n - live).toLocaleString()} points dropped out in earlier steps.</span>` : ''}</p><p class="muted">Counted at ${N} digits: where f shrinks distances, points closer than the last digit merge, so the count can be higher than the true one.</p>` + continuityZ();
   } else if (qview === 'map'){
     if (!esc) txt = '<p><span class="lab">Escape map</span></p><p class="muted">Following every point for up to ' + MAXIT + ' steps…</p>';
     else {
       let first = 0, never = 0; for (let i = 0; i < n; i++){ if (esc[i] === 1) first++; if (!esc[i]) never++; }
       const pc = x => (100*x/n).toFixed(x === n || x === 0 ? 0 : 1) + '%';
       txt = `<p><span class="lab">Escape map</span></p><p>Each starting point is coloured by how many steps of f it takes to leave the window |x| ≤ ${p}${SUP(m)}.</p>
-        <p>${escMax ? `<b class="mono">${pc(first)}</b> leave on the first step; the longest survivors last <b class="mono">${escMax}</b> steps.` : 'Nothing leaves.'}${never ? ` <b class="mono">${never.toLocaleString()}</b> never leave in ${MAXIT} steps.` : ''}</p>
+        <p>${escMax ? `<b class="mono">${pc(first)}</b> leave on the first step; the longest survivors last <b class="mono">${escMax}</b> step${escMax === 1 ? '' : 's'}.` : 'Nothing leaves.'}${never ? ` <b class="mono">${never.toLocaleString()}</b> never leave in ${MAXIT} steps.` : ''}</p>
         <p class="muted">Tap a ball to watch its journey across the map.</p>`;
     }
   } else {

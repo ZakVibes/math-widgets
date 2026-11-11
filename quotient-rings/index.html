@@ -383,7 +383,7 @@ function parseExact(src, ring){
 const FPSUP=n=>String(n).replace(/\d/g,d=>'⁰¹²³⁴⁵⁶⁷⁸⁹'[d]);
 function toFp(poly,p){
   const out=poly.map(z=>{
-    if(!qz(z.i)) fail('Complex numbers do not live in F'+'₀₁₂₃₄₅₆₇₈₉'.charAt(0)+'.');
+    if(!qz(z.i)) fail('Complex numbers do not live in F'+sub(p)+'.');
     const P=BigInt(p); const dm=z.r.d%P;
     if(dm===0n) fail('The fraction '+qstr(z.r)+' has a denominator divisible by '+p+', which is 0 in F'+sub(p)+'.');
     const nm=((z.r.n%P)+P)%P; const inv=getFp(p).F.inv(Number(dm));
@@ -556,18 +556,26 @@ function decomposeChar0(f,isReal){
     // Shift x = y + c (c = minus the mean of the roots, exact) so the floating-point root finder
     // works on small numbers: huge offsets like (x-10^8)^2+1 then keep their +1.
     const a=P.monic(a0), da=P.deg(a);
-    const c=FC.mul(FC.neg(a[da-1]),FC.inv(FC.fromInt(da)));
+    let c=FC.mul(FC.neg(a[da-1]),FC.inv(FC.fromInt(da)));
     let b=[]; { let pw=[FC.one]; const yc=[c,FC.one]; for(let k=0;k<=da;k++){ b=P.add(b,P.scale(pw,a[k])); pw=P.mul(pw,yc); } }
-    const cr=qfloat(c.r), ci=qfloat(c.i);
-    const roots=aberth(b.map(cf2));
+    let cr=qfloat(c.r), ci=qfloat(c.i);
+    let roots=aberth(b.map(cf2));
+    // A large shift helps clustered roots but loses small roots through cancellation.
+    // If a root is tiny compared with the shift, solve the original polynomial instead.
+    if(roots.some(z=>Math.hypot(cr+z[0],ci+z[1])<1e-4*Math.hypot(cr,ci))){
+      c=FC.zero; cr=0; ci=0; b=a; roots=aberth(a.map(cf2));
+    }
     let R=0; for(const z of roots) R=Math.max(R,cabs(z));
-    const tiny=1e-10*(R+Math.hypot(cr,ci))||0;      // below this a float is rounding noise
-    const cl=x=>Math.abs(x)<=tiny?0:x;
+    const tiny=1e-10*(R+Math.hypot(cr,ci))||0;      // relative threshold; never sufficient on its own to erase a root
+    const cl=x=>Math.abs(x)<=tiny&&Math.abs(x)<1e-12?0:x;
     if(!isReal){
       for(const z of roots){
         const qr=snapQ(z[0]), qi=snapQ(z[1]);
-        let re=rnF(cl(cr+z[0])), im=rnF(cl(ci+z[1]));
+        let re=rnF(cr+z[0]), im=rnF(cl(ci+z[1]));
+        if(Math.abs(re.f)<=tiny&&P.F.isZero(a[0])) re=rnF(0);
         if(qr&&qi){ const ex=FC.add(c,C(qr,qi)); if(P.F.isZero(P.ev(a,ex))){ re=rnQ(ex.r); im=rnQ(ex.i); } }
+        const ar=snapQ(re.f,1000000), ai=snapQ(im.f,1000000);
+        if(ar&&ai&&P.F.isZero(P.ev(a,C(ar,ai)))){ re=rnQ(ar); im=rnQ(ai); }
         pieces.push({kind:'lin',e,d:1,re,im,sortKey:[re.f,im.f]});
       }
     } else {
@@ -579,8 +587,11 @@ function decomposeChar0(f,isReal){
         const cf=b.map(z=>qfloat(z.r)); let y=roots[k][0];
         for(let it=0;it<8;it++){ let p=0,d=0; for(let j=cf.length-1;j>=0;j--){ d=d*y+p; p=p*y+cf[j]; } if(d===0) break; const w=p/d; if(!isFinite(w)) break; y-=w; }
         const q=snapQ(y);
-        let re=rnF(cl(cr+y));
+        let re=rnF(cr+y);
+        if(Math.abs(re.f)<=tiny&&P.F.isZero(a[0])) re=rnF(0);
         if(q){ const ex=qadd(c.r,q); if(P.F.isZero(P.ev(a,C(ex,Q0)))) re=rnQ(ex); }
+        const ar=snapQ(re.f,1000000);
+        if(ar&&P.F.isZero(P.ev(a,C(ar,Q0)))) re=rnQ(ar);
         pieces.push({kind:'real',e,d:1,re,im:rnF(0),sortKey:[re.f,0]});
       }
       const reps=rest.slice().sort((u,v)=>roots[v][1]-roots[u][1]).slice(0,Math.floor(rest.length/2));
@@ -841,7 +852,7 @@ function plainText(h){
     .replace(/<sup>(\d+)<\/sup>/g,(_,d)=>d.replace(/\d/g,c=>SUPD[c])).replace(/<sub>(\d+)<\/sub>/g,(_,d)=>d.replace(/\d/g,c=>SUBD[c]))
     .replace(/<wbr>/g,'').replace(/<[^>]+>/g,'').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&');
 }
-const fieldName=(p,d)=>d===1?'F<sub>'+p+'</sub>':'F<sub>'+p+FPSUP(d)+'</sub>';
+const fieldName=(p,d)=>'F<sub>'+(BigInt(p)**BigInt(d))+'</sub>';
 const yring=(fld,e)=>fld+'[y]/(y<sup>'+e+'</sup>)';
 const bigFmt=b=>b.toString().replace(/\B(?=(\d{3})+(?!\d))/g,',');
 
@@ -996,6 +1007,10 @@ function renderPresets(){
 }
 
 /* ---------- rendering ---------- */
+function pieceInexact(pc){
+  const r=pc.raw;
+  return !!r&&(r.kind==='pair'?!(r.S.q&&r.T.q):!(r.re.q&&(r.kind==='real'||r.im.q)));
+}
 function cardHtml(pc,k,res,sel){
   const ring=res.ring, p=res.p;
   const baseName=ringName(ring,p);
@@ -1007,7 +1022,7 @@ function cardHtml(pc,k,res,sel){
   const fac='<span class="poly">('+pc.gHtml+')'+(pc.e>1?'<sup>'+pc.e+'</sup>':'')+'</span>';
   if(pc.role==='base'){
     if(ring==='Fp') desc='<p>The factor is linear, so this is evaluation at <span class="poly">x = '+pc.root+'</span>.</p>';
-    else if(pc.roots[0]) desc='<p>Evaluation at the root <span class="poly">x = '+rootText(pc.roots[0],pc.raw)+'</span>.</p>';
+    else if(pc.roots[0]) desc='<p>Evaluation at the root <span class="poly">x '+(pieceInexact(pc)?'≈':'=')+' '+rootText(pc.roots[0],pc.raw)+'</span>.</p>';
   } else if(pc.role==='ext'){
     if(ring==='Fp') desc='<p>A field with <b>'+bigFmt(BigInt(p)**BigInt(pc.d))+'</b> elements, of degree <b>'+pc.d+'</b> over '+baseName+'. Here <span class="poly">x</span> becomes a root of the irreducible factor.</p>';
     else desc='<p>ℂ is a degree 2 extension of ℝ: the two conjugate roots <span class="poly">'+rootText(pc.roots[0],pc.raw)+'</span>, <span class="poly">'+rootText(pc.roots[1],pc.raw)+'</span> are glued into one piece.</p>';
@@ -1267,7 +1282,7 @@ function selDetail(res,sel){
   const aH='<span class="poly">'+fpHtml(a,p,false)+'</span>';
   if(sel.cls==='zero') kindTxt='The zero element. It is nilpotent (0<sup>1</sup> = 0) but we do not count it as a zero divisor.';
   else if(sel.cls==='unit') kindTxt='<b>A unit.</b> '+aH+' · <span class="poly">'+fpHtml(sel.partner,p,false)+'</span> = 1, so its inverse is <span class="poly">'+fpHtml(sel.partner,p,false)+'</span>.';
-  else if(sel.cls==='nil') kindTxt='<b>Nilpotent.</b> '+(a.filter(c=>c).length>1?'('+aH+')':aH)+'<sup>'+sel.k+'</sup> = 0 (first at k = '+sel.k+'). Hence it is a zero divisor too: '+aH+' ·<span class="poly">'+fpHtml(sel.partner,p,false)+'</span> = 0.';
+  else if(sel.cls==='nil') kindTxt='<b>Nilpotent.</b> '+(a.filter(c=>c).length>1?'('+aH+')':aH)+'<sup>'+sel.k+'</sup> = 0 (first at k = '+sel.k+'). Hence it is a zero divisor too: '+aH+' · <span class="poly">'+fpHtml(sel.partner,p,false)+'</span> = 0.';
   else kindTxt='<b>A zero divisor</b> (not nilpotent). '+aH+' · <span class="poly">'+fpHtml(sel.partner,p,false)+'</span> = 0 although neither factor is 0.';
   let h='<div class="detail"><p>'+kindTxt+'</p><p>The multiples <span class="poly">a·R</span> (outlined in the grid) number <b>'+sel.reach.size+'</b>'+(sel.cls==='unit'?' (everything, since a unit reaches all of R)':'')+'.</p>';
   if(res.cnt.size<=32n){
@@ -1313,7 +1328,6 @@ function computeSel(res,idx){
 }
 function gridHtml(res,sel){
   const p=res.p,n=res.n,size=Math.pow(p,n); let tiles='';
-  const maxLen=Math.max(1,n*3);
   for(let i=0;i<size;i++){
     const a=elemFromIndex(p,n,i); const cls=res.classify(a);
     const c={zero:'z',unit:'u',nil:'n',zd:'d'}[cls];
@@ -1322,6 +1336,7 @@ function gridHtml(res,sel){
   }
   const tw=(n<=3?54:n<=4?60:n<=5?72:80)+(res.ring==="Zn"&&p>=6?8:0);
   return '<div class="legend"><span class="lu"><i></i>unit</span><span class="lz"><i></i>zero divisor</span><span class="ln"><i></i>nilpotent</span><span class="l0"><i></i>zero</span></div>'
+   +'<p class="note">Nonzero nilpotents are zero divisors too.</p>'
    +'<div class="egrid" style="--tw:'+tw+'px">'+tiles+'</div>'
    +(sel?selDetail(res,sel):'<p class="hint">Click an element to see what kind it is and why, which elements it can reach by multiplication, and where it lands in each piece.</p>');
 }
@@ -1393,6 +1408,7 @@ function render(){
   const sel=(res.kind==='ok'&&(res.ring==='Fp'||res.ring==='Zn')&&STATE.sel!=null&&res.cnt.size<=256n)?computeSel(res,STATE.sel):null;
   if(res.ring==='Zn'){ renderZn(res,sel); return; }
   // factoring line
+  const inexact=res.pieces.some(pieceInexact);
   const facs=res.pieces.map((pc,k)=>'<span class="fac '+pc.role+'" data-piece="'+k+'"><span class="poly">'+(res.pieces.length>1||pc.e>1?'(':'')+pc.gHtml+(res.pieces.length>1||pc.e>1?')':'')+(pc.e>1?'<sup>'+pc.e+'</sup>':'')+'</span></span>').join(' · ');
   const fTxt='<span class="poly">'+(res.monicChanged?res.fmHtml:res.fHtml)+'</span>';
   let note='';
@@ -1403,7 +1419,7 @@ function render(){
   const pcs=res.pieces.map((pc,k)=>(k?'<span class="times">×</span>':'')+cardHtml(pc,k,res,sel)).join('');
   const legend='<div class="legend"><span class="base"><i></i>same as the base</span><span class="ext"><i></i>bigger (extension)</span><span class="fat"><i></i>fat point (extra nilpotents)</span></div>';
   const decomp='<section class="panel"><h2>The decomposition</h2><div class="ringbox">'+rn+'[x] / (<span class="poly">'+res.fHtml+'</span>)</div>'+note
-    +'<div class="factoring">'+(res.monicChanged?'':'')+fTxt+' = '+(res.monicChanged&&res.leadHtml?'':'')+facs+'</div>'
+    +'<div class="factoring">'+(res.monicChanged?'':'')+fTxt+(inexact?' ≈ ':' = ')+(res.monicChanged&&res.leadHtml?'':'')+facs+(inexact?' <span class="note">(irrational numbers rounded to 4 digits)</span>':'')+'</div>'
     +'<div class="crt">Chinese Remainder Theorem</div><div class="arrowrow">↓</div><div class="pieces">'+pcs+'</div>'
     +'<div class="iso">'+iso+'</div>'+legend
     +(res.pieces.length>6?'<p class="hint">Many pieces: the cards wrap onto several rows.</p>':'')+'</section>';

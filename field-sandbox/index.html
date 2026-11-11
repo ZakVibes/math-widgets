@@ -74,6 +74,10 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
 .sl output{font-family:var(--font-mono);font-size:13px;text-align:right}
 .sl.inl{display:inline-grid;grid-template-columns:auto 120px 44px;margin:0}
 input[type=range]{width:100%;accent-color:var(--accent)}
+@media (max-width:600px),(pointer:coarse){input[type=range]{min-height:28px}}
+@media (max-width:520px){.ym-detail{display:none}}
+#srcLab{min-width:17ch}
+#srcSpeed{min-width:18ch}
 #plot{width:100%;height:120px;display:block;border-radius:8px;background:var(--soft)}
 .read{font:13px/1.6 var(--font-mono);color:var(--muted)}
 .read b{color:var(--fg);font-weight:500}
@@ -101,6 +105,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
       <button type="button" data-th="ah" aria-pressed="false">Superconductor</button>
       <button type="button" data-th="ym" aria-pressed="false">Yang–Mills (gluons)</button>
     </div>
+    <p class="note" id="tagline"></p>
     <p class="eq" id="eq"></p>
 
     <div class="main">
@@ -146,7 +151,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
           <label class="sl inl" id="srcMwrap" hidden>mass <input type="range" id="srcM" min="0.2" max="5" step="0.1" value="1"><output id="srcMo">1.0</output></label>
           <label class="sl inl" id="srcAwrap" hidden>swing <input type="range" id="srcA" min="0.5" max="10" step="0.5" value="3"><output id="srcAo">3.0</output></label>
           <span class="lab" id="srcSpeed"></span>
-          <button type="button" class="btn" id="srcDel" hidden>Delete source</button>
+          <button type="button" class="btn" id="srcDel" style="visibility:hidden">Delete source</button>
         </div>
         <div class="toolopts" id="opts-poke">
           <div class="seg sm" id="pokeSign" role="group" aria-label="Poke direction">
@@ -1509,7 +1514,10 @@ function autoScales(){
   if(P.view==='field'&&(P.th==='kg'||isEm())){
     const src=isEm()?Bz:phi;
     for(let q=0;q<N*N;q+=7){ const i=q%N, j=(q/N)|0; samp[n++]=Math.abs(src[K(i,j)]); }
-    const a=samp.subarray(0,n).sort(); const target=Math.max(isEm()?0.03:0.04,a[Math.floor(n*0.985)]);
+    const a=samp.subarray(0,n).sort();
+    // Keep the opening ripple's colours; lift the floor only after strong ripples have faded.
+    const floor=isEm()?0.03:a[n-1]>0.02?0.04:0.06;
+    const target=Math.max(floor,a[Math.floor(n*0.985)]);
     fscale=easeHold(fscale,target);
   }
   if(P.view==='energy'||isYm()){
@@ -1745,8 +1753,10 @@ const $=id=>document.getElementById(id);
 function readout(){
   const E=energy(); let extra='';
   if(P.th==='phi4'&&P.eps>0){
-    const dV=Vraw(vacPhi4(-1))-Vraw(vacPhi4(1));
-    extra=`<br>bubble needs radius > <b>${(2*mass()/3/dV).toFixed(1)}</b> to grow`;
+    if(vacPhi4(-1)<0){
+      const dV=Vraw(vacPhi4(-1))-Vraw(vacPhi4(1));
+      extra=`<br>bubble needs radius > <b>${(2*mass()/3/dV).toFixed(1)}</b> to grow`;
+    } else extra='<br>tilt too strong: the −1 valley is gone';
   }
   if(P.th==='phi4') extra+=`<br>domain wall energy per length <b>${(2*mass()/3).toFixed(3)}</b>`;
   if(P.th==='sg') extra+=`<br>domain wall energy per length <b>${(8*mass()).toFixed(2)}</b>`;
@@ -1777,12 +1787,22 @@ const EQ={
   ah:'∂²ψ/∂t² = D·Dψ − λ(|ψ|² − 1)ψ,   ∂²A/∂t² = −∇×∇×A + e Im(ψ* Dψ),   D = ∇ − ieA,   λ = m²/2',
   ym:'∂E/∂t = D×B − J,   B = ∂ₓA_y − ∂_yA_x + g A_x×A_y,   D·E = ρ,   D = ∇ + g A×   (A, E, B each have three colours: SU(2));   a charge: dp/dt = g Q·(E + v×B),   dQ/dt = −g (v·A)×Q;   Higgs: ∂²Φ/∂t² = D·DΦ − λ(|Φ|² − v²)Φ,   m_W = g v/2'
 };
+const TAGLINES={
+  kg:'Poke ripples, move sources, and see how mass changes waves.',
+  phi4:'Paint two vacua and watch bubbles shrink or grow.',
+  sg:'Watch kinks collide and long-lived lumps breathe.',
+  cx:'Twist the field to make vortices that meet and cancel.',
+  em:'Move charges and watch them send out light.',
+  ah:'Make magnetic flux tubes in a superconductor.',
+  ym:'Collide colour waves and see how they change each other.'
+};
+for(const b of document.querySelectorAll('#theorySeg button')) b.title=TAGLINES[b.dataset.th];
 const ABOUT={
   kg:`<h2>Waves and the Klein–Gordon field</h2>
 <p>With mass m = 0 this is the plain wave equation, a one-component cousin of light: ripples spread at speed 1 in every direction. Turn the mass up and it becomes the Klein–Gordon field. Now a wave needs frequency ω above m to travel at all (ω² = k² + m²), and the field of a steady source dies away over a distance of about 1/m. That's Yukawa's picture of the nuclear force, with the pion as the massive field. In quantum theory the ripples of this field become particles of mass m.</p>
 <ul class="try"><li><b>Mass gap:</b> two sources shake at the same time, one below m and one above. Only one of them radiates.</li>
 <li>Drag a source around quickly: every jerk sends out a ripple, and a fast-moving source drags a wake behind it.</li>
-<li>Put a steady source in with m = 0 and with m = 0.3. In a flat 2D world the massless field around a source keeps growing like log r; the massive one settles into a cloud of size 1/m.</li>
+<li>Put a steady source in with m = 0 and with m = 0.3. With m = 0 the cloud never settles: in a flat 2D world it keeps deepening as it spreads. The massive one settles into a cloud of size 1/m.</li>
 <li>Switch to Reflect edges and poke the field: the energy readout stays constant, because nothing leaks away.</li></ul>`,
   phi4:`<h2>φ⁴ theory: two vacua</h2>
 <p>The potential V = (λ/4)(φ² − 1)² has two lowest points, φ = +1 and φ = −1 (we use λ = m²/2, so small ripples have mass m). Where a region in one vacuum meets a region in the other, the field has to climb over the hill in between, and that costs energy: a domain wall, the 2D version of the φ⁴ kink φ = tanh(m x/2). Its energy per unit length is 2m/3. Walls are tense, so a closed bubble shrinks. A small bubble (radius about 3 to 5) doesn't vanish cleanly: it leaves an oscillon, a throbbing lump that lives for a very long time. A bigger one radiates all its energy away. This double well is the shape behind the Higgs field, and in quantum theory the kinks become particles of their own (solitons).</p>
@@ -2006,6 +2026,8 @@ function buildPresets(){
 function pressSeg(seg,attr,val){ for(const b of seg.querySelectorAll('button')) b.setAttribute('aria-pressed',String(b.dataset[attr]===String(val))); }
 function setTheory(th,keepField){
   if((P.th==='em')!==(th==='em')||th==='ym'||P.th==='ym'){ sources=[]; sel=null; }   // scalar sources, charges and colour charges are different things
+  if(th==='ym'&&P.th!=='ym'&&matchMedia('(max-width:600px), (pointer:coarse)').matches) P.speed=1;
+  resetFrameBudget();
   P.th=th; pressSeg($('theorySeg'),'th',th);
   const em=th==='em';
   const ym=th==='ym';
@@ -2013,7 +2035,8 @@ function setTheory(th,keepField){
   for(const b of document.querySelectorAll('#srcKind .sck')) b.hidden=em||ym;
   for(const b of document.querySelectorAll('#srcKind .emk')) b.hidden=!(em||ym&&(b.dataset.k==='still'||b.dataset.k==='free'));
   $('srcCol').hidden=!ym; $('srcPlus').textContent=ym?'colour':'+'; $('srcMinus').textContent=ym?'anti-colour':'−';
-  $('eq').textContent=EQ[th]; $('about').innerHTML=ABOUT[th];
+  $('eq').innerHTML=ym?EQ[th].replace(',   D =','<span class="ym-detail">,   D =')+'</span>':EQ[th];
+  $('tagline').textContent=TAGLINES[th]; $('about').innerHTML=ABOUT[th];
   const tilt=th==='phi4'||th==='cx', ph=th==='cx'||th==='ah', ah=th==='ah';
   $('epsWrap').hidden=!tilt; if(!tilt) P.eps=0;
   $('eWrap').hidden=!ah; $('srcToolBtn').hidden=ah; $('viewB').hidden=!ah;
@@ -2117,15 +2140,15 @@ function srcTarget(){ return sel||(isEm()?P.newCharge:isYm()?P.newYm:P.newSrc); 
 function syncSrcPanel(){
   const s=srcTarget(), em=isEm(), ym=isYm(), moving=em&&(s.kind==='wiggle'||s.kind==='orbit');
   $('srcLab').textContent=em||ym?(sel?'Selected charge:':'New charges:'):(sel?'Selected source:':'New sources:');
-  $('srcSelfWrap').hidden=!(em&&s.kind==='free'); $('srcSelf').checked=s.self!==false;
-  $('srcMwrap').hidden=!((em||ym)&&s.kind==='free'); if(ym) pressSeg($('srcCol'),'c',s.col); $('srcM').value=s.M||1; $('srcMo').textContent=(+(s.M||1)).toFixed(1);
-  $('srcAwrap').hidden=!moving; $('srcA').value=s.A||3; $('srcAo').textContent=(+(s.A||3)).toFixed(1);
-  $('srcSpeed').textContent=moving?`top speed ${(effAmp(s)*s.w).toFixed(2)} c`:'';
+  $('srcSelfWrap').hidden=!em; $('srcSelfWrap').style.visibility=s.kind==='free'?'':'hidden'; $('srcSelf').checked=s.self!==false;
+  $('srcMwrap').hidden=!(em||ym); $('srcMwrap').style.visibility=s.kind==='free'?'':'hidden'; if(ym) pressSeg($('srcCol'),'c',s.col); $('srcM').value=s.M||1; $('srcMo').textContent=(+(s.M||1)).toFixed(1);
+  $('srcAwrap').hidden=!em; $('srcAwrap').style.visibility=moving?'':'hidden'; $('srcA').value=s.A||3; $('srcAo').textContent=(+(s.A||3)).toFixed(1);
+  $('srcSpeed').style.visibility=moving?'':'hidden'; $('srcSpeed').textContent=`top speed ${moving?(effAmp(s)*s.w).toFixed(2):'0.00'} c`;
   pressSeg($('srcKind'),'k',s.kind); pressSeg($('srcSign'),'s',s.sign);
   $('srcQ').value=s.q; $('srcQo').textContent=(+s.q).toFixed(1);
   $('srcW').value=s.w; $('srcWo').textContent=(+s.w).toFixed(2);
-  $('srcWwrap').style.display=s.kind==='osc'||moving?'':'none';
-  $('srcDel').hidden=!sel; $('srcDel').textContent=em||ym?'Delete charge':'Delete source';
+  $('srcWwrap').style.visibility=s.kind==='osc'||moving?'':'hidden';
+  $('srcDel').style.visibility=sel?'':'hidden'; $('srcDel').textContent=em||ym?'Delete charge':'Delete source';
 }
 $('srcKind').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; const s=srcTarget(); s.kind=b.dataset.k; if(sel) sel.t0=t;
   if(s.kind==='free'){ s.M=s.M||1; s.mx=0; s.my=0; s.trail=[]; } if(sel) syncOwn(sel,true); syncSrcPanel(); dirty=true; };
@@ -2161,7 +2184,7 @@ function applyBrush(a,b){
     walkSeg(a,b,P.brush/dx/2,(x,y)=>poke(x,y,amp*0.25)); }
   else if(P.tool==='paint'){ const v=TH[P.th].targets[P.paintIdx][0]; let tv=v, tv2=0;
     if(isPh()){ const r0=vacPhi4(1); if(v===null) tv=0; else { tv=r0*Math.cos(v); tv2=r0*Math.sin(v); } }
-    else if(P.th==='phi4'&&Math.abs(v)===1) tv=vacPhi4(v);
+    else if(P.th==='phi4'&&Math.abs(v)===1){ tv=vacPhi4(v); if(v===-1&&tv>=0) tv=-1; }
     if(!a) paint(b.x,b.y,tv,tv2); else walkSeg(a,b,P.brush/dx/3,(x,y)=>paint(x,y,tv,tv2)); }
   else if(P.tool==='twist'){ if(!a) twistAt(b.x,b.y,P.twistSign); }
   else if(P.tool==='wall'){ const er=P.wallMode==='erase';
@@ -2170,6 +2193,7 @@ function applyBrush(a,b){
   if(!P.running) render();
 }
 cv.addEventListener('pointerdown',e=>{
+  if(drag) return;
   e.preventDefault(); cv.setPointerCapture(e.pointerId);
   const c=toCell(e);
   if(P.tool==='source'){
@@ -2203,13 +2227,32 @@ cv.addEventListener('pointerup',endDrag); cv.addEventListener('pointercancel',en
 
 /* ---------- main loop ---------- */
 let frameNo=0;
+// Measure our work, not time spent in a hidden tab. Two fast windows are needed to recover.
+let budgetFrames=0, budgetMs=0, halfSteps=false, fastWindows=0, stepCarry=0;
+function resetFrameBudget(){ budgetFrames=0; budgetMs=0; halfSteps=false; fastWindows=0; stepCarry=0; }
+function noteFrameCost(ms){
+  budgetMs+=ms;
+  if(++budgetFrames<30) return;
+  const avg=budgetMs/budgetFrames; budgetFrames=0; budgetMs=0;
+  if(!halfSteps&&avg>40){ halfSteps=true; fastWindows=0; }
+  else if(halfSteps){
+    fastWindows=avg<16?fastWindows+1:0;
+    if(fastWindows>=2){ halfSteps=false; fastWindows=0; }
+  }
+}
+function frameSteps(){
+  stepCarry+=(isYm()?P.speed:2*P.speed)*(halfSteps?0.5:1);
+  const n=Math.floor(stepCarry); stepCarry-=n; return n;
+}
 function frame(){
-  if(P.running){ advance(isYm()?P.speed:2*P.speed); }   // a Yang–Mills step costs ~2 superconductor steps, so it takes half as many
+  const start=performance.now();
+  if(P.running){ const n=frameSteps(); if(n>0) advance(n); }   // a Yang–Mills step costs ~2 superconductor steps, so it takes half as many
   sizeCanvas();
   if(frameNo%3===0){ autoScales(); vortices=findVortices(); }
   render();
   if(frameNo%6===0){ drawPlot(); drawLegend(); }
   if(frameNo%10===0) readout();
+  if(P.running) noteFrameCost(performance.now()-start); else resetFrameBudget();
   frameNo++;
   if(!window.NO_TICK) requestAnimationFrame(frame);
 }
@@ -2221,7 +2264,8 @@ if(/[?&]record\b/.test(location.search)) recordMode(); else requestAnimationFram
 /* ---------- ?record: YouTube Shorts (see ../shorts-rec.js) ---------- */
 /* 1080×1920: a caption band on top, the page's own picture (drawn 1080 wide, without the vortex rings) below it.
    ?record (or ?record=vortices) records the vortex Short, ?record=slits the light-through-slits one, ?record=atom the classical atom, ?record=jump the jumping charge,
-   ?record=ymcollide the Yang–Mills wave collision, ?record=ymtear the unstable colour-magnetic field.
+   ?record=ymcollide the Yang–Mills wave collision, ?record=ymtear the unstable colour-magnetic field,
+   ?record=ymturb the colour turbulence, ?record=flux the superconductor flux tubes.
    One take per preset or init, with a quick fade between takes. steps(f) = simulation steps per video frame (f = frame
    within the take); the quench passes the dark start quickly, then slows so the tangle can be seen. */
 function slitScene(gaps){            // a wall at x = -5 with openings 3 wide at the heights in gaps, light from the left
@@ -2382,7 +2426,7 @@ function recordMode(){
         {from:0, to:T+1, text:'Classical Yang–Mills theory', y:418, size:32, color:'#c9cfe0'}
       ]}
   };
-  const which=(location.search.match(/[?&]record=(\w+)/)||[])[1]||'vortices', SH=SHORTS[which], TAKES=SH.takes;
+  const which=(location.search.match(/[?&]record=(\w+)/)||[])[1]||'vortices', SH=Object.prototype.hasOwnProperty.call(SHORTS,which)?SHORTS[which]:SHORTS.vortices, TAKES=SH.takes;
   const start=[]; let n=0; for(const tk of TAKES){ start.push(n); n+=tk.sec*30; }
   const rc=document.createElement('canvas'), rctx=rc.getContext('2d');
   rc.width=W; rc.height=H;

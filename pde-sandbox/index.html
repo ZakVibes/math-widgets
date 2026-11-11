@@ -105,7 +105,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
   <header>
     <a class="back-link" href="../index.html">← All widgets</a>
     <h1>PDE sandbox</h1>
-    <p class="lede">Famous partial differential equations, solved as you watch. Pick an equation, choose how it starts and what drives it, and see the solution unfold: the curve shows u(x) right now, and the strip below keeps the whole history, with time running down the page.</p>
+    <p class="lede">Famous partial differential equations, solved as you watch. Pick an equation, choose how it starts and what drives it, and see the solution unfold: <span id="viewIntro">the curve shows u(x) right now, and the strip below keeps the whole history, with time running down the page.</span></p>
   </header>
 
   <section class="panel">
@@ -210,6 +210,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 <script>
 (()=>{
 "use strict";
+const RECORD=/[?&]record\b/.test(location.search);
 const $=id=>document.getElementById(id);
 
 /* ---------- formulas typed by the visitor (a small safe parser: no eval) ---------- */
@@ -351,7 +352,7 @@ const EQS={
       {name:'Hot spot', init:'exp(-200(x-0.5)^2)', edge:'fixed', rate:0.5, window:5},
       {name:'Ripples fade first', init:'sin(pi x) + 0.3sin(9pi x)', edge:'fixed', rate:0.5, window:5},
       {name:'Hot meets cold', init:'step(0.5-x)', edge:'insulated', rate:1, window:10},
-      {name:'Heated middle', init:'0', src:'5exp(-200(x-0.5)^2)', edge:'fixed', rate:1, window:12, range:0.6},
+      {name:'Heated middle', init:'0', src:'5exp(-200(x-0.5)^2)', edge:'fixed', rate:1, window:12, ...(RECORD?{range:0.6}:{})},
       {name:'Pulsing heater', init:'0', src:'8sin(4t)exp(-300(x-0.3)^2)', edge:'insulated', rate:1, window:12, range:0.5}
     ]},
   adv:{name:'Advection', a:0, b:1, N:400, order:1, kind:'signed', edges:['wrap'], edgeLabels:['','','Wrap'],
@@ -823,7 +824,7 @@ function readout(){
   }
   if(e==='heat') lines.push(`total heat ∫u dx = <b>${fmt(integral(q=>q))}</b>${P.edge!=='fixed'&&srcC.zero&&!painted?' (stays fixed: no heat gets in or out)':''}`);
   if(e==='adv'||e==='burg') lines.push(`∫u dx = <b>${fmt(integral(q=>q))}</b>${P.edge==='wrap'&&srcC.zero&&!painted?' (stays fixed)':''}`);
-  if(e==='kdv') lines.push(`∫u dx = <b>${fmt(integral(q=>q))}</b> · ∫u² dx = <b>${fmt(integral(q=>q*q))}</b> (both stay fixed)`);
+  if(e==='kdv') lines.push(`∫u dx = <b>${fmt(integral(q=>q))}</b> · ∫u² dx = <b>${fmt(integral(q=>q*q))}</b>${RECORD||(srcC.zero&&!painted)?' (both stay fixed)':''}`);
   if(e==='wave') lines.push(`energy = <b>${fmt(waveEnergy())}</b>${p.g===0&&srcC.zero&&!painted?' (stays fixed)':''}`);
   if(e==='fisher'){
     const X=frontPos(), sp=frontSpeed(Math.min(5,P.window/4));
@@ -932,7 +933,7 @@ function syncEdges(){
     b.hidden=k<0; b.textContent=d.edgeLabels[idx]||b.textContent; b.setAttribute('aria-pressed',String(b.dataset.e===P.edge));
   }
   const notes={fixed:'Fixed: the two ends are held at their starting values.',insulated:P.eq==='wave'?'Free: the ends move freely (zero slope there).':curKey().startsWith('heat')?'Insulated: no heat flows through the edges (zero slope).':'Zero slope: nothing flows through the ends.',wrap:'Wrap: the right end joins back onto the left, like a ring.'};
-  $('edgeNote').textContent=notes[P.edge]+(d.edges.length===1?' This equation needs the ring.':'');
+  $('edgeNote').textContent=notes[P.edge]+(d.edges.length===1?(RECORD?' This equation needs the ring.':' This page only offers the ring for this equation.'):'');
 }
 function loadPreset(name){
   const d=def(), pr=d.presets.find(q=>q.name===name)||d.presets[0];
@@ -1034,7 +1035,7 @@ const D2={
     dtMax(p){ return 0.9*dx2*dx2/(4*p.D); },
     presets:[
       {name:'Hot spots', u:'disk(x-0.3, y-0.65, 0.1) + disk(x-0.7, y-0.35, 0.06)', edge:'fixed', rate:1, range:1},
-      {name:'Heated corner', u:'0', src:'20disk(x-0.2, y-0.2, 0.05)', edge:'fixed', rate:2, range:0.2},
+      {name:'Heated corner', u:'0', src:'20disk(x-0.2, y-0.2, 0.05)', edge:'fixed', rate:2, ...(RECORD?{range:0.2}:{})},
       {name:'Hot meets cold', u:'step(0.5-x)', edge:'insulated', rate:3, range:1},
       {name:'Pulsing heater', u:'0', src:'40sin(3t)disk(x-0.5, y-0.5, 0.05)', edge:'insulated', rate:1, range:0.2}
     ]},
@@ -1069,7 +1070,7 @@ const D2={
     presets:[
       {name:'Spiral', u:'step(x-38)step(42-x)step(40-y)', v:'0.6step(38-x)step(40-y)', edge:'insulated', rate:8, range:1},
       {name:'Spiral pair', u:'step(x-38)step(42-x)step(abs(y-40)-8)', v:'0.6step(38-x)step(abs(y-40)-8)', edge:'insulated', rate:8, range:1},
-      {name:'Rings from sparks', u:'disk(x-20, y-58, 3) + disk(x-55, y-25, 3)', v:'0', edge:'insulated', rate:8, range:1}
+      {name:'Rings from sparks', u:'disk(x-20, y-58, 3) + disk(x-55, y-25, 3)', v:'0', edge:'insulated', rate:RECORD?8:3, range:1}
     ]},
   own2:{name:'Your own', N:128, L:[0,1], fields:2, view:'u', kind:'signed', rest:[0,0], brush:{u:1,r:0.04}, custom:true,
     edges:['fixed','insulated','wrap'], edgeLabels:['Fixed (at 0)','Zero slope','Wrap'],
@@ -1148,7 +1149,10 @@ function advance2(T){
   if(nsub>cap){ nsub=cap; left=cap*dm; slowed2=true; }
   if(nsub<1) nsub=1;
   const dt=left/nsub;
-  for(let n=0;n<nsub;n++){ d.step(dt,p,src2At(t2)); t2+=dt; }
+  // Sample midway through the substep times, then hold the source over this frame.
+  // The recorder retains its original substep sampling.
+  const source=RECORD?null:src2At(t2+(left-dt)/2);
+  for(let n=0;n<nsub;n++){ d.step(dt,p,RECORD?src2At(t2):source); t2+=dt; }
   lastDt2=dt; lastSub2=nsub;
 }
 function checkBlowup2(){
@@ -1160,7 +1164,12 @@ function readout2(){
   const lines=[`t = <b>${fmt(t2)}</b>`, `time step ${fmt(lastDt2)} · ${lastSub2} per frame${slowed2?' <b>(slowed down: this needs tiny steps)</b>':''}`];
   if(P.eq2==='heat2'){ let s=0; for(let j=1;j<=N2;j++) for(let k=j*G2+1,e=k+N2;k<e;k++) s+=u2[k]; lines.push(`total heat ∬u dA = <b>${fmt(s*dx2*dx2)}</b>${P.edge==='insulated'&&src2.zero?' (stays fixed)':''}`); }
   if(P.eq2==='gs') lines.push('F and k pick the pattern: small changes give spots, stripes, mazes or restless waves');
-  if(P.eq2==='spiral') lines.push('drag across a wave to break it: each broken end curls into a new spiral');
+  if(P.eq2==='spiral'){
+    // The readout runs every six frames, never inside the solver's substep loop.
+    let quiet=!RECORD&&!blew2;
+    for(let j=1;quiet&&j<=N2;j++) for(let k=j*G2+1,e=k+N2;k<e;k++) if(!(Math.abs(u2[k])<0.01)){ quiet=false; break; }
+    lines.push(quiet?'All quiet: the waves cancelled. Drag on the plate to start a new one.':'drag across a wave to break it: each broken end curls into a new spiral');
+  }
   if(def().custom&&rates2){ lines.push(`the time step is set by the <b>${rates2.top}</b>`); if(rates2.bad) lines.push(`<b style="color:var(--bad)">${rates2.bad}</b>`); }
   $('readout').innerHTML=lines.join('<br>'); $('tNow2').textContent=fmt(t2);
 }
@@ -1234,6 +1243,7 @@ function buildTabs(){
 }
 function setDim(dd){
   P.dim=dd;
+  if(!RECORD) $('viewIntro').textContent=dd===2?'the colour at each point of the plate shows the solution u(x, y) there right now, and the picture changes as time passes.':'the curve shows u(x) right now, and the strip below keeps the whole history, with time running down the page.';
   for(const b of $('dimSeg').children) b.setAttribute('aria-pressed',String(+b.dataset.d===dd));
   $('stage1').hidden=dd===2; $('stage2').hidden=dd!==2; $('ceq2').hidden=true;
   buildTabs();
@@ -1267,7 +1277,7 @@ buildTabs();
 for(const b of $('dimSeg').querySelectorAll('button')) b.addEventListener('click',()=>{ if(+b.dataset.d!==P.dim) setDim(+b.dataset.d); });
 for(const b of $('viewSeg2').querySelectorAll('button')) b.addEventListener('click',()=>{ P.view2=b.dataset.v; syncView2(); S2=1e-9; autoScale2(); drawLegend2(); draw2(); });
 $('playBtn2').addEventListener('click',()=>{ P.running=!P.running; syncPlay(); if(P.running&&blew2) restart2(); });
-$('restartBtn2').addEventListener('click',()=>restart2());
+$('restartBtn2').addEventListener('click',()=>{ const was=blew2; restart2(); if(!RECORD&&was&&!blew2){ P.running=true; syncPlay(); } });
 $('rhsUIn').addEventListener('change',e=>{ P.rhsU=e.target.value; if(setRhs2()){ blew2=false; $('warn2').hidden=true; } });
 $('rhsVIn').addEventListener('change',e=>{ P.rhsV=e.target.value; if(setRhs2()){ blew2=false; $('warn2').hidden=true; } });
 // drawing on the plate
@@ -1286,7 +1296,7 @@ let last2=null;
 function drag2To(pt){
   if(last2){ const dd=Math.hypot(pt[0]-last2[0],pt[1]-last2[1]), n=Math.max(1,Math.ceil(dd/dx2)); for(let s=1;s<=n;s++) brush2(last2[0]+(pt[0]-last2[0])*s/n,last2[1]+(pt[1]-last2[1])*s/n); }
   else brush2(pt[0],pt[1]);
-  last2=pt; if(!P.running) draw2();
+  last2=pt; if(!P.running) draw2(); if(!RECORD&&P.eq2==='spiral') readout2();
 }
 cp.addEventListener('pointerdown',e=>{ drag2=true; last2=null; cp.setPointerCapture(e.pointerId); drag2To(at2(e)); e.preventDefault(); });
 cp.addEventListener('pointermove',e=>{ const pt=at2(e); if(drag2) drag2To(pt); else { const i=Math.max(0,Math.min(N2-1,Math.floor((pt[0]-x2a)/dx2))), j=Math.max(0,Math.min(N2-1,Math.floor((pt[1]-x2a)/dx2))), k=(j+1)*G2+i+1;
@@ -1296,7 +1306,7 @@ cp.addEventListener('pointerup',end2); cp.addEventListener('pointercancel',end2)
 cp.addEventListener('pointerleave',()=>{ if(!drag2) $('hint2').textContent='Drag on the plate to draw. Hover to read values.'; });
 $('hint2').textContent='Drag on the plate to draw. Hover to read values.';
 $('playBtn').addEventListener('click',()=>{ P.running=!P.running; syncPlay(); if(P.running&&blew){ restart(); } });
-$('restartBtn').addEventListener('click',()=>{ restart(); });
+$('restartBtn').addEventListener('click',()=>{ const was=blew; restart(); if(!RECORD&&was&&!blew){ P.running=true; syncPlay(); } });
 $('clearPaint').addEventListener('click',()=>{ paint.fill(0); painted=false; srcMax=0; changed(); });
 $('speed').addEventListener('input',e=>{ P.mult=Math.pow(2,(e.target.value-5)/2); $('speedO').textContent='×'+(P.mult<1?P.mult.toFixed(2):P.mult.toFixed(P.mult%1?1:0)); });
 $('initIn').addEventListener('change',e=>{ P.initStr=e.target.value; P.dim===2?restart2():restart(); });

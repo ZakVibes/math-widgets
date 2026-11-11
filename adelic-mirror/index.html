@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>The Adelic Mirror</title>
-<link rel="manifest" href="../manifest.json"><link rel="icon" href="../icons/icon-192.png"><link rel="apple-touch-icon" href="../icons/icon-180.png"><meta name="apple-mobile-web-app-title" content="Math Widgets"><script>if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("../sw.js"));</script><script>if (location.hostname === "zakvibes.github.io") { const s = document.createElement("script"); s.defer = true; s.src = "https://static.cloudflareinsights.com/beacon.min.js"; s.dataset.cfBeacon = JSON.stringify({ token: "82a3b23479314bcbbeaf2af3881066d0", spa: false }); document.head.append(s); }</script>
+<link rel="manifest" href="../manifest.json"><link rel="icon" href="../icons/icon-192.png"><link rel="apple-touch-icon" href="../icons/icon-180.png"><meta name="apple-mobile-web-app-title" content="Math Widgets"><script>if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("../sw.js"));</script><script>if (location.hostname === "zakvibes.github.io") { const s = document.createElement("script"); s.defer = true; s.src = "https://static.cloudflareinsights.com/beacon.min.js"; s.dataset.cfBeacon = JSON.stringify({ token: "82a3b23479314bcbbeaf2af3881066d0" }); document.head.append(s); }</script>
 <link rel="stylesheet" href="../site.css">
 <style>:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -55,6 +55,7 @@ button:focus-visible,.chip:focus-visible,select:focus-visible,input:focus-visibl
 button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
 .zoombtns button{padding:4px 10px;font-size:12px;background:color-mix(in srgb,var(--raise) 85%,transparent)}
 .zoombtns button.mini{width:30px;height:28px;padding:0;font-size:15px;line-height:1;display:inline-flex;align-items:center;justify-content:center}
+@media (max-width:860px), (pointer:coarse){.zoombtns button{min-height:44px}.zoombtns button.mini{min-width:44px}}
 input[type=range]{accent-color:var(--accent);width:100%}
 aside{display:flex;flex-direction:column;gap:16px;min-width:0}
 .sect{display:flex;flex-direction:column;gap:8px}
@@ -112,6 +113,9 @@ input[type=text]{font-family:var(--font-mono);font-size:14px}
 .jrx{margin:0;font:500 14px/1.35 var(--font-mono);overflow-wrap:anywhere}
 .jrbar{display:none;position:sticky;bottom:0;z-index:20;box-sizing:border-box;margin-inline:-16px;padding:4px 8px calc(4px + env(safe-area-inset-bottom,0px));min-height:48px;background:var(--panel);border-top:1px solid var(--line);align-items:center;justify-content:center;gap:5px}
 @media (max-width:860px){.jrbar{display:flex}}
+#jbView{display:none}
+@media (max-width:860px){#jbView{display:inline-block}}
+@media (max-width:420px){.jrbar .jbread{display:none}.jrbar{gap:4px;padding-inline:4px}.jrbar button{padding:0 8px}.jrbar .chips .chip{padding:0 6px}}
 .jrbar button{min-height:40px;padding:0 10px;font-size:13px;white-space:nowrap}
 .jrbar .jbread{font-size:12px;color:var(--muted);white-space:nowrap;padding:0 2px}
 .jrbar .chips{flex-wrap:nowrap;gap:3px}.jrbar .chips .chip{padding:0 8px;font-size:12px}
@@ -279,6 +283,7 @@ input[type=text]{font-family:var(--font-mono);font-size:14px}
     <button type="button" id="jbReset" aria-label="Start over" title="Start over">↺<span class="jbw"> Start over</span></button>
     <span class="jbread mono" id="jbRead">0 / 0</span>
     <div class="chips" id="jbSpeed"></div>
+    <button type="button" id="jbView" aria-controls="views">View</button>
   </div>
 </div>
 
@@ -1346,7 +1351,7 @@ function renderGamePanel(){
   const nxt = gm.steps[gm.bi + 1];
   $('gSurv').innerHTML = `Survivors: <b class="mono">${gm.nSurv}</b> of <b class="mono">${gm.pool.length}</b> dots <span class="muted">(bottom numbers up to ${gm.B})</span>`;
   $('gGrow').disabled = nxt === undefined; $('gGrow').textContent = nxt === undefined ? 'The cloud is full size' : `Grow the cloud (to ${nxt})`;
-  $('gGrowNote').textContent = (gm.nSurv === 0 ? 'Nothing survives yet: grow the cloud, or let bigger bottom numbers in. ' : '') + (nxt !== undefined && nxt > 24 ? 'Past 24, only survivors are added. ' : '') + (gm.capped ? 'Capped at 4000 dots.' : '');
+  $('gGrowNote').textContent = (gm.nSurv === 0 ? (gm.bi > 0 ? `Still none up to ${gm.B}: the simplest answer has a bigger bottom number. ` : 'Nothing survives yet: grow the cloud, or let bigger bottom numbers in. ') : '') + (nxt !== undefined && nxt > 24 ? 'Past 24, only survivors are added. ' : '') + (gm.capped ? 'Capped at 4000 dots.' : '');
   // the full par stays hidden until the level is solved; before that, only its bottom number is a hint
   const parHint = gm.won ? `<b class="mono">${fracStr(gm.par)}</b>` : gm.par.d === 1n ? '<b>a whole number</b>' : `bottom number <b class="mono">${gm.par.d}</b>`;
   $('gPar').innerHTML = gm.par.exact ? `Par: ${parHint} <span class="muted">${gm.won ? 'the simplest fraction that hits everything' : '(the simplest answer, shown in full once you solve it)'}</span>` : `A simple answer: <b class="mono">${fracStr(gm.par)}</b>`;
@@ -1470,10 +1475,11 @@ function howText(s){
       triedTable(H) +
       (found ? `<p>Found it. Teeth get closer as b grows (M/${bot} apart), so once they are closer together than the band is wide a tooth must land. That is why there is always an answer.</p>` : '');
   }
-  const a = C.answer, bot = String(C.P*BigInt(C.parB || 1)), top = C.tried[C.tried.length - 1].n;
-  if (!R) return `<p><b>Done.</b> There is no real target, so b = 1 and we take the whole number ≡ A (mod ${M}) that is smallest in size: ${String(top)}${C.P > 1n ? '/' + P : ''} = <b class="mono">${fracStr({n:a[0], d:a[1]})}</b>. It lands in every target (all badges ✓), and it is the simplest fraction that does (par).</p>`;
-  const fs = fracStr({n:a[0], d:a[1]}), raw = String(top) + "/" + bot;
-  return `<p><b>Done.</b> b = ${C.parB} gives top = ${String(top)}, so x = ${raw}${raw === fs ? "" : " = " + fs} ≈ ${fmtNum(Number(a[0])/Number(a[1]))}. It lands in every target (all badges ✓), and it is the simplest fraction that does (par).</p>`;
+  const a = C.answer, bot = C.P*BigInt(C.parB || 1), top = C.tried[C.tried.length - 1].n;
+  const fs = fracStr({n:a[0], d:a[1]}), raw = fracStr({n:top, d:bot});
+  const exact = raw + (bot === 1n || raw === fs ? '' : ' = ' + fs);
+  if (!R) return `<p><b>Done.</b> There is no real target, so b = 1 and we take the whole number ≡ A (mod ${M}) that is smallest in size: <b class="mono">${exact}</b>. It lands in every target (all badges ✓), and it is the simplest fraction that does (par).</p>`;
+  return `<p><b>Done.</b> b = ${C.parB} gives top = ${String(top).replace('-', '−')}, so x = ${exact}${a[1] === 1n ? "" : " ≈ " + fmtNum(Number(a[0])/Number(a[1]))}. It lands in every target (all badges ✓), and it is the simplest fraction that does (par).</p>`;
 }
 function renderHow(){
   const box = $('gHowBox'), H = gm.how; $('gHow').textContent = H ? 'Hide the walkthrough' : 'Show me how';
@@ -1569,7 +1575,7 @@ const fmt3 = x => (x >= 1e6 || x < 1e-4) ? x.toExponential(2).replace('e+', 'e')
 function sizeText(e){
   if (e.kind === 'real'){ const t = e.den === 1n ? String(e.num) : e.num + '/' + e.den; return t.length > 20 ? '≈ ' + fmt3(Number(e.num)/Number(e.den)) : t; }
   let t; if (e.pw){ const s = String(BigInt(e.pw[0]) ** BigInt(e.pw[1])); t = s.length > 16 ? e.pw[0] + SUP(e.pw[1]) : s; }
-  else { const s = String(e.L); t = s.length > 16 ? '≈ ' + fmtNum(Number(e.L)) : s; }
+  else { const s = String(e.L); if (s.length > 16) return '≈ ' + (e.big ? '' : '1/') + Number(e.L).toExponential(2).replace(/\.0+(?=e)/, '').replace('e+', 'e'); t = s; }
   return e.big ? t : '1/' + t;
 }
 function balExact(){ let N = 1n, D = 1n; for (const e of bal.ents){ N *= e.num; D *= e.den; } const g = bgcd(N, D); return (N / g) + '/' + (D / g); }
@@ -1589,13 +1595,14 @@ function renderBalance(){
   bal.zero = false;
   if (!msg){
     if (w.n === 0n){ msg = '0 has no size to balance: the product formula is about nonzero numbers.'; bal.zero = true; }
-    else { ents = balEntries(w.n, w.d); if (!ents.length) msg = '1 has size 1 in every world, so there is nothing on the scale.'; }
+    else { ents = balEntries(w.n, w.d); if (!ents.length) msg = 'This number has size 1 in every world, so there is nothing on the scale.'; }
   }
   bal.ents = ents; setBalTarget(ents);
   let h = w.head ? `<h3 class="mono" style="overflow-wrap:anywhere">${w.head}</h3>` : '';
   if (msg) h += `<p>${msg}</p>`;
   else {
-    h += `<p class="eq">${ents.map(sizeText).join(' × ')} = 1</p>`;
+    const sizes = ents.map(sizeText);
+    h += `<p class="eq">${sizes.join(' × ')} ${sizes.some(s => s.startsWith('≈')) ? '≈' : '='} 1</p>`;
     h += `<table class="wtab baltab"><thead><tr><th>World</th><th>Size</th><th></th></tr></thead><tbody>` + ents.map(e => {
       const dec = e.kind === 'real' && e.den !== 1n && !sizeText(e).startsWith('≈') ? ' ≈ ' + fmt3(Number(e.num)/Number(e.den)) : '';
       return `<tr><td><span class="sw ${e.big ? 't' : 'c'}${e.on ? '' : ' off'}"></span>${e.name}</td><td>${sizeText(e)}${dec}</td><td>${e.big ? 'bigger' : 'smaller'}${e.on ? '' : ' · not on screen'}</td></tr>`;
@@ -1751,15 +1758,15 @@ const JR = [
   {name:'n!: 1, 2, 6, 24, …', last:60, f:n => { let f = 1n; for (let k = 2n; k <= BigInt(n); k++) f *= k; return [f, 1n]; }, rule:'x = n!, so each step multiplies the last by the next whole number: 0! = 1, 1! = 1, 2! = 2, 3! = 6, …',
    v:[RUNS, TO0, TO0, TO0, TO0], lims:[null, {zero:true}, {zero:true}, {zero:true}, {zero:true}], rv:{c:70, span:150}, zoom0:[2, 3, 5, 7],
    why:'n! keeps collecting factors of 2, 3, 5 and 7, so every p-adic world sees it shrink. The opposite of 1, 1/2, 1/3, …, which settles only on the real line.'},
-  {name:'1, 11, 111, …', last:39, f:n => [(10n ** BigInt(n + 1) - 1n) / 9n, 1n], rule:'x = 11…1 (n ones) = (10ⁿ − 1) ÷ 9: each step writes one more 1 on the left.',
+  {name:'1, 11, 111, …', last:39, f:n => [(10n ** BigInt(n + 1) - 1n) / 9n, 1n], rule:'x = 11…1 (n + 1 ones) = (10ⁿ⁺¹ − 1) ÷ 9: each step writes one more 1 on the left.',
    v:[RUNS, verd('conv', 'closes in on −1/9'), WAND, verd('conv', 'closes in on −1/9'), WAND], lims:[null, {q:() => [-1n, 9n]}, null, {q:() => [-1n, 9n]}, null], rv:{c:60, span:140},
    why:'10 = 2 × 5, so adding another 1 on the left changes the number by a power of 10, which is tiny to both the 2-adic and the 5-adic world. Both see 111…1 heading for −1/9, because 9 × (−1/9) = −1 = …99999.'},
   {name:'Fifth powers from 2', last:7, f:n => [2n ** (5n ** BigInt(n)), 1n], rule:'x₀ = 2, then each new x is the last one to the 5th power: x⁵.',
    v:[RUNS, TO0, WAND, verd('conv', 'closes in on √−1'), WAND], lims:[null, {zero:true}, null, {q:() => [sqrtm1in5(), 1n]}, null], rv:{c:20, span:50}, zoom0:[2],
-   why:'In the 5-adic world, raising to the 5th power pulls every number toward a special point with the same last digit. Starting from 2, that point is a square root of −1: exactly where Newton’s method for √−1 ended up, reached by a completely different road.'},
-  {name:'0! + 1! + 2! + …', last:60, f:n => [factSum(BigInt(n)), 1n], rule:'x = 0! + 1! + 2! + … + N!: each step adds the next factorial.',
+   why:'In the 5-adic world, raising to the 5th power pulls every whole number toward a special point with the same last digit. Starting from 2, that point is a square root of −1: exactly where Newton’s method for √−1 ended up, reached by a completely different road.'},
+  {name:'0! + 1! + 2! + …', last:60, f:n => [factSum(BigInt(n)), 1n], rule:'x = 0! + 1! + 2! + … + n!: each step adds the next factorial.',
    v:[RUNS, SETTLES, SETTLES, SETTLES, SETTLES], lims:[null, {q:() => [factSum(200n), 1n]}, {q:() => [factSum(200n), 1n]}, {q:() => [factSum(200n), 1n]}, {q:() => [factSum(200n), 1n]}], rv:{c:80, span:180},
-   why:'Each new term N! is tiny p-adically, so the sum settles in every p-adic world at once. Where it settles is a mystery: nobody has found a formula for those limits.'},
+   why:'Each new term n! is tiny p-adically, so the sum settles in every p-adic world at once. Where it settles is a mystery: nobody has found a formula for those limits.'},
   {name:'1 + 3 + 9 + 27 + …', last:40, f:n => [(3n ** BigInt(n + 1) - 1n) / 2n, 1n], rule:'x = 1 + 3 + 9 + … + 3ⁿ = (3ⁿ⁺¹ − 1) ÷ 2: each step adds the next power of 3.',
    v:[RUNS, WAND, verd('conv', 'closes in on −1/2'), WAND, WAND], lims:[null, null, {q:() => [-1n, 2n]}, null, null], rv:{c:70, span:160},
    why:'Like 1 + 2 + 4 + … heading for −1 in the 2-adic world: here s + 1/2 is a power of 3 (halved), so the 3-adic world sees the sums close in on −1/2. In base 3 they are …1111, and 2 × …1111 + 1 = …0000.'},
@@ -1890,7 +1897,7 @@ function renderJrPanel(){
   const xs = r.d === 1n ? bigTxt(s.n) : bigTxt(s.n) + ' / ' + bigTxt(s.d);
   $('jrChips').querySelectorAll('[data-j]').forEach(b => b.setAttribute('aria-pressed', +b.dataset.j === jr.idx));
   $('jrNow').innerHTML = `<h3 class="jrx">step ${jr.step}: x = ${xs}</h3>` +
-    (long ? `<p class="muted">a ${s.n.length}-digit top over a ${s.d.length}-digit bottom</p>` : '') +
+    (long ? `<p class="muted">${r.d === 1n ? `a ${s.n.length}-digit number` : `a ${s.n.length}-digit top over a ${s.d.length}-digit bottom`}</p>` : '') +
     `<p class="muted mono" style="margin:0">≈ ${jrNum(r)} · step ${jr.step} of ${J.last}</p><p>${J.rule}</p>`;
   const seen = jrSeen(), rows = ['Real line', '2-adic', '3-adic', '5-adic', '7-adic'].map((nm, wi) => {
     const v = J.v[wi], ok = v.k === 'conv' && seen;
@@ -1974,6 +1981,16 @@ for (const [pl, stp, rs] of [['jrPlay', 'jrStep', 'jrReset'], ['jbPlay', 'jbStep
   $(rs).addEventListener('click', () => { jrStop(); jrRestart(); });
 }
 for (const id of ['jrSpeed', 'jbSpeed']) $(id).addEventListener('click', e => { const b = e.target.closest('[data-s]'); if (b){ jr.speed = +b.dataset.s; renderJrPanel(); } });
+$('jbView').addEventListener('click', () => {
+  const views = $('views');
+  views.hidden = false;
+  for (let parent = views.parentElement; parent; parent = parent.parentElement){
+    if (parent.tagName === 'DETAILS') parent.open = true;
+    if (parent.hidden) parent.hidden = false;
+  }
+  views.scrollIntoView({block:'center'});
+  views.querySelector('[aria-pressed="true"]').focus({preventScroll:true});
+});
 $('jrFollow').addEventListener('click', () => {
   jr.follow = !jr.follow; jr.pause.fill(false);
   if (!jr.follow) jrFitAll();                        // off: back to the journey's own views
