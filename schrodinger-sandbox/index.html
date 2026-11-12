@@ -250,6 +250,44 @@ for (let j = 0; j < N; j++) { tc[j] = Math.cos(-TK[j] * DT); ts[j] = Math.sin(-T
 let view = [0, 1];
 let levels = [], vecs = [], pops = [];
 
+// ---------- exact infinite well (box, hard edges, no bumps): evolve sine-mode coefficients ----------
+// E_n = n²π²/(2W²) exactly, so the box spectrum is exactly n² and revivals are exact (T = 4W²/π).
+const EX_KC = 40;   // highest wave number kept, nπ/W (grid limit is π/DX ≈ 80)
+const ex = { on: false, W: 0, M: 0, i0: 0, nmax: 0, tab: null, cr: null, ci: null, tref: 0 };
+const exE = (n, W) => n * n * Math.PI * Math.PI / (2 * W * W);
+function exSetup(W) {
+  if (ex.tab && ex.W === W) return;
+  let i0 = -1, i1 = -1;
+  for (let i = 0; i < N; i++) if (Math.abs(X[i]) < W / 2) { if (i0 < 0) i0 = i; i1 = i; }
+  const M = i1 - i0 + 1, nmax = Math.floor(W * EX_KC / Math.PI), tab = new Float64Array(nmax * M), a = Math.sqrt(2 / W);
+  for (let m = 0; m < M; m++) {
+    const th = Math.PI * (X[i0 + m] + W / 2) / W, c2 = 2 * Math.cos(th);
+    let s0 = 0, s1 = Math.sin(th);
+    tab[m] = a * s1;
+    for (let n = 2; n <= nmax; n++) { const s2 = c2 * s1 - s0; tab[(n - 1) * M + m] = a * s2; s0 = s1; s1 = s2; }
+  }
+  ex.W = W; ex.M = M; ex.i0 = i0; ex.nmax = nmax; ex.tab = tab; ex.cr = new Float64Array(nmax); ex.ci = new Float64Array(nmax);
+}
+function exProject() {   // expand the current psi (inside the box) in sine modes; defines time zero
+  const { M, i0, nmax, tab, cr, ci } = ex;
+  for (let n = 0; n < nmax; n++) {
+    let a = 0, b = 0; const o = n * M;
+    for (let m = 0; m < M; m++) { const f = tab[o + m]; a += f * pr[i0 + m]; b += f * pi[i0 + m]; }
+    cr[n] = a * DX; ci[n] = b * DX;
+  }
+  ex.tref = S.t;
+}
+function exRebuild() {   // psi(t) = sum c_n exp(-i E_n t) phi_n
+  const { M, i0, nmax, tab, cr, ci, W } = ex, t = S.t - ex.tref;
+  pr.fill(0); pi.fill(0);
+  for (let n = 0; n < nmax; n++) {
+    const th = -((exE(n + 1, W) * t) % (2 * Math.PI)), cs = Math.cos(th), sn = Math.sin(th);
+    const ar = cr[n] * cs - ci[n] * sn, ai = cr[n] * sn + ci[n] * cs, o = n * M;
+    for (let m = 0; m < M; m++) { const f = tab[o + m]; pr[i0 + m] += ar * f; pi[i0 + m] += ai * f; }
+  }
+}
+function exSync() { if (ex.on) { exProject(); exRebuild(); } }
+
 function curParam() { return S.params[S.pot]; }
 
 function buildPotential() {
@@ -274,11 +312,22 @@ function buildPotential() {
     vc[i] = amp * Math.cos(ph); vs[i] = amp * Math.sin(ph);
   }
   view = P.view(p);
+  ex.on = S.pot === "box" && S.edges === "walls" && S.bumps.length === 0;
+  if (ex.on) { exSetup(+p); exSync(); }
   computeLevels();
 }
 
 // ---------- eigenstates of the finite-difference H (same kinetic term as the propagator) ----------
 function computeLevels() {
+  if (ex.on) {
+    levels = []; vecs = [];
+    for (let n = 1; n <= ex.nmax && levels.length < 80; n++) {
+      const E = exE(n, ex.W); if (E > view[1]) break;
+      const v = new Float64Array(N); v.set(ex.tab.subarray((n - 1) * ex.M, n * ex.M), ex.i0);
+      levels.push(E); vecs.push(v);
+    }
+    levelPath = null; return;
+  }
   const e = -1 / (2 * DX * DX), e2 = e * e, d = new Float64Array(N);
   let minV = Infinity;
   for (let i = 0; i < N; i++) { d[i] = 1 / (DX * DX) + Vtot[i]; if (Vtot[i] < minV) minV = Vtot[i]; }
@@ -338,7 +387,7 @@ function install(st, add) {
   const [re, im] = st;
   if (add) { for (let i = 0; i < N; i++) { pr[i] += re[i]; pi[i] += im[i]; } if (!normalize(pr, pi)) { pr.set(re); pi.set(im); } }
   else { pr.set(re); pi.set(im); }
-  p0r = pr.slice(); p0i = pi.slice(); S.t = 0; resetScale = true;
+  p0r = pr.slice(); p0i = pi.slice(); S.t = 0; resetScale = true; exSync();
 }
 const wantAdd = () => S.add || S.shift;
 
@@ -350,6 +399,11 @@ function step() {
   for (let j = 0; j < N; j++) { const a = pr[j], b = pi[j]; pr[j] = a * tc[j] - b * ts[j]; pi[j] = a * ts[j] + b * tc[j]; }
   fft(pr, pi, true);
   for (let i = 0; i < N; i++) { const a = pr[i], b = pi[i]; pr[i] = a * vc[i] - b * vs[i]; pi[i] = a * vs[i] + b * vc[i]; }
+}
+
+function advance(n) {
+  if (ex.on) { S.t += n * DT; exRebuild(); }
+  else { for (let s = 0; s < n; s++) step(); S.t += n * DT; }
 }
 
 // ---------- observables ----------
@@ -364,6 +418,11 @@ function measure() {
   for (let j = 0; j < N; j++) { const r = wr[j] * wr[j] + wi[j] * wi[j]; sk += r; sp += r * K[j]; st += r * TK[j]; }
   obs.norm = n; obs.x = n > 1e-9 ? sx / n : 0; obs.p = sk > 0 ? sp / sk : 0; obs.E = (sk > 0 ? st / sk : 0) + (n > 1e-9 ? sv / n : 0);
   const sq = Math.sqrt(DX);
+  if (ex.on) {
+    let tot = 0, eE = 0; for (let n = 0; n < ex.nmax; n++) { const q = ex.cr[n] ** 2 + ex.ci[n] ** 2; tot += q; eE += q * exE(n + 1, ex.W); }
+    if (tot > 1e-12) obs.E = eE / tot;
+    pops = levels.map((_, n) => ex.cr[n] ** 2 + ex.ci[n] ** 2); return;
+  }
   pops = vecs.map(v => { let a = 0, b = 0; for (let i = 0; i < N; i++) { a += v[i] * pr[i]; b += v[i] * pi[i]; } return (a * a + b * b) * DX; });
 }
 
@@ -561,7 +620,7 @@ const R = { t: rid("r-t"), x: rid("r-x"), p: rid("r-p"), e: rid("r-e"), n: rid("
 function rid(id) { return document.getElementById(id); }
 let frame = 0;
 function loop() {
-  if (S.playing) { for (let s = 0; s < S.speed; s++) step(); S.t += S.speed * DT; }
+  if (S.playing) advance(S.speed);
   if (frame++ % 90 === 0) readTokens();
   measure();
   if (WM > 0) { drawMain(); drawMom(); }
@@ -695,7 +754,7 @@ function syncPlay() { const b = $("play"); b.innerHTML = S.playing ? ICON_PAUSE 
 function togglePlay() { S.playing = !S.playing; syncPlay(); }
 syncPlay();
 $("play").addEventListener("click", togglePlay);
-$("restart").addEventListener("click", () => { pr.set(p0r); pi.set(p0i); S.t = 0; resetScale = resetScaleP = true; });
+$("restart").addEventListener("click", () => { pr.set(p0r); pi.set(p0i); S.t = 0; resetScale = resetScaleP = true; exSync(); });
 $("speed").addEventListener("input", e => { S.speed = +e.target.value; $("speedVal").textContent = `${(S.speed * DT * 60).toFixed(1)}/s`; });
 $("speedVal").textContent = `${(S.speed * DT * 60).toFixed(1)}/s`;
 
@@ -713,7 +772,7 @@ const PRESETS = [
   { name: "Coherent state", pot: "harmonic", p: 0.6, speed: 12, pk: [-6, 0, 1 / Math.sqrt(2 * 0.6)] },
   { name: "Squeezed breathing", pot: "harmonic", p: 0.6, speed: 10, pk: [0, 0, 0.3] },
   { name: "Two-level beat", pot: "dwell", p: 2.5, speed: 30, view: "prob", make: () => eigen([0, 1]) },
-  { name: "Box revival", pot: "box", p: 16, speed: 60, pk: [-3, 0, 0.35] },
+  { name: "Box revival", pot: "box", p: 16, speed: 60, pk: [-3, 4, 0.5] },
   { name: "Resonant tunneling", pot: "dbar", p: 6, speed: 14, pk: [-9, 1.9, 2.5] },
   { name: "Plane wave on a step", pot: "step", p: 4, speed: 14, pk: [-10, 2.4, 3.5] },
   { name: "Gaussian bump", pot: "free", speed: 12, pk: [-9, 3.2, 1.2], bumps: [{ x0: 0, A: 5, w: 0.8 }] },
@@ -740,7 +799,190 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", readTokens
 new MutationObserver(readTokens).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 install(packet(-8, 3, 1.4), false);
 if (matchMedia("(prefers-reduced-motion: reduce)").matches) togglePlay();
-requestAnimationFrame(loop);
+if (/[?&]record\b/.test(location.search)) recordMode(); else requestAnimationFrame(loop);
+
+// ---------- ?record: a YouTube Short of a quantum revival in a box (see ../shorts-rec.js) ----------
+// The ideal infinite well, width 16 (hbar = m = 1): E_n = n² π² / (2 W²), so every state comes back exactly at
+// T = 4 W² / π, two copies at T/4 and one mirrored copy at T/2. The state is evolved exactly in sine modes (no time
+// steps), and each frame is rebuilt from the modes with one FFT, so a frame at any time costs the same.
+// When the clock runs fast, a frame averages several moments across its interval (a camera shutter), so the
+// fast-forward reads as a blur, not a strobe. The ending carpet is |ψ|² of the same run, row by row in time.
+function recordMode() {
+  const W = 1080, H = 1920, BG = "#0D121D", WB = 16, TR = 4 * WB * WB / Math.PI, NM = 512, M = 1024, M2 = 2 * M;
+  const X0 = -3, K0 = 4, SG = 0.5;                       // the packet: starts at x = -3, moving right, width 0.5
+  const BL = 66, BR = 1014, BASE = 1250, HT = 470;       // the box on screen: left/right wall (px), floor, peak height
+  const CL = 150, CT = 520, CB = 1490, CR = 900;         // carpet: left (px; right edge = BR), top, bottom, rows
+  const T_END = 33, T_CAR = 26.6;
+  const cv = document.createElement("canvas"), ctx = cv.getContext("2d"); cv.width = W; cv.height = H;
+  document.documentElement.dataset.theme = "dark"; readTokens();
+  for (const el of document.body.children) el.style.display = "none";
+  document.body.style.background = BG;
+  cv.style.cssText = "display:block;margin:0 auto;width:min(100vw,56.25vh);height:min(100vh,177.78vw)";
+  document.body.append(cv);
+  const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+  const ramp = (t, a, b) => clamp((t - a) / (b - a));
+  const ease = u => u * u * (3 - 2 * u);
+
+  // sine-mode coefficients of the packet (fine-grid quadrature), and the exact energies
+  const E = new Float64Array(NM + 1), cr = new Float64Array(NM + 1), ci = new Float64Array(NM + 1);
+  {
+    const NQ = 16384, dq = WB / NQ, gr = new Float64Array(NQ), gi = new Float64Array(NQ); let nn = 0;
+    for (let q = 0; q < NQ; q++) { const x = -WB / 2 + (q + 0.5) * dq, u = x - X0, a = Math.exp(-u * u / (4 * SG * SG)); gr[q] = a * Math.cos(K0 * x); gi[q] = a * Math.sin(K0 * x); nn += a * a * dq; }
+    nn = 1 / Math.sqrt(nn);
+    for (let n = 1; n <= NM; n++) {
+      E[n] = n * n * Math.PI * Math.PI / (2 * WB * WB);
+      let sr = 0, si = 0; const f = n * Math.PI / WB;
+      for (let q = 0; q < NQ; q++) { const s = Math.sin(f * (q + 0.5) * dq); sr += gr[q] * s; si += gi[q] * s; }
+      const c = Math.sqrt(2 / WB) * dq * nn; cr[n] = sr * c; ci[n] = si * c;
+    }
+  }
+  // FFT of size 2M (radix 2), used as ψ_j = Σ a_n sin(π n j / M) = (F_j − F_{2M−j}) / 2i with F_j = Σ a_n e^{iπnj/M}
+  const BITS = Math.log2(M2), rv = new Uint32Array(M2), cs = new Float64Array(M2 / 2), sn = new Float64Array(M2 / 2);
+  for (let i = 0; i < M2; i++) { let r = 0; for (let b = 0; b < BITS; b++) r |= ((i >> b) & 1) << (BITS - 1 - b); rv[i] = r; }
+  for (let i = 0; i < M2 / 2; i++) { cs[i] = Math.cos(2 * Math.PI * i / M2); sn[i] = Math.sin(2 * Math.PI * i / M2); }
+  const fr = new Float64Array(M2), fi = new Float64Array(M2);
+  function ifft() {
+    for (let i = 0; i < M2; i++) { const j = rv[i]; if (j > i) { let t = fr[i]; fr[i] = fr[j]; fr[j] = t; t = fi[i]; fi[i] = fi[j]; fi[j] = t; } }
+    for (let size = 2; size <= M2; size <<= 1) {
+      const half = size >> 1, st = M2 / size;
+      for (let i = 0; i < M2; i += size) for (let j = 0; j < half; j++) {
+        const wr = cs[j * st], wi = sn[j * st], a = i + j, b = a + half;
+        const tr = wr * fr[b] - wi * fi[b], ti = wr * fi[b] + wi * fr[b];
+        fr[b] = fr[a] - tr; fi[b] = fi[a] - ti; fr[a] += tr; fi[a] += ti;
+      }
+    }
+  }
+  const sq = Math.sqrt(2 / WB);
+  // ψ at time τ on the M + 1 grid points x_j = -W/2 + W j / M (j = 0 and M are the walls)
+  function psiAt(tau, re, im) {
+    fr.fill(0); fi.fill(0);
+    for (let n = 1; n <= NM; n++) {
+      let ph = (E[n] * tau) % (2 * Math.PI); const c = Math.cos(ph), s = -Math.sin(ph);
+      fr[n] = cr[n] * c - ci[n] * s; fi[n] = cr[n] * s + ci[n] * c;
+    }
+    ifft();
+    for (let j = 0; j <= M; j++) { const k = (M2 - j) % M2; re[j] = sq * (fi[j] - fi[k]) / 2; im[j] = -sq * (fr[j] - fr[k]) / 2; }
+  }
+  const pr0 = new Float64Array(M + 1), pi0 = new Float64Array(M + 1);
+  psiAt(0, pr0, pi0); let PEAK = 0; for (let j = 0; j <= M; j++) PEAK = Math.max(PEAK, pr0[j] * pr0[j] + pi0[j] * pi0[j]);
+
+  // the clock: physical time τ against video time t, a monotone cubic through keyframes [t, τ, slope]
+  const KEYS = [[0, 0, 2], [3.5, 8, 3.5], [9.6, TR / 4, 0.5], [11.8, TR / 4 + 1.2, 0.5], [15.6, TR / 2, 0.5], [17.8, TR / 2 + 1.2, 0.5],
+                [21.4, TR - 5, 2.2], [23.5, TR, 0.8], [T_CAR, TR + 2.2, 0.8]];
+  function tauOf(t) {
+    if (t >= T_CAR) return KEYS[KEYS.length - 1][1];
+    let k = 0; while (k < KEYS.length - 2 && t > KEYS[k + 1][0]) k++;
+    const [t0, a0, m0] = KEYS[k], [t1, a1, m1] = KEYS[k + 1], h = t1 - t0, u = (t - t0) / h;
+    return (2 * u ** 3 - 3 * u * u + 1) * a0 + (u ** 3 - 2 * u * u + u) * h * m0 + (-2 * u ** 3 + 3 * u * u) * a1 + (u ** 3 - u * u) * h * m1;
+  }
+
+  // the carpet, computed once: rows of |ψ|² averaged over their time slice, coloured night → magenta → white
+  let carpet = null;
+  function makeCarpet() {
+    const SUB = 10, acc = new Float64Array((M + 1) * CR), re = new Float64Array(M + 1), im = new Float64Array(M + 1);
+    for (let r = 0; r < CR; r++) for (let s = 0; s < SUB; s++) {
+      psiAt(TR * (r + (s + 0.5) / SUB) / CR, re, im);
+      for (let j = 0; j <= M; j++) acc[r * (M + 1) + j] += (re[j] * re[j] + im[j] * im[j]) / SUB;
+    }
+    const sorted = Float64Array.from(acc).sort(), gain = sorted[Math.floor(sorted.length * 0.996)];
+    const stops = [[5, 6, 16], [40, 20, 90], [150, 40, 160], [255, 110, 170], [255, 220, 200], [255, 255, 255]];
+    const c = document.createElement("canvas"); c.width = M + 1; c.height = CR;
+    const g = c.getContext("2d"), img = g.createImageData(M + 1, CR);
+    for (let q = 0; q < acc.length; q++) {
+      const v = Math.pow(clamp(acc[q] / gain), 0.55) * (stops.length - 1), i = Math.min(stops.length - 2, Math.floor(v)), f = v - i;
+      for (let ch = 0; ch < 3; ch++) img.data[q * 4 + ch] = stops[i][ch] * (1 - f) + stops[i + 1][ch] * f;
+      img.data[q * 4 + 3] = 255;
+    }
+    g.putImageData(img, 0, 0);
+    return c;
+  }
+
+  const re = new Float64Array(M + 1), im = new Float64Array(M + 1), dens = new Float64Array(M + 1);
+  let cur = 0, tauPrev = 0, tauNow = 0;
+  const xPx = j => BL + (BR - BL) * j / M;
+  function drawWave(tau0, tau1) {
+    // a shutter over [tau0, tau1]: more samples when the clock runs fast
+    const K = clamp(Math.ceil(Math.abs(tau1 - tau0) / 0.12), 1, 24);
+    const cw = (BR - BL) / M + 0.8;
+    ctx.globalAlpha = 1 / K;
+    for (let s = 0; s < K; s++) {
+      psiAt(K === 1 ? tau1 : tau0 + (tau1 - tau0) * (s + 0.5) / K, re, im);
+      for (let j = 1; j < M; j++) {
+        const d = (re[j] * re[j] + im[j] * im[j]) / PEAK * HT; if (d < 0.4) continue;
+        ctx.fillStyle = `hsl(${hueOf(re[j], im[j]).toFixed(0)} ${C.Sa} ${C.L})`;
+        ctx.fillRect(xPx(j) - cw / 2, BASE - Math.min(d, HT * 1.08), cw, Math.min(d, HT * 1.08));
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  const short = {
+    name: "quantum-revival", seconds: T_END, captionY: 250,
+    music: { file: "beethoven-moonlight-1.ogg", start: 4.5, fade: 4.5 },   // Zak's pick over Nocturne Op. 15 No. 1
+    captions: [
+      { from: 0, to: 3.3, text: "Can a shattered particle\nput itself back together?", size: 72 },
+      { from: 3.5, to: 6.8, text: "A quantum particle in a box\nspreads into a mess", size: 68 },
+      { from: 9.4, to: 12.2, text: "At 1/4 of the time:\ntwo copies" },
+      { from: 15.4, to: 18.2, text: "At 1/2:\none copy, mirrored" },
+      { from: 20.2, to: 23.1, text: "Almost there…\nstill a mess" },
+      { from: 23.4, to: 26.5, text: "…and it's back.\nExactly." },
+      { from: 23.9, to: 26.5, text: "Energies go 1, 4, 9, 16…\nso every wave lines up again", y: 1440, size: 40, color: "#c9cfe0" },
+      { from: 27, to: 30.6, text: "The whole run, top to bottom:\na quantum carpet", size: 68 },
+      { from: 30.8, to: T_END + 1, text: "Try it yourself,\nlink in description" },
+      { from: 0, to: T_CAR, text: "Schrödinger equation, particle in a box", y: 1560, size: 32, color: "#c9cfe0" },
+    ],
+    reset() { if (!carpet) carpet = makeCarpet(); cur = 0; tauPrev = tauNow = 0; },
+    tick(i) { cur = (i + 1) / 30; tauPrev = tauNow; tauNow = tauOf(cur); },
+    render() {
+      const t = cur; ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.fillStyle = BG; ctx.fillRect(0, 0, W, H);
+      const car = ramp(t, T_CAR, T_CAR + 0.6);           // the box fades out, the carpet unrolls
+      if (car < 1) {
+        ctx.globalAlpha = 1 - car;
+        ctx.save(); ctx.globalAlpha = 1 - car;
+        // floor and walls
+        ctx.fillStyle = "#2a3550"; ctx.fillRect(BL - 18, BASE - HT - 40, 18, HT + 52); ctx.fillRect(BR, BASE - HT - 40, 18, HT + 52);
+        ctx.fillStyle = "#8995B0"; ctx.fillRect(BL - 18, BASE, BR - BL + 36, 3);
+        drawWave(t < 0.04 ? tauNow : tauPrev, tauNow);
+        ctx.globalAlpha = 1 - car;
+        // the clock: how far to the revival, with marks at 1/4 and 1/2
+        const cy = 1330, f = clamp(tauNow / TR);
+        ctx.fillStyle = "#1a2234"; ctx.fillRect(BL, cy, BR - BL, 10);
+        ctx.fillStyle = "#c9cfe0"; ctx.fillRect(BL, cy, (BR - BL) * f, 10);
+        ctx.font = '700 30px "Bricolage Grotesque", sans-serif'; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+        for (const [q, lab] of [[0.25, "¼"], [0.5, "½"], [1, "back"]]) {
+          const x = BL + (BR - BL) * q, on = f >= q - 1e-9;
+          ctx.fillStyle = on ? "#ffffff" : "#5a6477"; ctx.fillRect(x - 2, cy - 8, 4, 26);
+          ctx.textAlign = q === 1 ? "right" : "center"; ctx.fillText(lab, q === 1 ? x : x, cy + 56);
+        }
+        ctx.textAlign = "left"; ctx.fillStyle = "#8995B0"; ctx.fillText("time", BL, cy + 56);
+        const fast = clamp((tauNow - tauPrev) * 30 / 12 - 0.5);   // "fast-forward" while the clock races
+        if (fast > 0.02) { ctx.globalAlpha = (1 - car) * fast; ctx.textAlign = "right"; ctx.fillStyle = "#c9cfe0"; ctx.fillText("fast-forward ▶▶", BR, cy - 26); }
+        ctx.restore();
+      }
+      if (car > 0) {
+        const u = ease(ramp(t, T_CAR + 0.2, T_CAR + 3.2)), rows = Math.round(CR * u), hpx = (CB - CT) * u;
+        ctx.globalAlpha = car; ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+        if (rows > 0) ctx.drawImage(carpet, 0, 0, M + 1, rows, CL, CT, BR - CL, hpx);
+        ctx.fillStyle = "#ffffff"; if (u < 1) ctx.fillRect(CL, CT + hpx - 2, BR - CL, 3);
+        ctx.font = '700 28px "Bricolage Grotesque", sans-serif'; ctx.textBaseline = "middle"; ctx.textAlign = "right";
+        for (const [q, lab] of [[0, "start"], [0.25, "¼"], [0.5, "½"], [1, "back"]]) {
+          const y = CT + (CB - CT) * q, a = ramp(hpx, (CB - CT) * q - 30, (CB - CT) * q);
+          if (a <= 0) continue; ctx.globalAlpha = car * a; ctx.fillStyle = "#c9cfe0"; ctx.fillText(lab, CL - 12, y);
+        }
+        ctx.globalAlpha = 1;
+      }
+    },
+  };
+  window.__short = short;
+  const fl = document.createElement("link");   // the caption font, which this page doesn't otherwise load
+  fl.rel = "stylesheet"; fl.href = "https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&display=swap";
+  fl.onload = fl.onerror = () => {
+    const sc = document.createElement("script"); sc.src = "../shorts-rec.js";
+    sc.onload = () => { short.canvas = cv; ShortsRec(short); };
+    document.head.append(sc);
+  };
+  document.head.append(fl);
+}
 })();
 </script>
 
